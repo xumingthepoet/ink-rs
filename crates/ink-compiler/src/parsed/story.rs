@@ -1,4 +1,4 @@
-use super::{Object, ObjectRef};
+use super::{FlowBase, FlowLevel, HasContent, Identifier, NamedContent, Object, ObjectRef};
 
 #[derive(Debug, Clone)]
 pub struct Story {
@@ -27,5 +27,27 @@ impl Story {
 
     pub fn root(&self) -> ObjectRef {
         self.root.clone()
+    }
+}
+
+impl NamedContent for Story {
+    fn name(&self) -> Option<&str> {
+        None
+    }
+}
+
+impl FlowBase for Story {
+    fn identifier(&self) -> Option<&Identifier> {
+        None
+    }
+
+    fn flow_level(&self) -> FlowLevel {
+        FlowLevel::Story
+    }
+}
+
+impl HasContent for Story {
+    fn content(&self) -> Vec<ObjectRef> {
+        self.root.borrow().content().to_vec()
     }
 }

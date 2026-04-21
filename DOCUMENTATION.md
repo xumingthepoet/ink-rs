@@ -22,6 +22,7 @@ runtime instead of rewriting runtime execution.
 - Core `StringParser` cursor/rule helpers are now ported.
 - Parsed hierarchy `Object` ownership, parent links, debug metadata
   inheritance, path primitives, and traversal helpers are now ported.
+- Parsed hierarchy flow levels and base traits are now ported.
 - Ink parser grammar, parsed hierarchy named-content layers, reference
   resolution, and runtime export are still not implemented.
 - Long-horizon project memory docs now exist.
@@ -29,7 +30,7 @@ runtime instead of rewriting runtime execution.
 ## Current Milestone
 
 Milestone 1 is complete. Milestone 2 is complete. Milestone 3 is in progress,
-starting with the parsed object hierarchy slice.
+starting with the parsed content-node slice.
 
 ## Verification Checklist
 
@@ -69,8 +70,8 @@ The ignored `blade-ink-rs/` directory must be present because the workspace uses
   instead of exported JSON.
 - `InkParser::parse` currently returns a structured unsupported diagnostic.
 - The parsed hierarchy currently has the object tree, path primitives, and a
-  root-story wrapper, but named content, flow levels, and runtime export are
-  still pending.
+  root-story wrapper, but content-node leaf types and runtime export are still
+  pending.
 - `CompilerOptions` now accepts an injectable file handler, but include parsing
   is not implemented yet.
 - The ink parser grammar is still pending.
@@ -124,6 +125,14 @@ The ignored `blade-ink-rs/` directory must be present because the workspace uses
   the same ancestry model as C#.
 - Added tests covering parent links, debug metadata inheritance, ancestry
   ordering, traversal order, and path formatting.
+- Added parsed hierarchy flow primitives: `FlowLevel`, `NamedContent`,
+  `FlowBase`, and `FlowArgument`.
+- Reworked `Path` to carry base flow level metadata and formatting for weave
+  point paths.
+- Made `Story` implement the flow traits so it participates in the base flow
+  model.
+- Added tests for flow trait defaults, flow level ordering, and story-level
+  trait behavior.
 
 Validation:
 
@@ -178,6 +187,27 @@ about unnecessary parentheses around trait object types.
 
 ### 2026-04-22
 
+- Continued Milestone 3 with the parsed hierarchy flow trait slice.
+- Added parsed hierarchy flow primitives: `FlowLevel`, `NamedContent`,
+  `FlowBase`, and `FlowArgument`.
+- Updated `Path` to track a base flow level and weave-point formatting.
+- Implemented flow traits for `Story`.
+- Added tests for flow-level ordering, flow trait defaults, and story-level
+  flow behavior.
+
+Validation:
+
+```sh
+cargo fmt --all --check
+cargo test -p ink-compiler parsed
+cargo check --workspace
+```
+
+Result: all passed. `blade-ink-rs/lib` emitted the same two existing warnings
+about unnecessary parentheses around trait object types.
+
+### 2026-04-22
+
 - Continued Milestone 2 with `StringParserState` stack behavior.
 - Ported the parser state stack into `parser::string_parser::state`.
 - Added tests for push/pop, squash, stack initialization, and error-scope
@@ -216,8 +246,8 @@ about unnecessary parentheses around trait object types.
 
 ## Next Task
 
-Port `Identifier`, `Path`, `INamedContent`, flow levels, and base traits for
-Milestone 3.
+Port `ContentList`, `Text`, `AuthorWarning`, `Tag`, `Wrap`, and basic leaf
+nodes for Milestone 3.
 
 ## Repo Structure
 

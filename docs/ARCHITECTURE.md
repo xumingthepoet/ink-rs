@@ -62,6 +62,8 @@ The first parsed-hierarchy slice uses reference-counted tree nodes:
 - Tree traversal helpers operate on `ObjectRef` values and walk depth-first.
 - Debug metadata inherits from ancestors when a node does not define its own
   metadata.
+- Flow-level concepts are represented with `FlowLevel`, `NamedContent`, and
+  `FlowBase` traits so future knot/stitch types can share a common interface.
 
 ## Runtime Export
 

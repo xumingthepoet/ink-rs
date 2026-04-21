@@ -21,7 +21,7 @@ Core commands to run after every completed milestone:
 - [x] `cargo check --workspace`
 - [x] `cargo test --workspace`
 
-Current last verified milestone: Milestone 3 parsed object hierarchy slice
+Current last verified milestone: Milestone 3 parsed flow trait slice
 (`2026-04-22`).
 
 ## Rules
@@ -117,7 +117,7 @@ cargo check --workspace
 
 - [x] Port parsed `Object` ownership, parent/path model, debug metadata, and
   traversal helpers.
-- [ ] Port `Identifier`, `Path`, `INamedContent`, flow levels, and base traits.
+- [x] Port `Identifier`, `Path`, `INamedContent`, flow levels, and base traits.
 - [ ] Port `ContentList`, `Text`, `AuthorWarning`, `Tag`, `Wrap`, and basic
   leaf nodes.
 - [ ] Add tests for tree traversal and debug metadata propagation.
