@@ -1,0 +1,109 @@
+# Architecture
+
+## Overview
+
+`ink-rs` is split into two conceptual layers:
+
+- Compiler layer: implemented in this repository under `crates/ink-compiler`.
+- Runtime layer: reused from the ignored local `blade-ink-rs/lib` crate.
+
+The compiler layer parses `.ink` source, builds a parsed hierarchy, resolves
+references, and exports runtime JSON. The runtime layer loads that JSON and
+executes the story.
+
+```text
+.ink source
+  -> InkParser
+  -> parsed hierarchy
+  -> reference resolution
+  -> runtime JSON export
+  -> bladeink::story::Story
+```
+
+## Compiler Crate Modules
+
+- `compiler`: public orchestration API, equivalent to C# `Compiler.cs`.
+- `parser`: ink parser entry point and future parser submodules.
+- `parsed`: parsed hierarchy types, equivalent to C#
+  `compiler/ParsedHierarchy`.
+- `error`: compiler diagnostics and error types.
+
+## C# Architecture Mapping
+
+| C# area | Rust target | Purpose |
+| --- | --- | --- |
+| `Compiler.cs` | `compiler` | Parse and compile orchestration |
+| `StringParser/` | `parser::string_parser` | Low-level parser state and rules |
+| `InkParser/` | `parser::ink_parser` | Ink language grammar |
+| `ParsedHierarchy/` | `parsed` | AST-like parsed object model |
+| `ink-engine-runtime/` | `bladeink` dependency | Runtime story execution |
+
+## Parsed Hierarchy Design
+
+The C# compiler uses inheritance heavily. Rust should preserve the conceptual
+model while using explicit enums, traits, owned structs, or reference-counted
+nodes where appropriate.
+
+Guidelines:
+
+- Keep type names recognizable.
+- Preserve behavior before optimizing representation.
+- Document ownership choices when they differ from C# parent pointers.
+- Avoid using a single large enum if it makes incremental porting harder.
+- Prefer small tests for each parsed object behavior before integrating with
+  the full parser.
+
+## Runtime Export
+
+The compiler should own the JSON export path. It should generate JSON compatible
+with `bladeink::story::Story::new`.
+
+Do not copy the runtime implementation into `ink-compiler`. If runtime internals
+are private, prefer generating serialized JSON directly from compiler-owned
+structures rather than making broad runtime visibility changes.
+
+## Diagnostics
+
+Diagnostics should carry:
+
+- Severity: error or warning.
+- Message.
+- Source filename when available.
+- Line and column.
+- Optional debug metadata range.
+
+The user-facing API should support collecting diagnostics even when compilation
+cannot continue.
+
+## Long-Horizon State
+
+The codebase state is externalized through Markdown:
+
+- `PROMPT.md`: target and constraints.
+- `PLAN.md`: checkpointed milestones.
+- `IMPLEMENT.md`: execution loop.
+- `DOCUMENTATION.md`: current status and decisions.
+
+This keeps repeated `继续` prompts grounded in repository state rather than chat
+history.
+
+## Architecture Risks
+
+- JSON export compatibility depends on matching the runtime reader's expected
+  shape, not just matching C# object names.
+- Parser rollback must match C# closely because grammar rules depend on
+  speculative parsing.
+- Rust ownership for parsed parent/child relationships needs explicit design;
+  do not hide it behind ad-hoc cloning.
+- Reference resolution should be tested feature-by-feature to avoid late
+  all-at-once failures.
+
+## Demo Path
+
+The final architecture should support this minimal demonstration:
+
+1. Compile plain text ink to JSON.
+2. Load it with `bladeink::story::Story::new`.
+3. Continue the runtime story and print expected output.
+4. Repeat with a story containing choices and diverts.
+5. Repeat with variables, expressions, and conditions.

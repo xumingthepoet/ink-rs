@@ -1,5 +1,23 @@
 # AGENTS.md
 
+## Operating Model
+
+This project is intended to support long-horizon Codex work. Treat the
+following files as durable project memory:
+
+- `PROMPT.md`: frozen project specification, goals, non-goals, deliverables,
+  and definition of done.
+- `PLAN.md`: ordered milestone plan with acceptance criteria and validation
+  commands.
+- `IMPLEMENT.md`: runbook for how to execute each work loop.
+- `DOCUMENTATION.md`: live status, decisions, audit log, known issues, and
+  quickstart commands.
+
+When the user says `继续`, read those files first, then continue with the first
+unchecked task in `PLAN.md`. Keep the diff scoped to that task, run the
+validation listed for the task, fix failures before moving on, and update
+`PLAN.md` plus `DOCUMENTATION.md` before ending the turn.
+
 ## Project Goal
 
 This repository is a Rust port of the official ink compiler layer from the C#
@@ -55,3 +73,16 @@ cargo test --workspace
 These commands require the ignored local `blade-ink-rs/` directory to be
 present because `crates/ink-compiler` depends on `blade-ink-rs/lib` by path.
 
+## Verification Rule
+
+Every implementation turn should run the narrowest useful validation first, then
+the broader workspace checks when feasible:
+
+```sh
+cargo fmt --all --check
+cargo check --workspace
+cargo test --workspace
+```
+
+If validation fails, repair the failure in the same turn unless it is unrelated
+to the current task and already documented in `DOCUMENTATION.md`.
