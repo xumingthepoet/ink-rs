@@ -34,6 +34,8 @@ runtime instead of rewriting runtime execution.
   divert nodes.
 - Ink parser now has golden parser tests for minimal plain-text, knot, and
   divert snippets.
+- Runtime JSON shape for `bladeink::story::Story::new` has been identified
+  with a minimal loading fixture.
 - Ink parser grammar, parsed hierarchy named-content layers, reference
   resolution, and runtime export are still not implemented.
 - Long-horizon project memory docs now exist.
@@ -41,7 +43,8 @@ runtime instead of rewriting runtime execution.
 ## Current Milestone
 
 Milestone 1 is complete. Milestone 2 is complete. Milestone 3 is complete.
-Milestone 4 is complete. Milestone 5 starts with runtime export skeleton work.
+Milestone 4 is complete. Milestone 5 is in progress, starting with runtime
+JSON shape identification.
 
 ## Verification Checklist
 
@@ -92,6 +95,9 @@ The ignored `blade-ink-rs/` directory must be present because the workspace uses
   line prefix and models them as parsed flow nodes.
 - `InkParser::parse` now also recognizes simple divert lines and models them as
   parsed divert nodes, but the full divert grammar is still pending.
+- The runtime JSON reader expects top-level `inkVersion`, `root`, and
+  `listDefs` keys; the `root` value is a container array whose trailing entry
+  is either named-content metadata or `null`.
 - `CompilerOptions` now accepts an injectable file handler, but include parsing
   is not implemented yet.
 - The ink parser grammar is still pending.
@@ -182,6 +188,8 @@ The ignored `blade-ink-rs/` directory must be present because the workspace uses
   rejection.
 - Added golden parser tests that snapshot minimal plain-text, knot, and
   simple-divert parsed trees as stable textual dumps.
+- Added a runtime JSON smoke test that proves the minimal compiled story shape
+  loads through `bladeink::story::Story::new`.
 
 Validation:
 
@@ -257,6 +265,14 @@ about unnecessary parentheses around trait object types.
 - Added a data-driven golden parser test harness that renders parsed trees to
   stable textual snapshots.
 - Covered plain-text, knot, and simple-divert snippets with golden expectations.
+
+### 2026-04-22
+
+- Started Milestone 5 with runtime JSON shape identification.
+- Confirmed that `bladeink::story::Story::new` accepts a minimal JSON fixture
+  with `inkVersion`, `root`, and `listDefs`.
+- Recorded the top-level JSON contract and container terminator shape in the
+  live documentation.
 
 Validation:
 
@@ -394,7 +410,8 @@ about unnecessary parentheses around trait object types.
 
 ## Next Task
 
-Identify required public or internal runtime JSON structures in `blade-ink-rs`.
+Implement a compiler-owned JSON export path rather than copying runtime
+internals.
 
 ## Repo Structure
 

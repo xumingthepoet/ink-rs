@@ -87,6 +87,11 @@ Before implementing a compiler export feature:
 - Find the Rust runtime type or JSON reader behavior in `blade-ink-rs`.
 - Prefer generating JSON that the Rust runtime already accepts.
 - Avoid modifying `blade-ink-rs` unless no compiler-side adapter can work.
+- The runtime loader requires top-level `inkVersion`, `root`, and `listDefs`
+  fields, with `root` encoded as a container array that may end in `null` or a
+  named-content trailer object.
+- Runtime JSON tokens are compact: commands are strings, divert targets are
+  object encodings, and list definitions are keyed objects of item values.
 
 ## Diagnostics Compatibility
 

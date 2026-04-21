@@ -85,6 +85,19 @@ The first parsed-hierarchy slice uses reference-counted tree nodes:
 The compiler should own the JSON export path. It should generate JSON compatible
 with `bladeink::story::Story::new`.
 
+The runtime reader's minimal accepted shape is:
+
+- Top-level object keys: `inkVersion`, `root`, and `listDefs`.
+- `inkVersion` is the story format version and must be numeric.
+- `root` is a container array. Its final entry is either `null` or a trailing
+  object containing named-content metadata such as `#n` and `#f`.
+- `listDefs` is an object mapping list names to item dictionaries.
+- Runtime tokens are encoded as compact JSON values:
+  - string commands like `done`, `<>`, `^text`, `\n`, `->`, `->t->`, `f()`,
+    and `x()`
+  - object encodings like `{"^->":"path"}`, `{"*":"path"}`,
+    `{"VAR?":"name"}`, `{"VAR=":"name"}`, and `{"#":"tag"}`
+
 Do not copy the runtime implementation into `ink-compiler`. If runtime internals
 are private, prefer generating serialized JSON directly from compiler-owned
 structures rather than making broad runtime visibility changes.

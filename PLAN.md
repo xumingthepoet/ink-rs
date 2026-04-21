@@ -21,7 +21,7 @@ Core commands to run after every completed milestone:
 - [x] `cargo check --workspace`
 - [x] `cargo test --workspace`
 
-Current last verified milestone: Milestone 4 golden parser tests slice
+Current last verified milestone: Milestone 5 runtime JSON shape identification slice
 (`2026-04-22`).
 
 ## Rules
@@ -176,7 +176,7 @@ cargo check --workspace
 
 ## Milestone 5: Runtime Export Skeleton
 
-- [ ] Identify required public or internal runtime JSON structures in
+- [x] Identify required public or internal runtime JSON structures in
   `blade-ink-rs/lib`.
 - [ ] Implement a compiler-owned JSON export path rather than copying runtime
   internals.
