@@ -3,7 +3,7 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use super::FlowLevel;
+use super::{FlowLevel, Path};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DebugMetadata {
@@ -24,6 +24,12 @@ pub(crate) enum ObjectKind {
     },
     Text {
         text: String,
+    },
+    Divert {
+        target: Option<Path>,
+        is_empty: bool,
+        is_tunnel: bool,
+        is_thread: bool,
     },
     AuthorWarning {
         warning_message: String,
@@ -98,6 +104,21 @@ impl Object {
             flow_level,
             name,
             is_function,
+        };
+    }
+
+    pub(crate) fn set_divert_kind(
+        &mut self,
+        target: Option<Path>,
+        is_empty: bool,
+        is_tunnel: bool,
+        is_thread: bool,
+    ) {
+        self.kind = ObjectKind::Divert {
+            target,
+            is_empty,
+            is_tunnel,
+            is_thread,
         };
     }
 

@@ -39,6 +39,7 @@ review.
 | `InkParser/InkParser_Whitespace.cs` | `parser/whitespace.rs` | started |
 | `InkParser/InkParser_Content.cs` | `parser/mod.rs` | started |
 | `InkParser/InkParser_Knot.cs` | `parser/mod.rs` | started |
+| `InkParser/InkParser_Divert.cs` | `parser/mod.rs` | started |
 | `InkParser/*.cs` | `parser/ink_parser/` | not started |
 | `ParsedHierarchy/Object.cs` | `parsed/object.rs` | started |
 | `ParsedHierarchy/Identifier.cs` | `parsed/identifier.rs` | started |
@@ -54,7 +55,7 @@ review.
 | `ParsedHierarchy/Wrap.cs` | `parsed/content.rs` | started |
 | `ParsedHierarchy/Weave.cs` | `parsed/weave.rs` | not started |
 | `ParsedHierarchy/Choice.cs` | `parsed/choice.rs` | not started |
-| `ParsedHierarchy/Divert.cs` | `parsed/divert.rs` | not started |
+| `ParsedHierarchy/Divert.cs` | `parsed/divert.rs` | started |
 | `ParsedHierarchy/Expression.cs` | `parsed/expression.rs` | not started |
 | `ParsedHierarchy/ListDefinition.cs` | `parsed/list_definition.rs` | not started |
 

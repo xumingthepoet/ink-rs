@@ -65,18 +65,20 @@ The first parsed-hierarchy slice uses reference-counted tree nodes:
 - Flow-level concepts are represented with `FlowLevel`, `NamedContent`, and
   `FlowBase` traits so future knot/stitch types can share a common interface.
 - Content-node leaf types are represented as `ObjectKind`-backed wrappers so
-  `ContentList`, `Text`, `AuthorWarning`, and `Tag` can live in the same tree
-  model without changing traversal behavior.
+  `ContentList`, `Text`, `AuthorWarning`, `Tag`, and `Divert` can live in the
+  same tree model without changing traversal behavior.
 - `InkParser::new` runs a comment-elimination pre-pass before the grammar
   layer sees the input, mirroring the C# compiler's preprocessing step.
 - Whitespace handling lives in parser helpers that mirror the C# parser rules
   for newline, end-of-file, and spacing combinators.
 - The current parser entry point has a temporary plain-text fallback that
-  produces `ContentList`/`Text` nodes and basic flow nodes until the divert
-  grammar slice is ported.
+  produces `ContentList`/`Text` nodes and basic flow nodes while the fuller
+  grammar is still being ported.
 - Basic knot and stitch headers are currently recognized by line prefix and
   attached to their nested body lines; this is intentionally a temporary
   parsing slice, not the final full grammar.
+- Simple divert lines are now recognized by line prefix and become parsed
+  `Divert` nodes; the full divert grammar is still pending.
 
 ## Runtime Export
 

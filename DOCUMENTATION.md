@@ -30,6 +30,8 @@ runtime instead of rewriting runtime execution.
   nodes and rejects obvious unported structural syntax with diagnostics.
 - Ink parser now recognizes basic knot and stitch headers and attaches their
   following content lines to the corresponding flow node.
+- Ink parser now also recognizes simple divert lines and models them as parsed
+  divert nodes.
 - Ink parser grammar, parsed hierarchy named-content layers, reference
   resolution, and runtime export are still not implemented.
 - Long-horizon project memory docs now exist.
@@ -37,7 +39,8 @@ runtime instead of rewriting runtime execution.
 ## Current Milestone
 
 Milestone 1 is complete. Milestone 2 is complete. Milestone 3 is complete.
-Milestone 4 is in progress, starting with simple diverts.
+Milestone 4 is in progress. Simple diverts are complete; golden parser tests
+for minimal `.ink` snippets are next.
 
 ## Verification Checklist
 
@@ -82,11 +85,12 @@ The ignored `blade-ink-rs/` directory must be present because the workspace uses
 - `InkParser::new` now stores an owned, comment-stripped input string so the
   preprocessor can normalize line endings before any grammar work begins.
 - `InkParser::parse` currently accepts plain text stories and returns a parsed
-  content tree, but it still rejects obvious structural syntax such as knots
-  and diverts until the corresponding parser slices land.
+  content tree, but the full grammar is still pending beyond the current plain
+  text, knot/stitch, and simple divert slices.
 - `InkParser::parse` now also recognizes basic knot and stitch declarations by
-  line prefix and models them as parsed flow nodes, but divert parsing is still
-  pending.
+  line prefix and models them as parsed flow nodes.
+- `InkParser::parse` now also recognizes simple divert lines and models them as
+  parsed divert nodes, but the full divert grammar is still pending.
 - `CompilerOptions` now accepts an injectable file handler, but include parsing
   is not implemented yet.
 - The ink parser grammar is still pending.
@@ -171,6 +175,10 @@ The ignored `blade-ink-rs/` directory must be present because the workspace uses
   `== knot ==` and `= stitch` lines, with their body lines attached as nested
   content.
 - Added parser tests covering basic knot/stitch parsing.
+- Added a simple divert parser slice that recognizes `->` lines, empty
+  diverts, and basic knot/stitch divert targets.
+- Added parser tests covering simple divert parsing and tunnel-divert
+  rejection.
 
 Validation:
 
@@ -230,6 +238,15 @@ about unnecessary parentheses around trait object types.
 - Flow headers now become parsed flow nodes with nested body content lines.
 - Added parser tests covering knot/stitch parsing alongside the existing
   plain-text and preprocessing coverage.
+
+### 2026-04-22
+
+- Continued Milestone 4 with the simple divert parsing slice.
+- Added line-driven recognition for simple `->` divert lines.
+- Diverts now parse into dedicated parsed `Divert` nodes, including empty
+  diverts and basic knot/stitch targets.
+- Added parser tests covering simple divert parsing and tunnel-divert
+  rejection.
 
 Validation:
 
@@ -367,7 +384,7 @@ about unnecessary parentheses around trait object types.
 
 ## Next Task
 
-Port simple diverts for Milestone 4.
+Add golden parser tests for minimal `.ink` snippets.
 
 ## Repo Structure
 

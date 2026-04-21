@@ -15,7 +15,10 @@ use std::sync::Arc;
 
 use crate::{
     error::{Diagnostic, DiagnosticSeverity},
-    parsed::{ContentList, FlowLevel, Object, ObjectRef, Story as ParsedStory, Text},
+    parsed::{
+        ContentList, Divert, FlowLevel, Identifier, Object, ObjectRef, Path, Story as ParsedStory,
+        Text,
+    },
     results::{FileHandler, ParseResult},
 };
 
@@ -93,6 +96,17 @@ impl<'source> InkParser<'source> {
                     .set_flow_kind(flow_level, Some(name), is_function);
                 top_level_content.push(flow.clone());
                 current_flow = Some(flow);
+                continue;
+            }
+
+            if let Some(divert) =
+                Self::parse_simple_divert_line(line_text, line_index + 1, source_filename.clone())?
+            {
+                if let Some(parent) = current_flow.as_ref() {
+                    Object::add_content(parent, divert);
+                } else {
+                    top_level_content.push(divert);
+                }
                 continue;
             }
 
@@ -186,12 +200,97 @@ impl<'source> InkParser<'source> {
         Ok(Some((flow_level, name, is_function)))
     }
 
+    fn parse_simple_divert_line(
+        line_text: &str,
+        line_number: usize,
+        source_filename: Option<String>,
+    ) -> std::result::Result<Option<ObjectRef>, Diagnostic> {
+        let trimmed_start = line_text.trim_start();
+        if !trimmed_start.starts_with("->") {
+            return Ok(None);
+        }
+
+        if trimmed_start.starts_with("->->") {
+            return Err(Diagnostic::new(
+                DiagnosticSeverity::Error,
+                source_filename,
+                line_number,
+                line_text.len().saturating_sub(trimmed_start.len()) + 1,
+                "Tunnel diverts are not supported yet",
+            ));
+        }
+
+        let remainder = trimmed_start[2..].trim_start();
+        let line_indent = line_text.len().saturating_sub(trimmed_start.len()) + 1;
+
+        if remainder.is_empty() {
+            return Ok(Some(Divert::empty().object()));
+        }
+
+        let mut target_tokens = remainder.split_whitespace();
+        let target_text = target_tokens.next().unwrap_or_default();
+        if target_text.is_empty() {
+            return Ok(Some(Divert::empty().object()));
+        }
+
+        if target_tokens.next().is_some() {
+            return Err(Diagnostic::new(
+                DiagnosticSeverity::Error,
+                source_filename,
+                line_number,
+                line_indent + 2,
+                "Simple divert targets must be a single knot or stitch name",
+            ));
+        }
+
+        let target = Self::parse_simple_divert_target(target_text).ok_or_else(|| {
+            Diagnostic::new(
+                DiagnosticSeverity::Error,
+                source_filename.clone(),
+                line_number,
+                line_indent + 3,
+                "Expected a valid divert target",
+            )
+        })?;
+
+        Ok(Some(Divert::new(Some(target)).object()))
+    }
+
+    fn parse_simple_divert_target(target_text: &str) -> Option<Path> {
+        let mut components = Vec::new();
+
+        for raw_component in target_text.split('.') {
+            let component = raw_component.trim();
+            if component.is_empty() {
+                return None;
+            }
+
+            if !component
+                .chars()
+                .all(|character| character.is_alphanumeric() || character == '_')
+            {
+                return None;
+            }
+
+            components.push(Identifier::new(component));
+        }
+
+        if components.is_empty() {
+            None
+        } else {
+            Some(Path::new(components))
+        }
+    }
+
     fn find_unsupported_syntax(&self) -> Option<(usize, usize, &'static str)> {
         for (line_index, line) in self.input_string.lines().enumerate() {
             let trimmed = line.trim_start();
             let column = line.len().saturating_sub(trimmed.len()) + 1;
 
-            for marker in ["->", "~", "*", "-", "#", "{", "}"] {
+            for marker in ["~", "*", "-", "#", "{", "}"] {
+                if marker == "-" && trimmed.starts_with("->") {
+                    continue;
+                }
                 if trimmed.starts_with(marker) {
                     return Some((line_index + 1, column, marker));
                 }
@@ -252,7 +351,7 @@ mod tests {
 
     #[test]
     fn ink_parser_reports_unsupported_structural_syntax() {
-        let mut parser = InkParser::new("-> knot", Some("story.ink"), None);
+        let mut parser = InkParser::new("* choice", Some("story.ink"), None);
         let result = parser.parse();
 
         assert!(result.parsed_story.is_none());
@@ -314,5 +413,77 @@ mod tests {
             knot_content[0].borrow().content()[0].borrow().kind(),
             ObjectKind::Text { text } if text == "Knot body"
         ));
+    }
+
+    #[test]
+    fn ink_parser_parses_simple_diverts() {
+        let mut parser =
+            InkParser::new("== start ==\n-> ending\nFlow body", Some("story.ink"), None);
+        let result = parser.parse();
+
+        assert!(result.diagnostics.is_empty());
+        let story = result.parsed_story.expect("expected parsed story");
+        let content = story.content();
+
+        assert_eq!(content.len(), 1);
+
+        let flow = content[0].borrow();
+        assert!(matches!(
+            flow.kind(),
+            ObjectKind::Flow {
+                flow_level: crate::parsed::FlowLevel::Knot,
+                name,
+                is_function: false,
+            } if name.as_deref() == Some("start")
+        ));
+
+        let flow_content = flow.content().to_vec();
+        assert_eq!(flow_content.len(), 2);
+        assert!(matches!(
+            flow_content[0].borrow().kind(),
+            ObjectKind::Divert {
+                target,
+                is_empty: false,
+                is_tunnel: false,
+                is_thread: false,
+            } if target.as_ref().and_then(|path| path.first_component()) == Some("ending")
+        ));
+        assert!(matches!(
+            flow_content[1].borrow().kind(),
+            ObjectKind::ContentList { .. }
+        ));
+        assert!(matches!(
+            flow_content[1].borrow().content()[0].borrow().kind(),
+            ObjectKind::Text { text } if text == "Flow body"
+        ));
+    }
+
+    #[test]
+    fn ink_parser_parses_empty_diverts() {
+        let mut parser = InkParser::new("->", Some("story.ink"), None);
+        let result = parser.parse();
+
+        assert!(result.diagnostics.is_empty());
+        let story = result.parsed_story.expect("expected parsed story");
+        let content = story.content();
+
+        assert_eq!(content.len(), 1);
+        assert!(matches!(
+            content[0].borrow().kind(),
+            ObjectKind::Divert { is_empty: true, .. }
+        ));
+    }
+
+    #[test]
+    fn ink_parser_rejects_tunnel_diverts() {
+        let mut parser = InkParser::new("->-> target", Some("story.ink"), None);
+        let result = parser.parse();
+
+        assert!(result.parsed_story.is_none());
+        assert_eq!(result.diagnostics.len(), 1);
+        assert_eq!(
+            result.diagnostics[0].message,
+            "Tunnel diverts are not supported yet"
+        );
     }
 }

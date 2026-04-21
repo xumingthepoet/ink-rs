@@ -119,6 +119,21 @@ impl fmt::Display for ContentList {
                 let borrowed = object.borrow();
                 match borrowed.kind() {
                     ObjectKind::Text { text } => text.clone(),
+                    ObjectKind::Divert {
+                        target,
+                        is_empty,
+                        is_tunnel: _,
+                        is_thread: _,
+                    } => {
+                        if *is_empty {
+                            "->".to_string()
+                        } else {
+                            target
+                                .as_ref()
+                                .map(|path| path.to_string())
+                                .unwrap_or_else(|| "->".to_string())
+                        }
+                    }
                     ObjectKind::AuthorWarning { warning_message } => {
                         format!("AuthorWarning({warning_message})")
                     }

@@ -1,4 +1,5 @@
 mod content;
+mod divert;
 mod flow;
 mod flow_level;
 mod identifier;
@@ -7,6 +8,7 @@ mod path;
 mod story;
 
 pub use content::{AuthorWarning, ContentList, Tag, Text, Wrap};
+pub use divert::Divert;
 pub use flow::{FlowArgument, FlowBase, HasContent, NamedContent};
 pub use flow_level::FlowLevel;
 pub use identifier::Identifier;
