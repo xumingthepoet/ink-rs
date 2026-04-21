@@ -106,8 +106,10 @@ The runtime reader's minimal accepted shape is:
   - object encodings like `{"^->":"path"}`, `{"*":"path"}`,
     `{"VAR?":"name"}`, `{"VAR=":"name"}`, and `{"#":"tag"}`
 
-The current Rust exporter only covers the minimal plain-text story slice, but
-it is compiler-owned and already validated against the runtime loader.
+The current Rust exporter covers the minimal plain-text story slice and
+collects parsed list declarations into top-level `listDefs` metadata, but
+broader grammar export is still pending. It is compiler-owned and already
+validated against the runtime loader.
 
 Do not copy the runtime implementation into `ink-compiler`. If runtime internals
 are private, prefer generating serialized JSON directly from compiler-owned

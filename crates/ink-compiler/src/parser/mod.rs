@@ -19,7 +19,8 @@ use crate::{
     error::{Diagnostic, DiagnosticSeverity},
     parsed::{
         ConstantDeclaration, ContentList, Divert, ExternalDeclaration, FlowLevel, Identifier, Knot,
-        Object, ObjectRef, Path, Stitch, Story as ParsedStory, Text, VariableAssignment,
+        ListDefinition, ListElementDefinition, Object, ObjectRef, Path, Stitch,
+        Story as ParsedStory, Text, VariableAssignment,
     },
     results::{FileHandler, ParseResult},
 };
@@ -339,6 +340,12 @@ impl<'source> InkParser<'source> {
         }
 
         if let Some(statement) =
+            Self::parse_list_declaration(trimmed_start, line_number, source_filename.clone())?
+        {
+            return Ok(Some(statement));
+        }
+
+        if let Some(statement) =
             Self::parse_constant_declaration(trimmed_start, line_number, source_filename.clone())?
         {
             return Ok(Some(statement));
@@ -528,6 +535,50 @@ impl<'source> InkParser<'source> {
         ))
     }
 
+    fn parse_list_declaration(
+        line_text: &str,
+        line_number: usize,
+        source_filename: Option<String>,
+    ) -> std::result::Result<Option<ObjectRef>, Diagnostic> {
+        let Some(remainder) = Self::strip_keyword(line_text, "LIST") else {
+            return Ok(None);
+        };
+
+        let remainder = remainder.trim_start();
+        let (identifier, after_identifier) =
+            Self::parse_identifier_prefix(remainder).ok_or_else(|| {
+                Diagnostic::new(
+                    DiagnosticSeverity::Error,
+                    source_filename.clone(),
+                    line_number,
+                    1,
+                    "Expected list name",
+                )
+            })?;
+
+        let after_identifier = after_identifier.trim_start();
+        let Some(rhs) = after_identifier.strip_prefix('=') else {
+            return Err(Diagnostic::new(
+                DiagnosticSeverity::Error,
+                source_filename,
+                line_number,
+                1,
+                "Expected '=' after list name",
+            ));
+        };
+
+        let list_definition = Self::parse_list_definition(
+            identifier.clone(),
+            rhs.trim_start(),
+            line_number,
+            source_filename,
+        )?;
+        Ok(Some(
+            VariableAssignment::new_with_list_definition(identifier, list_definition, true)
+                .object(),
+        ))
+    }
+
     fn parse_constant_declaration(
         line_text: &str,
         line_number: usize,
@@ -564,6 +615,133 @@ impl<'source> InkParser<'source> {
             Self::parse_expression_fragment(rhs.trim_start(), line_number, source_filename)?;
         Ok(Some(
             ConstantDeclaration::new(identifier, Some(expression)).object(),
+        ))
+    }
+
+    fn parse_list_definition(
+        identifier: Identifier,
+        definition_text: &str,
+        line_number: usize,
+        source_filename: Option<String>,
+    ) -> std::result::Result<ListDefinition, Diagnostic> {
+        let mut elements = Vec::new();
+        let mut current_value = 1_i64;
+
+        for raw_element in definition_text.split(',') {
+            let element_text = raw_element.trim();
+            if element_text.is_empty() {
+                return Err(Diagnostic::new(
+                    DiagnosticSeverity::Error,
+                    source_filename.clone(),
+                    line_number,
+                    1,
+                    "Expected list item name",
+                ));
+            }
+
+            let element = Self::parse_list_element_definition(
+                element_text,
+                current_value,
+                line_number,
+                source_filename.clone(),
+            )?;
+            let element_series_value = element.series_value().unwrap_or(current_value);
+            current_value = element_series_value.saturating_add(1);
+            elements.push(element);
+        }
+
+        if elements.is_empty() {
+            return Err(Diagnostic::new(
+                DiagnosticSeverity::Error,
+                source_filename,
+                line_number,
+                1,
+                "Expected list item names",
+            ));
+        }
+
+        Ok(ListDefinition::new(identifier, elements))
+    }
+
+    fn parse_list_element_definition(
+        element_text: &str,
+        current_value: i64,
+        line_number: usize,
+        source_filename: Option<String>,
+    ) -> std::result::Result<ListElementDefinition, Diagnostic> {
+        let mut remaining = element_text.trim_start();
+        let in_initial_list = remaining.starts_with('(');
+        if in_initial_list {
+            remaining = remaining[1..].trim_start();
+        }
+
+        let (identifier, after_identifier) =
+            Self::parse_identifier_prefix(remaining).ok_or_else(|| {
+                Diagnostic::new(
+                    DiagnosticSeverity::Error,
+                    source_filename.clone(),
+                    line_number,
+                    1,
+                    "Expected list item name",
+                )
+            })?;
+
+        let mut tail = after_identifier.trim_start();
+        let mut needs_close_paren = in_initial_list;
+
+        if in_initial_list && tail.starts_with(')') {
+            tail = tail[1..].trim_start();
+            needs_close_paren = false;
+        }
+
+        let mut explicit_value = None;
+        if tail.starts_with('=') {
+            tail = tail[1..].trim_start();
+            let (value, after_value) =
+                Self::parse_signed_integer_prefix(tail).ok_or_else(|| {
+                    Diagnostic::new(
+                        DiagnosticSeverity::Error,
+                        source_filename.clone(),
+                        line_number,
+                        1,
+                        "Expected integer value for list item",
+                    )
+                })?;
+            explicit_value = Some(value);
+            tail = after_value.trim_start();
+
+            if needs_close_paren && tail.starts_with(')') {
+                tail = tail[1..].trim_start();
+                needs_close_paren = false;
+            }
+        }
+
+        if needs_close_paren {
+            return Err(Diagnostic::new(
+                DiagnosticSeverity::Error,
+                source_filename,
+                line_number,
+                1,
+                "Expected closing ')' for list item",
+            ));
+        }
+
+        if !tail.is_empty() {
+            return Err(Diagnostic::new(
+                DiagnosticSeverity::Error,
+                source_filename,
+                line_number,
+                1,
+                "Unexpected trailing text in list item definition",
+            ));
+        }
+
+        let series_value = explicit_value.unwrap_or(current_value);
+        Ok(ListElementDefinition::new(
+            identifier,
+            in_initial_list,
+            explicit_value,
+            series_value,
         ))
     }
 
@@ -700,6 +878,44 @@ impl<'source> InkParser<'source> {
         }
 
         Some((Identifier::new(identifier), &input[consumed..]))
+    }
+
+    fn parse_signed_integer_prefix(input: &str) -> Option<(i64, &str)> {
+        let trimmed = input.trim_start();
+        let leading_whitespace = input.len() - trimmed.len();
+        let remainder = &input[leading_whitespace..];
+
+        let mut chars = remainder.chars();
+        let mut token = String::new();
+
+        if let Some(first) = chars.next() {
+            if first == '+' || first == '-' {
+                token.push(first);
+            } else if first.is_ascii_digit() {
+                token.push(first);
+            } else {
+                return None;
+            }
+        } else {
+            return None;
+        }
+
+        let mut consumed = token.len();
+        for character in chars {
+            if character.is_ascii_digit() {
+                token.push(character);
+                consumed += character.len_utf8();
+            } else {
+                break;
+            }
+        }
+
+        if token == "+" || token == "-" {
+            return None;
+        }
+
+        let value = token.parse::<i64>().ok()?;
+        Some((value, &remainder[consumed..]))
     }
 
     fn parse_assignment_operator(input: &str) -> Option<(AssignmentOperator, &str)> {
@@ -841,6 +1057,26 @@ mod tests {
                     identifier.name
                 ));
             }
+            ObjectKind::ListDefinition { identifier } => {
+                lines.push(format!(
+                    "{padding}ListDefinition(name={:?})",
+                    identifier.name
+                ));
+                for child in borrowed.content() {
+                    render_object(child, indent + 1, lines);
+                }
+            }
+            ObjectKind::ListElementDefinition {
+                identifier,
+                explicit_value,
+                series_value,
+                in_initial_list,
+            } => {
+                lines.push(format!(
+                    "{padding}ListElementDefinition(name={:?}, explicit={explicit_value:?}, series={series_value}, initial={in_initial_list})",
+                    identifier.name
+                ));
+            }
             other => lines.push(format!("{padding}{other:?}")),
         }
     }
@@ -956,6 +1192,95 @@ mod tests {
             ObjectKind::Expression {
                 kind: crate::parsed::ExpressionKind::VariableReference { .. }
             }
+        ));
+    }
+
+    #[test]
+    fn ink_parser_parses_lists_definitions_and_list_values() {
+        let mut parser = InkParser::new(
+            "LIST terrain = (forest), hill = 4, (beach)\nVAR chosen = (forest, terrain.hill)",
+            Some("story.ink"),
+            None,
+        );
+        let result = parser.parse();
+
+        assert!(result.diagnostics.is_empty());
+        let story = result.parsed_story.expect("expected parsed story");
+        let content = story.content();
+
+        assert_eq!(content.len(), 2);
+
+        let list_assignment = content[0].borrow();
+        assert!(matches!(
+            list_assignment.kind(),
+            ObjectKind::VariableAssignment {
+                is_global_declaration: true,
+                is_new_temporary_declaration: false,
+                ..
+            }
+        ));
+        let list_definition = list_assignment
+            .content()
+            .first()
+            .expect("expected list definition child")
+            .borrow();
+        assert!(matches!(
+            list_definition.kind(),
+            ObjectKind::ListDefinition { identifier }
+                if identifier.name == "terrain"
+        ));
+        assert_eq!(list_definition.content().len(), 3);
+        assert!(matches!(
+            list_definition.content()[0].borrow().kind(),
+            ObjectKind::ListElementDefinition {
+                identifier,
+                explicit_value,
+                series_value,
+                in_initial_list,
+            } if identifier.name == "forest"
+                && explicit_value.is_none()
+                && *series_value == 1
+                && *in_initial_list
+        ));
+        assert!(matches!(
+            list_definition.content()[1].borrow().kind(),
+            ObjectKind::ListElementDefinition {
+                identifier,
+                explicit_value,
+                series_value,
+                in_initial_list,
+            } if identifier.name == "hill"
+                && *explicit_value == Some(4)
+                && *series_value == 4
+                && !*in_initial_list
+        ));
+        assert!(matches!(
+            list_definition.content()[2].borrow().kind(),
+            ObjectKind::ListElementDefinition {
+                identifier,
+                explicit_value,
+                series_value,
+                in_initial_list,
+            } if identifier.name == "beach"
+                && explicit_value.is_none()
+                && *series_value == 5
+                && *in_initial_list
+        ));
+
+        let chosen_assignment = content[1].borrow();
+        assert!(matches!(
+            chosen_assignment.kind(),
+            ObjectKind::VariableAssignment {
+                is_global_declaration: true,
+                is_new_temporary_declaration: false,
+                ..
+            }
+        ));
+        assert!(matches!(
+            chosen_assignment.content()[0].borrow().kind(),
+            ObjectKind::Expression {
+                kind: crate::parsed::ExpressionKind::List { item_identifiers }
+            } if item_identifiers.len() == 2
         ));
     }
 

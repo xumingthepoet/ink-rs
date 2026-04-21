@@ -64,6 +64,15 @@ pub(crate) enum ObjectKind {
         identifier: Identifier,
         argument_names: Vec<String>,
     },
+    ListDefinition {
+        identifier: Identifier,
+    },
+    ListElementDefinition {
+        identifier: Identifier,
+        explicit_value: Option<i64>,
+        series_value: i64,
+        in_initial_list: bool,
+    },
     Expression {
         kind: ExpressionKind,
     },
@@ -208,6 +217,25 @@ impl Object {
         self.kind = ObjectKind::ExternalDeclaration {
             identifier,
             argument_names,
+        };
+    }
+
+    pub(crate) fn set_list_definition_kind(&mut self, identifier: Identifier) {
+        self.kind = ObjectKind::ListDefinition { identifier };
+    }
+
+    pub(crate) fn set_list_element_definition_kind(
+        &mut self,
+        identifier: Identifier,
+        explicit_value: Option<i64>,
+        series_value: i64,
+        in_initial_list: bool,
+    ) {
+        self.kind = ObjectKind::ListElementDefinition {
+            identifier,
+            explicit_value,
+            series_value,
+            in_initial_list,
         };
     }
 

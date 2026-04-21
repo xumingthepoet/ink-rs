@@ -61,7 +61,7 @@ review.
 | `ParsedHierarchy/Wrap.cs` | `parsed/content.rs` | started |
 | `ParsedHierarchy/Divert.cs` | `parsed/divert.rs` | started |
 | `ParsedHierarchy/Expression.cs` | `parsed/expression.rs` | not started |
-| `ParsedHierarchy/ListDefinition.cs` | `parsed/list_definition.rs` | not started |
+| `ParsedHierarchy/ListDefinition.cs` | `parsed/list_definition.rs` | started |
 
 ## Handling C# Inheritance
 

@@ -34,6 +34,8 @@ runtime instead of rewriting runtime execution.
   `MultipleConditionExpression`) are now ported.
 - Parsed hierarchy variable statement wrappers (`VariableAssignment`,
   `ConstantDeclaration`, and `ExternalDeclaration`) are now ported.
+- Parsed hierarchy list-definition wrappers (`ListDefinition` and
+  `ListElementDefinition`) are now ported.
 - Parsed hierarchy content nodes (`ContentList`, `Text`, `AuthorWarning`,
   `Tag`, and generic `Wrap<T>`) are now ported.
 - Ink parser comment elimination and whitespace helpers are now ported.
@@ -51,13 +53,16 @@ runtime instead of rewriting runtime execution.
 - Ink parser now also recognizes `VAR`, `CONST`, `EXTERNAL`, and `~` logic
   lines for variable statements, temporary assignments, constants, and
   variable references.
+- Ink parser now also recognizes `LIST` declarations and models them as parsed
+  list-definition nodes.
 - Runtime story behavior tests now cover choice selection, named knot/stitch
   and gather-like container paths, and explicit diverts against
   `bladeink::story::Story`.
 - Runtime JSON shape for `bladeink::story::Story::new` has been identified
   with a minimal loading fixture.
-- Compiler-owned runtime export now emits minimal plain-text story JSON and
-  loads successfully through `bladeink::story::Story::new`.
+- Compiler-owned runtime export now emits minimal plain-text story JSON plus
+  `listDefs` metadata for parsed list declarations and loads successfully
+  through `bladeink::story::Story::new`.
 - Ink parser grammar is still pending, but Milestone 6 is now complete with
   flow base, knot/stitch behavior, weave-point wrappers, path resolution, and
   runtime behavior coverage.
@@ -67,8 +72,8 @@ runtime instead of rewriting runtime execution.
 
 Milestone 1 is complete. Milestone 2 is complete. Milestone 3 is complete.
 Milestone 4 is complete. Milestone 5 is complete. Milestone 6 is complete.
-Milestone 7 is in progress, and the expression and variable-statement slices
-are complete.
+Milestone 7 is in progress, and the expression, variable-statement, and
+list-definition slices are complete.
 
 ## Verification Checklist
 
@@ -127,15 +132,19 @@ The ignored `blade-ink-rs/` directory must be present because the workspace uses
   beyond the variable-statement helpers.
 - `InkParser::parse` now also recognizes `VAR`, `CONST`, `EXTERNAL`, and `~`
   logic lines for variable declarations, constants, externals, temporary
-  assignments, and variable-reference expressions, but list declarations and
-  the rest of the logic grammar are still pending.
+  assignments, and variable-reference expressions.
+- `InkParser::parse` now also recognizes `LIST` declarations and models them as
+  parsed list-definition nodes.
 - The runtime JSON reader expects top-level `inkVersion`, `root`, and
   `listDefs` keys; the `root` value is a container array whose trailing entry
   is either named-content metadata or `null`.
-- `Compiler::compile_json` now exports minimal plain-text story JSON, and
-  `Compiler::compile` can load that JSON through `bladeink`.
+- `Compiler::compile_json` now exports minimal plain-text story JSON plus
+  `listDefs` metadata for parsed list declarations, and `Compiler::compile`
+  can load that JSON through `bladeink`.
 - `CompilerOptions` now accepts an injectable file handler, but include parsing
   is not implemented yet.
+- Parsed list declarations populate runtime `listDefs`, but broader list-driven
+  runtime semantics are still limited.
 - The ink parser grammar is still pending.
 - The C# `Glue` and `LegacyTag` `Wrap<T>` aliases are not yet ported as
   dedicated compiler-side wrappers because the corresponding runtime modules in
@@ -574,9 +583,31 @@ cargo check --workspace
 Result: all passed. `blade-ink-rs/lib` emitted the same two existing warnings
 about unnecessary parentheses around trait object types.
 
+### 2026-04-22
+
+- Completed Milestone 7 list definitions and list values slice.
+- Added parsed hierarchy `ListDefinition` and `ListElementDefinition`
+  wrappers, plus parser support for `LIST` declarations.
+- Extended runtime export to collect parsed list declarations into top-level
+  `listDefs` metadata while preserving the existing plain-text export path.
+- Added parser and runtime export tests for list-definition parsing and JSON
+  loading.
+
+Validation:
+
+```sh
+cargo fmt --all --check
+cargo test -p ink-compiler lists
+cargo check --workspace
+cargo test --workspace
+```
+
+Result: all passed. `blade-ink-rs/lib` emitted the same two existing warnings
+about unnecessary parentheses around trait object types.
+
 ## Next Task
 
-Port list definitions and list values.
+Port conditionals, sequences, function calls, returns, and tunnels.
 
 ## Repo Structure
 

@@ -1,6 +1,6 @@
 use std::fmt;
 
-use super::{Identifier, Object, ObjectKind, ObjectRef};
+use super::{Identifier, ListDefinition, Object, ObjectKind, ObjectRef};
 
 #[derive(Debug, Clone)]
 pub struct VariableAssignment {
@@ -8,6 +8,10 @@ pub struct VariableAssignment {
 }
 
 impl VariableAssignment {
+    pub(crate) fn from_object(object: ObjectRef) -> Self {
+        Self { object }
+    }
+
     pub fn new(
         identifier: Identifier,
         expression: Option<ObjectRef>,
@@ -28,6 +32,21 @@ impl VariableAssignment {
         Self { object }
     }
 
+    pub fn new_with_list_definition(
+        identifier: Identifier,
+        list_definition: ListDefinition,
+        is_global_declaration: bool,
+    ) -> Self {
+        let object = Object::new_ref();
+        object
+            .borrow_mut()
+            .set_variable_assignment_kind(identifier, is_global_declaration, false);
+
+        Object::add_content(&object, list_definition.object());
+
+        Self { object }
+    }
+
     pub fn object(&self) -> ObjectRef {
         self.object.clone()
     }
@@ -41,6 +60,18 @@ impl VariableAssignment {
 
     pub fn expression(&self) -> Option<ObjectRef> {
         self.object.borrow().content().first().cloned()
+    }
+
+    pub fn list_definition(&self) -> Option<ListDefinition> {
+        let object = self.expression()?;
+        let is_list_definition =
+            matches!(object.borrow().kind(), ObjectKind::ListDefinition { .. });
+
+        if is_list_definition {
+            Some(ListDefinition::from_object(object))
+        } else {
+            None
+        }
     }
 
     pub fn is_global_declaration(&self) -> bool {
