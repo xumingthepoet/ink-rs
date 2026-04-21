@@ -19,7 +19,7 @@ use crate::{
     error::{Diagnostic, DiagnosticSeverity},
     parsed::{
         ConstantDeclaration, ContentList, Divert, ExternalDeclaration, FlowLevel, Identifier, Knot,
-        ListDefinition, ListElementDefinition, Object, ObjectRef, Path, Stitch,
+        ListDefinition, ListElementDefinition, Object, ObjectRef, Path, Return, Stitch,
         Story as ParsedStory, Text, VariableAssignment,
     },
     results::{FileHandler, ParseResult},
@@ -381,6 +381,12 @@ impl<'source> InkParser<'source> {
         }
 
         if let Some(statement) =
+            Self::parse_return_statement(body, line_number, source_filename.clone())?
+        {
+            return Ok(Some(statement));
+        }
+
+        if let Some(statement) =
             Self::parse_temp_assignment(body, line_number, source_filename.clone())?
         {
             return Ok(Some(statement));
@@ -393,6 +399,25 @@ impl<'source> InkParser<'source> {
         }
 
         Ok(None)
+    }
+
+    fn parse_return_statement(
+        body: &str,
+        line_number: usize,
+        source_filename: Option<String>,
+    ) -> std::result::Result<Option<ObjectRef>, Diagnostic> {
+        let Some(remainder) = Self::strip_keyword(body, "return") else {
+            return Ok(None);
+        };
+
+        let expression_text = remainder.trim_start();
+        if expression_text.is_empty() {
+            return Ok(Some(Return::new(None).object()));
+        }
+
+        let expression =
+            Self::parse_expression_fragment(expression_text, line_number, source_filename)?;
+        Ok(Some(Return::new(Some(expression)).object()))
     }
 
     fn parse_temp_assignment(
@@ -1057,6 +1082,12 @@ mod tests {
                     identifier.name
                 ));
             }
+            ObjectKind::Return => {
+                lines.push(format!("{padding}Return"));
+                for child in borrowed.content() {
+                    render_object(child, indent + 1, lines);
+                }
+            }
             ObjectKind::ListDefinition { identifier } => {
                 lines.push(format!(
                     "{padding}ListDefinition(name={:?})",
@@ -1192,6 +1223,41 @@ mod tests {
             ObjectKind::Expression {
                 kind: crate::parsed::ExpressionKind::VariableReference { .. }
             }
+        ));
+    }
+
+    #[test]
+    fn ink_parser_parses_return_statements() {
+        let mut parser =
+            InkParser::new("== start ==\n~ return\n~ return 5", Some("story.ink"), None);
+        let result = parser.parse();
+
+        assert!(result.diagnostics.is_empty());
+        let story = result.parsed_story.expect("expected parsed story");
+        let story_content = story.content();
+        let flow = story_content[0].borrow();
+        assert!(matches!(
+            flow.kind(),
+            ObjectKind::Flow {
+                flow_level: crate::parsed::FlowLevel::Knot,
+                name,
+                is_function: false,
+            } if name.as_deref() == Some("start")
+        ));
+
+        let flow_content = flow.content().to_vec();
+        assert_eq!(flow_content.len(), 2);
+        assert!(matches!(
+            flow_content[0].borrow().kind(),
+            ObjectKind::Return
+        ));
+        assert!(matches!(
+            flow_content[1].borrow().kind(),
+            ObjectKind::Return
+        ));
+        assert!(matches!(
+            flow_content[1].borrow().content()[0].borrow().kind(),
+            ObjectKind::Expression { .. }
         ));
     }
 

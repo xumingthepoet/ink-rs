@@ -55,6 +55,8 @@ runtime instead of rewriting runtime execution.
   variable references.
 - Ink parser now also recognizes `LIST` declarations and models them as parsed
   list-definition nodes.
+- Ink parser now also recognizes `~ return` logic lines and models them as
+  parsed return nodes.
 - Runtime story behavior tests now cover choice selection, named knot/stitch
   and gather-like container paths, and explicit diverts against
   `bladeink::story::Story`.
@@ -145,6 +147,8 @@ The ignored `blade-ink-rs/` directory must be present because the workspace uses
   is not implemented yet.
 - Parsed list declarations populate runtime `listDefs`, but broader list-driven
   runtime semantics are still limited.
+- Parsed return nodes are parsed, but compiler-side runtime export for
+  function-return semantics is still pending.
 - The ink parser grammar is still pending.
 - The C# `Glue` and `LegacyTag` `Wrap<T>` aliases are not yet ported as
   dedicated compiler-side wrappers because the corresponding runtime modules in
@@ -270,6 +274,13 @@ cargo check --workspace
 
 Result: all passed. `blade-ink-rs/lib` emitted the same two existing warnings
 about unnecessary parentheses around trait object types.
+
+### 2026-04-22
+
+- Started the Milestone 7 return-statement slice.
+- Added a parsed hierarchy `Return` wrapper and `~ return` parser support.
+- Kept runtime export conservative by rejecting return nodes for now.
+- Added parser and parsed-hierarchy tests for the new return node.
 
 ### 2026-04-22
 

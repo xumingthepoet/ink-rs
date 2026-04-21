@@ -64,6 +64,7 @@ pub(crate) enum ObjectKind {
         identifier: Identifier,
         argument_names: Vec<String>,
     },
+    Return,
     ListDefinition {
         identifier: Identifier,
     },
@@ -218,6 +219,10 @@ impl Object {
             identifier,
             argument_names,
         };
+    }
+
+    pub(crate) fn set_return_kind(&mut self) {
+        self.kind = ObjectKind::Return;
     }
 
     pub(crate) fn set_list_definition_kind(&mut self, identifier: Identifier) {

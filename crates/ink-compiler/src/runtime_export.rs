@@ -61,6 +61,11 @@ fn export_object(object: &ObjectRef, state: &mut ExportState) -> Result<(), Comp
                 ));
             }
         }
+        ObjectKind::Return => {
+            return Err(CompilerError::Unsupported(
+                "runtime export currently supports plain text and list definitions only",
+            ));
+        }
         ObjectKind::AuthorWarning { .. }
         | ObjectKind::Tag { .. }
         | ObjectKind::Divert { .. }
