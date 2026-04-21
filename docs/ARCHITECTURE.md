@@ -79,7 +79,7 @@ cannot continue.
 
 The codebase state is externalized through Markdown:
 
-- `PROMPT.md`: target and constraints.
+- `AGENTS.md`: target, constraints, and agent rules.
 - `PLAN.md`: checkpointed milestones.
 - `IMPLEMENT.md`: execution loop.
 - `DOCUMENTATION.md`: current status and decisions.

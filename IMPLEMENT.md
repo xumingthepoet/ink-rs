@@ -5,7 +5,7 @@ just `继续`.
 
 ## Required Loop
 
-1. Read `PROMPT.md`, `PLAN.md`, `DOCUMENTATION.md`, and this file.
+1. Read `AGENTS.md`, `PLAN.md`, `DOCUMENTATION.md`, and this file.
 2. Inspect the current Git status.
 3. Select the first unchecked, unblocked task in `PLAN.md`.
 4. Read only the C# and Rust reference files needed for that task.
@@ -33,7 +33,7 @@ analysis step. Continue through the selected task end-to-end:
 - and leave a clear next task.
 
 Ask a question only when a reasonable technical decision cannot be made from
-`PROMPT.md`, `PLAN.md`, existing code, or the local reference implementations.
+`AGENTS.md`, `PLAN.md`, existing code, or the local reference implementations.
 
 ## Stop-and-Fix Rule
 
@@ -42,7 +42,7 @@ same turn unless:
 
 - The failure is unrelated to the current diff.
 - The failure existed before the current task.
-- The failure requires a product decision not captured in `PROMPT.md`.
+- The failure requires a product decision not captured in `AGENTS.md`.
 
 If any exception applies, document it in `DOCUMENTATION.md` before stopping.
 

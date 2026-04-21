@@ -73,13 +73,15 @@ The ignored `blade-ink-rs/` directory must be present because the workspace uses
 - Added `.gitignore` rules for local reference trees and Rust build outputs.
 - Added initial Rust workspace and `ink-compiler` scaffold.
 - Added long-horizon project docs based on the Codex durable-memory workflow:
-  `PROMPT.md`, `PLAN.md`, `IMPLEMENT.md`, and `DOCUMENTATION.md`.
+  `AGENTS.md`, `PLAN.md`, `IMPLEMENT.md`, and `DOCUMENTATION.md`.
 - Added project-specific docs under `docs/`.
 - Read the linked example Markdown files from the OpenAI article:
   `prompt.md`, `plans.md`, `implement.md`, and `documentation.md`.
 - Updated the local docs to include the example's practical patterns:
   verification checklist, risk register, demo script, architecture overview,
   non-stop implementation loop, bug reproduction rule, and live status format.
+- Merged the former standalone project specification into `AGENTS.md`, leaving
+  `AGENTS.md` as the single project spec and agent rules entry point.
 
 Validation:
 
@@ -102,7 +104,7 @@ Define the stable compiler API contract and diagnostics for Milestone 1.
 - `docs/ARCHITECTURE.md`: module boundaries and pipeline architecture.
 - `docs/PORTING_GUIDE.md`: C# to Rust porting rules.
 - `docs/TESTING.md`: test layers and validation strategy.
-- `PROMPT.md`: stable project spec.
+- `AGENTS.md`: stable project spec and agent rules.
 - `PLAN.md`: milestone plan, validation checklist, risks, and notes.
 - `IMPLEMENT.md`: execution runbook for repeated `继续` prompts.
 - `DOCUMENTATION.md`: this live status and audit log.

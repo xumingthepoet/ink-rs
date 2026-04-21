@@ -47,7 +47,7 @@ Current last verified milestone: Milestone 0 documentation update
 
 Acceptance:
 
-- `AGENTS.md`, `PROMPT.md`, `PLAN.md`, `IMPLEMENT.md`, and
+- `AGENTS.md`, `PLAN.md`, `IMPLEMENT.md`, and
   `DOCUMENTATION.md` exist.
 - README links to the project-memory docs.
 - Ignored reference trees remain untracked.

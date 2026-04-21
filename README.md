@@ -20,7 +20,7 @@ next to this project when building locally.
 This repository keeps project memory in Markdown so Codex can continue work
 across many prompts without losing the target:
 
-- `PROMPT.md`: project specification and definition of done.
+- `AGENTS.md`: project specification, definition of done, and agent rules.
 - `PLAN.md`: milestone checklist and validations.
 - `IMPLEMENT.md`: execution runbook for each "continue" loop.
 - `DOCUMENTATION.md`: live status, decisions, audit log, and known issues.
