@@ -45,8 +45,10 @@ runtime instead of rewriting runtime execution.
   following content lines to `Knot` and `Stitch` flow nodes.
 - Ink parser now also recognizes simple divert lines and models them as parsed
   divert nodes.
+- Ink parser now also recognizes tunnel divert lines (`->->`) and models them
+  as parsed tunnel diverts.
 - Ink parser now has golden parser tests for minimal plain-text, knot, and
-  divert snippets.
+  divert snippets, including tunnel diverts.
 - Expression parser foundation is now ported with Pratt-style precedence
   parsing for literals, variable paths, function calls, lists, divert targets,
   unary operators, and binary operators.
@@ -127,6 +129,8 @@ The ignored `blade-ink-rs/` directory must be present because the workspace uses
   line prefix and models them as parsed `Knot` and `Stitch` nodes.
 - `InkParser::parse` now also recognizes simple divert lines and models them as
   parsed divert nodes, but the full divert grammar is still pending.
+- `InkParser::parse` now also recognizes tunnel divert lines, but broader
+  tunnel semantics and runtime export behavior remain limited.
 - Expression parsing currently covers a focused foundation subset: numeric and
   boolean literals, string expressions, variable paths, function calls, list
   expressions, divert targets, unary operators, and binary precedence. The
@@ -234,7 +238,7 @@ The ignored `blade-ink-rs/` directory must be present because the workspace uses
 - Added a simple divert parser slice that recognizes `->` lines, empty
   diverts, and basic knot/stitch divert targets.
 - Added parser tests covering simple divert parsing and tunnel-divert
-  rejection.
+  recognition.
 - Added golden parser tests that snapshot minimal plain-text, knot, and
   simple-divert parsed trees as stable textual dumps.
 - Added a runtime JSON smoke test that proves the minimal compiled story shape
@@ -317,14 +321,36 @@ about unnecessary parentheses around trait object types.
 - Diverts now parse into dedicated parsed `Divert` nodes, including empty
   diverts and basic knot/stitch targets.
 - Added parser tests covering simple divert parsing and tunnel-divert
-  rejection.
+  recognition.
+
+### 2026-04-22
+
+- Continued Milestone 4 with the tunnel divert slice.
+- Added parser support for `->->` tunnel diverts by reusing the parsed
+  `Divert` wrapper with the tunnel flag set.
+- Added parser and golden tests covering tunnel divert parsing.
+
+Validation:
+
+```sh
+cargo fmt --all --check
+cargo test -p ink-compiler tunnel_divert_marks_tunnel_flag
+cargo test -p ink-compiler ink_parser_parses_tunnel_diverts
+cargo test -p ink-compiler ink_parser_golden_cases_for_minimal_snippets
+cargo check --workspace
+cargo test --workspace
+```
+
+Result: all passed. `blade-ink-rs/lib` emitted the same two existing warnings
+about unnecessary parentheses around trait object types.
 
 ### 2026-04-22
 
 - Completed Milestone 4 with golden parser tests for minimal ink snippets.
 - Added a data-driven golden parser test harness that renders parsed trees to
   stable textual snapshots.
-- Covered plain-text, knot, and simple-divert snippets with golden expectations.
+- Covered plain-text, knot, simple-divert, and tunnel-divert snippets with
+  golden expectations.
 
 ### 2026-04-22
 

@@ -245,27 +245,28 @@ impl<'source> InkParser<'source> {
             return Ok(None);
         }
 
-        if trimmed_start.starts_with("->->") {
-            return Err(Diagnostic::new(
-                DiagnosticSeverity::Error,
-                source_filename,
-                line_number,
-                line_text.len().saturating_sub(trimmed_start.len()) + 1,
-                "Tunnel diverts are not supported yet",
-            ));
-        }
+        let is_tunnel = trimmed_start.starts_with("->->");
+        let divert_prefix = if is_tunnel { "->->" } else { "->" };
 
-        let remainder = trimmed_start[2..].trim_start();
+        let remainder = trimmed_start[divert_prefix.len()..].trim_start();
         let line_indent = line_text.len().saturating_sub(trimmed_start.len()) + 1;
 
         if remainder.is_empty() {
-            return Ok(Some(Divert::empty().object()));
+            return Ok(Some(if is_tunnel {
+                Divert::tunnel(None).object()
+            } else {
+                Divert::empty().object()
+            }));
         }
 
         let mut target_tokens = remainder.split_whitespace();
         let target_text = target_tokens.next().unwrap_or_default();
         if target_text.is_empty() {
-            return Ok(Some(Divert::empty().object()));
+            return Ok(Some(if is_tunnel {
+                Divert::tunnel(None).object()
+            } else {
+                Divert::empty().object()
+            }));
         }
 
         if target_tokens.next().is_some() {
@@ -288,7 +289,11 @@ impl<'source> InkParser<'source> {
             )
         })?;
 
-        Ok(Some(Divert::new(Some(target)).object()))
+        Ok(Some(if is_tunnel {
+            Divert::tunnel(Some(target)).object()
+        } else {
+            Divert::new(Some(target)).object()
+        }))
     }
 
     fn parse_simple_divert_target(target_text: &str) -> Option<Path> {
@@ -1457,16 +1462,24 @@ mod tests {
     }
 
     #[test]
-    fn ink_parser_rejects_tunnel_diverts() {
+    fn ink_parser_parses_tunnel_diverts() {
         let mut parser = InkParser::new("->-> target", Some("story.ink"), None);
         let result = parser.parse();
 
-        assert!(result.parsed_story.is_none());
-        assert_eq!(result.diagnostics.len(), 1);
-        assert_eq!(
-            result.diagnostics[0].message,
-            "Tunnel diverts are not supported yet"
-        );
+        assert!(result.diagnostics.is_empty());
+        let story = result.parsed_story.expect("expected parsed story");
+        let content = story.content();
+
+        assert_eq!(content.len(), 1);
+        assert!(matches!(
+            content[0].borrow().kind(),
+            ObjectKind::Divert {
+                target,
+                is_empty: false,
+                is_tunnel: true,
+                is_thread: false,
+            } if target.as_ref().and_then(|path| path.first_component()) == Some("target")
+        ));
     }
 
     #[test]
@@ -1486,6 +1499,11 @@ mod tests {
                 "simple_divert",
                 "-> ending",
                 "Story\n  Divert(target=\"-> ending\", empty=false, tunnel=false, thread=false)",
+            ),
+            (
+                "tunnel_divert",
+                "->-> ending",
+                "Story\n  Divert(target=\"-> ending\", empty=false, tunnel=true, thread=false)",
             ),
         ];
 

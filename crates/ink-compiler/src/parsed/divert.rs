@@ -30,6 +30,15 @@ impl Divert {
         Self { object }
     }
 
+    pub fn tunnel(target: Option<Path>) -> Self {
+        let object = Object::new_ref();
+        object
+            .borrow_mut()
+            .set_divert_kind(target, false, true, false);
+
+        Self { object }
+    }
+
     pub fn object(&self) -> ObjectRef {
         self.object.clone()
     }
@@ -85,9 +94,38 @@ impl Divert {
 
 impl fmt::Display for Divert {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.target() {
-            Some(target) => write!(f, "{}", target),
-            None => f.write_str("->"),
+        match self.object.borrow().kind() {
+            ObjectKind::Divert {
+                target,
+                is_empty,
+                is_tunnel,
+                ..
+            } => {
+                if *is_empty || target.is_none() {
+                    if *is_tunnel {
+                        f.write_str("->->")
+                    } else {
+                        f.write_str("->")
+                    }
+                } else if *is_tunnel {
+                    match target
+                        .as_ref()
+                        .and_then(|path| path.dot_separated_components())
+                    {
+                        Some(components) => write!(f, "->-> {components}"),
+                        None => f.write_str("->->"),
+                    }
+                } else {
+                    write!(
+                        f,
+                        "{}",
+                        target
+                            .as_ref()
+                            .expect("target present for non-empty divert")
+                    )
+                }
+            }
+            _ => f.write_str("->"),
         }
     }
 }
@@ -116,5 +154,14 @@ mod tests {
 
         assert!(divert.is_empty());
         assert_eq!(divert.to_string(), "->");
+    }
+
+    #[test]
+    fn tunnel_divert_marks_tunnel_flag() {
+        let divert = Divert::tunnel(Some(Path::new(vec![Identifier::new("ending")])));
+
+        assert!(divert.is_tunnel());
+        assert!(!divert.is_empty());
+        assert_eq!(divert.to_string(), "->-> ending");
     }
 }

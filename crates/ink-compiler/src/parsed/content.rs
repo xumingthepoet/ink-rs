@@ -1,6 +1,6 @@
 use std::fmt;
 
-use super::{HasContent, Object, ObjectKind, ObjectRef};
+use super::{Divert, HasContent, Object, ObjectKind, ObjectRef};
 
 #[derive(Debug, Clone)]
 pub struct ContentList {
@@ -120,20 +120,8 @@ impl fmt::Display for ContentList {
                 match borrowed.kind() {
                     ObjectKind::Text { text } => text.clone(),
                     ObjectKind::Divert {
-                        target,
-                        is_empty,
-                        is_tunnel: _,
-                        is_thread: _,
-                    } => {
-                        if *is_empty {
-                            "->".to_string()
-                        } else {
-                            target
-                                .as_ref()
-                                .map(|path| path.to_string())
-                                .unwrap_or_else(|| "->".to_string())
-                        }
-                    }
+                        ..
+                    } => Divert::from_object(object.clone()).to_string(),
                     ObjectKind::AuthorWarning { warning_message } => {
                         format!("AuthorWarning({warning_message})")
                     }
