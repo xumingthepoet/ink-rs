@@ -28,6 +28,8 @@ runtime instead of rewriting runtime execution.
 - Ink parser comment elimination and whitespace helpers are now ported.
 - Ink parser can now parse plain text lines into structured parsed content
   nodes and rejects obvious unported structural syntax with diagnostics.
+- Ink parser now recognizes basic knot and stitch headers and attaches their
+  following content lines to the corresponding flow node.
 - Ink parser grammar, parsed hierarchy named-content layers, reference
   resolution, and runtime export are still not implemented.
 - Long-horizon project memory docs now exist.
@@ -35,7 +37,7 @@ runtime instead of rewriting runtime execution.
 ## Current Milestone
 
 Milestone 1 is complete. Milestone 2 is complete. Milestone 3 is complete.
-Milestone 4 is in progress, starting with basic knots and stitches.
+Milestone 4 is in progress, starting with simple diverts.
 
 ## Verification Checklist
 
@@ -82,6 +84,9 @@ The ignored `blade-ink-rs/` directory must be present because the workspace uses
 - `InkParser::parse` currently accepts plain text stories and returns a parsed
   content tree, but it still rejects obvious structural syntax such as knots
   and diverts until the corresponding parser slices land.
+- `InkParser::parse` now also recognizes basic knot and stitch declarations by
+  line prefix and models them as parsed flow nodes, but divert parsing is still
+  pending.
 - `CompilerOptions` now accepts an injectable file handler, but include parsing
   is not implemented yet.
 - The ink parser grammar is still pending.
@@ -162,6 +167,10 @@ The ignored `blade-ink-rs/` directory must be present because the workspace uses
 - Added a plain-text parser slice that turns lines into `ContentList` and
   `Text` parsed nodes and emits a diagnostic for obvious unported structure.
 - Added parser tests covering plain-text story parsing and syntax rejection.
+- Added a knot/stitch parser slice that creates parsed flow nodes for basic
+  `== knot ==` and `= stitch` lines, with their body lines attached as nested
+  content.
+- Added parser tests covering basic knot/stitch parsing.
 
 Validation:
 
@@ -208,6 +217,25 @@ Validation:
 ```sh
 cargo fmt --all --check
 cargo test -p ink-compiler parsed
+cargo check --workspace
+```
+
+Result: all passed. `blade-ink-rs/lib` emitted the same two existing warnings
+about unnecessary parentheses around trait object types.
+
+### 2026-04-22
+
+- Continued Milestone 4 with the basic knot and stitch parsing slice.
+- Added line-driven recognition for basic knot and stitch headers.
+- Flow headers now become parsed flow nodes with nested body content lines.
+- Added parser tests covering knot/stitch parsing alongside the existing
+  plain-text and preprocessing coverage.
+
+Validation:
+
+```sh
+cargo fmt --all --check
+cargo test -p ink-compiler parser
 cargo check --workspace
 ```
 
@@ -339,7 +367,7 @@ about unnecessary parentheses around trait object types.
 
 ## Next Task
 
-Port basic knots and stitches for Milestone 4.
+Port simple diverts for Milestone 4.
 
 ## Repo Structure
 

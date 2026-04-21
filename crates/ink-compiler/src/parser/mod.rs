@@ -15,7 +15,7 @@ use std::sync::Arc;
 
 use crate::{
     error::{Diagnostic, DiagnosticSeverity},
-    parsed::{ContentList, Story as ParsedStory, Text},
+    parsed::{ContentList, FlowLevel, Object, ObjectRef, Story as ParsedStory, Text},
     results::{FileHandler, ParseResult},
 };
 
@@ -74,29 +74,116 @@ impl<'source> InkParser<'source> {
         }
 
         let mut top_level_content = Vec::new();
+        let mut current_flow: Option<ObjectRef> = None;
+        let source_filename = self.source_filename.map(str::to_string);
 
         if self.input_string.is_empty() {
             return Ok(ParsedStory::new(top_level_content, false));
         }
 
-        for segment in self.input_string.split_inclusive('\n') {
+        for (line_index, segment) in self.input_string.split_inclusive('\n').enumerate() {
             let had_newline = segment.ends_with('\n');
             let line_text = segment.strip_suffix('\n').unwrap_or(segment);
 
-            let line = ContentList::new();
-            if !line_text.is_empty() {
-                line.add_content(Text::new(line_text).object());
+            if let Some((flow_level, name, is_function)) =
+                Self::parse_flow_header(line_text, line_index + 1, source_filename.clone())?
+            {
+                let flow = Object::new_ref();
+                flow.borrow_mut()
+                    .set_flow_kind(flow_level, Some(name), is_function);
+                top_level_content.push(flow.clone());
+                current_flow = Some(flow);
+                continue;
             }
-            line.trim_trailing_whitespace();
 
-            if had_newline {
-                line.add_content(Text::new("\n").object());
+            let line = Self::build_content_line(line_text, had_newline);
+            if let Some(parent) = current_flow.as_ref() {
+                Object::add_content(parent, line);
+            } else {
+                top_level_content.push(line);
             }
-
-            top_level_content.push(line.object());
         }
 
         Ok(ParsedStory::new(top_level_content, false))
+    }
+
+    fn build_content_line(line_text: &str, had_newline: bool) -> ObjectRef {
+        let line = ContentList::new();
+        if !line_text.is_empty() {
+            line.add_content(Text::new(line_text).object());
+        }
+        line.trim_trailing_whitespace();
+
+        if had_newline {
+            line.add_content(Text::new("\n").object());
+        }
+
+        line.object()
+    }
+
+    fn parse_flow_header(
+        line_text: &str,
+        line_number: usize,
+        source_filename: Option<String>,
+    ) -> std::result::Result<Option<(FlowLevel, String, bool)>, Diagnostic> {
+        let trimmed_start = line_text.trim_start();
+        if trimmed_start.is_empty() {
+            return Ok(None);
+        }
+
+        let (flow_level, equals_count) = if trimmed_start.starts_with("==") {
+            (
+                FlowLevel::Knot,
+                trimmed_start
+                    .chars()
+                    .take_while(|character| *character == '=')
+                    .count(),
+            )
+        } else if trimmed_start.starts_with('=') {
+            (FlowLevel::Stitch, 1)
+        } else {
+            return Ok(None);
+        };
+
+        if flow_level == FlowLevel::Stitch && trimmed_start.chars().nth(1) == Some('=') {
+            return Ok(None);
+        }
+
+        let mut remainder = trimmed_start[equals_count..].trim();
+        if remainder.ends_with('=') {
+            remainder = remainder.trim_end_matches('=').trim_end();
+        }
+
+        let mut is_function = false;
+        if let Some(function_remainder) = remainder.strip_prefix("function") {
+            if function_remainder.is_empty()
+                || function_remainder
+                    .chars()
+                    .next()
+                    .map(char::is_whitespace)
+                    .unwrap_or(false)
+            {
+                is_function = true;
+                remainder = function_remainder.trim_start();
+            }
+        }
+
+        let name = remainder
+            .split_whitespace()
+            .next()
+            .filter(|name| !name.is_empty())
+            .ok_or_else(|| {
+                Diagnostic::new(
+                    DiagnosticSeverity::Error,
+                    source_filename.clone(),
+                    line_number,
+                    1,
+                    "Expected knot or stitch name",
+                )
+            })?
+            .to_string();
+
+        Ok(Some((flow_level, name, is_function)))
     }
 
     fn find_unsupported_syntax(&self) -> Option<(usize, usize, &'static str)> {
@@ -104,7 +191,7 @@ impl<'source> InkParser<'source> {
             let trimmed = line.trim_start();
             let column = line.len().saturating_sub(trimmed.len()) + 1;
 
-            for marker in ["===", "->", "~", "*", "-", "#", "{", "}"] {
+            for marker in ["->", "~", "*", "-", "#", "{", "}"] {
                 if trimmed.starts_with(marker) {
                     return Some((line_index + 1, column, marker));
                 }
@@ -180,5 +267,52 @@ mod tests {
         );
         assert_eq!(result.diagnostics[0].line, 1);
         assert_eq!(result.diagnostics[0].column, 1);
+    }
+
+    #[test]
+    fn ink_parser_parses_basic_knots_and_stitches() {
+        let mut parser = InkParser::new(
+            "Intro line\n== start ==\nKnot body\n= stitch\nStitch body",
+            Some("story.ink"),
+            None,
+        );
+        let result = parser.parse();
+
+        assert!(result.diagnostics.is_empty());
+        let story = result.parsed_story.expect("expected parsed story");
+        let content = story.content();
+
+        assert_eq!(content.len(), 3);
+        assert!(matches!(
+            content[0].borrow().kind(),
+            ObjectKind::ContentList { .. }
+        ));
+        assert!(matches!(
+            content[1].borrow().kind(),
+            ObjectKind::Flow {
+                flow_level: crate::parsed::FlowLevel::Knot,
+                name,
+                is_function: false,
+            } if name.as_deref() == Some("start")
+        ));
+        assert!(matches!(
+            content[2].borrow().kind(),
+            ObjectKind::Flow {
+                flow_level: crate::parsed::FlowLevel::Stitch,
+                name,
+                is_function: false,
+            } if name.as_deref() == Some("stitch")
+        ));
+
+        let knot_content = content[1].borrow().content().to_vec();
+        assert_eq!(knot_content.len(), 1);
+        assert!(matches!(
+            knot_content[0].borrow().kind(),
+            ObjectKind::ContentList { .. }
+        ));
+        assert!(matches!(
+            knot_content[0].borrow().content()[0].borrow().kind(),
+            ObjectKind::Text { text } if text == "Knot body"
+        ));
     }
 }

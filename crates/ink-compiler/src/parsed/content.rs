@@ -132,6 +132,25 @@ impl fmt::Display for ContentList {
                             "#EndTag".to_string()
                         }
                     }
+                    ObjectKind::Flow {
+                        flow_level,
+                        name,
+                        is_function,
+                    } => {
+                        let kind = match flow_level {
+                            super::FlowLevel::Story => "Story",
+                            super::FlowLevel::Knot => "Knot",
+                            super::FlowLevel::Stitch => "Stitch",
+                            super::FlowLevel::WeavePoint => "WeavePoint",
+                        };
+
+                        let name = name.as_deref().unwrap_or("<unnamed>");
+                        if *is_function {
+                            format!("{kind}({name}, function)")
+                        } else {
+                            format!("{kind}({name})")
+                        }
+                    }
                     _ => "<Object>".to_string(),
                 }
             })

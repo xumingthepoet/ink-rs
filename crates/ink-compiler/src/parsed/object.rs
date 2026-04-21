@@ -3,6 +3,8 @@ use std::{
     rc::{Rc, Weak},
 };
 
+use super::FlowLevel;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DebugMetadata {
     pub source_name: Option<String>,
@@ -17,10 +19,24 @@ pub type ObjectRef = Rc<RefCell<Object>>;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum ObjectKind {
     Generic,
-    ContentList { dont_flatten: bool },
-    Text { text: String },
-    AuthorWarning { warning_message: String },
-    Tag { is_start: bool, in_choice: bool },
+    ContentList {
+        dont_flatten: bool,
+    },
+    Text {
+        text: String,
+    },
+    AuthorWarning {
+        warning_message: String,
+    },
+    Tag {
+        is_start: bool,
+        in_choice: bool,
+    },
+    Flow {
+        flow_level: FlowLevel,
+        name: Option<String>,
+        is_function: bool,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -70,6 +86,19 @@ impl Object {
 
     pub(crate) fn set_kind(&mut self, kind: ObjectKind) {
         self.kind = kind;
+    }
+
+    pub(crate) fn set_flow_kind(
+        &mut self,
+        flow_level: FlowLevel,
+        name: Option<String>,
+        is_function: bool,
+    ) {
+        self.kind = ObjectKind::Flow {
+            flow_level,
+            name,
+            is_function,
+        };
     }
 
     pub fn parent(&self) -> Option<ObjectRef> {

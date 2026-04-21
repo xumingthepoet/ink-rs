@@ -72,8 +72,11 @@ The first parsed-hierarchy slice uses reference-counted tree nodes:
 - Whitespace handling lives in parser helpers that mirror the C# parser rules
   for newline, end-of-file, and spacing combinators.
 - The current parser entry point has a temporary plain-text fallback that
-  produces `ContentList`/`Text` nodes until the knot, stitch, and divert
-  grammar slices are ported.
+  produces `ContentList`/`Text` nodes and basic flow nodes until the divert
+  grammar slice is ported.
+- Basic knot and stitch headers are currently recognized by line prefix and
+  attached to their nested body lines; this is intentionally a temporary
+  parsing slice, not the final full grammar.
 
 ## Runtime Export
 

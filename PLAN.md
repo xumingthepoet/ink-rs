@@ -21,7 +21,7 @@ Core commands to run after every completed milestone:
 - [x] `cargo check --workspace`
 - [x] `cargo test --workspace`
 
-Current last verified milestone: Milestone 4 plain text parsing slice
+Current last verified milestone: Milestone 4 basic knot and stitch parsing slice
 (`2026-04-22`).
 
 ## Rules
@@ -148,7 +148,7 @@ cargo check --workspace
 
 - [x] Port comment elimination and whitespace handling.
 - [x] Parse plain text lines into parsed text/content nodes.
-- [ ] Parse basic knots and stitches.
+- [x] Parse basic knots and stitches.
 - [ ] Parse simple diverts.
 - [ ] Add golden parser tests for minimal `.ink` snippets.
 
