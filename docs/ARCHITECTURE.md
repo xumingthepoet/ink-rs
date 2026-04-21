@@ -66,6 +66,12 @@ The first parsed-hierarchy slice uses reference-counted tree nodes:
   `FlowBase` traits so future knot/stitch types can share a common interface.
 - `Knot` and `Stitch` wrappers now build on the flow traits so line-based
   parser output has named flow nodes instead of anonymous placeholders.
+- `Weave`, `Choice`, and `Gather` wrappers now model the C# weave-point layer
+  with indentation-based grouping and local weave-point naming lookup, while
+  the fuller parser/runtime wiring remains a separate slice.
+- `Path::resolve_from_context` now resolves flow names, nested stitches, and
+  weave points from the parsed tree using the same name-search structure as the
+  C# compiler's path resolution rules.
 - Content-node leaf types are represented as `ObjectKind`-backed wrappers so
   `ContentList`, `Text`, `AuthorWarning`, `Tag`, and `Divert` can live in the
   same tree model without changing traversal behavior.

@@ -50,13 +50,15 @@ review.
 | `ParsedHierarchy/FlowBase.cs` | `parsed/flow.rs` | started |
 | `ParsedHierarchy/Knot.cs` | `parsed/knot.rs` | started |
 | `ParsedHierarchy/Stitch.cs` | `parsed/stitch.rs` | started |
+| `ParsedHierarchy/IWeavePoint.cs` | `parsed/weave_point.rs` | started |
+| `ParsedHierarchy/Weave.cs` | `parsed/weave.rs` | started |
+| `ParsedHierarchy/Choice.cs` | `parsed/choice.rs` | started |
+| `ParsedHierarchy/Gather.cs` | `parsed/gather.rs` | started |
 | `ParsedHierarchy/ContentList.cs` | `parsed/content.rs` | started |
 | `ParsedHierarchy/Text.cs` | `parsed/content.rs` | started |
 | `ParsedHierarchy/AuthorWarning.cs` | `parsed/content.rs` | started |
 | `ParsedHierarchy/Tag.cs` | `parsed/content.rs` | started |
 | `ParsedHierarchy/Wrap.cs` | `parsed/content.rs` | started |
-| `ParsedHierarchy/Weave.cs` | `parsed/weave.rs` | not started |
-| `ParsedHierarchy/Choice.cs` | `parsed/choice.rs` | not started |
 | `ParsedHierarchy/Divert.cs` | `parsed/divert.rs` | started |
 | `ParsedHierarchy/Expression.cs` | `parsed/expression.rs` | not started |
 | `ParsedHierarchy/ListDefinition.cs` | `parsed/list_definition.rs` | not started |

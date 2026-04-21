@@ -3,7 +3,7 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use super::{FlowLevel, Path};
+use super::{FlowLevel, Identifier, Path};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DebugMetadata {
@@ -37,6 +37,20 @@ pub(crate) enum ObjectKind {
     Tag {
         is_start: bool,
         in_choice: bool,
+    },
+    Weave {
+        base_indent_index: usize,
+    },
+    Choice {
+        identifier: Option<Identifier>,
+        indentation_depth: usize,
+        once_only: bool,
+        is_invisible_default: bool,
+        has_weave_style_inline_brackets: bool,
+    },
+    Gather {
+        identifier: Option<Identifier>,
+        indentation_depth: usize,
     },
     Flow {
         flow_level: FlowLevel,
@@ -119,6 +133,38 @@ impl Object {
             is_empty,
             is_tunnel,
             is_thread,
+        };
+    }
+
+    pub(crate) fn set_weave_kind(&mut self, base_indent_index: usize) {
+        self.kind = ObjectKind::Weave { base_indent_index };
+    }
+
+    pub(crate) fn set_choice_kind(
+        &mut self,
+        identifier: Option<Identifier>,
+        indentation_depth: usize,
+        once_only: bool,
+        is_invisible_default: bool,
+        has_weave_style_inline_brackets: bool,
+    ) {
+        self.kind = ObjectKind::Choice {
+            identifier,
+            indentation_depth,
+            once_only,
+            is_invisible_default,
+            has_weave_style_inline_brackets,
+        };
+    }
+
+    pub(crate) fn set_gather_kind(
+        &mut self,
+        identifier: Option<Identifier>,
+        indentation_depth: usize,
+    ) {
+        self.kind = ObjectKind::Gather {
+            identifier,
+            indentation_depth,
         };
     }
 

@@ -37,6 +37,9 @@ fn export_object(object: &ObjectRef, output: &mut Vec<Value>) -> Result<(), Comp
         ObjectKind::AuthorWarning { .. }
         | ObjectKind::Tag { .. }
         | ObjectKind::Divert { .. }
+        | ObjectKind::Weave { .. }
+        | ObjectKind::Choice { .. }
+        | ObjectKind::Gather { .. }
         | ObjectKind::Flow { .. }
         | ObjectKind::Generic => {
             return Err(CompilerError::Unsupported(

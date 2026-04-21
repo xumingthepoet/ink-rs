@@ -166,6 +166,34 @@ impl fmt::Display for ContentList {
                             format!("{kind}({name})")
                         }
                     }
+                    ObjectKind::Weave { base_indent_index } => {
+                        format!("Weave(base={base_indent_index})")
+                    }
+                    ObjectKind::Choice {
+                        identifier,
+                        indentation_depth,
+                        once_only,
+                        is_invisible_default,
+                        has_weave_style_inline_brackets,
+                    } => {
+                        let name = identifier
+                            .as_ref()
+                            .map(|identifier| identifier.name.as_str())
+                            .unwrap_or("<unnamed>");
+                        format!(
+                            "Choice({name}, depth={indentation_depth}, once={once_only}, invisible={is_invisible_default}, weave_style={has_weave_style_inline_brackets})"
+                        )
+                    }
+                    ObjectKind::Gather {
+                        identifier,
+                        indentation_depth,
+                    } => {
+                        let name = identifier
+                            .as_ref()
+                            .map(|identifier| identifier.name.as_str())
+                            .unwrap_or("<unnamed>");
+                        format!("Gather({name}, depth={indentation_depth})")
+                    }
                     _ => "<Object>".to_string(),
                 }
             })

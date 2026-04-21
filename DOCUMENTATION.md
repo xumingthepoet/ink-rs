@@ -24,6 +24,10 @@ runtime instead of rewriting runtime execution.
   inheritance, path primitives, and traversal helpers are now ported.
 - Parsed hierarchy flow levels and base traits are now ported.
 - Parsed hierarchy knot and stitch wrappers are now ported.
+- Parsed hierarchy weave-point wrappers (`Weave`, `Choice`, and `Gather`)
+  plus local weave-point naming lookup are now ported.
+- Parsed hierarchy path resolution can now resolve flow names, nested stitches,
+  and weave points from a parsed context.
 - Parsed hierarchy content nodes (`ContentList`, `Text`, `AuthorWarning`,
   `Tag`, and generic `Wrap<T>`) are now ported.
 - Ink parser comment elimination and whitespace helpers are now ported.
@@ -39,15 +43,16 @@ runtime instead of rewriting runtime execution.
   with a minimal loading fixture.
 - Compiler-owned runtime export now emits minimal plain-text story JSON and
   loads successfully through `bladeink::story::Story::new`.
-- Ink parser grammar, parsed hierarchy named-content layers, and reference
-  resolution are still not implemented.
+- Ink parser grammar is still pending, and only the flow/weave path-resolution
+  slice is implemented so far.
 - Long-horizon project memory docs now exist.
 
 ## Current Milestone
 
 Milestone 1 is complete. Milestone 2 is complete. Milestone 3 is complete.
 Milestone 4 is complete. Milestone 5 is complete. Milestone 6 is in progress,
-with flow base and knot/stitch behavior complete.
+with flow base, knot/stitch behavior, and weave-point parsed hierarchy slices
+complete.
 
 ## Verification Checklist
 
@@ -87,6 +92,9 @@ The ignored `blade-ink-rs/` directory must be present because the workspace uses
   full compiler output path is still limited to plain-text stories.
 - The parsed hierarchy currently has the object tree, path primitives, and a
   root-story wrapper with content-node leaf wrappers.
+- Parsed `Weave`, `Choice`, and `Gather` wrappers now exist with indentation
+  grouping and local weave-point naming lookup, but the parser/runtime wiring
+  for choice stories is still pending.
 - `InkParser::new` now stores an owned, comment-stripped input string so the
   preprocessor can normalize line endings before any grammar work begins.
 - `InkParser::parse` currently accepts plain text stories and returns a parsed
@@ -291,6 +299,49 @@ about unnecessary parentheses around trait object types.
 
 ### 2026-04-22
 
+- Continued Milestone 6 with the flow/weave path-resolution slice.
+- Added `Path::resolve_from_context` and supporting search helpers for flow
+  names, nested stitches, and weave points.
+- Added path-resolution tests that resolve knot, stitch, and weave-point
+  targets from a parsed tree.
+
+Validation:
+
+```sh
+cargo fmt --all --check
+cargo test -p ink-compiler parsed::path
+cargo check -p ink-compiler
+cargo check --workspace
+cargo test --workspace
+```
+
+Result: all passed. `blade-ink-rs/lib` emitted the same two existing warnings
+about unnecessary parentheses around trait object types.
+
+### 2026-04-22
+
+- Continued Milestone 6 with the weave-point parsed hierarchy slice.
+- Added parsed `Weave`, `Choice`, and `Gather` wrappers plus a local naming
+  table for weave points.
+- Added indentation-based weave grouping and duplicate-label diagnostics for
+  the parsed weave tree.
+- Added tests covering weave indentation, weave-point naming, and choice /
+  gather metadata accessors.
+
+Validation:
+
+```sh
+cargo fmt --all --check
+cargo test -p ink-compiler parsed
+cargo check --workspace
+cargo test --workspace
+```
+
+Result: all passed. `blade-ink-rs/lib` emitted the same two existing warnings
+about unnecessary parentheses around trait object types.
+
+### 2026-04-22
+
 - Continued Milestone 6 with the flow base and knot/stitch slice.
 - Added dedicated `Knot` and `Stitch` parsed hierarchy wrappers built on the
   existing flow traits.
@@ -434,7 +485,7 @@ about unnecessary parentheses around trait object types.
 
 ## Next Task
 
-Port `Weave`, `Choice`, `Gather`, and weave point naming.
+Add runtime tests for choices, gathers, knots, stitches, and diverts.
 
 ## Repo Structure
 
