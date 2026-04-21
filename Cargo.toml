@@ -1,0 +1,10 @@
+[workspace]
+members = ["crates/ink-compiler"]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+
+[workspace.dependencies]
+bladeink = { path = "blade-ink-rs/lib" }
+

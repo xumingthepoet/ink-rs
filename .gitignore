@@ -1,0 +1,20 @@
+# Rust build outputs
+/target/
+**/target/
+
+# Local reference implementations. Keep these on disk, but do not track them
+# in this repository.
+/ink-csharp/
+/blade-ink-rs/
+
+# C#/.NET build outputs from local reference trees if copied elsewhere.
+bin/
+obj/
+
+# Editor and OS files
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
