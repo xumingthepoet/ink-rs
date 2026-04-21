@@ -39,20 +39,24 @@ runtime instead of rewriting runtime execution.
   divert nodes.
 - Ink parser now has golden parser tests for minimal plain-text, knot, and
   divert snippets.
+- Runtime story behavior tests now cover choice selection, named knot/stitch
+  and gather-like container paths, and explicit diverts against
+  `bladeink::story::Story`.
 - Runtime JSON shape for `bladeink::story::Story::new` has been identified
   with a minimal loading fixture.
 - Compiler-owned runtime export now emits minimal plain-text story JSON and
   loads successfully through `bladeink::story::Story::new`.
-- Ink parser grammar is still pending, and only the flow/weave path-resolution
-  slice is implemented so far.
+- Ink parser grammar is still pending, but Milestone 6 is now complete with
+  flow base, knot/stitch behavior, weave-point wrappers, path resolution, and
+  runtime behavior coverage.
 - Long-horizon project memory docs now exist.
 
 ## Current Milestone
 
 Milestone 1 is complete. Milestone 2 is complete. Milestone 3 is complete.
-Milestone 4 is complete. Milestone 5 is complete. Milestone 6 is in progress,
-with flow base, knot/stitch behavior, and weave-point parsed hierarchy slices
-complete.
+Milestone 4 is complete. Milestone 5 is complete. Milestone 6 is complete.
+Milestone 7 has not started, and expression parsing is the next unchecked
+item.
 
 ## Verification Checklist
 
@@ -320,6 +324,26 @@ about unnecessary parentheses around trait object types.
 
 ### 2026-04-22
 
+- Completed Milestone 6 with runtime tests for choices, gathers, knots,
+  stitches, and diverts.
+- Added integration tests against `bladeink::story::Story` covering a choice
+  fixture, nested knot/stitch and gather-like named container paths, and
+  explicit diverts.
+
+Validation:
+
+```sh
+cargo fmt --all --check
+cargo test -p ink-compiler --test runtime_story_behaviour
+cargo check --workspace
+cargo test --workspace
+```
+
+Result: all passed. `blade-ink-rs/lib` emitted the same two existing warnings
+about unnecessary parentheses around trait object types.
+
+### 2026-04-22
+
 - Continued Milestone 6 with the weave-point parsed hierarchy slice.
 - Added parsed `Weave`, `Choice`, and `Gather` wrappers plus a local naming
   table for weave points.
@@ -485,7 +509,7 @@ about unnecessary parentheses around trait object types.
 
 ## Next Task
 
-Add runtime tests for choices, gathers, knots, stitches, and diverts.
+Port expression parsing and expression parsed hierarchy.
 
 ## Repo Structure
 

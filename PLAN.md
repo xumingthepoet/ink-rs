@@ -21,8 +21,7 @@ Core commands to run after every completed milestone:
 - [x] `cargo check --workspace`
 - [x] `cargo test --workspace`
 
-Current last verified milestone: Milestone 6 flow/weave path-resolution slice
-(`2026-04-22`).
+Current last verified milestone: Milestone 6 complete (`2026-04-22`).
 
 ## Rules
 
@@ -207,9 +206,9 @@ cargo test --workspace
 ## Milestone 6: Flow, Weave, Choices, and Gathers
 
 - [x] Port `FlowBase`, `Story`, `Knot`, and `Stitch` behavior.
-- [ ] Port `Weave`, `Choice`, `Gather`, and weave point naming.
+- [x] Port `Weave`, `Choice`, `Gather`, and weave point naming.
 - [x] Implement reference resolution for paths used by flow and weave.
-- [ ] Add runtime tests for choices, gathers, knots, stitches, and diverts.
+- [x] Add runtime tests for choices, gathers, knots, stitches, and diverts.
 
 Primary C# references:
 
@@ -318,7 +317,7 @@ cargo test --workspace
 
 ## Next Task
 
-Port `Weave`, `Choice`, `Gather`, and weave point naming.
+Port expression parsing and expression parsed hierarchy.
 
 ## Risk Register
 
