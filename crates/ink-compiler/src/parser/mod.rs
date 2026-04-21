@@ -1,19 +1,27 @@
+use std::sync::Arc;
+
 use crate::{
-    error::{CompilerError, Result},
-    parsed,
+    error::CompilerError,
+    results::{FileHandler, ParseResult},
 };
 
 #[derive(Debug)]
 pub struct InkParser<'source> {
     input_string: &'source str,
     source_filename: Option<&'source str>,
+    file_handler: Option<Arc<dyn FileHandler>>,
 }
 
 impl<'source> InkParser<'source> {
-    pub fn new(input_string: &'source str, source_filename: Option<&'source str>) -> Self {
+    pub fn new(
+        input_string: &'source str,
+        source_filename: Option<&'source str>,
+        file_handler: Option<Arc<dyn FileHandler>>,
+    ) -> Self {
         Self {
             input_string,
             source_filename,
+            file_handler,
         }
     }
 
@@ -25,9 +33,17 @@ impl<'source> InkParser<'source> {
         self.source_filename
     }
 
-    pub fn parse(&mut self) -> Result<parsed::Story> {
-        Err(CompilerError::Unsupported(
-            "InkParser has not been ported from ink-csharp/compiler/InkParser yet",
-        ))
+    pub fn file_handler(&self) -> Option<&dyn FileHandler> {
+        self.file_handler.as_deref()
+    }
+
+    pub fn parse(&mut self) -> ParseResult {
+        ParseResult::failure(
+            CompilerError::Unsupported(
+                "InkParser has not been ported from ink-csharp/compiler/InkParser yet",
+            )
+            .into_diagnostic()
+            .with_source_filename(self.source_filename.map(str::to_string)),
+        )
     }
 }

@@ -7,6 +7,10 @@ pub mod compiler;
 pub mod error;
 pub mod parsed;
 pub mod parser;
+pub mod results;
 
-pub use compiler::{Compiler, CompilerOptions};
-pub use error::{CompilerError, Result};
+pub use compiler::Compiler;
+pub use error::{CompilerError, Diagnostic, DiagnosticSeverity, Result};
+pub use results::{
+    CompileJsonResult, CompileResult, CompilerOptions, DefaultFileHandler, FileHandler, ParseResult,
+};

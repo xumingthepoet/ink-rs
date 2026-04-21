@@ -14,14 +14,16 @@ runtime instead of rewriting runtime execution.
 - Root Git repository exists.
 - `ink-csharp/` and `blade-ink-rs/` are local ignored reference trees.
 - Rust workspace exists with `crates/ink-compiler`.
-- `ink-compiler` currently contains an API scaffold only.
-- Parser, parsed hierarchy, reference resolution, and runtime export are not
-  implemented yet.
+- `ink-compiler` now exposes a stable API contract with structured diagnostics,
+  parse/compile result types, and file handler abstractions.
+- Parser, parsed hierarchy, reference resolution, and runtime export are still
+  not implemented.
 - Long-horizon project memory docs now exist.
 
 ## Current Milestone
 
-Milestone 0 is complete. Next work starts at Milestone 1: Compiler API Contract.
+Milestone 1 is complete. Next work starts at Milestone 2: String Parser
+Foundation.
 
 ## Verification Checklist
 
@@ -57,10 +59,12 @@ The ignored `blade-ink-rs/` directory must be present because the workspace uses
 
 ## Known Issues
 
-- `Compiler::compile_json` currently returns an unsupported error.
-- `InkParser::parse` currently returns an unsupported error.
+- `Compiler::compile_json` currently returns structured unsupported diagnostics
+  instead of exported JSON.
+- `InkParser::parse` currently returns a structured unsupported diagnostic.
 - The parsed hierarchy only has placeholder `Object` and `Story` structs.
-- No compiler tests exist yet.
+- `CompilerOptions` now accepts an injectable file handler, but include parsing
+  is not implemented yet.
 - `cargo check --workspace` reports warnings from ignored dependency
   `blade-ink-rs/lib`; these are upstream/local reference warnings, not current
   compiler crate failures.
@@ -82,6 +86,15 @@ The ignored `blade-ink-rs/` directory must be present because the workspace uses
   non-stop implementation loop, bug reproduction rule, and live status format.
 - Merged the former standalone project specification into `AGENTS.md`, leaving
   `AGENTS.md` as the single project spec and agent rules entry point.
+- Defined the Milestone 1 compiler API contract in `ink-compiler`:
+  structured `Diagnostic`/`DiagnosticSeverity`, `ParseResult`,
+  `CompileJsonResult`, `CompileResult`, `FileHandler`, and
+  `DefaultFileHandler`.
+- Wired `Compiler` and `InkParser` to return result objects instead of bare
+  placeholder errors, and made `CompilerOptions` carry an injectable file
+  handler.
+- Added API contract tests covering diagnostic shape, file handler cloning, and
+  the current unsupported parse/compile behavior.
 
 Validation:
 
@@ -96,7 +109,7 @@ unnecessary parentheses around trait object types.
 
 ## Next Task
 
-Define the stable compiler API contract and diagnostics for Milestone 1.
+Port the string parser foundation for Milestone 2.
 
 ## Repo Structure
 

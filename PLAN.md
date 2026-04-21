@@ -21,7 +21,7 @@ Core commands to run after every completed milestone:
 - [x] `cargo check --workspace`
 - [x] `cargo test --workspace`
 
-Current last verified milestone: Milestone 0 documentation update
+Current last verified milestone: Milestone 1 compiler API contract
 (`2026-04-22`).
 
 ## Rules
@@ -62,11 +62,11 @@ git status --short --ignored
 
 ## Milestone 1: Compiler API Contract
 
-- [ ] Define stable public API for `Compiler`, `CompilerOptions`, parse result,
+- [x] Define stable public API for `Compiler`, `CompilerOptions`, parse result,
   compile result, diagnostics, and file handling.
-- [ ] Add API-level tests for unsupported current behavior and future expected
+- [x] Add API-level tests for unsupported current behavior and future expected
   behavior.
-- [ ] Add structured diagnostics with severity, source filename, line, column,
+- [x] Add structured diagnostics with severity, source filename, line, column,
   and message.
 
 Acceptance:

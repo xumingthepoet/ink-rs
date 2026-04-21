@@ -1,16 +1,15 @@
+use std::sync::Arc;
+
 use bladeink::story::Story as RuntimeStory;
 
+pub use crate::results::CompilerOptions;
+
 use crate::{
-    error::{CompilerError, Result},
+    error::CompilerError,
     parsed,
     parser::InkParser,
+    results::{CompileJsonResult, CompileResult, DefaultFileHandler, ParseResult},
 };
-
-#[derive(Debug, Clone, Default)]
-pub struct CompilerOptions {
-    pub source_filename: Option<String>,
-    pub count_all_visits: bool,
-}
 
 #[derive(Debug)]
 pub struct Compiler {
@@ -21,9 +20,14 @@ pub struct Compiler {
 
 impl Compiler {
     pub fn new(ink_source: impl Into<String>, options: Option<CompilerOptions>) -> Self {
+        let mut options = options.unwrap_or_default();
+        if options.file_handler.is_none() {
+            options.file_handler = Some(Arc::new(DefaultFileHandler));
+        }
+
         Self {
             input_string: ink_source.into(),
-            options: options.unwrap_or_default(),
+            options,
             parsed_story: None,
         }
     }
@@ -32,29 +36,72 @@ impl Compiler {
         self.parsed_story.as_ref()
     }
 
-    pub fn parse(&mut self) -> Result<&parsed::Story> {
-        let mut parser =
-            InkParser::new(&self.input_string, self.options.source_filename.as_deref());
-        let mut parsed_story = parser.parse()?;
-        parsed_story.count_all_visits = self.options.count_all_visits;
-        self.parsed_story = Some(parsed_story);
+    pub fn parse(&mut self) -> ParseResult {
+        let mut parser = InkParser::new(
+            &self.input_string,
+            self.options.source_filename.as_deref(),
+            self.options.file_handler.clone(),
+        );
+        let mut parse_result = parser.parse();
 
-        Ok(self
-            .parsed_story
-            .as_ref()
-            .expect("parsed_story was just populated"))
+        if let Some(parsed_story) = parse_result.parsed_story.as_mut() {
+            parsed_story.count_all_visits = self.options.count_all_visits;
+            self.parsed_story = Some(parsed_story.clone());
+        } else {
+            self.parsed_story = None;
+        }
+
+        parse_result
     }
 
-    pub fn compile_json(&mut self) -> Result<String> {
-        let _ = self.parse()?;
+    pub fn compile_json(&mut self) -> CompileJsonResult {
+        let parse_result = self.parse();
+        if parse_result.parsed_story.is_none() {
+            return CompileJsonResult {
+                json: None,
+                diagnostics: parse_result.diagnostics,
+            };
+        }
 
-        Err(CompilerError::Unsupported(
-            "runtime export has not been ported from ink-csharp/compiler yet",
-        ))
+        let mut diagnostics = parse_result.diagnostics;
+        diagnostics.push(
+            CompilerError::Unsupported(
+                "runtime export has not been ported from ink-csharp/compiler yet",
+            )
+            .into_diagnostic()
+            .with_source_filename(self.options.source_filename.clone()),
+        );
+
+        CompileJsonResult {
+            json: None,
+            diagnostics,
+        }
     }
 
-    pub fn compile(&mut self) -> Result<RuntimeStory> {
-        let json = self.compile_json()?;
-        RuntimeStory::new(&json).map_err(|err| CompilerError::Runtime(err.to_string()))
+    pub fn compile(&mut self) -> CompileResult {
+        let compile_json_result = self.compile_json();
+
+        let Some(json) = compile_json_result.json else {
+            return CompileResult {
+                story: None,
+                diagnostics: compile_json_result.diagnostics,
+            };
+        };
+
+        match RuntimeStory::new(&json) {
+            Ok(story) => CompileResult {
+                story: Some(story),
+                diagnostics: compile_json_result.diagnostics,
+            },
+            Err(err) => {
+                let mut diagnostics = compile_json_result.diagnostics;
+                diagnostics.push(CompilerError::Runtime(err.to_string()).into_diagnostic());
+
+                CompileResult {
+                    story: None,
+                    diagnostics,
+                }
+            }
+        }
     }
 }
