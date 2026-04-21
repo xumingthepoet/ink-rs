@@ -19,8 +19,8 @@ use crate::{
     error::{Diagnostic, DiagnosticSeverity},
     parsed::{
         ConstantDeclaration, ContentList, Divert, ExternalDeclaration, FlowLevel, Identifier, Knot,
-        ListDefinition, ListElementDefinition, Object, ObjectRef, Path, Return, Stitch,
-        Story as ParsedStory, Text, VariableAssignment,
+        ListDefinition, ListElementDefinition, Object, ObjectRef, Path, Return, Sequence,
+        SequenceType, Stitch, Story as ParsedStory, Text, VariableAssignment,
     },
     results::{FileHandler, ParseResult},
 };
@@ -124,6 +124,17 @@ impl<'source> InkParser<'source> {
                     Object::add_content(parent, divert);
                 } else {
                     top_level_content.push(divert);
+                }
+                continue;
+            }
+
+            if let Some(sequence) =
+                Self::parse_sequence_line(line_text, line_index + 1, source_filename.clone())?
+            {
+                if let Some(parent) = current_flow.as_ref() {
+                    Object::add_content(parent, sequence);
+                } else {
+                    top_level_content.push(sequence);
                 }
                 continue;
             }
@@ -294,6 +305,49 @@ impl<'source> InkParser<'source> {
         } else {
             Divert::new(Some(target)).object()
         }))
+    }
+
+    fn parse_sequence_line(
+        line_text: &str,
+        line_number: usize,
+        source_filename: Option<String>,
+    ) -> std::result::Result<Option<ObjectRef>, Diagnostic> {
+        let trimmed_start = line_text.trim_start();
+        let (sequence_type, remainder) =
+            if let Some(remainder) = trimmed_start.strip_prefix("once:") {
+                (SequenceType::Once, remainder)
+            } else if let Some(remainder) = trimmed_start.strip_prefix("cycle:") {
+                (SequenceType::Cycle, remainder)
+            } else if let Some(remainder) = trimmed_start.strip_prefix("shuffle:") {
+                (SequenceType::Shuffle, remainder)
+            } else if let Some(remainder) = trimmed_start.strip_prefix("stopping:") {
+                (SequenceType::Stopping, remainder)
+            } else {
+                return Ok(None);
+            };
+
+        let mut branches = Vec::new();
+        for branch_text in remainder.split('|') {
+            let branch = ContentList::new();
+            let branch_text = branch_text.trim();
+            if !branch_text.is_empty() {
+                branch.add_content(Text::new(branch_text).object());
+            }
+            branch.trim_trailing_whitespace();
+            branches.push(branch);
+        }
+
+        if branches.len() < 2 {
+            return Err(Diagnostic::new(
+                DiagnosticSeverity::Error,
+                source_filename,
+                line_number,
+                line_text.len().saturating_sub(trimmed_start.len()) + 1,
+                "Sequence lines must contain at least two branches separated by '|'",
+            ));
+        }
+
+        Ok(Some(Sequence::new(branches, sequence_type).object()))
     }
 
     fn parse_simple_divert_target(target_text: &str) -> Option<Path> {
@@ -992,7 +1046,7 @@ impl<'source> InkParser<'source> {
 #[cfg(test)]
 mod tests {
     use super::{CommentEliminator, InkParser};
-    use crate::parsed::{ObjectKind, ObjectRef, Story as ParsedStory};
+    use crate::parsed::{ObjectKind, ObjectRef, SequenceType, Story as ParsedStory};
 
     fn render_story(story: &ParsedStory) -> String {
         let mut lines = vec!["Story".to_string()];
@@ -1112,6 +1166,12 @@ mod tests {
                     "{padding}ListElementDefinition(name={:?}, explicit={explicit_value:?}, series={series_value}, initial={in_initial_list})",
                     identifier.name
                 ));
+            }
+            ObjectKind::Sequence { sequence_type } => {
+                lines.push(format!("{padding}Sequence(type={sequence_type})"));
+                for child in borrowed.content() {
+                    render_object(child, indent + 1, lines);
+                }
             }
             other => lines.push(format!("{padding}{other:?}")),
         }
@@ -1483,6 +1543,43 @@ mod tests {
     }
 
     #[test]
+    fn ink_parser_parses_sequences() {
+        let mut parser = InkParser::new("once: first | second", Some("story.ink"), None);
+        let result = parser.parse();
+
+        assert!(result.diagnostics.is_empty());
+        let story = result.parsed_story.expect("expected parsed story");
+        let content = story.content();
+
+        assert_eq!(content.len(), 1);
+        assert!(matches!(
+            content[0].borrow().kind(),
+            ObjectKind::Sequence {
+                sequence_type: SequenceType::Once,
+            }
+        ));
+
+        let branches = content[0].borrow().content().to_vec();
+        assert_eq!(branches.len(), 2);
+        assert!(matches!(
+            branches[0].borrow().kind(),
+            ObjectKind::ContentList { .. }
+        ));
+        assert!(matches!(
+            branches[0].borrow().content()[0].borrow().kind(),
+            ObjectKind::Text { text } if text == "first"
+        ));
+        assert!(matches!(
+            branches[1].borrow().kind(),
+            ObjectKind::ContentList { .. }
+        ));
+        assert!(matches!(
+            branches[1].borrow().content()[0].borrow().kind(),
+            ObjectKind::Text { text } if text == "second"
+        ));
+    }
+
+    #[test]
     fn ink_parser_golden_cases_for_minimal_snippets() {
         let cases = [
             (
@@ -1504,6 +1601,11 @@ mod tests {
                 "tunnel_divert",
                 "->-> ending",
                 "Story\n  Divert(target=\"-> ending\", empty=false, tunnel=true, thread=false)",
+            ),
+            (
+                "sequence",
+                "once: first | second",
+                "Story\n  Sequence(type=Once)\n    ContentList\n      Text(\"first\")\n    ContentList\n      Text(\"second\")",
             ),
         ];
 

@@ -72,6 +72,7 @@ fn export_object(object: &ObjectRef, state: &mut ExportState) -> Result<(), Comp
         | ObjectKind::Weave { .. }
         | ObjectKind::Choice { .. }
         | ObjectKind::Gather { .. }
+        | ObjectKind::Sequence { .. }
         | ObjectKind::ConstantDeclaration { .. }
         | ObjectKind::ExternalDeclaration { .. }
         | ObjectKind::Expression { .. }

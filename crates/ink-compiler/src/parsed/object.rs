@@ -3,7 +3,7 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use super::{ExpressionKind, FlowLevel, Identifier, Path};
+use super::{ExpressionKind, FlowLevel, Identifier, Path, SequenceType};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DebugMetadata {
@@ -51,6 +51,9 @@ pub(crate) enum ObjectKind {
     Gather {
         identifier: Option<Identifier>,
         indentation_depth: usize,
+    },
+    Sequence {
+        sequence_type: SequenceType,
     },
     VariableAssignment {
         identifier: Identifier,
@@ -191,6 +194,10 @@ impl Object {
             identifier,
             indentation_depth,
         };
+    }
+
+    pub(crate) fn set_sequence_kind(&mut self, sequence_type: SequenceType) {
+        self.kind = ObjectKind::Sequence { sequence_type };
     }
 
     pub(crate) fn set_variable_assignment_kind(

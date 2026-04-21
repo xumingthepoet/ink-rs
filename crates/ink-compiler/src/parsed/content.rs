@@ -182,6 +182,9 @@ impl fmt::Display for ContentList {
                             .unwrap_or("<unnamed>");
                         format!("Gather({name}, depth={indentation_depth})")
                     }
+                    ObjectKind::Sequence { sequence_type } => {
+                        format!("Sequence(type={sequence_type})")
+                    }
                     _ => "<Object>".to_string(),
                 }
             })

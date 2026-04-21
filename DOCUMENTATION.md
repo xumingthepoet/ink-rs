@@ -47,6 +47,8 @@ runtime instead of rewriting runtime execution.
   divert nodes.
 - Ink parser now also recognizes tunnel divert lines (`->->`) and models them
   as parsed tunnel diverts.
+- Ink parser now also recognizes simple inline sequence lines such as
+  `once: a | b` and models them as parsed sequence nodes.
 - Ink parser now has golden parser tests for minimal plain-text, knot, and
   divert snippets, including tunnel diverts.
 - Expression parser foundation is now ported with Pratt-style precedence
@@ -77,7 +79,8 @@ runtime instead of rewriting runtime execution.
 Milestone 1 is complete. Milestone 2 is complete. Milestone 3 is complete.
 Milestone 4 is complete. Milestone 5 is complete. Milestone 6 is complete.
 Milestone 7 is in progress, and the expression, variable-statement, and
-list-definition slices are complete.
+list-definition, return-statement, tunnel-divert, and inline-sequence slices
+are complete.
 
 ## Verification Checklist
 
@@ -131,11 +134,14 @@ The ignored `blade-ink-rs/` directory must be present because the workspace uses
   parsed divert nodes, but the full divert grammar is still pending.
 - `InkParser::parse` now also recognizes tunnel divert lines, but broader
   tunnel semantics and runtime export behavior remain limited.
+- `InkParser::parse` now also recognizes simple inline sequence lines, but the
+  broader multiline sequence grammar and runtime export behavior remain
+  limited.
 - Expression parsing currently covers a focused foundation subset: numeric and
   boolean literals, string expressions, variable paths, function calls, list
   expressions, divert targets, unary operators, and binary precedence. The
-  list-definition, conditionals, and sequence grammar slices are still pending
-  beyond the variable-statement helpers.
+  list-definition, conditionals, and broader sequence grammar slices are still
+  pending beyond the variable-statement helpers.
 - `InkParser::parse` now also recognizes `VAR`, `CONST`, `EXTERNAL`, and `~`
   logic lines for variable declarations, constants, externals, temporary
   assignments, and variable-reference expressions.
@@ -239,6 +245,10 @@ The ignored `blade-ink-rs/` directory must be present because the workspace uses
   diverts, and basic knot/stitch divert targets.
 - Added parser tests covering simple divert parsing and tunnel-divert
   recognition.
+- Added a sequence parser slice that recognizes simple inline `once: a | b`
+  style lines and models them as parsed `Sequence` nodes.
+- Added parser and parsed-hierarchy tests covering inline sequence parsing and
+  rendering.
 - Added golden parser tests that snapshot minimal plain-text, knot, and
   simple-divert parsed trees as stable textual dumps.
 - Added a runtime JSON smoke test that proves the minimal compiled story shape
@@ -330,6 +340,13 @@ about unnecessary parentheses around trait object types.
   `Divert` wrapper with the tunnel flag set.
 - Added parser and golden tests covering tunnel divert parsing.
 
+### 2026-04-22
+
+- Continued Milestone 7 with the inline sequence parsing slice.
+- Added a parsed hierarchy `Sequence` wrapper and `SequenceType` enum.
+- Added parser support for simple inline sequence lines such as `once: a | b`.
+- Added parser and parsed-hierarchy tests covering inline sequence parsing.
+
 Validation:
 
 ```sh
@@ -337,6 +354,8 @@ cargo fmt --all --check
 cargo test -p ink-compiler tunnel_divert_marks_tunnel_flag
 cargo test -p ink-compiler ink_parser_parses_tunnel_diverts
 cargo test -p ink-compiler ink_parser_golden_cases_for_minimal_snippets
+cargo test -p ink-compiler sequence
+cargo test -p ink-compiler ink_parser_parses_sequences
 cargo check --workspace
 cargo test --workspace
 ```
