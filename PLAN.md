@@ -21,7 +21,7 @@ Core commands to run after every completed milestone:
 - [x] `cargo check --workspace`
 - [x] `cargo test --workspace`
 
-Current last verified milestone: Milestone 1 compiler API contract
+Current last verified milestone: Milestone 2 string parser foundation complete
 (`2026-04-22`).
 
 ## Rules
@@ -86,11 +86,11 @@ cargo check --workspace
 
 ## Milestone 2: String Parser Foundation
 
-- [ ] Port `CharacterSet`, `CharacterRange`, and low-level character helpers.
-- [ ] Port `StringParserState` stack behavior.
-- [ ] Port core `StringParser` cursor, rule, expectation, error, whitespace,
+- [x] Port `CharacterSet`, `CharacterRange`, and low-level character helpers.
+- [x] Port `StringParserState` stack behavior.
+- [x] Port core `StringParser` cursor, rule, expectation, error, whitespace,
   line, and debug metadata helpers.
-- [ ] Add focused unit tests against small parsing rules.
+- [x] Add focused unit tests against small parsing rules.
 
 Primary C# references:
 

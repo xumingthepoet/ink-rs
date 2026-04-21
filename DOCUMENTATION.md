@@ -16,14 +16,18 @@ runtime instead of rewriting runtime execution.
 - Rust workspace exists with `crates/ink-compiler`.
 - `ink-compiler` now exposes a stable API contract with structured diagnostics,
   parse/compile result types, and file handler abstractions.
-- Parser, parsed hierarchy, reference resolution, and runtime export are still
-  not implemented.
+- `CharacterSet`, `CharacterRange`, and basic string parser character helpers
+  are now ported.
+- `StringParserState` stack behavior is now ported.
+- Core `StringParser` cursor/rule helpers are now ported.
+- Ink parser grammar, parsed hierarchy, reference resolution, and runtime
+  export are still not implemented.
 - Long-horizon project memory docs now exist.
 
 ## Current Milestone
 
-Milestone 1 is complete. Next work starts at Milestone 2: String Parser
-Foundation.
+Milestone 1 is complete. Milestone 2 is complete. Next work starts at
+Milestone 3: Parsed Hierarchy Core.
 
 ## Verification Checklist
 
@@ -65,6 +69,7 @@ The ignored `blade-ink-rs/` directory must be present because the workspace uses
 - The parsed hierarchy only has placeholder `Object` and `Story` structs.
 - `CompilerOptions` now accepts an injectable file handler, but include parsing
   is not implemented yet.
+- The ink parser grammar is still pending.
 - `cargo check --workspace` reports warnings from ignored dependency
   `blade-ink-rs/lib`; these are upstream/local reference warnings, not current
   compiler crate failures.
@@ -95,6 +100,19 @@ The ignored `blade-ink-rs/` directory must be present because the workspace uses
   handler.
 - Added API contract tests covering diagnostic shape, file handler cloning, and
   the current unsupported parse/compile behavior.
+- Ported `CharacterSet` and `CharacterRange` into `parser::character_set` and
+  `parser::character_range`, plus basic `string_parser` character classification
+  helpers.
+- Added focused tests covering character set mutation, range caching, and the
+  low-level character classification helpers.
+- Ported `StringParserState` into `parser::string_parser::state` with push,
+  pop, peek, squash, and error-scope behavior.
+- Added unit tests covering stack initialization, push/pop/squash semantics,
+  error scope marking, and mismatched rule ID panics.
+- Ported the core `StringParser` cursor, rule, expectation, error, whitespace,
+  line, and debug metadata helpers into `parser::string_parser`.
+- Added unit tests covering cursor movement, newline tracking, character set
+  parsing, rule rollback/commit behavior, diagnostics, and debug metadata.
 
 Validation:
 
@@ -107,9 +125,68 @@ cargo test --workspace
 Result: all passed. `blade-ink-rs/lib` emitted two existing warnings about
 unnecessary parentheses around trait object types.
 
+### 2026-04-22
+
+- Continued Milestone 2 with the string parser foundation slice.
+- Ported `CharacterSet` and `CharacterRange` as dedicated parser modules.
+- Added basic string character helper functions for newline, whitespace,
+  digits, letters, and identifier characters.
+- Added unit tests for set mutation, range exclusion/cache behavior, and the
+  helper classification functions.
+
+Validation:
+
+```sh
+cargo fmt --all --check
+cargo test -p ink-compiler string_parser
+cargo check --workspace
+```
+
+Result: all passed. `blade-ink-rs/lib` emitted the same two existing warnings
+about unnecessary parentheses around trait object types.
+
+### 2026-04-22
+
+- Continued Milestone 2 with `StringParserState` stack behavior.
+- Ported the parser state stack into `parser::string_parser::state`.
+- Added tests for push/pop, squash, stack initialization, and error-scope
+  propagation.
+
+Validation:
+
+```sh
+cargo fmt --all --check
+cargo test -p ink-compiler string_parser
+cargo check --workspace
+```
+
+Result: all passed. `blade-ink-rs/lib` emitted the same two existing warnings
+about unnecessary parentheses around trait object types.
+
+### 2026-04-22
+
+- Completed Milestone 2 by porting the core `StringParser` helpers.
+- Added a Rust `StringParser` implementation with rule stack helpers, cursor
+  navigation, character parsing, expectation/error reporting, debug metadata
+  creation, and newline handling.
+- Added focused tests for cursor movement, `peek`/`parse_object` commit and
+  rollback behavior, diagnostics, and debug metadata generation.
+
+Validation:
+
+```sh
+cargo fmt --all --check
+cargo test -p ink-compiler string_parser
+cargo check --workspace
+```
+
+Result: all passed. `blade-ink-rs/lib` emitted the same two existing warnings
+about unnecessary parentheses around trait object types.
+
 ## Next Task
 
-Port the string parser foundation for Milestone 2.
+Port parsed `Object` ownership, parent/path model, debug metadata, and
+traversal helpers for Milestone 3.
 
 ## Repo Structure
 

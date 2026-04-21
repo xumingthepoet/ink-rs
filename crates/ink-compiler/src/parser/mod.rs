@@ -1,3 +1,9 @@
+pub mod character_range;
+pub mod character_set;
+pub mod string_parser;
+
+pub use string_parser::{Element, ParseSuccessStruct, StringParser, StringParserState};
+
 use std::sync::Arc;
 
 use crate::{

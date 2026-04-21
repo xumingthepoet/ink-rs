@@ -31,10 +31,10 @@ review.
 | C# file | Rust destination | Status |
 | --- | --- | --- |
 | `Compiler.cs` | `compiler.rs` | scaffolded |
-| `CharacterSet.cs` | `parser/character_set.rs` | not started |
-| `CharacterRange.cs` | `parser/character_range.rs` | not started |
-| `StringParser/StringParserState.cs` | `parser/string_parser/state.rs` | not started |
-| `StringParser/StringParser.cs` | `parser/string_parser/mod.rs` | not started |
+| `CharacterSet.cs` | `parser/character_set.rs` | started |
+| `CharacterRange.cs` | `parser/character_range.rs` | started |
+| `StringParser/StringParserState.cs` | `parser/string_parser/state.rs` | started |
+| `StringParser/StringParser.cs` | `parser/string_parser/mod.rs` | started |
 | `InkParser/*.cs` | `parser/ink_parser/` | not started |
 | `ParsedHierarchy/Object.cs` | `parsed/object.rs` | placeholder |
 | `ParsedHierarchy/Story.cs` | `parsed/story.rs` | placeholder |
@@ -89,4 +89,3 @@ Each ported feature should include at least one of:
 - JSON export golden test.
 - Runtime smoke test through `bladeink`.
 - Diagnostic test for an invalid input.
-
