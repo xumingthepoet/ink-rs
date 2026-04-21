@@ -26,6 +26,8 @@ runtime instead of rewriting runtime execution.
 - Parsed hierarchy content nodes (`ContentList`, `Text`, `AuthorWarning`,
   `Tag`, and generic `Wrap<T>`) are now ported.
 - Ink parser comment elimination and whitespace helpers are now ported.
+- Ink parser can now parse plain text lines into structured parsed content
+  nodes and rejects obvious unported structural syntax with diagnostics.
 - Ink parser grammar, parsed hierarchy named-content layers, reference
   resolution, and runtime export are still not implemented.
 - Long-horizon project memory docs now exist.
@@ -33,7 +35,7 @@ runtime instead of rewriting runtime execution.
 ## Current Milestone
 
 Milestone 1 is complete. Milestone 2 is complete. Milestone 3 is complete.
-Milestone 4 is in progress, starting with plain text lines.
+Milestone 4 is in progress, starting with basic knots and stitches.
 
 ## Verification Checklist
 
@@ -77,6 +79,9 @@ The ignored `blade-ink-rs/` directory must be present because the workspace uses
   still pending.
 - `InkParser::new` now stores an owned, comment-stripped input string so the
   preprocessor can normalize line endings before any grammar work begins.
+- `InkParser::parse` currently accepts plain text stories and returns a parsed
+  content tree, but it still rejects obvious structural syntax such as knots
+  and diverts until the corresponding parser slices land.
 - `CompilerOptions` now accepts an injectable file handler, but include parsing
   is not implemented yet.
 - The ink parser grammar is still pending.
@@ -154,6 +159,9 @@ The ignored `blade-ink-rs/` directory must be present because the workspace uses
   string.
 - Added tests for comment stripping, line-ending normalization, whitespace
   helpers, and the preprocessed parser input.
+- Added a plain-text parser slice that turns lines into `ContentList` and
+  `Text` parsed nodes and emits a diagnostic for obvious unported structure.
+- Added parser tests covering plain-text story parsing and syntax rejection.
 
 Validation:
 
@@ -200,6 +208,26 @@ Validation:
 ```sh
 cargo fmt --all --check
 cargo test -p ink-compiler parsed
+cargo check --workspace
+```
+
+Result: all passed. `blade-ink-rs/lib` emitted the same two existing warnings
+about unnecessary parentheses around trait object types.
+
+### 2026-04-22
+
+- Continued Milestone 4 with the plain-text parsing slice.
+- Added a parser path that turns plain text lines into `ContentList` and `Text`
+  parsed nodes.
+- Added a structured diagnostic for obvious unported structural syntax such as
+  knots and diverts.
+- Added parser tests covering plain-text story parsing and syntax rejection.
+
+Validation:
+
+```sh
+cargo fmt --all --check
+cargo test -p ink-compiler parser
 cargo check --workspace
 ```
 
@@ -311,7 +339,7 @@ about unnecessary parentheses around trait object types.
 
 ## Next Task
 
-Port plain text lines into parsed text/content nodes for Milestone 4.
+Port basic knots and stitches for Milestone 4.
 
 ## Repo Structure
 

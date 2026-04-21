@@ -71,6 +71,9 @@ The first parsed-hierarchy slice uses reference-counted tree nodes:
   layer sees the input, mirroring the C# compiler's preprocessing step.
 - Whitespace handling lives in parser helpers that mirror the C# parser rules
   for newline, end-of-file, and spacing combinators.
+- The current parser entry point has a temporary plain-text fallback that
+  produces `ContentList`/`Text` nodes until the knot, stitch, and divert
+  grammar slices are ported.
 
 ## Runtime Export
 
