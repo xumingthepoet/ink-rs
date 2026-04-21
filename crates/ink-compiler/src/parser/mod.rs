@@ -16,8 +16,8 @@ use std::sync::Arc;
 use crate::{
     error::{Diagnostic, DiagnosticSeverity},
     parsed::{
-        ContentList, Divert, FlowLevel, Identifier, Object, ObjectRef, Path, Story as ParsedStory,
-        Text,
+        ContentList, Divert, FlowLevel, Identifier, Knot, Object, ObjectRef, Path, Stitch,
+        Story as ParsedStory, Text,
     },
     results::{FileHandler, ParseResult},
 };
@@ -88,12 +88,9 @@ impl<'source> InkParser<'source> {
             let had_newline = segment.ends_with('\n');
             let line_text = segment.strip_suffix('\n').unwrap_or(segment);
 
-            if let Some((flow_level, name, is_function)) =
+            if let Some(flow) =
                 Self::parse_flow_header(line_text, line_index + 1, source_filename.clone())?
             {
-                let flow = Object::new_ref();
-                flow.borrow_mut()
-                    .set_flow_kind(flow_level, Some(name), is_function);
                 top_level_content.push(flow.clone());
                 current_flow = Some(flow);
                 continue;
@@ -139,7 +136,7 @@ impl<'source> InkParser<'source> {
         line_text: &str,
         line_number: usize,
         source_filename: Option<String>,
-    ) -> std::result::Result<Option<(FlowLevel, String, bool)>, Diagnostic> {
+    ) -> std::result::Result<Option<ObjectRef>, Diagnostic> {
         let trimmed_start = line_text.trim_start();
         if trimmed_start.is_empty() {
             return Ok(None);
@@ -197,7 +194,24 @@ impl<'source> InkParser<'source> {
             })?
             .to_string();
 
-        Ok(Some((flow_level, name, is_function)))
+        let identifier = Identifier::new(name);
+        let flow = match flow_level {
+            FlowLevel::Knot => Knot::new(identifier, Vec::new(), Vec::new(), is_function).object(),
+            FlowLevel::Stitch => {
+                Stitch::new(identifier, Vec::new(), Vec::new(), is_function).object()
+            }
+            FlowLevel::Story | FlowLevel::WeavePoint => {
+                return Err(Diagnostic::new(
+                    DiagnosticSeverity::Error,
+                    source_filename,
+                    line_number,
+                    1,
+                    "Expected knot or stitch name",
+                ));
+            }
+        };
+
+        Ok(Some(flow))
     }
 
     fn parse_simple_divert_line(

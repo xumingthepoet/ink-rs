@@ -21,7 +21,7 @@ Core commands to run after every completed milestone:
 - [x] `cargo check --workspace`
 - [x] `cargo test --workspace`
 
-Current last verified milestone: Milestone 5 runtime export skeleton slice
+Current last verified milestone: Milestone 6 flow base and knot/stitch slice
 (`2026-04-22`).
 
 ## Rules
@@ -206,7 +206,7 @@ cargo test --workspace
 
 ## Milestone 6: Flow, Weave, Choices, and Gathers
 
-- [ ] Port `FlowBase`, `Story`, `Knot`, and `Stitch` behavior.
+- [x] Port `FlowBase`, `Story`, `Knot`, and `Stitch` behavior.
 - [ ] Port `Weave`, `Choice`, `Gather`, and weave point naming.
 - [ ] Implement reference resolution for paths used by flow and weave.
 - [ ] Add runtime tests for choices, gathers, knots, stitches, and diverts.

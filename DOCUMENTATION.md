@@ -23,13 +23,14 @@ runtime instead of rewriting runtime execution.
 - Parsed hierarchy `Object` ownership, parent links, debug metadata
   inheritance, path primitives, and traversal helpers are now ported.
 - Parsed hierarchy flow levels and base traits are now ported.
+- Parsed hierarchy knot and stitch wrappers are now ported.
 - Parsed hierarchy content nodes (`ContentList`, `Text`, `AuthorWarning`,
   `Tag`, and generic `Wrap<T>`) are now ported.
 - Ink parser comment elimination and whitespace helpers are now ported.
 - Ink parser can now parse plain text lines into structured parsed content
   nodes and rejects obvious unported structural syntax with diagnostics.
 - Ink parser now recognizes basic knot and stitch headers and attaches their
-  following content lines to the corresponding flow node.
+  following content lines to `Knot` and `Stitch` flow nodes.
 - Ink parser now also recognizes simple divert lines and models them as parsed
   divert nodes.
 - Ink parser now has golden parser tests for minimal plain-text, knot, and
@@ -45,8 +46,8 @@ runtime instead of rewriting runtime execution.
 ## Current Milestone
 
 Milestone 1 is complete. Milestone 2 is complete. Milestone 3 is complete.
-Milestone 4 is complete. Milestone 5 is complete. Milestone 6 starts with flow,
-weave, and choice behavior.
+Milestone 4 is complete. Milestone 5 is complete. Milestone 6 is in progress,
+with flow base and knot/stitch behavior complete.
 
 ## Verification Checklist
 
@@ -84,7 +85,6 @@ The ignored `blade-ink-rs/` directory must be present because the workspace uses
 
 - `Compiler::compile_json` now exports minimal plain-text story JSON, but the
   full compiler output path is still limited to plain-text stories.
-- `InkParser::parse` currently returns a structured unsupported diagnostic.
 - The parsed hierarchy currently has the object tree, path primitives, and a
   root-story wrapper with content-node leaf wrappers.
 - `InkParser::new` now stores an owned, comment-stripped input string so the
@@ -93,7 +93,7 @@ The ignored `blade-ink-rs/` directory must be present because the workspace uses
   content tree, but the full grammar is still pending beyond the current plain
   text, knot/stitch, and simple divert slices.
 - `InkParser::parse` now also recognizes basic knot and stitch declarations by
-  line prefix and models them as parsed flow nodes.
+  line prefix and models them as parsed `Knot` and `Stitch` nodes.
 - `InkParser::parse` now also recognizes simple divert lines and models them as
   parsed divert nodes, but the full divert grammar is still pending.
 - The runtime JSON reader expects top-level `inkVersion`, `root`, and
@@ -289,6 +289,15 @@ about unnecessary parentheses around trait object types.
 - Verified that exported JSON loads through `bladeink::story::Story::new` and
   that `compile()` returns a runtime story for a plain-text input.
 
+### 2026-04-22
+
+- Continued Milestone 6 with the flow base and knot/stitch slice.
+- Added dedicated `Knot` and `Stitch` parsed hierarchy wrappers built on the
+  existing flow traits.
+- Updated the parser to construct named knot/stitch flow nodes for line-based
+  headers.
+- Added tests covering knot/stitch flow metadata and parser recognition.
+
 Validation:
 
 ```sh
@@ -425,7 +434,7 @@ about unnecessary parentheses around trait object types.
 
 ## Next Task
 
-Port `FlowBase`, `Story`, `Knot`, and `Stitch` behavior.
+Port `Weave`, `Choice`, `Gather`, and weave point naming.
 
 ## Repo Structure
 

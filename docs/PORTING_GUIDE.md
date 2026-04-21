@@ -48,6 +48,8 @@ review.
 | `ParsedHierarchy/FlowLevel.cs` | `parsed/flow_level.rs` | started |
 | `ParsedHierarchy/INamedContent.cs` | `parsed/flow.rs` | started |
 | `ParsedHierarchy/FlowBase.cs` | `parsed/flow.rs` | started |
+| `ParsedHierarchy/Knot.cs` | `parsed/knot.rs` | started |
+| `ParsedHierarchy/Stitch.cs` | `parsed/stitch.rs` | started |
 | `ParsedHierarchy/ContentList.cs` | `parsed/content.rs` | started |
 | `ParsedHierarchy/Text.cs` | `parsed/content.rs` | started |
 | `ParsedHierarchy/AuthorWarning.cs` | `parsed/content.rs` | started |
