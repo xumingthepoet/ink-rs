@@ -69,7 +69,7 @@ fn ink_parser_exposes_the_file_handler_contract() {
 }
 
 #[test]
-fn parse_returns_a_structured_unsupported_diagnostic() {
+fn parse_returns_a_structured_plain_text_story() {
     let mut compiler = Compiler::new(
         "Hello world",
         Some(CompilerOptions {
@@ -81,21 +81,13 @@ fn parse_returns_a_structured_unsupported_diagnostic() {
 
     let result = compiler.parse();
 
-    assert!(result.parsed_story.is_none());
-    assert!(result.has_errors());
-    assert_eq!(result.diagnostics.len(), 1);
-
-    let diagnostic = &result.diagnostics[0];
-    assert_eq!(diagnostic.severity, DiagnosticSeverity::Error);
-    assert_eq!(diagnostic.source_filename.as_deref(), Some("story.ink"));
-    assert_eq!(diagnostic.line, 0);
-    assert_eq!(diagnostic.column, 0);
-    assert!(diagnostic.message.contains("InkParser"));
-    assert!(compiler.parsed_story().is_none());
+    assert!(result.parsed_story.is_some());
+    assert!(result.diagnostics.is_empty());
+    assert!(compiler.parsed_story().is_some());
 }
 
 #[test]
-fn compile_json_returns_a_result_object_with_diagnostics() {
+fn compile_json_returns_runtime_json_for_plain_text_story() {
     let mut compiler = Compiler::new(
         "Hello world",
         Some(CompilerOptions {
@@ -107,19 +99,33 @@ fn compile_json_returns_a_result_object_with_diagnostics() {
 
     let result = compiler.compile_json();
 
-    assert!(result.json.is_none());
-    assert!(result.has_errors());
-    assert_eq!(result.diagnostics.len(), 1);
-    assert_eq!(result.diagnostics[0].severity, DiagnosticSeverity::Error);
+    let json = result.json.expect("expected runtime JSON");
+    assert!(json.contains("\"inkVersion\":21"));
+    assert!(json.contains("\"root\""));
+    assert!(json.contains("\"listDefs\":{}"));
+    assert!(result.diagnostics.is_empty());
 }
 
 #[test]
-fn compile_returns_a_runtime_result_object_with_diagnostics() {
+fn compile_returns_a_runtime_story_for_plain_text_story() {
     let mut compiler = Compiler::new("Hello world", None);
 
     let result = compiler.compile();
 
-    assert!(result.story.is_none());
+    let mut story = result.story.expect("expected runtime story");
+    assert!(result.diagnostics.is_empty());
+    assert!(story.can_continue());
+    assert_eq!(story.cont().unwrap(), "Hello world");
+    assert!(!story.can_continue());
+}
+
+#[test]
+fn compile_json_rejects_structured_story_for_now() {
+    let mut compiler = Compiler::new("== start ==\nHello", None);
+
+    let result = compiler.compile_json();
+
+    assert!(result.json.is_none());
     assert!(result.has_errors());
     assert_eq!(result.diagnostics.len(), 1);
     assert_eq!(result.diagnostics[0].severity, DiagnosticSeverity::Error);

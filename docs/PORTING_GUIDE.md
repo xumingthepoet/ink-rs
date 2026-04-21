@@ -92,6 +92,8 @@ Before implementing a compiler export feature:
   named-content trailer object.
 - Runtime JSON tokens are compact: commands are strings, divert targets are
   object encodings, and list definitions are keyed objects of item values.
+- A compiler-owned minimal exporter now exists for plain-text stories; extend
+  it one story feature at a time rather than copying runtime writer code.
 
 ## Diagnostics Compatibility
 

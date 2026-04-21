@@ -36,15 +36,17 @@ runtime instead of rewriting runtime execution.
   divert snippets.
 - Runtime JSON shape for `bladeink::story::Story::new` has been identified
   with a minimal loading fixture.
-- Ink parser grammar, parsed hierarchy named-content layers, reference
-  resolution, and runtime export are still not implemented.
+- Compiler-owned runtime export now emits minimal plain-text story JSON and
+  loads successfully through `bladeink::story::Story::new`.
+- Ink parser grammar, parsed hierarchy named-content layers, and reference
+  resolution are still not implemented.
 - Long-horizon project memory docs now exist.
 
 ## Current Milestone
 
 Milestone 1 is complete. Milestone 2 is complete. Milestone 3 is complete.
-Milestone 4 is complete. Milestone 5 is in progress, starting with runtime
-JSON shape identification.
+Milestone 4 is complete. Milestone 5 is complete. Milestone 6 starts with flow,
+weave, and choice behavior.
 
 ## Verification Checklist
 
@@ -80,12 +82,11 @@ The ignored `blade-ink-rs/` directory must be present because the workspace uses
 
 ## Known Issues
 
-- `Compiler::compile_json` currently returns structured unsupported diagnostics
-  instead of exported JSON.
+- `Compiler::compile_json` now exports minimal plain-text story JSON, but the
+  full compiler output path is still limited to plain-text stories.
 - `InkParser::parse` currently returns a structured unsupported diagnostic.
 - The parsed hierarchy currently has the object tree, path primitives, and a
-  root-story wrapper with content-node leaf wrappers, but runtime export is
-  still pending.
+  root-story wrapper with content-node leaf wrappers.
 - `InkParser::new` now stores an owned, comment-stripped input string so the
   preprocessor can normalize line endings before any grammar work begins.
 - `InkParser::parse` currently accepts plain text stories and returns a parsed
@@ -98,6 +99,8 @@ The ignored `blade-ink-rs/` directory must be present because the workspace uses
 - The runtime JSON reader expects top-level `inkVersion`, `root`, and
   `listDefs` keys; the `root` value is a container array whose trailing entry
   is either named-content metadata or `null`.
+- `Compiler::compile_json` now exports minimal plain-text story JSON, and
+  `Compiler::compile` can load that JSON through `bladeink`.
 - `CompilerOptions` now accepts an injectable file handler, but include parsing
   is not implemented yet.
 - The ink parser grammar is still pending.
@@ -190,6 +193,10 @@ The ignored `blade-ink-rs/` directory must be present because the workspace uses
   simple-divert parsed trees as stable textual dumps.
 - Added a runtime JSON smoke test that proves the minimal compiled story shape
   loads through `bladeink::story::Story::new`.
+- Added a compiler-owned runtime export path that serializes minimal
+  plain-text stories to runtime JSON and returns a runtime `Story`.
+- Added compiler and API contract tests covering JSON export success,
+  runtime loading, and rejection of non-text nodes.
 
 Validation:
 
@@ -274,11 +281,19 @@ about unnecessary parentheses around trait object types.
 - Recorded the top-level JSON contract and container terminator shape in the
   live documentation.
 
+### 2026-04-22
+
+- Completed Milestone 5 with a compiler-owned runtime export skeleton.
+- Added a JSON exporter that turns plain-text parsed stories into runtime JSON
+  without copying runtime internals.
+- Verified that exported JSON loads through `bladeink::story::Story::new` and
+  that `compile()` returns a runtime story for a plain-text input.
+
 Validation:
 
 ```sh
 cargo fmt --all --check
-cargo test -p ink-compiler parser
+cargo test --workspace
 cargo check --workspace
 ```
 
@@ -410,8 +425,7 @@ about unnecessary parentheses around trait object types.
 
 ## Next Task
 
-Implement a compiler-owned JSON export path rather than copying runtime
-internals.
+Port `FlowBase`, `Story`, `Knot`, and `Stitch` behavior.
 
 ## Repo Structure
 

@@ -9,6 +9,7 @@ use crate::{
     parsed,
     parser::InkParser,
     results::{CompileJsonResult, CompileResult, DefaultFileHandler, ParseResult},
+    runtime_export::export_story_json,
 };
 
 #[derive(Debug)]
@@ -63,18 +64,27 @@ impl Compiler {
             };
         }
 
-        let mut diagnostics = parse_result.diagnostics;
-        diagnostics.push(
-            CompilerError::Unsupported(
-                "runtime export has not been ported from ink-csharp/compiler yet",
-            )
-            .into_diagnostic()
-            .with_source_filename(self.options.source_filename.clone()),
-        );
+        let parsed_story = parse_result
+            .parsed_story
+            .expect("parsed_story checked to exist above");
 
-        CompileJsonResult {
-            json: None,
-            diagnostics,
+        match export_story_json(&parsed_story) {
+            Ok(json) => CompileJsonResult {
+                json: Some(json),
+                diagnostics: parse_result.diagnostics,
+            },
+            Err(err) => {
+                let mut diagnostics = parse_result.diagnostics;
+                diagnostics.push(
+                    err.into_diagnostic()
+                        .with_source_filename(self.options.source_filename.clone()),
+                );
+
+                CompileJsonResult {
+                    json: None,
+                    diagnostics,
+                }
+            }
         }
     }
 

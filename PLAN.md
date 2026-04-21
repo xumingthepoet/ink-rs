@@ -21,7 +21,7 @@ Core commands to run after every completed milestone:
 - [x] `cargo check --workspace`
 - [x] `cargo test --workspace`
 
-Current last verified milestone: Milestone 5 runtime JSON shape identification slice
+Current last verified milestone: Milestone 5 runtime export skeleton slice
 (`2026-04-22`).
 
 ## Rules
@@ -178,10 +178,10 @@ cargo check --workspace
 
 - [x] Identify required public or internal runtime JSON structures in
   `blade-ink-rs/lib`.
-- [ ] Implement a compiler-owned JSON export path rather than copying runtime
+- [x] Implement a compiler-owned JSON export path rather than copying runtime
   internals.
-- [ ] Export minimal plain text story JSON.
-- [ ] Verify exported JSON loads with `bladeink::story::Story::new`.
+- [x] Export minimal plain text story JSON.
+- [x] Verify exported JSON loads with `bladeink::story::Story::new`.
 
 Primary C# references:
 

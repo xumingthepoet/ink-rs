@@ -8,6 +8,7 @@ pub mod error;
 pub mod parsed;
 pub mod parser;
 pub mod results;
+mod runtime_export;
 
 pub use compiler::Compiler;
 pub use error::{CompilerError, Diagnostic, DiagnosticSeverity, Result};
