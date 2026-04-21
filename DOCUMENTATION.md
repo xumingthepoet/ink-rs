@@ -32,6 +32,8 @@ runtime instead of rewriting runtime execution.
   following content lines to the corresponding flow node.
 - Ink parser now also recognizes simple divert lines and models them as parsed
   divert nodes.
+- Ink parser now has golden parser tests for minimal plain-text, knot, and
+  divert snippets.
 - Ink parser grammar, parsed hierarchy named-content layers, reference
   resolution, and runtime export are still not implemented.
 - Long-horizon project memory docs now exist.
@@ -39,8 +41,7 @@ runtime instead of rewriting runtime execution.
 ## Current Milestone
 
 Milestone 1 is complete. Milestone 2 is complete. Milestone 3 is complete.
-Milestone 4 is in progress. Simple diverts are complete; golden parser tests
-for minimal `.ink` snippets are next.
+Milestone 4 is complete. Milestone 5 starts with runtime export skeleton work.
 
 ## Verification Checklist
 
@@ -179,6 +180,8 @@ The ignored `blade-ink-rs/` directory must be present because the workspace uses
   diverts, and basic knot/stitch divert targets.
 - Added parser tests covering simple divert parsing and tunnel-divert
   rejection.
+- Added golden parser tests that snapshot minimal plain-text, knot, and
+  simple-divert parsed trees as stable textual dumps.
 
 Validation:
 
@@ -247,6 +250,13 @@ about unnecessary parentheses around trait object types.
   diverts and basic knot/stitch targets.
 - Added parser tests covering simple divert parsing and tunnel-divert
   rejection.
+
+### 2026-04-22
+
+- Completed Milestone 4 with golden parser tests for minimal ink snippets.
+- Added a data-driven golden parser test harness that renders parsed trees to
+  stable textual snapshots.
+- Covered plain-text, knot, and simple-divert snippets with golden expectations.
 
 Validation:
 
@@ -384,7 +394,7 @@ about unnecessary parentheses around trait object types.
 
 ## Next Task
 
-Add golden parser tests for minimal `.ink` snippets.
+Identify required public or internal runtime JSON structures in `blade-ink-rs`.
 
 ## Repo Structure
 

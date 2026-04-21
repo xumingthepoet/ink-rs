@@ -304,7 +304,73 @@ impl<'source> InkParser<'source> {
 #[cfg(test)]
 mod tests {
     use super::{CommentEliminator, InkParser};
-    use crate::parsed::ObjectKind;
+    use crate::parsed::{ObjectKind, ObjectRef, Story as ParsedStory};
+
+    fn render_story(story: &ParsedStory) -> String {
+        let mut lines = vec!["Story".to_string()];
+
+        for child in story.content() {
+            render_object(&child, 1, &mut lines);
+        }
+
+        lines.join("\n")
+    }
+
+    fn render_object(object: &ObjectRef, indent: usize, lines: &mut Vec<String>) {
+        let padding = "  ".repeat(indent);
+        let borrowed = object.borrow();
+
+        match borrowed.kind() {
+            ObjectKind::ContentList { .. } => {
+                lines.push(format!("{padding}ContentList"));
+                for child in borrowed.content() {
+                    render_object(child, indent + 1, lines);
+                }
+            }
+            ObjectKind::Text { text } => {
+                lines.push(format!("{padding}Text({text:?})"));
+            }
+            ObjectKind::Divert {
+                target,
+                is_empty,
+                is_tunnel,
+                is_thread,
+            } => {
+                let target = target
+                    .as_ref()
+                    .map(|path| path.to_string())
+                    .unwrap_or_else(|| "->".to_string());
+                lines.push(format!(
+                    "{padding}Divert(target={target:?}, empty={is_empty}, tunnel={is_tunnel}, thread={is_thread})"
+                ));
+            }
+            ObjectKind::Flow {
+                flow_level,
+                name,
+                is_function,
+            } => {
+                lines.push(format!(
+                    "{padding}Flow(level={flow_level:?}, name={:?}, function={is_function})",
+                    name.as_deref().unwrap_or("<unnamed>")
+                ));
+                for child in borrowed.content() {
+                    render_object(child, indent + 1, lines);
+                }
+            }
+            ObjectKind::AuthorWarning { warning_message } => {
+                lines.push(format!("{padding}AuthorWarning({warning_message:?})"));
+            }
+            ObjectKind::Tag {
+                is_start,
+                in_choice,
+            } => {
+                lines.push(format!(
+                    "{padding}Tag(start={is_start}, in_choice={in_choice})"
+                ));
+            }
+            other => lines.push(format!("{padding}{other:?}")),
+        }
+    }
 
     #[test]
     fn ink_parser_preprocesses_comments_and_newlines() {
@@ -485,5 +551,40 @@ mod tests {
             result.diagnostics[0].message,
             "Tunnel diverts are not supported yet"
         );
+    }
+
+    #[test]
+    fn ink_parser_golden_cases_for_minimal_snippets() {
+        let cases = [
+            (
+                "plain_text",
+                "Hello world",
+                "Story\n  ContentList\n    Text(\"Hello world\")",
+            ),
+            (
+                "knot_with_body",
+                "== start ==\nHello",
+                "Story\n  Flow(level=Knot, name=\"start\", function=false)\n    ContentList\n      Text(\"Hello\")",
+            ),
+            (
+                "simple_divert",
+                "-> ending",
+                "Story\n  Divert(target=\"-> ending\", empty=false, tunnel=false, thread=false)",
+            ),
+        ];
+
+        for (name, source, expected) in cases {
+            let mut parser = InkParser::new(source, Some("story.ink"), None);
+            let result = parser.parse();
+
+            assert!(
+                result.diagnostics.is_empty(),
+                "case {name} produced diagnostics: {:?}",
+                result.diagnostics
+            );
+
+            let story = result.parsed_story.expect("expected parsed story");
+            assert_eq!(render_story(&story), expected, "case {name}");
+        }
     }
 }
