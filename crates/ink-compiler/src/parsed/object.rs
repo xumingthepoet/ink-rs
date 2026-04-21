@@ -14,8 +14,18 @@ pub struct DebugMetadata {
 
 pub type ObjectRef = Rc<RefCell<Object>>;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum ObjectKind {
+    Generic,
+    ContentList { dont_flatten: bool },
+    Text { text: String },
+    AuthorWarning { warning_message: String },
+    Tag { is_start: bool, in_choice: bool },
+}
+
 #[derive(Debug, Clone)]
 pub struct Object {
+    kind: ObjectKind,
     debug_metadata: Option<DebugMetadata>,
     parent: Option<Weak<RefCell<Object>>>,
     content: Vec<ObjectRef>,
@@ -24,6 +34,7 @@ pub struct Object {
 impl Object {
     pub fn new() -> Self {
         Self {
+            kind: ObjectKind::Generic,
             debug_metadata: None,
             parent: None,
             content: Vec::new(),
@@ -49,6 +60,18 @@ impl Object {
         self.debug_metadata.is_some()
     }
 
+    pub(crate) fn kind(&self) -> &ObjectKind {
+        &self.kind
+    }
+
+    pub(crate) fn kind_mut(&mut self) -> &mut ObjectKind {
+        &mut self.kind
+    }
+
+    pub(crate) fn set_kind(&mut self, kind: ObjectKind) {
+        self.kind = kind;
+    }
+
     pub fn parent(&self) -> Option<ObjectRef> {
         self.parent.as_ref().and_then(Weak::upgrade)
     }
@@ -59,6 +82,10 @@ impl Object {
 
     pub fn content(&self) -> &[ObjectRef] {
         &self.content
+    }
+
+    pub(crate) fn content_mut(&mut self) -> &mut Vec<ObjectRef> {
+        &mut self.content
     }
 
     pub fn add_content(parent: &ObjectRef, sub_content: ObjectRef) -> ObjectRef {

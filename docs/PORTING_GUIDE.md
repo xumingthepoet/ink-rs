@@ -43,6 +43,11 @@ review.
 | `ParsedHierarchy/FlowLevel.cs` | `parsed/flow_level.rs` | started |
 | `ParsedHierarchy/INamedContent.cs` | `parsed/flow.rs` | started |
 | `ParsedHierarchy/FlowBase.cs` | `parsed/flow.rs` | started |
+| `ParsedHierarchy/ContentList.cs` | `parsed/content.rs` | started |
+| `ParsedHierarchy/Text.cs` | `parsed/content.rs` | started |
+| `ParsedHierarchy/AuthorWarning.cs` | `parsed/content.rs` | started |
+| `ParsedHierarchy/Tag.cs` | `parsed/content.rs` | started |
+| `ParsedHierarchy/Wrap.cs` | `parsed/content.rs` | started |
 | `ParsedHierarchy/Weave.cs` | `parsed/weave.rs` | not started |
 | `ParsedHierarchy/Choice.cs` | `parsed/choice.rs` | not started |
 | `ParsedHierarchy/Divert.cs` | `parsed/divert.rs` | not started |

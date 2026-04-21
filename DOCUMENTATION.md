@@ -23,14 +23,16 @@ runtime instead of rewriting runtime execution.
 - Parsed hierarchy `Object` ownership, parent links, debug metadata
   inheritance, path primitives, and traversal helpers are now ported.
 - Parsed hierarchy flow levels and base traits are now ported.
+- Parsed hierarchy content nodes (`ContentList`, `Text`, `AuthorWarning`,
+  `Tag`, and generic `Wrap<T>`) are now ported.
 - Ink parser grammar, parsed hierarchy named-content layers, reference
   resolution, and runtime export are still not implemented.
 - Long-horizon project memory docs now exist.
 
 ## Current Milestone
 
-Milestone 1 is complete. Milestone 2 is complete. Milestone 3 is in progress,
-starting with the parsed content-node slice.
+Milestone 1 is complete. Milestone 2 is complete. Milestone 3 is complete.
+Milestone 4 is next, starting with comment elimination and whitespace handling.
 
 ## Verification Checklist
 
@@ -70,11 +72,15 @@ The ignored `blade-ink-rs/` directory must be present because the workspace uses
   instead of exported JSON.
 - `InkParser::parse` currently returns a structured unsupported diagnostic.
 - The parsed hierarchy currently has the object tree, path primitives, and a
-  root-story wrapper, but content-node leaf types and runtime export are still
-  pending.
+  root-story wrapper with content-node leaf wrappers, but runtime export is
+  still pending.
 - `CompilerOptions` now accepts an injectable file handler, but include parsing
   is not implemented yet.
 - The ink parser grammar is still pending.
+- The C# `Glue` and `LegacyTag` `Wrap<T>` aliases are not yet ported as
+  dedicated compiler-side wrappers because the corresponding runtime modules in
+  `blade-ink-rs` are private; the generic `Wrap<T>` helper is in place for
+  future use.
 - `cargo check --workspace` reports warnings from ignored dependency
   `blade-ink-rs/lib`; these are upstream/local reference warnings, not current
   compiler crate failures.
@@ -133,6 +139,10 @@ The ignored `blade-ink-rs/` directory must be present because the workspace uses
   model.
 - Added tests for flow trait defaults, flow level ordering, and story-level
   trait behavior.
+- Added parsed hierarchy content-node wrappers: `ContentList`, `Text`,
+  `AuthorWarning`, `Tag`, and generic `Wrap<T>`.
+- Added tests covering trailing-whitespace trimming, tag formatting,
+  payload storage, wrapper passthrough, and parent-link preservation.
 
 Validation:
 
@@ -173,6 +183,27 @@ about unnecessary parentheses around trait object types.
 - Added `parsed::Identifier` and `parsed::Path` primitives.
 - Reworked `parsed::Story` to own a root object that adopts top-level content.
 - Added traversal helpers for depth-first search and ancestry collection.
+
+Validation:
+
+```sh
+cargo fmt --all --check
+cargo test -p ink-compiler parsed
+cargo check --workspace
+```
+
+Result: all passed. `blade-ink-rs/lib` emitted the same two existing warnings
+about unnecessary parentheses around trait object types.
+
+### 2026-04-22
+
+- Continued Milestone 3 with the parsed hierarchy content-node slice.
+- Added parsed hierarchy content-node wrappers: `ContentList`, `Text`,
+  `AuthorWarning`, `Tag`, and generic `Wrap<T>`.
+- `ContentList` now trims trailing whitespace from leaf text nodes and keeps
+  tree parent links intact when adding or inserting content.
+- Added tests covering trimming, payload storage, tag formatting, wrapper
+  passthrough, and tree composition.
 
 Validation:
 
@@ -246,8 +277,7 @@ about unnecessary parentheses around trait object types.
 
 ## Next Task
 
-Port `ContentList`, `Text`, `AuthorWarning`, `Tag`, `Wrap`, and basic leaf
-nodes for Milestone 3.
+Port comment elimination and whitespace handling for Milestone 4.
 
 ## Repo Structure
 

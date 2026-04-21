@@ -64,6 +64,9 @@ The first parsed-hierarchy slice uses reference-counted tree nodes:
   metadata.
 - Flow-level concepts are represented with `FlowLevel`, `NamedContent`, and
   `FlowBase` traits so future knot/stitch types can share a common interface.
+- Content-node leaf types are represented as `ObjectKind`-backed wrappers so
+  `ContentList`, `Text`, `AuthorWarning`, and `Tag` can live in the same tree
+  model without changing traversal behavior.
 
 ## Runtime Export
 
