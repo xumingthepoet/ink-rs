@@ -35,6 +35,8 @@ review.
 | `CharacterRange.cs` | `parser/character_range.rs` | started |
 | `StringParser/StringParserState.cs` | `parser/string_parser/state.rs` | started |
 | `StringParser/StringParser.cs` | `parser/string_parser/mod.rs` | started |
+| `InkParser/CommentEliminator.cs` | `parser/comment_eliminator.rs` | started |
+| `InkParser/InkParser_Whitespace.cs` | `parser/whitespace.rs` | started |
 | `InkParser/*.cs` | `parser/ink_parser/` | not started |
 | `ParsedHierarchy/Object.cs` | `parsed/object.rs` | started |
 | `ParsedHierarchy/Identifier.cs` | `parsed/identifier.rs` | started |

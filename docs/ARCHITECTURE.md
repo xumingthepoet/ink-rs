@@ -67,6 +67,10 @@ The first parsed-hierarchy slice uses reference-counted tree nodes:
 - Content-node leaf types are represented as `ObjectKind`-backed wrappers so
   `ContentList`, `Text`, `AuthorWarning`, and `Tag` can live in the same tree
   model without changing traversal behavior.
+- `InkParser::new` runs a comment-elimination pre-pass before the grammar
+  layer sees the input, mirroring the C# compiler's preprocessing step.
+- Whitespace handling lives in parser helpers that mirror the C# parser rules
+  for newline, end-of-file, and spacing combinators.
 
 ## Runtime Export
 

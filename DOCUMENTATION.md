@@ -25,6 +25,7 @@ runtime instead of rewriting runtime execution.
 - Parsed hierarchy flow levels and base traits are now ported.
 - Parsed hierarchy content nodes (`ContentList`, `Text`, `AuthorWarning`,
   `Tag`, and generic `Wrap<T>`) are now ported.
+- Ink parser comment elimination and whitespace helpers are now ported.
 - Ink parser grammar, parsed hierarchy named-content layers, reference
   resolution, and runtime export are still not implemented.
 - Long-horizon project memory docs now exist.
@@ -32,7 +33,7 @@ runtime instead of rewriting runtime execution.
 ## Current Milestone
 
 Milestone 1 is complete. Milestone 2 is complete. Milestone 3 is complete.
-Milestone 4 is next, starting with comment elimination and whitespace handling.
+Milestone 4 is in progress, starting with plain text lines.
 
 ## Verification Checklist
 
@@ -74,6 +75,8 @@ The ignored `blade-ink-rs/` directory must be present because the workspace uses
 - The parsed hierarchy currently has the object tree, path primitives, and a
   root-story wrapper with content-node leaf wrappers, but runtime export is
   still pending.
+- `InkParser::new` now stores an owned, comment-stripped input string so the
+  preprocessor can normalize line endings before any grammar work begins.
 - `CompilerOptions` now accepts an injectable file handler, but include parsing
   is not implemented yet.
 - The ink parser grammar is still pending.
@@ -143,6 +146,14 @@ The ignored `blade-ink-rs/` directory must be present because the workspace uses
   `AuthorWarning`, `Tag`, and generic `Wrap<T>`.
 - Added tests covering trailing-whitespace trimming, tag formatting,
   payload storage, wrapper passthrough, and parent-link preservation.
+- Added a Rust `CommentEliminator` preprocessor that strips `//` and `/* */`
+  comments while preserving line counts.
+- Added whitespace helper functions that mirror the C# `InkParser_Whitespace`
+  rules for newline, end-of-file, and spacing combinators.
+- Made `InkParser::new` run the comment eliminator before storing the input
+  string.
+- Added tests for comment stripping, line-ending normalization, whitespace
+  helpers, and the preprocessed parser input.
 
 Validation:
 
@@ -189,6 +200,29 @@ Validation:
 ```sh
 cargo fmt --all --check
 cargo test -p ink-compiler parsed
+cargo check --workspace
+```
+
+Result: all passed. `blade-ink-rs/lib` emitted the same two existing warnings
+about unnecessary parentheses around trait object types.
+
+### 2026-04-22
+
+- Continued Milestone 4 with comment elimination and whitespace handling.
+- Added a Rust `CommentEliminator` preprocessor for `//` and `/* */`
+  comments, preserving line counts and normalizing line endings.
+- Added whitespace helper functions mirroring `InkParser_Whitespace`:
+  `newline`, `end_of_file`, `end_of_line`, `whitespace`,
+  `multiline_whitespace`, `any_whitespace`, `spaced`, and `multi_spaced`.
+- Made `InkParser::new` store an owned, comment-stripped input string.
+- Added tests for comment stripping, whitespace helpers, and the parser input
+  preprocessing step.
+
+Validation:
+
+```sh
+cargo fmt --all --check
+cargo test -p ink-compiler parser
 cargo check --workspace
 ```
 
@@ -277,7 +311,7 @@ about unnecessary parentheses around trait object types.
 
 ## Next Task
 
-Port comment elimination and whitespace handling for Milestone 4.
+Port plain text lines into parsed text/content nodes for Milestone 4.
 
 ## Repo Structure
 
