@@ -20,14 +20,16 @@ runtime instead of rewriting runtime execution.
   are now ported.
 - `StringParserState` stack behavior is now ported.
 - Core `StringParser` cursor/rule helpers are now ported.
-- Ink parser grammar, parsed hierarchy, reference resolution, and runtime
-  export are still not implemented.
+- Parsed hierarchy `Object` ownership, parent links, debug metadata
+  inheritance, path primitives, and traversal helpers are now ported.
+- Ink parser grammar, parsed hierarchy named-content layers, reference
+  resolution, and runtime export are still not implemented.
 - Long-horizon project memory docs now exist.
 
 ## Current Milestone
 
-Milestone 1 is complete. Milestone 2 is complete. Next work starts at
-Milestone 3: Parsed Hierarchy Core.
+Milestone 1 is complete. Milestone 2 is complete. Milestone 3 is in progress,
+starting with the parsed object hierarchy slice.
 
 ## Verification Checklist
 
@@ -66,7 +68,9 @@ The ignored `blade-ink-rs/` directory must be present because the workspace uses
 - `Compiler::compile_json` currently returns structured unsupported diagnostics
   instead of exported JSON.
 - `InkParser::parse` currently returns a structured unsupported diagnostic.
-- The parsed hierarchy only has placeholder `Object` and `Story` structs.
+- The parsed hierarchy currently has the object tree, path primitives, and a
+  root-story wrapper, but named content, flow levels, and runtime export are
+  still pending.
 - `CompilerOptions` now accepts an injectable file handler, but include parsing
   is not implemented yet.
 - The ink parser grammar is still pending.
@@ -113,6 +117,13 @@ The ignored `blade-ink-rs/` directory must be present because the workspace uses
   line, and debug metadata helpers into `parser::string_parser`.
 - Added unit tests covering cursor movement, newline tracking, character set
   parsing, rule rollback/commit behavior, diagnostics, and debug metadata.
+- Ported parsed hierarchy ownership into reference-counted tree nodes with weak
+  parent links, inherited debug metadata, depth-first traversal helpers, and
+  basic `Identifier`/`Path` types.
+- Reworked `parsed::Story` into a root object wrapper so top-level content uses
+  the same ancestry model as C#.
+- Added tests covering parent links, debug metadata inheritance, ancestry
+  ordering, traversal order, and path formatting.
 
 Validation:
 
@@ -139,6 +150,26 @@ Validation:
 ```sh
 cargo fmt --all --check
 cargo test -p ink-compiler string_parser
+cargo check --workspace
+```
+
+Result: all passed. `blade-ink-rs/lib` emitted the same two existing warnings
+about unnecessary parentheses around trait object types.
+
+### 2026-04-22
+
+- Continued Milestone 3 with the parsed hierarchy object slice.
+- Reworked `parsed::Object` into `Rc<RefCell<_>>`-backed tree nodes with weak
+  parent links and inherited debug metadata.
+- Added `parsed::Identifier` and `parsed::Path` primitives.
+- Reworked `parsed::Story` to own a root object that adopts top-level content.
+- Added traversal helpers for depth-first search and ancestry collection.
+
+Validation:
+
+```sh
+cargo fmt --all --check
+cargo test -p ink-compiler parsed
 cargo check --workspace
 ```
 
@@ -185,8 +216,8 @@ about unnecessary parentheses around trait object types.
 
 ## Next Task
 
-Port parsed `Object` ownership, parent/path model, debug metadata, and
-traversal helpers for Milestone 3.
+Port `Identifier`, `Path`, `INamedContent`, flow levels, and base traits for
+Milestone 3.
 
 ## Repo Structure
 

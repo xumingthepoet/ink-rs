@@ -36,8 +36,10 @@ review.
 | `StringParser/StringParserState.cs` | `parser/string_parser/state.rs` | started |
 | `StringParser/StringParser.cs` | `parser/string_parser/mod.rs` | started |
 | `InkParser/*.cs` | `parser/ink_parser/` | not started |
-| `ParsedHierarchy/Object.cs` | `parsed/object.rs` | placeholder |
-| `ParsedHierarchy/Story.cs` | `parsed/story.rs` | placeholder |
+| `ParsedHierarchy/Object.cs` | `parsed/object.rs` | started |
+| `ParsedHierarchy/Identifier.cs` | `parsed/identifier.rs` | started |
+| `ParsedHierarchy/Path.cs` | `parsed/path.rs` | started |
+| `ParsedHierarchy/Story.cs` | `parsed/story.rs` | started |
 | `ParsedHierarchy/FlowBase.cs` | `parsed/flow_base.rs` | not started |
 | `ParsedHierarchy/Weave.cs` | `parsed/weave.rs` | not started |
 | `ParsedHierarchy/Choice.cs` | `parsed/choice.rs` | not started |

@@ -53,6 +53,16 @@ Guidelines:
 - Prefer small tests for each parsed object behavior before integrating with
   the full parser.
 
+### Current Ownership Model
+
+The first parsed-hierarchy slice uses reference-counted tree nodes:
+
+- `parsed::Object` is wrapped in `Rc<RefCell<_>>` when stored in a tree.
+- Child nodes keep a `Weak` parent pointer to avoid ownership cycles.
+- Tree traversal helpers operate on `ObjectRef` values and walk depth-first.
+- Debug metadata inherits from ancestors when a node does not define its own
+  metadata.
+
 ## Runtime Export
 
 The compiler should own the JSON export path. It should generate JSON compatible

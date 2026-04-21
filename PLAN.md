@@ -21,7 +21,7 @@ Core commands to run after every completed milestone:
 - [x] `cargo check --workspace`
 - [x] `cargo test --workspace`
 
-Current last verified milestone: Milestone 2 string parser foundation complete
+Current last verified milestone: Milestone 3 parsed object hierarchy slice
 (`2026-04-22`).
 
 ## Rules
@@ -115,7 +115,7 @@ cargo check --workspace
 
 ## Milestone 3: Parsed Hierarchy Core
 
-- [ ] Port parsed `Object` ownership, parent/path model, debug metadata, and
+- [x] Port parsed `Object` ownership, parent/path model, debug metadata, and
   traversal helpers.
 - [ ] Port `Identifier`, `Path`, `INamedContent`, flow levels, and base traits.
 - [ ] Port `ContentList`, `Text`, `AuthorWarning`, `Tag`, `Wrap`, and basic
