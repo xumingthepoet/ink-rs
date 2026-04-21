@@ -21,7 +21,7 @@ Core commands to run after every completed milestone:
 - [x] `cargo check --workspace`
 - [x] `cargo test --workspace`
 
-Current last verified milestone: Milestone 7 expression parsing slice
+Current last verified milestone: Milestone 7 variable statements slice
 (`2026-04-22`).
 
 ## Rules
@@ -237,7 +237,7 @@ cargo check --workspace
 ## Milestone 7: Expressions, Variables, Lists, and Logic
 
 - [x] Port expression parsing and expression parsed hierarchy.
-- [ ] Port variable declarations, assignments, references, constants, and
+- [x] Port variable declarations, assignments, references, constants, and
   externals.
 - [ ] Port list definitions and list values.
 - [ ] Port conditionals, sequences, function calls, returns, and tunnels.
@@ -318,7 +318,7 @@ cargo test --workspace
 
 ## Next Task
 
-Port variable declarations, assignments, references, constants, and externals.
+Port list definitions and list values.
 
 ## Risk Register
 

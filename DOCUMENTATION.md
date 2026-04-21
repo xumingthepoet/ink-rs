@@ -32,6 +32,8 @@ runtime instead of rewriting runtime execution.
   `VariableReference`, `FunctionCall`, `DivertTarget`, `List`,
   `BinaryExpression`, `UnaryExpression`, `IncDecExpression`, and
   `MultipleConditionExpression`) are now ported.
+- Parsed hierarchy variable statement wrappers (`VariableAssignment`,
+  `ConstantDeclaration`, and `ExternalDeclaration`) are now ported.
 - Parsed hierarchy content nodes (`ContentList`, `Text`, `AuthorWarning`,
   `Tag`, and generic `Wrap<T>`) are now ported.
 - Ink parser comment elimination and whitespace helpers are now ported.
@@ -46,6 +48,9 @@ runtime instead of rewriting runtime execution.
 - Expression parser foundation is now ported with Pratt-style precedence
   parsing for literals, variable paths, function calls, lists, divert targets,
   unary operators, and binary operators.
+- Ink parser now also recognizes `VAR`, `CONST`, `EXTERNAL`, and `~` logic
+  lines for variable statements, temporary assignments, constants, and
+  variable references.
 - Runtime story behavior tests now cover choice selection, named knot/stitch
   and gather-like container paths, and explicit diverts against
   `bladeink::story::Story`.
@@ -62,7 +67,8 @@ runtime instead of rewriting runtime execution.
 
 Milestone 1 is complete. Milestone 2 is complete. Milestone 3 is complete.
 Milestone 4 is complete. Milestone 5 is complete. Milestone 6 is complete.
-Milestone 7 is in progress, and the expression parsing slice is complete.
+Milestone 7 is in progress, and the expression and variable-statement slices
+are complete.
 
 ## Verification Checklist
 
@@ -109,7 +115,7 @@ The ignored `blade-ink-rs/` directory must be present because the workspace uses
   preprocessor can normalize line endings before any grammar work begins.
 - `InkParser::parse` currently accepts plain text stories and returns a parsed
   content tree, but the full grammar is still pending beyond the current plain
-  text, knot/stitch, and simple divert slices.
+  text, knot/stitch, simple divert, and variable-statement slices.
 - `InkParser::parse` now also recognizes basic knot and stitch declarations by
   line prefix and models them as parsed `Knot` and `Stitch` nodes.
 - `InkParser::parse` now also recognizes simple divert lines and models them as
@@ -117,8 +123,12 @@ The ignored `blade-ink-rs/` directory must be present because the workspace uses
 - Expression parsing currently covers a focused foundation subset: numeric and
   boolean literals, string expressions, variable paths, function calls, list
   expressions, divert targets, unary operators, and binary precedence. The
-  variable declaration, list-definition, conditionals, sequence, and logic
-  grammar slices are still pending.
+  list-definition, conditionals, and sequence grammar slices are still pending
+  beyond the variable-statement helpers.
+- `InkParser::parse` now also recognizes `VAR`, `CONST`, `EXTERNAL`, and `~`
+  logic lines for variable declarations, constants, externals, temporary
+  assignments, and variable-reference expressions, but list declarations and
+  the rest of the logic grammar are still pending.
 - The runtime JSON reader expects top-level `inkVersion`, `root`, and
   `listDefs` keys; the `root` value is a container array whose trailing entry
   is either named-content metadata or `null`.
@@ -378,6 +388,29 @@ about unnecessary parentheses around trait object types.
 
 ### 2026-04-22
 
+- Continued Milestone 7 with the variable statement slice.
+- Added parsed hierarchy wrappers for `VariableAssignment`,
+  `ConstantDeclaration`, and `ExternalDeclaration`.
+- Added line-driven parser support for `VAR`, `CONST`, `EXTERNAL`, and `~`
+  logic statements with expression parsing for assignments and references.
+- Added parser tests covering variable declarations, constants, externals,
+  temporary assignments, increment/decrement assignments, and plain variable
+  reference logic lines.
+
+Validation:
+
+```sh
+cargo fmt --all --check
+cargo test -p ink-compiler variables
+cargo check --workspace
+cargo test --workspace
+```
+
+Result: all passed. `blade-ink-rs/lib` emitted the same two existing warnings
+about unnecessary parentheses around trait object types.
+
+### 2026-04-22
+
 - Continued Milestone 6 with the weave-point parsed hierarchy slice.
 - Added parsed `Weave`, `Choice`, and `Gather` wrappers plus a local naming
   table for weave points.
@@ -543,7 +576,7 @@ about unnecessary parentheses around trait object types.
 
 ## Next Task
 
-Port variable declarations, assignments, references, constants, and externals.
+Port list definitions and list values.
 
 ## Repo Structure
 

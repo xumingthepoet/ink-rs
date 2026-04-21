@@ -18,8 +18,8 @@ use std::sync::Arc;
 use crate::{
     error::{Diagnostic, DiagnosticSeverity},
     parsed::{
-        ContentList, Divert, FlowLevel, Identifier, Knot, Object, ObjectRef, Path, Stitch,
-        Story as ParsedStory, Text,
+        ConstantDeclaration, ContentList, Divert, ExternalDeclaration, FlowLevel, Identifier, Knot,
+        Object, ObjectRef, Path, Stitch, Story as ParsedStory, Text, VariableAssignment,
     },
     results::{FileHandler, ParseResult},
 };
@@ -29,6 +29,13 @@ pub struct InkParser<'source> {
     input_string: String,
     source_filename: Option<&'source str>,
     file_handler: Option<Arc<dyn FileHandler>>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AssignmentOperator {
+    Assign,
+    Increment,
+    Decrement,
 }
 
 impl<'source> InkParser<'source> {
@@ -89,6 +96,17 @@ impl<'source> InkParser<'source> {
         for (line_index, segment) in self.input_string.split_inclusive('\n').enumerate() {
             let had_newline = segment.ends_with('\n');
             let line_text = segment.strip_suffix('\n').unwrap_or(segment);
+
+            if let Some(statement) =
+                Self::parse_statement_line(line_text, line_index + 1, source_filename.clone())?
+            {
+                if let Some(parent) = current_flow.as_ref() {
+                    Object::add_content(parent, statement);
+                } else {
+                    top_level_content.push(statement);
+                }
+                continue;
+            }
 
             if let Some(flow) =
                 Self::parse_flow_header(line_text, line_index + 1, source_filename.clone())?
@@ -298,12 +316,420 @@ impl<'source> InkParser<'source> {
         }
     }
 
+    fn parse_statement_line(
+        line_text: &str,
+        line_number: usize,
+        source_filename: Option<String>,
+    ) -> std::result::Result<Option<ObjectRef>, Diagnostic> {
+        let trimmed_start = line_text.trim_start();
+        if trimmed_start.is_empty() {
+            return Ok(None);
+        }
+
+        if let Some(statement) =
+            Self::parse_logic_statement(trimmed_start, line_number, source_filename.clone())?
+        {
+            return Ok(Some(statement));
+        }
+
+        if let Some(statement) =
+            Self::parse_variable_declaration(trimmed_start, line_number, source_filename.clone())?
+        {
+            return Ok(Some(statement));
+        }
+
+        if let Some(statement) =
+            Self::parse_constant_declaration(trimmed_start, line_number, source_filename.clone())?
+        {
+            return Ok(Some(statement));
+        }
+
+        if let Some(statement) =
+            Self::parse_external_declaration(trimmed_start, line_number, source_filename)?
+        {
+            return Ok(Some(statement));
+        }
+
+        Ok(None)
+    }
+
+    fn parse_logic_statement(
+        line_text: &str,
+        line_number: usize,
+        source_filename: Option<String>,
+    ) -> std::result::Result<Option<ObjectRef>, Diagnostic> {
+        let Some(body) = line_text.strip_prefix('~') else {
+            return Ok(None);
+        };
+
+        let body = body.trim_start();
+        if body.is_empty() {
+            return Err(Diagnostic::new(
+                DiagnosticSeverity::Error,
+                source_filename,
+                line_number,
+                1,
+                "Expected logic after '~'",
+            ));
+        }
+
+        if let Some(statement) =
+            Self::parse_temp_assignment(body, line_number, source_filename.clone())?
+        {
+            return Ok(Some(statement));
+        }
+
+        if let Some(statement) =
+            Self::parse_assignment_or_expression(body, line_number, source_filename)?
+        {
+            return Ok(Some(statement));
+        }
+
+        Ok(None)
+    }
+
+    fn parse_temp_assignment(
+        body: &str,
+        line_number: usize,
+        source_filename: Option<String>,
+    ) -> std::result::Result<Option<ObjectRef>, Diagnostic> {
+        let Some(remainder) = Self::strip_keyword(body, "temp") else {
+            return Ok(None);
+        };
+
+        let remainder = remainder.trim_start();
+        let (identifier, after_identifier) =
+            Self::parse_identifier_prefix(remainder).ok_or_else(|| {
+                Diagnostic::new(
+                    DiagnosticSeverity::Error,
+                    source_filename.clone(),
+                    line_number,
+                    1,
+                    "Expected temporary variable name",
+                )
+            })?;
+
+        let after_identifier = after_identifier.trim_start();
+        if after_identifier.is_empty() {
+            return Ok(Some(
+                VariableAssignment::new(identifier, None, false, true).object(),
+            ));
+        }
+
+        if let Some((operator, rhs)) = Self::parse_assignment_operator(after_identifier) {
+            let rhs = rhs.trim_start();
+            if rhs.is_empty() {
+                return Err(Diagnostic::new(
+                    DiagnosticSeverity::Error,
+                    source_filename,
+                    line_number,
+                    1,
+                    "Expected value after assignment operator",
+                ));
+            }
+
+            let expression = Self::parse_expression_fragment(rhs, line_number, source_filename)?;
+            return Ok(Some(match operator {
+                AssignmentOperator::Assign => {
+                    VariableAssignment::new(identifier, Some(expression), false, true).object()
+                }
+                AssignmentOperator::Increment => {
+                    crate::parsed::IncDecExpression::new(identifier, true, Some(expression))
+                        .object()
+                }
+                AssignmentOperator::Decrement => {
+                    crate::parsed::IncDecExpression::new(identifier, false, Some(expression))
+                        .object()
+                }
+            }));
+        }
+
+        Ok(Some(
+            VariableAssignment::new(identifier, None, false, true).object(),
+        ))
+    }
+
+    fn parse_assignment_or_expression(
+        body: &str,
+        line_number: usize,
+        source_filename: Option<String>,
+    ) -> std::result::Result<Option<ObjectRef>, Diagnostic> {
+        if let Some((identifier, after_identifier)) = Self::parse_identifier_prefix(body) {
+            if let Some((operator, rhs)) = Self::parse_assignment_operator(after_identifier) {
+                let rhs = rhs.trim_start();
+                if rhs.is_empty() {
+                    return Err(Diagnostic::new(
+                        DiagnosticSeverity::Error,
+                        source_filename,
+                        line_number,
+                        1,
+                        "Expected value after assignment operator",
+                    ));
+                }
+
+                let expression =
+                    Self::parse_expression_fragment(rhs, line_number, source_filename.clone())?;
+                return Ok(Some(match operator {
+                    AssignmentOperator::Assign => {
+                        VariableAssignment::new(identifier, Some(expression), false, false).object()
+                    }
+                    AssignmentOperator::Increment => {
+                        crate::parsed::IncDecExpression::new(identifier, true, Some(expression))
+                            .object()
+                    }
+                    AssignmentOperator::Decrement => {
+                        crate::parsed::IncDecExpression::new(identifier, false, Some(expression))
+                            .object()
+                    }
+                }));
+            }
+        }
+
+        let expression = Self::parse_expression_fragment(body, line_number, source_filename)?;
+        Ok(Some(expression))
+    }
+
+    fn parse_variable_declaration(
+        line_text: &str,
+        line_number: usize,
+        source_filename: Option<String>,
+    ) -> std::result::Result<Option<ObjectRef>, Diagnostic> {
+        let Some(remainder) = Self::strip_keyword(line_text, "VAR") else {
+            return Ok(None);
+        };
+
+        let remainder = remainder.trim_start();
+        let (identifier, after_identifier) =
+            Self::parse_identifier_prefix(remainder).ok_or_else(|| {
+                Diagnostic::new(
+                    DiagnosticSeverity::Error,
+                    source_filename.clone(),
+                    line_number,
+                    1,
+                    "Expected variable name",
+                )
+            })?;
+
+        let after_identifier = after_identifier.trim_start();
+        let Some(rhs) = after_identifier.strip_prefix('=') else {
+            return Err(Diagnostic::new(
+                DiagnosticSeverity::Error,
+                source_filename,
+                line_number,
+                1,
+                "Expected '=' after variable name",
+            ));
+        };
+
+        let expression =
+            Self::parse_expression_fragment(rhs.trim_start(), line_number, source_filename)?;
+        Ok(Some(
+            VariableAssignment::new(identifier, Some(expression), true, false).object(),
+        ))
+    }
+
+    fn parse_constant_declaration(
+        line_text: &str,
+        line_number: usize,
+        source_filename: Option<String>,
+    ) -> std::result::Result<Option<ObjectRef>, Diagnostic> {
+        let Some(remainder) = Self::strip_keyword(line_text, "CONST") else {
+            return Ok(None);
+        };
+
+        let remainder = remainder.trim_start();
+        let (identifier, after_identifier) =
+            Self::parse_identifier_prefix(remainder).ok_or_else(|| {
+                Diagnostic::new(
+                    DiagnosticSeverity::Error,
+                    source_filename.clone(),
+                    line_number,
+                    1,
+                    "Expected constant name",
+                )
+            })?;
+
+        let after_identifier = after_identifier.trim_start();
+        let Some(rhs) = after_identifier.strip_prefix('=') else {
+            return Err(Diagnostic::new(
+                DiagnosticSeverity::Error,
+                source_filename,
+                line_number,
+                1,
+                "Expected '=' after constant name",
+            ));
+        };
+
+        let expression =
+            Self::parse_expression_fragment(rhs.trim_start(), line_number, source_filename)?;
+        Ok(Some(
+            ConstantDeclaration::new(identifier, Some(expression)).object(),
+        ))
+    }
+
+    fn parse_external_declaration(
+        line_text: &str,
+        line_number: usize,
+        source_filename: Option<String>,
+    ) -> std::result::Result<Option<ObjectRef>, Diagnostic> {
+        let Some(remainder) = Self::strip_keyword(line_text, "EXTERNAL") else {
+            return Ok(None);
+        };
+
+        let remainder = remainder.trim_start();
+        let (identifier, after_identifier) =
+            Self::parse_identifier_prefix(remainder).ok_or_else(|| {
+                Diagnostic::new(
+                    DiagnosticSeverity::Error,
+                    source_filename.clone(),
+                    line_number,
+                    1,
+                    "Expected external name",
+                )
+            })?;
+
+        let mut argument_names = Vec::new();
+        let after_identifier = after_identifier.trim_start();
+        if after_identifier.starts_with('(') {
+            let Some(close_paren_index) = after_identifier.find(')') else {
+                return Err(Diagnostic::new(
+                    DiagnosticSeverity::Error,
+                    source_filename,
+                    line_number,
+                    1,
+                    "Expected closing ')' for external declaration",
+                ));
+            };
+
+            let inside = &after_identifier[1..close_paren_index];
+            for raw_arg in inside.split(',') {
+                let arg = raw_arg.trim();
+                if arg.is_empty() {
+                    continue;
+                }
+                let (argument, tail) = Self::parse_identifier_prefix(arg).ok_or_else(|| {
+                    Diagnostic::new(
+                        DiagnosticSeverity::Error,
+                        source_filename.clone(),
+                        line_number,
+                        1,
+                        "Expected external argument name",
+                    )
+                })?;
+
+                if !tail.trim().is_empty() {
+                    return Err(Diagnostic::new(
+                        DiagnosticSeverity::Error,
+                        source_filename.clone(),
+                        line_number,
+                        1,
+                        "Unexpected trailing text in external declaration",
+                    ));
+                }
+                argument_names.push(argument.name);
+            }
+        }
+
+        Ok(Some(
+            ExternalDeclaration::new(identifier, argument_names).object(),
+        ))
+    }
+
+    fn parse_expression_fragment(
+        expression_text: &str,
+        line_number: usize,
+        source_filename: Option<String>,
+    ) -> std::result::Result<ObjectRef, Diagnostic> {
+        let mut parser = ExpressionParser::new(expression_text.to_string(), source_filename);
+        parser.parse_expression().ok_or_else(|| {
+            let diagnostic = parser.diagnostics().first().cloned().unwrap_or_else(|| {
+                Diagnostic::new(
+                    DiagnosticSeverity::Error,
+                    None,
+                    line_number,
+                    1,
+                    "Failed to parse expression",
+                )
+            });
+            Diagnostic::new(
+                diagnostic.severity,
+                diagnostic.source_filename,
+                line_number,
+                diagnostic.column,
+                diagnostic.message,
+            )
+        })
+    }
+
+    fn strip_keyword<'input>(input: &'input str, keyword: &str) -> Option<&'input str> {
+        if !input.starts_with(keyword) {
+            return None;
+        }
+
+        let remainder = &input[keyword.len()..];
+        if remainder
+            .chars()
+            .next()
+            .map(|character| character.is_alphanumeric() || character == '_')
+            .unwrap_or(false)
+        {
+            return None;
+        }
+
+        Some(remainder)
+    }
+
+    fn parse_identifier_prefix(input: &str) -> Option<(Identifier, &str)> {
+        let mut chars = input.chars();
+        let first = chars.next()?;
+        if !(first.is_alphabetic() || first == '_') {
+            return None;
+        }
+
+        let mut identifier = String::new();
+        identifier.push(first);
+
+        let mut consumed = first.len_utf8();
+        for character in chars {
+            if character.is_alphanumeric() || character == '_' {
+                identifier.push(character);
+                consumed += character.len_utf8();
+            } else {
+                break;
+            }
+        }
+
+        Some((Identifier::new(identifier), &input[consumed..]))
+    }
+
+    fn parse_assignment_operator(input: &str) -> Option<(AssignmentOperator, &str)> {
+        let trimmed = input.trim_start();
+        let leading_whitespace = input.len() - trimmed.len();
+        let remainder = &input[leading_whitespace..];
+
+        if let Some(after) = remainder.strip_prefix("+=") {
+            return Some((AssignmentOperator::Increment, after));
+        }
+
+        if let Some(after) = remainder.strip_prefix("-=") {
+            return Some((AssignmentOperator::Decrement, after));
+        }
+
+        if let Some(after) = remainder.strip_prefix('=') {
+            if !after.starts_with('=') {
+                return Some((AssignmentOperator::Assign, after));
+            }
+        }
+
+        None
+    }
+
     fn find_unsupported_syntax(&self) -> Option<(usize, usize, &'static str)> {
         for (line_index, line) in self.input_string.lines().enumerate() {
             let trimmed = line.trim_start();
             let column = line.len().saturating_sub(trimmed.len()) + 1;
 
-            for marker in ["~", "*", "-", "#", "{", "}"] {
+            for marker in ["*", "-", "#", "{", "}"] {
                 if marker == "-" && trimmed.starts_with("->") {
                     continue;
                 }
@@ -384,6 +810,37 @@ mod tests {
                     "{padding}Tag(start={is_start}, in_choice={in_choice})"
                 ));
             }
+            ObjectKind::VariableAssignment {
+                identifier,
+                is_global_declaration,
+                is_new_temporary_declaration,
+            } => {
+                lines.push(format!(
+                    "{padding}VariableAssignment(name={:?}, global={is_global_declaration}, temp={is_new_temporary_declaration})",
+                    identifier.name
+                ));
+                for child in borrowed.content() {
+                    render_object(child, indent + 1, lines);
+                }
+            }
+            ObjectKind::ConstantDeclaration { identifier } => {
+                lines.push(format!(
+                    "{padding}ConstantDeclaration(name={:?})",
+                    identifier.name
+                ));
+                for child in borrowed.content() {
+                    render_object(child, indent + 1, lines);
+                }
+            }
+            ObjectKind::ExternalDeclaration {
+                identifier,
+                argument_names,
+            } => {
+                lines.push(format!(
+                    "{padding}ExternalDeclaration(name={:?}, args={argument_names:?})",
+                    identifier.name
+                ));
+            }
             other => lines.push(format!("{padding}{other:?}")),
         }
     }
@@ -448,6 +905,58 @@ mod tests {
         );
         assert_eq!(result.diagnostics[0].line, 1);
         assert_eq!(result.diagnostics[0].column, 1);
+    }
+
+    #[test]
+    fn ink_parser_parses_variables_and_external_statements() {
+        let mut parser = InkParser::new(
+            "VAR score = 5\nCONST pi = 3.14\nEXTERNAL print(message)\n~ temp tmp = score\n~ score += 1\n~ score",
+            Some("story.ink"),
+            None,
+        );
+        let result = parser.parse();
+
+        assert!(result.diagnostics.is_empty());
+        let story = result.parsed_story.expect("expected parsed story");
+        let content = story.content();
+
+        assert_eq!(content.len(), 6);
+        assert!(matches!(
+            content[0].borrow().kind(),
+            ObjectKind::VariableAssignment {
+                is_global_declaration: true,
+                is_new_temporary_declaration: false,
+                ..
+            }
+        ));
+        assert!(matches!(
+            content[1].borrow().kind(),
+            ObjectKind::ConstantDeclaration { .. }
+        ));
+        assert!(matches!(
+            content[2].borrow().kind(),
+            ObjectKind::ExternalDeclaration { .. }
+        ));
+        assert!(matches!(
+            content[3].borrow().kind(),
+            ObjectKind::VariableAssignment {
+                is_global_declaration: false,
+                is_new_temporary_declaration: true,
+                ..
+            }
+        ));
+        assert!(matches!(
+            content[4].borrow().kind(),
+            ObjectKind::Expression {
+                kind: crate::parsed::ExpressionKind::IncDec { is_inc: true, .. }
+            }
+        ));
+        assert!(matches!(
+            content[5].borrow().kind(),
+            ObjectKind::Expression {
+                kind: crate::parsed::ExpressionKind::VariableReference { .. }
+            }
+        ));
     }
 
     #[test]

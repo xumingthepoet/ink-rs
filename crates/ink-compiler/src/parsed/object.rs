@@ -52,6 +52,18 @@ pub(crate) enum ObjectKind {
         identifier: Option<Identifier>,
         indentation_depth: usize,
     },
+    VariableAssignment {
+        identifier: Identifier,
+        is_global_declaration: bool,
+        is_new_temporary_declaration: bool,
+    },
+    ConstantDeclaration {
+        identifier: Identifier,
+    },
+    ExternalDeclaration {
+        identifier: Identifier,
+        argument_names: Vec<String>,
+    },
     Expression {
         kind: ExpressionKind,
     },
@@ -168,6 +180,34 @@ impl Object {
         self.kind = ObjectKind::Gather {
             identifier,
             indentation_depth,
+        };
+    }
+
+    pub(crate) fn set_variable_assignment_kind(
+        &mut self,
+        identifier: Identifier,
+        is_global_declaration: bool,
+        is_new_temporary_declaration: bool,
+    ) {
+        self.kind = ObjectKind::VariableAssignment {
+            identifier,
+            is_global_declaration,
+            is_new_temporary_declaration,
+        };
+    }
+
+    pub(crate) fn set_constant_declaration_kind(&mut self, identifier: Identifier) {
+        self.kind = ObjectKind::ConstantDeclaration { identifier };
+    }
+
+    pub(crate) fn set_external_declaration_kind(
+        &mut self,
+        identifier: Identifier,
+        argument_names: Vec<String>,
+    ) {
+        self.kind = ObjectKind::ExternalDeclaration {
+            identifier,
+            argument_names,
         };
     }
 

@@ -40,6 +40,9 @@ fn export_object(object: &ObjectRef, output: &mut Vec<Value>) -> Result<(), Comp
         | ObjectKind::Weave { .. }
         | ObjectKind::Choice { .. }
         | ObjectKind::Gather { .. }
+        | ObjectKind::VariableAssignment { .. }
+        | ObjectKind::ConstantDeclaration { .. }
+        | ObjectKind::ExternalDeclaration { .. }
         | ObjectKind::Expression { .. }
         | ObjectKind::Flow { .. }
         | ObjectKind::Generic => {
