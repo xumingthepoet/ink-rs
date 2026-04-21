@@ -1,6 +1,7 @@
 mod choice;
 mod content;
 mod divert;
+mod expression;
 mod flow;
 mod flow_level;
 mod gather;
@@ -16,6 +17,11 @@ mod weave_point;
 pub use choice::Choice;
 pub use content::{AuthorWarning, ContentList, Tag, Text, Wrap};
 pub use divert::Divert;
+pub use expression::{
+    BinaryExpression, DivertTarget, ExpressionKind, FunctionCall, IncDecExpression, List,
+    MultipleConditionExpression, Number, NumberValue, StringExpression, UnaryExpression,
+    VariableReference,
+};
 pub use flow::{FlowArgument, FlowBase, HasContent, NamedContent};
 pub use flow_level::FlowLevel;
 pub use gather::Gather;

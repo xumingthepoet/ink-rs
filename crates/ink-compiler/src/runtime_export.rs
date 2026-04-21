@@ -40,6 +40,7 @@ fn export_object(object: &ObjectRef, output: &mut Vec<Value>) -> Result<(), Comp
         | ObjectKind::Weave { .. }
         | ObjectKind::Choice { .. }
         | ObjectKind::Gather { .. }
+        | ObjectKind::Expression { .. }
         | ObjectKind::Flow { .. }
         | ObjectKind::Generic => {
             return Err(CompilerError::Unsupported(

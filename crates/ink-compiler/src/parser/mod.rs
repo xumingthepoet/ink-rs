@@ -1,10 +1,12 @@
 pub mod character_range;
 pub mod character_set;
 mod comment_eliminator;
+pub mod expression;
 pub mod string_parser;
 mod whitespace;
 
 pub use comment_eliminator::CommentEliminator;
+pub use expression::ExpressionParser;
 pub use string_parser::{Element, ParseSuccessStruct, StringParser, StringParserState};
 pub use whitespace::{
     any_whitespace, end_of_file, end_of_line, multi_spaced, multiline_whitespace, newline, spaced,

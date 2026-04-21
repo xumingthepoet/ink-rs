@@ -28,6 +28,10 @@ runtime instead of rewriting runtime execution.
   plus local weave-point naming lookup are now ported.
 - Parsed hierarchy path resolution can now resolve flow names, nested stitches,
   and weave points from a parsed context.
+- Parsed hierarchy expression wrappers (`Number`, `StringExpression`,
+  `VariableReference`, `FunctionCall`, `DivertTarget`, `List`,
+  `BinaryExpression`, `UnaryExpression`, `IncDecExpression`, and
+  `MultipleConditionExpression`) are now ported.
 - Parsed hierarchy content nodes (`ContentList`, `Text`, `AuthorWarning`,
   `Tag`, and generic `Wrap<T>`) are now ported.
 - Ink parser comment elimination and whitespace helpers are now ported.
@@ -39,6 +43,9 @@ runtime instead of rewriting runtime execution.
   divert nodes.
 - Ink parser now has golden parser tests for minimal plain-text, knot, and
   divert snippets.
+- Expression parser foundation is now ported with Pratt-style precedence
+  parsing for literals, variable paths, function calls, lists, divert targets,
+  unary operators, and binary operators.
 - Runtime story behavior tests now cover choice selection, named knot/stitch
   and gather-like container paths, and explicit diverts against
   `bladeink::story::Story`.
@@ -55,8 +62,7 @@ runtime instead of rewriting runtime execution.
 
 Milestone 1 is complete. Milestone 2 is complete. Milestone 3 is complete.
 Milestone 4 is complete. Milestone 5 is complete. Milestone 6 is complete.
-Milestone 7 has not started, and expression parsing is the next unchecked
-item.
+Milestone 7 is in progress, and the expression parsing slice is complete.
 
 ## Verification Checklist
 
@@ -108,6 +114,11 @@ The ignored `blade-ink-rs/` directory must be present because the workspace uses
   line prefix and models them as parsed `Knot` and `Stitch` nodes.
 - `InkParser::parse` now also recognizes simple divert lines and models them as
   parsed divert nodes, but the full divert grammar is still pending.
+- Expression parsing currently covers a focused foundation subset: numeric and
+  boolean literals, string expressions, variable paths, function calls, list
+  expressions, divert targets, unary operators, and binary precedence. The
+  variable declaration, list-definition, conditionals, sequence, and logic
+  grammar slices are still pending.
 - The runtime JSON reader expects top-level `inkVersion`, `root`, and
   `listDefs` keys; the `root` value is a container array whose trailing entry
   is either named-content metadata or `null`.
@@ -344,6 +355,29 @@ about unnecessary parentheses around trait object types.
 
 ### 2026-04-22
 
+- Started Milestone 7 with the expression parsing and expression parsed
+  hierarchy slice.
+- Added expression wrappers for numbers, strings, variable references,
+  function calls, divert targets, list expressions, binary and unary
+  operators, increment/decrement, and multiple conditions.
+- Added a standalone Pratt-style expression parser with tests for literals,
+  variable paths, function calls, list expressions, divert targets, unary
+  operators, and binary precedence.
+
+Validation:
+
+```sh
+cargo fmt --all --check
+cargo test -p ink-compiler expression
+cargo check --workspace
+cargo test --workspace
+```
+
+Result: all passed. `blade-ink-rs/lib` emitted the same two existing warnings
+about unnecessary parentheses around trait object types.
+
+### 2026-04-22
+
 - Continued Milestone 6 with the weave-point parsed hierarchy slice.
 - Added parsed `Weave`, `Choice`, and `Gather` wrappers plus a local naming
   table for weave points.
@@ -509,7 +543,7 @@ about unnecessary parentheses around trait object types.
 
 ## Next Task
 
-Port expression parsing and expression parsed hierarchy.
+Port variable declarations, assignments, references, constants, and externals.
 
 ## Repo Structure
 

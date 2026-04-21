@@ -17,6 +17,10 @@ impl Divert {
         Self { object }
     }
 
+    pub(crate) fn from_object(object: ObjectRef) -> Self {
+        Self { object }
+    }
+
     pub fn empty() -> Self {
         let object = Object::new_ref();
         object

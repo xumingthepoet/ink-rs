@@ -3,7 +3,7 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use super::{FlowLevel, Identifier, Path};
+use super::{ExpressionKind, FlowLevel, Identifier, Path};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DebugMetadata {
@@ -16,7 +16,7 @@ pub struct DebugMetadata {
 
 pub type ObjectRef = Rc<RefCell<Object>>;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) enum ObjectKind {
     Generic,
     ContentList {
@@ -51,6 +51,9 @@ pub(crate) enum ObjectKind {
     Gather {
         identifier: Option<Identifier>,
         indentation_depth: usize,
+    },
+    Expression {
+        kind: ExpressionKind,
     },
     Flow {
         flow_level: FlowLevel,
@@ -166,6 +169,10 @@ impl Object {
             identifier,
             indentation_depth,
         };
+    }
+
+    pub(crate) fn set_expression_kind(&mut self, kind: ExpressionKind) {
+        self.kind = ObjectKind::Expression { kind };
     }
 
     pub fn parent(&self) -> Option<ObjectRef> {
