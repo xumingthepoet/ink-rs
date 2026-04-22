@@ -22,14 +22,22 @@ just `继续`.
 13. End with a concise summary and mention any validation not run.
 
 For a full local verification pass, `make gate` is the preferred unified entry
-point. It runs format, check, and test with workspace warnings denied.
+point. It runs format, check, and a timeboxed test pass with workspace warnings
+denied.
+
+All standalone test commands should be wrapped in `timeout` as well. On
+macOS, use `gtimeout` if GNU `timeout` is not installed.
+Start with 30 seconds; only increase the timeout temporarily when a specific
+fixture needs more wall-clock time.
 
 The legacy compiler-to-runtime conformance suite is available behind the
-`compiler-conformance` Cargo feature:
+`compiler-conformance` Cargo feature and should always be run with a timeout:
 
 ```sh
-cargo test -p ink-test --features compiler-conformance --test compiler_conformance_legacy
+timeout 30s cargo test -p ink-test --features compiler-conformance --test compiler_conformance_legacy
 ```
+
+If `timeout` is unavailable on macOS, use `gtimeout` from coreutils.
 
 ## Non-Negotiable Continuation Rule
 

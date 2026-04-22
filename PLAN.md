@@ -19,14 +19,16 @@ Core commands to run after every completed milestone:
 
 - [x] `cargo fmt --all --check`
 - [x] `cargo check --workspace`
-- [x] `cargo test --workspace`
+- [x] `timeout 30s cargo test --workspace`
 - [x] `make gate`
 
 Current last verified milestone: Milestone 12 legacy conformance import
 slice (`2026-04-22`).
 
 Workspace warning policy: `.cargo/config.toml` now denies warnings, and
-`make gate` is the unified local entry point for format, check, and test.
+`make gate` is the unified local entry point for format, check, and a
+timeboxed test pass. Any standalone `cargo test` command should also be
+wrapped in `timeout`.
 
 The manual compiler entry point now lives under `crates/ink-tools/` instead
 of `examples/`.
@@ -350,7 +352,7 @@ Validation:
 ```sh
 cargo fmt --all --check
 cargo check --workspace
-cargo test --workspace
+timeout 30s cargo test --workspace
 ```
 
 ## Milestone 11: Parser Snapshot Relocation
@@ -425,7 +427,55 @@ cargo test --workspace
 
 ## Next Task
 
-Import the legacy `csharp_tests` suite into `ink-test`.
+## Milestone 13: Compiler Conformance Stabilization
+
+- [ ] Add a timeout-wrapped compiler-conformance gate and use it for every
+  focused iteration on the legacy compiler-to-runtime suite.
+- [ ] Fix compiler-conformance failures in dependency-light order:
+  - basic text, knots, stitches, diverts, and glue
+  - tags, gathers, and simple multi-flow paths
+  - variables, lists, expressions, and functions
+  - conditionals, sequences, and choice generation
+  - runtime behaviors: save/load, externals, observers, visit counts, threads,
+    and tunnels
+- [ ] Normalize and document any intentional JSON mismatches while the suite
+  is still being brought up, then remove the mismatches once the compiler
+  matches the fixture set.
+- [ ] Remove the `compiler-conformance` feature gate once the legacy suite is
+  green and include it in the default workspace test run.
+- [ ] Delete any compiler-conformance wrappers that become unnecessary after
+  the suite is promoted to a normal test target.
+
+Primary Rust references:
+
+- `crates/ink-test/tests/compiler_conformance_legacy.rs`
+- `crates/ink-test/tests/compiler_conformance/`
+- `crates/ink-test/fixtures/conformance/`
+- `crates/ink-compiler/src/compiler.rs`
+- `crates/ink-compiler/src/runtime_export.rs`
+
+Acceptance:
+
+- The legacy compiler-to-runtime suite can be run with a timeout wrapper and
+  produces either a green run or a bounded failure report.
+- The suite is reduced to dependency-light, isolated examples first so the
+  least coupled bugs can be fixed before multi-flow and runtime-heavy cases.
+- Once green, the suite no longer needs the `compiler-conformance` feature gate
+  and can run as part of the normal workspace test pass.
+
+Validation:
+
+```sh
+timeout 30s cargo test -p ink-test --features compiler-conformance --test compiler_conformance_legacy
+timeout 30s cargo test -p ink-test --features compiler-conformance --test compiler_conformance_legacy compiler_conformance::choice_test::conditional_choice_test -- --exact
+cargo fmt --all --check
+cargo check --workspace
+timeout 30s cargo test --workspace
+```
+
+## Next Task
+
+Stabilize the legacy compiler-to-runtime conformance suite in `ink-test`.
 
 ## Risk Register
 

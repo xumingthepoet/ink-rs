@@ -24,6 +24,9 @@ into `crates/ink-runtime` instead of rewriting runtime execution.
   `crates/ink-test/tests/compiler_conformance_legacy.rs` and is gated behind
   the `compiler-conformance` feature so it can stay available without breaking
   the default workspace while compiler coverage is still growing.
+- The documented test loop now treats every long-running `cargo test` path as
+  timeboxed, and `make gate` wraps the workspace test pass with a timeout as
+  well.
 - `CharacterSet`, `CharacterRange`, and basic string parser character helpers
   are now ported.
 - `StringParserState` stack behavior is now ported.
@@ -107,6 +110,8 @@ into `crates/ink-runtime` instead of rewriting runtime execution.
   manual compile entry point that used to live under `examples/`.
 - The workspace now treats warnings as errors via `.cargo/config.toml`, and
   `make gate` is the unified local wrapper for format, check, and test.
+- The default test timeout is 30 seconds; longer timeouts should only be used
+  temporarily for specific fixtures that genuinely need them.
 - The conformance harness now compares compiler output against copied trusted
   fixtures under `crates/ink-test/fixtures` and compiler behavior against the
   copied official include examples there as well.
@@ -207,7 +212,7 @@ Last full verification: `2026-04-22`.
 ```sh
 cargo fmt --all --check
 cargo check --workspace
-cargo test --workspace
+timeout 30s cargo test --workspace
 ```
 
 The workspace now builds against `crates/ink-runtime`; the old `blade-ink-rs/`
@@ -359,6 +364,14 @@ Pass a second argument to write the JSON to a file instead of stdout.
 - External fixture-driven parser snapshots now live in `crates/ink-test/tests/`.
 
 ## Audit Log
+
+### 2026-04-22
+
+- Tightened the documented test loop so the default timeout is 30 seconds,
+  `make gate` uses a timeboxed workspace test pass, and the top-level plan and
+  quickstart examples now show `timeout 30s cargo test ...` explicitly.
+- Validation: `git diff --check`, `make gate`.
+- Result: all passed; the workspace remained warning-free.
 
 ### 2026-04-22
 
@@ -1512,7 +1525,7 @@ Result: all passed.
 
 ## Next Task
 
-Import the legacy `csharp_tests` suite into `ink-test`.
+Stabilize the legacy compiler-to-runtime conformance suite in `ink-test`.
 
 ### 2026-04-22
 
@@ -1528,6 +1541,8 @@ Import the legacy `csharp_tests` suite into `ink-test`.
 - Added the entry point in
   `crates/ink-test/tests/compiler_conformance_legacy.rs` and copied the legacy
   fixtures under `crates/ink-test/fixtures/conformance/`.
+- Added a feature-aware runbook entry and a timeboxed gate so future compiler
+  conformance work can be iterated safely without burning CPU on a stuck test.
 
 Validation:
 
@@ -1539,7 +1554,8 @@ cargo test --workspace
 ```
 
 Result: default workspace validation passed. The compiler conformance suite is
-available behind the `compiler-conformance` feature for explicit runs.
+available behind the `compiler-conformance` feature for explicit runs, and
+compiler-conformance iterations should be run with a timeout wrapper.
 
 ## Repo Structure
 
