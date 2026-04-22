@@ -21,7 +21,7 @@ Core commands to run after every completed milestone:
 - [x] `cargo check --workspace`
 - [x] `cargo test --workspace`
 
-Current last verified milestone: Milestone 9 conformance harness slice
+Current last verified milestone: Milestone 9 documentation slice
 (`2026-04-22`).
 
 ## Rules
@@ -301,8 +301,8 @@ cargo check --workspace
 - [x] Build a conformance harness using local examples from `blade-ink-rs` and
   official `ink-csharp/tests`.
 - [x] Compare compiler JSON or runtime behavior against trusted fixtures.
-- [ ] Add regression tests for every fixed bug.
-- [ ] Document remaining incompatibilities.
+- [x] Add regression tests for every fixed bug.
+- [x] Document remaining incompatibilities.
 
 Acceptance:
 
@@ -319,7 +319,7 @@ cargo test --workspace
 
 ## Next Task
 
-Add regression tests for every fixed bug.
+No unchecked required tasks remain.
 
 ## Risk Register
 

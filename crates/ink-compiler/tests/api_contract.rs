@@ -156,6 +156,19 @@ fn compile_returns_a_runtime_story_for_plain_text_story() {
 }
 
 #[test]
+fn compiler_strips_utf8_bom_from_source_text() {
+    let mut compiler = Compiler::new("\u{feff}Hello world", None);
+
+    let result = compiler.compile();
+
+    let mut story = result.story.expect("expected runtime story");
+    assert!(result.diagnostics.is_empty());
+    assert!(story.can_continue());
+    assert_eq!(story.cont().unwrap(), "Hello world");
+    assert!(!story.can_continue());
+}
+
+#[test]
 fn compiler_compile_json_expands_includes_through_file_handler() {
     let mut files = HashMap::new();
     files.insert(
@@ -183,6 +196,36 @@ fn compiler_compile_json_expands_includes_through_file_handler() {
     assert!(json.contains("Included line."));
     assert!(json.contains("Postlude."));
     assert!(result.diagnostics.is_empty());
+    assert_eq!(file_handler.resolve_calls.load(Ordering::SeqCst), 1);
+    assert_eq!(file_handler.load_calls.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn compiler_strips_utf8_bom_from_included_files() {
+    let mut files = HashMap::new();
+    files.insert(
+        PathBuf::from("/virtual/chapter.ink"),
+        "\u{feff}Included line.".to_string(),
+    );
+
+    let file_handler = Arc::new(IncludeFileHandler::new(files));
+    let handler: Arc<dyn FileHandler> = file_handler.clone();
+    let mut compiler = Compiler::new(
+        "INCLUDE chapter.ink",
+        Some(CompilerOptions {
+            source_filename: Some("/virtual/main.ink".to_string()),
+            count_all_visits: false,
+            file_handler: Some(handler),
+        }),
+    );
+
+    let result = compiler.compile_json();
+
+    let json = result
+        .json
+        .expect("expected runtime JSON for include story");
+    assert!(!json.contains('\u{feff}'));
+    assert!(json.contains("Included line."));
     assert_eq!(file_handler.resolve_calls.load(Ordering::SeqCst), 1);
     assert_eq!(file_handler.load_calls.load(Ordering::SeqCst), 1);
 }

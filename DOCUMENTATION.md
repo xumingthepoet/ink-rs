@@ -86,8 +86,10 @@ runtime instead of rewriting runtime execution.
 - A conformance harness now compares compiler output against trusted local
   fixtures from `blade-ink-rs/conformance-tests` and compiler behavior against
   the official include examples from `ink-csharp/tests`.
-- `CommentEliminator` now strips a leading UTF-8 BOM, fixing include-file text
-  handling for the C# reference examples.
+- `CommentEliminator` now strips a leading UTF-8 BOM, and compiler-level
+  regression tests cover both direct-source and include-file BOM handling.
+- Remaining compiler/runtime incompatibilities are now documented in the
+  Known Issues and Remaining Incompatibilities sections below.
 - Long-horizon project memory docs now exist.
 
 ## Current Milestone
@@ -100,8 +102,8 @@ inline-conditional, brace multiline conditional/sequence, and feature-test
 slices are complete.
 Milestone 8 is complete, including include handling, plugin-scope
 documentation, and the minimal manual compilation example.
-Milestone 9 has started with the conformance harness slice and trusted
-fixture comparisons.
+Milestone 9 is complete: the conformance harness, regression tests, and
+remaining incompatibility notes are all documented.
 
 ## Verification Checklist
 
@@ -209,13 +211,62 @@ Pass a second argument to write the JSON to a file instead of stdout.
   scope.
 - The conformance harness currently covers a minimal plain-text baseline and a
   C# include story; broader conformance coverage is still pending.
-- The leading UTF-8 BOM stripping fix is now covered by a parser regression
-  test.
+- The leading UTF-8 BOM stripping fix is now covered by parser and API
+  contract regression tests.
 - `cargo check --workspace` reports warnings from ignored dependency
   `blade-ink-rs/lib`; these are upstream/local reference warnings, not current
   compiler crate failures.
 
+## Remaining Incompatibilities
+
+- `Compiler::compile_json` still emits only the minimal runtime JSON shape that
+  the current `bladeink::story::Story::new` loader accepts, plus `listDefs`
+  metadata for parsed list declarations.
+- The parser and parsed hierarchy still only cover the ported slices listed in
+  the current status above; the rest of the official C# grammar remains
+  unported.
+- Nested brace logic, full tunnel semantics, and broader runtime export
+  behavior for conditionals and sequences remain limited to the ported slices.
+- Plugin hooks and dynamic plugin discovery remain intentionally deferred.
+- The conformance harness currently covers a small trusted subset, not the
+  full official test suite.
+
 ## Audit Log
+
+### 2026-04-22
+
+- Completed the Milestone 9 documentation slice.
+- Documented the remaining compiler/runtime incompatibilities so the current
+  port boundary is explicit in the project memory.
+
+Validation:
+
+```sh
+cargo fmt --all --check
+cargo check --workspace
+cargo test --workspace
+```
+
+Result: all passed. The only remaining warnings are the two existing
+`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
+
+### 2026-04-22
+
+- Completed the Milestone 9 regression-test slice.
+- Added compiler-level regression tests that verify a leading UTF-8 BOM is
+  stripped from both direct source text and included files before compilation.
+
+Validation:
+
+```sh
+cargo fmt --all --check
+cargo test -p ink-compiler --test api_contract
+cargo check --workspace
+cargo test --workspace
+```
+
+Result: all passed. The only remaining warnings are the two existing
+`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
 
 ### 2026-04-22
 
@@ -845,7 +896,7 @@ about unnecessary parentheses around trait object types.
 
 ## Next Task
 
-Decide plugin support scope and document any deliberate deferral.
+Document remaining incompatibilities.
 
 ## Repo Structure
 
