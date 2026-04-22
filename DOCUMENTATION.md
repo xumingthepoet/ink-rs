@@ -55,18 +55,19 @@ into `crates/ink-runtime` instead of rewriting runtime execution.
 - The compiler-conformance fixture queue is tracked in
   `COMPILER_CONFORMANCE_CHECKLIST.md`, and it is now ordered to match the
   broad syntax progression in `WritingWithInk.md` rather than the old folder
-  order. The file header now shows the actual current green count (`6/126`)
+  order. The file header now shows the actual current green count (`7/126`)
   so batch progress is visible at a glance.
-- The next compiler-conformance blocker after the six green fixtures is
-  `choices/no-choice-text`: the exporter still needs a deeper choice-to-gather
-  handoff for the root choice-only branch, even though the official `.parse`
-  and `.json` fixtures are already in place.
+- The next compiler-conformance fixture after the current green set is
+  `choices/one`, and the queue still keeps `choices/TheIntercept` in the final
+  last-pass section because it is too broad for the low-dependency repair
+  order.
 - `TheIntercept` is intentionally deferred to the new last-pass fixture
   section because it combines several syntax features and is too broad for the
   current low-dependency compiler-conformance queue.
-- `choices/divert-choice`, `choices/label-scope`, and `choices/sticky-choice`
-  are now green again after the parse-snapshot render rules and snapshot
-  postprocessing were tightened; the checklist reflects the current checkpoint.
+- `choices/divert-choice`, `choices/label-scope`, `choices/sticky-choice`,
+  and `choices/no-choice-text` are now green again after the parse-snapshot
+  render rules and runtime exporter were tightened; the checklist reflects
+  the current checkpoint.
 - The documented test loop now treats every long-running `cargo test` path as
   timeboxed, and `make gate` wraps the workspace test pass with a timeout as
   well.

@@ -46,7 +46,8 @@ pub fn export_story_json(story: &ParsedStory) -> Result<String, CompilerError> {
         {
             state.main_content.push(Value::String("\n".to_string()));
         }
-        if !matches!(state.main_content.last(), Some(Value::Array(value)) if matches!(value.as_slice(), [Value::String(marker), Value::Object(_)] if marker == "done"))
+        if !top_level_has_weave_points
+            && !matches!(state.main_content.last(), Some(Value::Array(value)) if matches!(value.as_slice(), [Value::String(marker), Value::Object(_)] if marker == "done"))
         {
             state.main_content.push(json!([
                 Value::String("done".to_string()),
@@ -56,9 +57,7 @@ pub fn export_story_json(story: &ParsedStory) -> Result<String, CompilerError> {
     }
 
     let mut inner_container = state.main_content;
-    if has_named_containers {
-        inner_container.push(Value::Null);
-    } else {
+    if !top_level_has_weave_points {
         inner_container.push(Value::Null);
     }
 
@@ -91,6 +90,12 @@ struct ExportState {
     last_top_level_kind: Option<ObjectKind>,
     named_flow_depth: usize,
     named_flow_entry_emitted: bool,
+}
+
+#[derive(Debug, Clone)]
+struct ChoiceGatherTarget {
+    target: String,
+    synthetic: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -519,7 +524,7 @@ fn export_choice_container(
     has_start_content: bool,
     has_choice_only_content: bool,
     has_inline_inner_content: bool,
-    branch_gather_target: Option<String>,
+    branch_gather_target: Option<ChoiceGatherTarget>,
     inherited_gather_target: Option<String>,
     tokens: &mut Vec<Value>,
 ) -> Result<BTreeMap<String, Value>, CompilerError> {
@@ -557,12 +562,6 @@ fn export_choice_container(
     } else {
         choice_index
     };
-    if std::env::var_os("INK_DEBUG_CHOICE").is_some() {
-        eprintln!(
-            "choice debug: choice_index={choice_index} has_start_content={has_start_content} has_choice_only_content={has_choice_only_content} has_condition={has_condition} inline={has_inline_inner_content} branch_gather_target={:?}",
-            branch_gather_target
-        );
-    }
     if needs_eval {
         outer_tokens.push(json!("ev"));
     }
@@ -584,7 +583,8 @@ fn export_choice_container(
             choice_only_content,
             state,
             branch_gather_target
-                .clone()
+                .as_ref()
+                .map(|target| target.target.clone())
                 .or(inherited_gather_target.clone()),
         )?);
         outer_tokens.push(json!("/str"));
@@ -629,7 +629,8 @@ fn export_choice_container(
             &start_content,
             state,
             branch_gather_target
-                .clone()
+                .as_ref()
+                .map(|target| target.target.clone())
                 .or(inherited_gather_target.clone()),
         )?);
         s_tokens.push(json!({"->":"$r", "var":true}));
@@ -658,7 +659,8 @@ fn export_choice_container(
             &inner_content,
             state,
             branch_gather_target
-                .clone()
+                .as_ref()
+                .map(|target| target.target.clone())
                 .or(inherited_gather_target.clone()),
         )?
     } else {
@@ -693,8 +695,8 @@ fn export_choice_container(
             inner_tokens.push(Value::String("end".to_string()));
         }
 
-        if let Some(branch_target) = branch_gather_target.clone() {
-            inner_tokens.push(json!({"->": branch_target}));
+        if let Some(branch_target) = branch_gather_target.as_ref() {
+            inner_tokens.push(json!({"->": branch_target.target.clone()}));
         }
         if has_parent_only_relative_divert(&inner_tokens) {
             inner_tokens.push(Value::Null);
@@ -717,8 +719,8 @@ fn export_choice_container(
         {
             inner_tokens.push(Value::String("\n".to_string()));
         }
-        if let Some(branch_gather_target) = branch_gather_target {
-            inner_tokens.push(json!({"->": branch_gather_target}));
+        if let Some(branch_gather_target) = branch_gather_target.as_ref() {
+            inner_tokens.push(json!({"->": branch_gather_target.target.clone()}));
         }
         if has_parent_only_relative_divert(&inner_tokens) {
             inner_tokens.push(Value::Null);
@@ -737,6 +739,23 @@ fn export_choice_container(
         }
         merge_leading_space_text_tokens(&mut inner_tokens);
         choice_named_content.insert(format!("c-{choice_index}"), Value::Array(inner_tokens));
+    }
+
+    if let Some(branch_target) = branch_gather_target.as_ref() {
+        if branch_target.synthetic {
+            let gather_name = branch_target
+                .target
+                .rsplit('.')
+                .next()
+                .unwrap_or(branch_target.target.as_str())
+                .to_string();
+            let gather_tokens = if flow_prefix.is_empty() {
+                vec![json!("done"), Value::Null]
+            } else {
+                vec![json!({"->": flow_prefix}), json!("end"), Value::Null]
+            };
+            choice_named_content.insert(gather_name, Value::Array(gather_tokens));
+        }
     }
     if has_start_content {
         tokens.push(Value::Array(outer_tokens));
@@ -842,15 +861,6 @@ fn export_children(
     allow_named_flow: bool,
     inherited_gather_target: Option<String>,
 ) -> Result<(), CompilerError> {
-    if std::env::var_os("INK_DEBUG_CHOICE").is_some() {
-        eprintln!(
-            "export_children kinds: {:?}",
-            children
-                .iter()
-                .map(|child| child.borrow().kind().clone())
-                .collect::<Vec<_>>()
-        );
-    }
     let mut pending_choice_named_contents: Vec<BTreeMap<String, Value>> = Vec::new();
 
     for (index, child) in children.iter().enumerate() {
@@ -915,9 +925,9 @@ fn export_children(
 fn gather_target_for_choice(
     children: &[ObjectRef],
     current_index: usize,
-    _state: &ExportState,
+    state: &ExportState,
     inherited_gather_target: Option<String>,
-) -> Option<String> {
+) -> Option<ChoiceGatherTarget> {
     for child in children.iter().skip(current_index + 1) {
         match child.borrow().kind() {
             ObjectKind::Choice { .. } => continue,
@@ -950,7 +960,10 @@ fn gather_target_for_choice(
                     .filter(|identifier| !identifier.name.is_empty())
                     .map(|identifier| identifier.name.clone())
                     .unwrap_or_else(|| flow_named_gather_component(child));
-                return Some(format!(".^.^.{gather_name}"));
+                return Some(ChoiceGatherTarget {
+                    target: format!(".^.^.{gather_name}"),
+                    synthetic: false,
+                });
             }
             _ => return None,
         }
@@ -964,24 +977,27 @@ fn gather_target_for_choice(
             ..
         }
     );
-    let gather_fallback =
-        choice_has_only_content.then(|| format!("0.g-{}", _state.gather_index));
+    let gather_fallback = choice_has_only_content.then(|| ChoiceGatherTarget {
+        target: format!("0.g-{}", state.gather_index),
+        synthetic: true,
+    });
 
     next_gather_sibling_target(&children[current_index])
+        .map(|target| ChoiceGatherTarget {
+            target,
+            synthetic: false,
+        })
         .or(gather_fallback)
-        .or(inherited_gather_target)
+        .or(inherited_gather_target.map(|target| ChoiceGatherTarget {
+            target,
+            synthetic: false,
+        }))
 }
 
 fn next_gather_sibling_target(object: &ObjectRef) -> Option<String> {
     let mut current = Some(object.clone());
 
     while let Some(node) = current {
-        if std::env::var_os("INK_DEBUG_CHOICE").is_some() {
-            eprintln!(
-                "searching gather from node: {:?}",
-                node.borrow().kind().clone()
-            );
-        }
         let parent = node.borrow().parent()?;
         let siblings = parent.borrow().content().to_vec();
         let mut found_self = false;
