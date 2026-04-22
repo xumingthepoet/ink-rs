@@ -93,11 +93,13 @@ into `crates/ink-runtime` instead of rewriting runtime execution.
   compiler crate does not implement dynamic plugin discovery or PreParse /
   PostParse / PostExport hooks, and that scope is documented as out of band
   until there is a concrete compatibility need.
-- A minimal `ink_compile` example now provides a manual compile path for `.ink`
+- A minimal `ink_compile` tool now provides a manual compile path for `.ink`
   files, rooted to the source file directory so relative includes resolve in
   the expected location.
 - A new `ink-test` crate now hosts the package-level integration tests and
   copied fixture data used by the conformance harness and runtime smoke tests.
+- The `ink-tools` crate now hosts the manual compile entry point that used to
+  live under `examples/`.
 - The workspace now treats warnings as errors via `.cargo/config.toml`, and
   `make gate` is the unified local wrapper for format, check, and test.
 - The conformance harness now compares compiler output against copied trusted
@@ -200,7 +202,7 @@ tree is no longer required.
 For manual compilation, run:
 
 ```sh
-cargo run -p ink-compiler --example ink_compile -- path/to/story.ink
+cargo run --manifest-path tools/Cargo.toml --bin ink_compile -- path/to/story.ink
 ```
 
 Pass a second argument to write the JSON to a file instead of stdout.
@@ -318,7 +320,7 @@ Pass a second argument to write the JSON to a file instead of stdout.
   dedicated compiler-side wrappers because the corresponding runtime modules in
   `blade-ink-rs` are private; the generic `Wrap<T>` helper is in place for
   future use.
-- The `ink_compile` example is intentionally minimal and prints JSON to stdout
+- The `ink_compile` tool is intentionally minimal and prints JSON to stdout
   or writes it to an optional output path; richer CLI ergonomics remain out of
   scope.
 - The conformance harness currently covers a minimal plain-text baseline and a
@@ -397,8 +399,7 @@ cargo check --workspace
 cargo test --workspace
 ```
 
-Result: all passed. The only remaining warnings are the two existing
-`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
+Result: all passed with warnings denied.
 
 ### 2026-04-22
 
@@ -872,10 +873,11 @@ Result: all passed. The only remaining warnings are the two existing
 
 ### 2026-04-22
 
-- Completed the Milestone 8 manual compilation slice.
-- Added a minimal `ink_compile` example and a smoke test that compiles a story
+- Completed the manual compile entry-point relocation slice.
+- Added a minimal `ink_compile` tool and a smoke test that compiles a story
   with a relative include through the CLI path.
-- Documented the manual compilation command in the project memory.
+- Moved the manual compile entry point from `examples/` to `tools/` so the
+  name matches its actual role better.
 
 Validation:
 

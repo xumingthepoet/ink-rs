@@ -28,6 +28,9 @@ Current last verified milestone: Milestone 10 runtime/test relocation slice
 Workspace warning policy: `.cargo/config.toml` now denies warnings, and
 `make gate` is the unified local entry point for format, check, and test.
 
+The manual compiler entry point now lives under `tools/` instead of
+`examples/`.
+
 ## Rules
 
 - Pick the first unchecked task that is not blocked.

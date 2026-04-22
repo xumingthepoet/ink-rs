@@ -1,0 +1,12 @@
+[package]
+name = "ink-tools"
+version = "0.1.0"
+edition.workspace = true
+publish = false
+
+[dependencies]
+ink-compiler = { path = "../crates/ink-compiler" }
+
+[[bin]]
+name = "ink_compile"
+path = "src/main.rs"
