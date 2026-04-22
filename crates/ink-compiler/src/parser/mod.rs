@@ -2666,6 +2666,26 @@ to Savile Row\n\
     }
 
     #[test]
+    fn ink_parser_parses_trusted_basictext_twolines_fixture() {
+        let source =
+            load_workspace_text("blade-ink-rs/conformance-tests/inkfiles/basictext/twolines.ink");
+        let mut parser = InkParser::new(&source, Some("twolines.ink"), None);
+        let result = parser.parse();
+
+        assert!(
+            result.diagnostics.is_empty(),
+            "unexpected diagnostics: {:#?}",
+            result.diagnostics
+        );
+
+        let story = result.parsed_story.expect("expected parsed story");
+        assert_eq!(
+            render_story(&story),
+            "Story\n  ContentList\n    Text(\"Line.\")\n    Text(\"\\n\")\n  ContentList\n    Text(\"Other line.\")\n    Text(\"\\n\")"
+        );
+    }
+
+    #[test]
     fn ink_parser_feature_cases_cover_arithmetic_variables_lists_conditions_functions_and_sequences(
     ) {
         let cases = [
