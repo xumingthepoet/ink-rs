@@ -99,6 +99,8 @@ runtime instead of rewriting runtime execution.
   now has a parser-level conformance snapshot.
 - The trusted `blade-ink-rs` knot fixture `knot/multi-line.ink` now has a
   runtime conformance snapshot.
+- The trusted `blade-ink-rs` knot fixture `knot/strip-empty-lines.ink` now
+  has a runtime conformance snapshot.
 - Official C# include-chain fixtures now have a parser-level conformance
   snapshot covering BOM stripping, recursive include expansion, a variable
   declaration, and a knot with a divert.
@@ -246,10 +248,29 @@ Pass a second argument to write the JSON to a file instead of stdout.
 - Nested brace logic, full tunnel semantics, and broader runtime export
   behavior for conditionals and sequences remain limited to the ported slices.
 - Plugin hooks and dynamic plugin discovery remain intentionally deferred.
-- The conformance harness currently covers a small trusted subset, not the
-  full official test suite.
+- The conformance harness currently covers a small trusted subset of trusted
+  runtime and parser snapshots, not the full official test suite.
 
 ## Audit Log
+
+### 2026-04-22
+
+- Added a runtime conformance snapshot for `blade-ink-rs` knot fixture
+  `knot/strip-empty-lines.ink`.
+- The snapshot verifies plain-text runtime output stays stable for a source
+  file with internal blank lines.
+
+Validation:
+
+```sh
+cargo fmt --all --check
+cargo test -p ink-compiler --test conformance_harness
+cargo check --workspace
+cargo test --workspace
+```
+
+Result: all passed. The only remaining warnings are the two existing
+`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
 
 ### 2026-04-22
 

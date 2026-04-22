@@ -99,6 +99,12 @@ fn blade_basictext_oneline_matches_trusted_runtime_output() {
             "/virtual/multi-line.ink",
             "Hello, world!\nHello?\nHello, are you there?\n",
         ),
+        (
+            "blade-ink-rs/conformance-tests/inkfiles/knot/strip-empty-lines.ink",
+            "blade-ink-rs/conformance-tests/inkfiles/knot/strip-empty-lines.ink.json",
+            "/virtual/strip-empty-lines.ink",
+            "Hello, world!\nHello?\nHello, are you there?\n",
+        ),
     ];
 
     for (source_path, expected_path, virtual_path, expected_output) in cases {
