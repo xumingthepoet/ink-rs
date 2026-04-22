@@ -562,13 +562,23 @@ fn export_choice_container(
     } else {
         choice_index
     };
+    let choice_eval_prefix = if flow_prefix.is_empty() {
+        format!("0.{choice_eval_index}")
+    } else {
+        format!("{flow_prefix}.0.{choice_eval_index}")
+    };
+    let choice_container_prefix = if flow_prefix.is_empty() {
+        format!("0.c-{choice_index}")
+    } else {
+        format!("{flow_prefix}.0.c-{choice_index}")
+    };
     if needs_eval {
         outer_tokens.push(json!("ev"));
     }
 
     if let Some(_start_content) = start_content.as_ref() {
         outer_tokens.push(json!({
-            "^->": format!("{flow_prefix}.0.{choice_eval_index}.$r1")
+            "^->": format!("{choice_eval_prefix}.$r1")
         }));
         outer_tokens.push(json!({"temp=":"$r"}));
         outer_tokens.push(json!("str"));
@@ -646,11 +656,11 @@ fn export_choice_container(
     if has_start_content {
         inner_tokens.push(json!("ev"));
         inner_tokens.push(json!({
-            "^->": format!("{flow_prefix}.0.c-{choice_index}.$r2")
+            "^->": format!("{choice_container_prefix}.$r2")
         }));
         inner_tokens.push(json!("/ev"));
         inner_tokens.push(json!({"temp=":"$r"}));
-        inner_tokens.push(json!({"->": format!(".^.^.{choice_eval_index}.s")}));
+        inner_tokens.push(json!({"->": format!("{choice_eval_prefix}.s")}));
         inner_tokens.push(Value::Array(vec![json!({"#n":"$r2"})]));
     }
 
@@ -678,7 +688,9 @@ fn export_choice_container(
     inner_tokens.extend(body_tokens);
 
     if has_start_content {
-        if branch_gather_target.is_some()
+        if branch_gather_target
+            .as_ref()
+            .is_some_and(|target| !target.synthetic)
             && !matches!(
                 inner_tokens.last(),
                 Some(Value::String(value)) if value == "\n"
@@ -969,15 +981,7 @@ fn gather_target_for_choice(
         }
     }
 
-    let choice_has_only_content = matches!(
-        children[current_index].borrow().kind(),
-        ObjectKind::Choice {
-            has_start_content: false,
-            has_choice_only_content: true,
-            ..
-        }
-    );
-    let gather_fallback = choice_has_only_content.then(|| ChoiceGatherTarget {
+    let gather_fallback = Some(ChoiceGatherTarget {
         target: format!("0.g-{}", state.gather_index),
         synthetic: true,
     });
@@ -1441,9 +1445,13 @@ fn flow_path_prefix(object: &ObjectRef) -> String {
     names.join(".")
 }
 
-fn choice_path_prefix(object: &ObjectRef, has_start_content: bool) -> &'static str {
+fn choice_path_prefix(object: &ObjectRef, has_start_content: bool) -> String {
     if has_start_content {
-        return ".^.^.";
+        let flow_prefix = flow_path_prefix(object);
+        if flow_prefix.is_empty() {
+            return "0.".to_string();
+        }
+        return format!("{flow_prefix}.0.");
     }
 
     let mut current = object.borrow().parent();
@@ -1456,15 +1464,15 @@ fn choice_path_prefix(object: &ObjectRef, has_start_content: bool) -> &'static s
 
         if let ObjectKind::Flow { flow_level, .. } = kind {
             return match flow_level {
-                FlowLevel::Stitch => ".^.^.",
-                _ => ".^.",
+                FlowLevel::Stitch => ".^.^.".to_string(),
+                _ => ".^.".to_string(),
             };
         }
 
         current = parent;
     }
 
-    "0."
+    "0.".to_string()
 }
 
 fn export_text_token(text: &str) -> Value {

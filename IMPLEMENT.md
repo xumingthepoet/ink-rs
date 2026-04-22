@@ -58,6 +58,11 @@ current dependency slice so failed work can be resumed without replaying the
 entire suite. After the compiler suite is stable, switch the same checkpointing
 discipline to the csharp tests.
 
+Before fixing any unpassed legacy fixture, read the source `.ink` file and the
+corresponding test assertions first. Identify what feature the fixture is
+actually exercising before changing parser, exporter, or runtime-adjacent code.
+Do not patch from the failing output alone.
+
 ## Non-Negotiable Continuation Rule
 
 When the user says `继续`, do not stop after planning or after one read-only

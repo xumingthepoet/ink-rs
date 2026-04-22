@@ -476,12 +476,13 @@ Current blocker while the imported suites are being stabilized:
 
 - The imported legacy compiler-to-runtime suite now has tokenizer-level
   `.ink.parse` snapshots wired in before `A.ink.json`, and the Rust parse
-  renderer now matches the official dump for the basic text and
-  `choices/label-scope` fixtures. The checklist queue has been reordered to
-  follow the broad syntax progression in `WritingWithInk.md` so the next
-  compiler-conformance work always starts from the earliest dependency-light
-  syntax slice, before moving on to the remaining choice-heavy fixtures such
-  as `choices/sticky-choice`.
+  renderer now matches the official dump for the current choice slice
+  (`choices/no-choice-text`, `choices/one`, `choices/single-choice`,
+  `choices/divert-choice`, and `choices/sticky-choice`). The checklist queue
+  has been reordered to follow the broad syntax progression in
+  `WritingWithInk.md`, so the next compiler-conformance work starts from the
+  earliest dependency-light syntax slice and now moves on to
+  `choices/multi-choice`.
 
 Acceptance:
 

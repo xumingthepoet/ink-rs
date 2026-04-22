@@ -1,6 +1,6 @@
 # compiler_conformance_legacy Checklist
 
-Progress: **7/126** completed.
+Progress: **9/126** completed.
 
 This is the working queue for the imported legacy compiler-conformance suite.
 The order now follows the broad progression in `ink-csharp/Documentation/
@@ -21,8 +21,8 @@ Legend:
 
 ## 2. Basic choices
 
-- [ ] `choices/one`
-- [ ] `choices/single-choice`
+- [x] `choices/one`
+- [x] `choices/single-choice`
 - [ ] `choices/multi-choice`
 - [ ] `choices/suppress-choice`
 - [ ] `choices/mixed-choice`

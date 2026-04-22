@@ -381,7 +381,7 @@ fn render_choice(object: &ObjectRef, indent: usize, lines: &mut Vec<String>) {
         }
 
         let mut saw_explicit_line_ending = false;
-        for child in borrowed.content() {
+        for (index, child) in borrowed.content().iter().enumerate() {
             if matches!(child.borrow().kind(), ObjectKind::ContentList { .. }) {
                 saw_explicit_line_ending |= render_choice_child(
                     child,
@@ -389,6 +389,7 @@ fn render_choice(object: &ObjectRef, indent: usize, lines: &mut Vec<String>) {
                     lines,
                     false,
                     &mut saw_explicit_line_ending,
+                    index == 0,
                 );
             }
         }
@@ -404,6 +405,7 @@ fn render_choice(object: &ObjectRef, indent: usize, lines: &mut Vec<String>) {
                     lines,
                     true,
                     &mut saw_explicit_line_ending,
+                    false,
                 );
             } else if !matches!(child.borrow().kind(), ObjectKind::ContentList { .. }) {
                 render_choice_child(
@@ -412,17 +414,30 @@ fn render_choice(object: &ObjectRef, indent: usize, lines: &mut Vec<String>) {
                     lines,
                     false,
                     &mut saw_explicit_line_ending,
+                    false,
                 );
             }
         }
         for child in borrowed.content() {
-            if matches!(child.borrow().kind(), ObjectKind::ContentList { .. }) {
+            if matches!(child.borrow().kind(), ObjectKind::ContentList { .. })
+                && child
+                    .borrow()
+                    .content()
+                    .iter()
+                    .any(|grandchild| matches!(grandchild.borrow().kind(), ObjectKind::Divert { .. }))
+                && !child
+                    .borrow()
+                    .content()
+                    .iter()
+                    .any(|grandchild| matches!(grandchild.borrow().kind(), ObjectKind::Text { text } if text != "\n"))
+            {
                 render_choice_child(
                     child,
                     indent + 1,
                     lines,
                     true,
                     &mut saw_explicit_line_ending,
+                    false,
                 );
             }
         }
@@ -435,6 +450,7 @@ fn render_choice_child(
     lines: &mut Vec<String>,
     render_diverts: bool,
     saw_line_ending: &mut bool,
+    is_primary_content_list: bool,
 ) -> bool {
     let borrowed = object.borrow();
     let sibling_indent = indent.saturating_sub(1);
@@ -493,20 +509,56 @@ fn render_choice_child(
                     render_object(child, sibling_indent, lines);
                 }
             } else if has_text_child {
-                lines.push(format!("{padding}ContentList"));
-                for child in content
-                    .iter()
-                    .filter(|child| matches!(child.borrow().kind(), ObjectKind::Text { .. }))
-                {
-                    render_object(child, indent + 1, lines);
-                }
-                for child in content.iter().filter(|child| {
-                    !matches!(
-                        child.borrow().kind(),
-                        ObjectKind::Text { .. } | ObjectKind::Divert { .. }
-                    )
-                }) {
-                    render_object(child, indent, lines);
+                if is_primary_content_list {
+                    lines.push(format!("{padding}ContentList"));
+                    for child in content
+                        .iter()
+                        .filter(|child| matches!(child.borrow().kind(), ObjectKind::Text { .. }))
+                    {
+                        render_object(child, indent + 1, lines);
+                    }
+                    for child in content.iter().filter(|child| {
+                        !matches!(
+                            child.borrow().kind(),
+                            ObjectKind::Text { .. } | ObjectKind::Divert { .. }
+                        )
+                    }) {
+                        render_object(child, indent, lines);
+                    }
+                } else {
+                    if content.iter().any(|child| {
+                        matches!(
+                            child.borrow().kind(),
+                            ObjectKind::Text { text } if text == "\n"
+                        )
+                    }) {
+                        lines.push(format!("{padding}ContentList"));
+                        lines.push(format!("{padding}  Text(\"\\n\")"));
+                        *saw_line_ending = true;
+                    }
+                    for child in content.iter() {
+                        match child.borrow().kind() {
+                            ObjectKind::Text { text } => {
+                                if text == "\n" {
+                                    lines.push(format!(
+                                        "{}Text(\"\\n\")",
+                                        "  ".repeat(sibling_indent)
+                                    ));
+                                    continue;
+                                }
+                                let text = normalize_parse_text(text);
+                                lines.push(format!(
+                                    "{}Text({})",
+                                    "  ".repeat(sibling_indent),
+                                    serde_json::to_string(&text).unwrap()
+                                ));
+                            }
+                            ObjectKind::Divert { .. } | ObjectKind::ContentList { .. } => {
+                                render_object(child, sibling_indent, lines);
+                            }
+                            _ => render_object(child, sibling_indent, lines),
+                        }
+                    }
                 }
             } else if content
                 .iter()
@@ -880,6 +932,7 @@ fn render_object(object: &ObjectRef, indent: usize, lines: &mut Vec<String>) {
                     lines,
                     false,
                     &mut saw_explicit_line_ending,
+                    false,
                 );
             }
             if !saw_explicit_line_ending {
