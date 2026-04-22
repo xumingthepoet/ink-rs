@@ -16,9 +16,16 @@ impl Choice {
     pub fn new(identifier: Option<Identifier>, indentation_depth: usize) -> Self {
         let object = Object::new_ref();
         let kind_identifier = identifier.clone();
-        object
-            .borrow_mut()
-            .set_choice_kind(kind_identifier, indentation_depth, true, false, false);
+        object.borrow_mut().set_choice_kind(
+            kind_identifier,
+            indentation_depth,
+            true,
+            false,
+            false,
+            false,
+            false,
+            false,
+        );
 
         Self {
             object,
@@ -103,6 +110,56 @@ impl Choice {
             *current = has_weave_style_inline_brackets;
         }
     }
+
+    pub fn has_start_content(&self) -> bool {
+        matches!(
+            self.object.borrow().kind(),
+            ObjectKind::Choice {
+                has_start_content: true,
+                ..
+            }
+        )
+    }
+
+    pub fn set_has_start_content(&mut self, has_start_content: bool) {
+        if let ObjectKind::Choice {
+            has_start_content: current,
+            ..
+        } = self.object.borrow_mut().kind_mut()
+        {
+            *current = has_start_content;
+        }
+    }
+
+    pub fn has_choice_only_content(&self) -> bool {
+        matches!(
+            self.object.borrow().kind(),
+            ObjectKind::Choice {
+                has_choice_only_content: true,
+                ..
+            }
+        )
+    }
+
+    pub fn set_has_choice_only_content(&mut self, has_choice_only_content: bool) {
+        if let ObjectKind::Choice {
+            has_choice_only_content: current,
+            ..
+        } = self.object.borrow_mut().kind_mut()
+        {
+            *current = has_choice_only_content;
+        }
+    }
+
+    pub fn set_has_inline_inner_content(&mut self, has_inline_inner_content: bool) {
+        if let ObjectKind::Choice {
+            has_inline_inner_content: current,
+            ..
+        } = self.object.borrow_mut().kind_mut()
+        {
+            *current = has_inline_inner_content;
+        }
+    }
 }
 
 impl NamedContent for Choice {
@@ -156,6 +213,8 @@ mod tests {
         assert!(!choice.once_only());
         assert!(choice.is_invisible_default());
         assert!(choice.has_weave_style_inline_brackets());
+        assert!(!choice.has_start_content());
+        assert!(!choice.has_choice_only_content());
         assert_eq!(choice.content().len(), 1);
         assert_eq!(WeavePoint::name(&choice), Some("branch"));
         assert_eq!(choice.to_string(), "* branch");

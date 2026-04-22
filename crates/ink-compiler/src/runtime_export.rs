@@ -10,15 +10,26 @@ use crate::{
 pub fn export_story_json(story: &ParsedStory) -> Result<String, CompilerError> {
     let mut state = ExportState::default();
     for object in story.content() {
+        let top_level_kind = object.borrow().kind().clone();
         export_object(&object, &mut state)?;
+        state.last_top_level_kind = Some(top_level_kind);
     }
 
-    if !matches!(state.main_content.last(), Some(Value::String(value)) if value == "\n") {
+    if !matches!(
+        state.last_top_level_kind,
+        Some(ObjectKind::Choice { .. } | ObjectKind::Gather { .. })
+    ) && !matches!(state.main_content.last(), Some(Value::String(value)) if value == "\n")
+    {
         state.main_content.push(Value::String("\n".to_string()));
     }
 
     let mut inner_container = state.main_content;
-    inner_container.push(Value::Null);
+    if !matches!(
+        state.last_top_level_kind,
+        Some(ObjectKind::Choice { .. } | ObjectKind::Gather { .. })
+    ) {
+        inner_container.push(Value::Null);
+    }
 
     let named_containers = if state.named_containers.is_empty() {
         Value::Null
@@ -47,6 +58,8 @@ struct ExportState {
     main_content: Vec<Value>,
     named_containers: BTreeMap<String, Value>,
     list_defs: BTreeMap<String, BTreeMap<String, i64>>,
+    choice_index: usize,
+    last_top_level_kind: Option<ObjectKind>,
 }
 
 fn export_object(object: &ObjectRef, state: &mut ExportState) -> Result<(), CompilerError> {
@@ -100,6 +113,40 @@ fn export_object_into(
                 }
             }
         }
+        ObjectKind::Choice {
+            once_only,
+            is_invisible_default,
+            has_start_content,
+            has_choice_only_content,
+            has_inline_inner_content,
+            ..
+        } => {
+            export_choice_container(
+                object,
+                state,
+                once_only,
+                is_invisible_default,
+                has_start_content,
+                has_choice_only_content,
+                has_inline_inner_content,
+                tokens.len(),
+                tokens,
+            )?;
+        }
+        ObjectKind::Gather { .. }
+        | ObjectKind::Sequence { .. }
+        | ObjectKind::Conditional
+        | ObjectKind::ConditionalSingleBranch { .. }
+        | ObjectKind::ConstantDeclaration { .. }
+        | ObjectKind::ExternalDeclaration { .. }
+        | ObjectKind::Expression { .. }
+        | ObjectKind::ListDefinition { .. }
+        | ObjectKind::ListElementDefinition { .. }
+        | ObjectKind::Generic => {
+            return Err(CompilerError::Unsupported(
+                "runtime export currently supports plain text stories and list definitions only",
+            ));
+        }
         ObjectKind::VariableAssignment { .. } => {
             let assignment = crate::parsed::VariableAssignment::from_object(object.clone());
             if let Some(list_definition) = assignment.list_definition() {
@@ -123,20 +170,7 @@ fn export_object_into(
                 "runtime export currently supports plain text and list definitions only",
             ));
         }
-        ObjectKind::AuthorWarning { .. }
-        | ObjectKind::Tag { .. }
-        | ObjectKind::Weave { .. }
-        | ObjectKind::Choice { .. }
-        | ObjectKind::Gather { .. }
-        | ObjectKind::Sequence { .. }
-        | ObjectKind::Conditional
-        | ObjectKind::ConditionalSingleBranch { .. }
-        | ObjectKind::ConstantDeclaration { .. }
-        | ObjectKind::ExternalDeclaration { .. }
-        | ObjectKind::Expression { .. }
-        | ObjectKind::ListDefinition { .. }
-        | ObjectKind::ListElementDefinition { .. }
-        | ObjectKind::Generic => {
+        ObjectKind::AuthorWarning { .. } | ObjectKind::Tag { .. } | ObjectKind::Weave { .. } => {
             return Err(CompilerError::Unsupported(
                 "runtime export currently supports plain text stories and list definitions only",
             ));
@@ -163,6 +197,163 @@ fn export_named_flow_container(
     tokens.push(Value::Null);
 
     Ok(Value::Array(tokens))
+}
+
+fn export_choice_container(
+    object: &ObjectRef,
+    state: &mut ExportState,
+    once_only: bool,
+    is_invisible_default: bool,
+    has_start_content: bool,
+    has_choice_only_content: bool,
+    has_inline_inner_content: bool,
+    outer_index: usize,
+    tokens: &mut Vec<Value>,
+) -> Result<(), CompilerError> {
+    let choice_index = state.choice_index;
+    state.choice_index += 1;
+
+    let (start_content, choice_only_content, inner_content) = {
+        let children = object.borrow().content().to_vec();
+        let mut iter = children.into_iter();
+
+        let start_content = if has_start_content { iter.next() } else { None };
+        let choice_only_content = if has_choice_only_content {
+            iter.next()
+        } else {
+            None
+        };
+        let inner_content = iter.next();
+        (start_content, choice_only_content, inner_content)
+    };
+
+    let mut outer_tokens = Vec::new();
+    let mut choice_named_content = BTreeMap::new();
+
+    if let Some(_start_content) = start_content.as_ref() {
+        outer_tokens.push(json!("ev"));
+        outer_tokens.push(json!({
+            "^->": format!("0.{outer_index}.$r1")
+        }));
+        outer_tokens.push(json!({"temp=":"$r"}));
+        outer_tokens.push(json!("str"));
+        outer_tokens.push(json!({"->":".^.s"}));
+        outer_tokens.push(Value::Array(vec![json!({"#n":"$r1"})]));
+        outer_tokens.push(json!("/str"));
+    }
+
+    if let Some(choice_only_content) = choice_only_content.as_ref() {
+        if !has_start_content {
+            outer_tokens.push(json!("ev"));
+        }
+        outer_tokens.push(json!("str"));
+        outer_tokens.extend(export_content_list_tokens(choice_only_content, state)?);
+        outer_tokens.push(json!("/str"));
+    }
+
+    if has_start_content || has_choice_only_content {
+        outer_tokens.push(json!("/ev"));
+    }
+
+    let flags = {
+        let mut flags = 0;
+        if has_start_content {
+            flags |= 2;
+        }
+        if has_choice_only_content {
+            flags |= 4;
+        }
+        if is_invisible_default {
+            flags |= 8;
+        }
+        if once_only {
+            flags |= 16;
+        }
+        flags
+    };
+    outer_tokens.push(json!({"*": format!("0.c-{choice_index}"), "flg": flags}));
+
+    if let Some(start_content) = start_content {
+        let mut s_tokens = Vec::new();
+        s_tokens.extend(export_content_list_tokens(&start_content, state)?);
+        s_tokens.push(json!({"->":"$r", "var":true}));
+        s_tokens.push(Value::Null);
+        outer_tokens.push(Value::Object(
+            vec![("s".to_string(), Value::Array(s_tokens))]
+                .into_iter()
+                .collect::<Map<_, _>>(),
+        ));
+    }
+
+    let mut inner_tokens = Vec::new();
+    if has_start_content {
+        inner_tokens.push(json!("ev"));
+        inner_tokens.push(json!({
+            "^->": format!("0.c-{choice_index}.$r2")
+        }));
+        inner_tokens.push(json!("/ev"));
+        inner_tokens.push(json!({"temp=":"$r"}));
+        inner_tokens.push(json!({
+            "->": format!("0.{outer_index}.s")
+        }));
+        inner_tokens.push(Value::Array(vec![json!({"#n":"$r2"})]));
+    }
+
+    let mut body_tokens = if let Some(inner_content) = inner_content {
+        export_content_list_tokens(&inner_content, state)?
+    } else {
+        Vec::new()
+    };
+
+    if !has_inline_inner_content
+        && !matches!(body_tokens.first(), Some(Value::String(value)) if value == "\n")
+    {
+        body_tokens.insert(0, Value::String("\n".to_string()));
+    }
+
+    inner_tokens.extend(body_tokens);
+
+    if !matches!(
+        inner_tokens.last(),
+        Some(Value::String(value)) if value == "done" || value == "end"
+    ) {
+        inner_tokens.push(Value::String("end".to_string()));
+    }
+
+    inner_tokens.push(json!({"->": format!("0.g-{choice_index}")}));
+    inner_tokens.push(json!({"#f":5}));
+
+    choice_named_content.insert(format!("c-{choice_index}"), Value::Array(inner_tokens));
+    choice_named_content.insert(
+        format!("g-{choice_index}"),
+        Value::Array(vec![Value::String("done".to_string()), Value::Null]),
+    );
+    if has_start_content {
+        tokens.push(Value::Array(outer_tokens));
+    } else {
+        tokens.extend(outer_tokens);
+    }
+    tokens.push(Value::Object(
+        choice_named_content.into_iter().collect::<Map<_, _>>(),
+    ));
+    Ok(())
+}
+
+fn export_content_list_tokens(
+    content_list: &ObjectRef,
+    state: &mut ExportState,
+) -> Result<Vec<Value>, CompilerError> {
+    let children = {
+        let borrowed = content_list.borrow();
+        borrowed.content().to_vec()
+    };
+
+    let mut tokens = Vec::new();
+    for child in children {
+        export_object_into(&child, state, &mut tokens, false)?;
+    }
+
+    Ok(tokens)
 }
 
 fn build_list_defs_json(list_defs: BTreeMap<String, BTreeMap<String, i64>>) -> Value {

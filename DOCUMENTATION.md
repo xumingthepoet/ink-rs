@@ -23,6 +23,8 @@ into `crates/ink-runtime` instead of rewriting runtime execution.
 - The legacy compiler-to-runtime conformance suite now lives in
   `crates/ink-test/tests/compiler_conformance_legacy.rs` and is gated behind
   the `compiler-conformance` feature while the remaining failures are fixed.
+- The compiler-conformance choice slice now has the basic `no-choice`, `one`,
+  `single-choice`, `suppress-choice`, and `mixed-choice` fixtures green.
 - The current compiler-conformance slice has made the simple divert and glue
   fixtures green and updated the trusted parser snapshots to reflect inline
   divert splitting inside conditional fixtures.
@@ -30,8 +32,9 @@ into `crates/ink-runtime` instead of rewriting runtime execution.
   commits after each few passing fixtures so the remaining work stays
   resumable and bounded.
 - The legacy compiler-to-runtime suite is still not green under the feature
-  gate; the current blocker is unsupported choice/gather syntax and the
-  resulting step-limit failures in the `variable_text` fixtures.
+  gate; the current blocker is unsupported choice conditions/named choices,
+  gather syntax, and the resulting step-limit failures in the
+  `variable_text` fixtures.
 - The documented test loop now treats every long-running `cargo test` path as
   timeboxed, and `make gate` wraps the workspace test pass with a timeout as
   well.
@@ -172,6 +175,9 @@ into `crates/ink-runtime` instead of rewriting runtime execution.
 - The simple divert parser now also accepts an optional trailing `->` glue
   marker, which matches the official `function/evaluating-function-
   variablestate-bug.ink` fixture.
+- Choice output now preserves user-visible spacing in choice text fragments
+  and matches the official JSON layout for the green `no-choice`, `one`,
+  `single-choice`, `suppress-choice`, and `mixed-choice` fixtures.
 - The trusted `blade-ink-rs` glue/divert fixture `glue/glue-with-divert.ink`
   now has a parser-level conformance snapshot.
 - The trusted `blade-ink-rs` knot fixture `knot/multi-line.ink` now has a
@@ -257,8 +263,9 @@ Pass a second argument to write the JSON to a file instead of stdout.
 - The parsed hierarchy currently has the object tree, path primitives, and a
   root-story wrapper with content-node leaf wrappers.
 - Parsed `Weave`, `Choice`, and `Gather` wrappers now exist with indentation
-  grouping and local weave-point naming lookup, but the parser/runtime wiring
-  for choice stories is still pending.
+  grouping and local weave-point naming lookup, and the basic choice runtime
+  wiring is now green for the dependency-light fixtures. Conditional/named
+  choices and gather-heavy stories remain pending.
 - `InkParser::new` now stores an owned, comment-stripped input string so the
   preprocessor can normalize line endings before any grammar work begins.
 - `InkParser::parse` currently accepts plain text stories and returns a parsed
@@ -381,6 +388,25 @@ Pass a second argument to write the JSON to a file instead of stdout.
 - Validation: documentation update only; no code change validation run.
 - Result: the runbook, plan, and live status now all state that Milestone 13
   should be advanced in small committed batches.
+
+### 2026-04-22
+
+- Advanced the compiler-conformance choice slice so the basic `no-choice`,
+  `one`, `single-choice`, `suppress-choice`, and `mixed-choice` fixtures are
+  green, and preserved choice text spacing to match the official JSON shape.
+- Validation: `timeout 30s cargo test -p ink-test --features
+  compiler-conformance --test compiler_conformance_legacy
+  compiler_conformance::choice_test::suppress_choice_test -- --exact`,
+  `timeout 30s cargo test -p ink-test --features compiler-conformance --test
+  compiler_conformance_legacy compiler_conformance::choice_test::one_test --
+  --exact`, `timeout 30s cargo test -p ink-test --features compiler-
+  conformance --test compiler_conformance_legacy
+  compiler_conformance::choice_test::single_choice1_test -- --exact`,
+  `timeout 30s cargo test -p ink-test --features compiler-conformance --test
+  compiler_conformance_legacy compiler_conformance::choice_test::mixed_choice_test
+  -- --exact`, and `cargo fmt --all`.
+- Result: the dependency-light choice fixtures are green; the next blocker is
+  conditional/named choices.
 
 ### 2026-04-22
 
@@ -1584,9 +1610,10 @@ Result: all passed.
 ## Next Task
 
 Keep shrinking the remaining `compiler_conformance_legacy` failures in
-dependency-light order. The next useful work is still the choice-heavy and
-function-heavy fixtures, but the suite remains feature-gated until those are
-green.
+dependency-light order. The next useful work is still the remaining
+choice-heavy fixtures, especially conditional/named choices, before moving
+deeper into gather-heavy and runtime-heavy cases. The suite remains
+feature-gated until those are green.
 
 Stabilize the legacy compiler-to-runtime conformance suite in `ink-test`.
 

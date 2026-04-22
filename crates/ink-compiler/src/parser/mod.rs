@@ -19,7 +19,7 @@ use std::sync::Arc;
 use crate::{
     error::{Diagnostic, DiagnosticSeverity},
     parsed::{
-        Conditional, ConditionalSingleBranch, ConstantDeclaration, ContentList, Divert,
+        Choice, Conditional, ConditionalSingleBranch, ConstantDeclaration, ContentList, Divert,
         ExternalDeclaration, FlowLevel, Identifier, Knot, ListDefinition, ListElementDefinition,
         Object, ObjectKind, ObjectRef, Path, Return, Sequence, SequenceType, Stitch,
         Story as ParsedStory, Text, VariableAssignment,
@@ -48,6 +48,11 @@ struct ConditionalBranchBuilder {
     is_true_branch: bool,
     is_else: bool,
     matching_equality: bool,
+}
+
+#[derive(Debug, Default)]
+struct ChoiceBodyBuilder {
+    inner_content: Vec<ObjectRef>,
 }
 
 impl<'source> InkParser<'source> {
@@ -174,6 +179,21 @@ impl<'source> InkParser<'source> {
                 top_level_content.push(flow.clone());
                 current_flow = Some(flow);
                 line_index += 1;
+                continue;
+            }
+
+            if let Some(choice) = Self::parse_choice_line(
+                &segments,
+                line_index,
+                line_index + 1,
+                source_filename.clone(),
+            )? {
+                if let Some(parent) = current_flow.as_ref() {
+                    Object::add_content(parent, choice.0);
+                } else {
+                    top_level_content.push(choice.0);
+                }
+                line_index += choice.1;
                 continue;
             }
 
@@ -309,13 +329,15 @@ impl<'source> InkParser<'source> {
     fn build_content_line(line_text: &str, had_newline: bool) -> ObjectRef {
         let line = ContentList::new();
         if let Some((text, divert_target)) = Self::split_inline_divert(line_text) {
+            let text = text.trim_end_matches([' ', '\t']);
             if !text.is_empty() {
                 line.add_content(Text::new(text).object());
             }
             line.add_content(Divert::new(Some(divert_target)).object());
         } else {
-            if !line_text.is_empty() {
-                line.add_content(Text::new(line_text).object());
+            let text = line_text.trim_end_matches([' ', '\t']);
+            if !text.is_empty() {
+                line.add_content(Text::new(text).object());
             }
             line.trim_trailing_whitespace();
         }
@@ -496,6 +518,179 @@ impl<'source> InkParser<'source> {
         } else {
             Divert::new(Some(target)).object()
         }))
+    }
+
+    fn parse_choice_line(
+        segments: &[&str],
+        start_index: usize,
+        line_number: usize,
+        source_filename: Option<String>,
+    ) -> std::result::Result<Option<(ObjectRef, usize)>, Diagnostic> {
+        let first_segment = segments[start_index];
+        let line_text = first_segment.strip_suffix('\n').unwrap_or(first_segment);
+        let trimmed_start = line_text.trim_start();
+
+        let Some((once_only, bullets_consumed, remainder)) =
+            Self::parse_choice_bullet_prefix(trimmed_start)
+        else {
+            return Ok(None);
+        };
+
+        let line_indent = line_text.len().saturating_sub(trimmed_start.len());
+        let remainder = remainder.trim_start();
+
+        if remainder.starts_with('{') || remainder.starts_with('(') {
+            return Err(Diagnostic::new(
+                DiagnosticSeverity::Error,
+                source_filename,
+                line_number,
+                line_indent + 1,
+                "Choice conditions and named choices are not yet supported",
+            ));
+        }
+
+        let (start_text, choice_only_text, inner_tail_text) =
+            Self::split_choice_text_fragments(remainder, line_number, source_filename.clone())?;
+
+        let mut choice = Choice::new(None, bullets_consumed);
+        choice.set_once_only(once_only);
+
+        if !start_text.is_empty() {
+            let start_content = ContentList::new();
+            start_content.add_content(Text::new(start_text).object());
+            choice.set_has_start_content(true);
+            Object::add_content(&choice.object(), start_content.object());
+        }
+
+        if !choice_only_text.is_empty() {
+            let choice_only_content = ContentList::new();
+            choice_only_content.add_content(Text::new(choice_only_text).object());
+            choice.set_has_choice_only_content(true);
+            Object::add_content(&choice.object(), choice_only_content.object());
+        }
+
+        let mut inner_content = ChoiceBodyBuilder::default();
+        let mut has_inline_inner_content = false;
+        if !inner_tail_text.is_empty() {
+            choice.set_has_inline_inner_content(true);
+            has_inline_inner_content = true;
+            inner_content
+                .inner_content
+                .push(Self::build_content_line(inner_tail_text, false));
+        }
+
+        let mut consumed_lines = 1usize;
+        while start_index + consumed_lines < segments.len() {
+            let segment = segments[start_index + consumed_lines];
+            let inner_line_text = segment.strip_suffix('\n').unwrap_or(segment);
+            let trimmed = inner_line_text.trim_start();
+            let indent = inner_line_text.len().saturating_sub(trimmed.len());
+
+            if !trimmed.is_empty() && indent <= line_indent {
+                let is_next_choice = trimmed.starts_with('*') || trimmed.starts_with('+');
+                let is_next_gather = trimmed.starts_with('-') && !trimmed.starts_with("->");
+                let is_next_flow = trimmed.starts_with('=') || trimmed.starts_with("INCLUDE");
+                let is_next_brace_logic = trimmed.starts_with('{') || trimmed == "}";
+
+                if is_next_choice || is_next_gather || is_next_flow || is_next_brace_logic {
+                    break;
+                }
+            }
+
+            inner_content
+                .inner_content
+                .extend(Self::parse_branch_content_objects(
+                    inner_line_text,
+                    line_number + consumed_lines,
+                    source_filename.clone(),
+                    segment.ends_with('\n'),
+                )?);
+            consumed_lines += 1;
+        }
+
+        if has_inline_inner_content && consumed_lines > 1 {
+            inner_content
+                .inner_content
+                .insert(1, Text::new("\n").object());
+        }
+
+        if !inner_content.inner_content.is_empty() {
+            let inner_list = Self::build_content_list(inner_content.inner_content);
+            Object::add_content(&choice.object(), inner_list.object());
+        }
+
+        Ok(Some((choice.object(), consumed_lines)))
+    }
+
+    fn parse_choice_bullet_prefix(trimmed_start: &str) -> Option<(bool, usize, &str)> {
+        let mut remainder = trimmed_start;
+        let mut bullet_count = 0usize;
+        let mut once_only = true;
+        let mut saw_bullet = false;
+
+        loop {
+            let after_space = remainder.trim_start();
+            if after_space.len() != remainder.len() {
+                remainder = after_space;
+            }
+
+            let Some(first_char) = remainder.chars().next() else {
+                break;
+            };
+
+            if first_char != '*' && first_char != '+' {
+                break;
+            }
+
+            saw_bullet = true;
+            if first_char == '+' {
+                once_only = false;
+            }
+
+            bullet_count += 1;
+            remainder = &remainder[first_char.len_utf8()..];
+        }
+
+        if !saw_bullet {
+            return None;
+        }
+
+        Some((once_only, bullet_count.max(1), remainder))
+    }
+
+    fn split_choice_text_fragments(
+        remainder: &str,
+        line_number: usize,
+        source_filename: Option<String>,
+    ) -> std::result::Result<(&str, &str, &str), Diagnostic> {
+        let Some(open_index) = remainder.find('[') else {
+            return Ok((remainder, "", ""));
+        };
+
+        let Some(close_index) = remainder.rfind(']') else {
+            return Err(Diagnostic::new(
+                DiagnosticSeverity::Error,
+                source_filename,
+                line_number,
+                remainder.len().saturating_sub(remainder.trim_start().len()) + 1,
+                "Expected closing ']' for choice text",
+            ));
+        };
+
+        if close_index < open_index {
+            return Err(Diagnostic::new(
+                DiagnosticSeverity::Error,
+                source_filename,
+                line_number,
+                remainder.len().saturating_sub(remainder.trim_start().len()) + 1,
+                "Expected closing ']' for choice text",
+            ));
+        }
+
+        let start_text = &remainder[..open_index];
+        let choice_only_text = &remainder[open_index + 1..close_index];
+        let inner_tail_text = &remainder[close_index + 1..];
+        Ok((start_text, choice_only_text, inner_tail_text))
     }
 
     fn parse_sequence_line(
@@ -1704,7 +1899,7 @@ impl<'source> InkParser<'source> {
                 continue;
             }
 
-            for marker in ["*", "-", "#", "{", "}"] {
+            for marker in ["-", "#", "{", "}"] {
                 if marker == "-" && trimmed.starts_with("->") {
                     continue;
                 }

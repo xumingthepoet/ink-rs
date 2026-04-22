@@ -75,6 +75,9 @@ impl ContentList {
 
                 match child_borrow.kind_mut() {
                     ObjectKind::Text { text } => {
+                        if text == "\n" {
+                            continue;
+                        }
                         let trimmed = text.trim_end_matches([' ', '\t']).to_string();
                         if trimmed.is_empty() {
                             remove_current = true;
@@ -163,13 +166,16 @@ impl fmt::Display for ContentList {
                         once_only,
                         is_invisible_default,
                         has_weave_style_inline_brackets,
+                        has_start_content,
+                        has_choice_only_content,
+                        has_inline_inner_content,
                     } => {
                         let name = identifier
                             .as_ref()
                             .map(|identifier| identifier.name.as_str())
                             .unwrap_or("<unnamed>");
                         format!(
-                            "Choice({name}, depth={indentation_depth}, once={once_only}, invisible={is_invisible_default}, weave_style={has_weave_style_inline_brackets})"
+                            "Choice({name}, depth={indentation_depth}, once={once_only}, invisible={is_invisible_default}, weave_style={has_weave_style_inline_brackets}, start={has_start_content}, choice_only={has_choice_only_content}, inline_inner={has_inline_inner_content})"
                         )
                     }
                     ObjectKind::Gather {

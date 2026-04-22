@@ -47,6 +47,9 @@ pub(crate) enum ObjectKind {
         once_only: bool,
         is_invisible_default: bool,
         has_weave_style_inline_brackets: bool,
+        has_start_content: bool,
+        has_choice_only_content: bool,
+        has_inline_inner_content: bool,
     },
     Gather {
         identifier: Option<Identifier>,
@@ -181,6 +184,9 @@ impl Object {
         once_only: bool,
         is_invisible_default: bool,
         has_weave_style_inline_brackets: bool,
+        has_start_content: bool,
+        has_choice_only_content: bool,
+        has_inline_inner_content: bool,
     ) {
         self.kind = ObjectKind::Choice {
             identifier,
@@ -188,6 +194,9 @@ impl Object {
             once_only,
             is_invisible_default,
             has_weave_style_inline_brackets,
+            has_start_content,
+            has_choice_only_content,
+            has_inline_inner_content,
         };
     }
 

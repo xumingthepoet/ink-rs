@@ -25,6 +25,10 @@ Core commands to run after every completed milestone:
 Current last verified milestone: Milestone 13 compiler-conformance gate
 slice (`2026-04-22`).
 
+Current verified checkpoint: compiler-conformance choice slice with
+`no-choice`, `one`, `single-choice`, `suppress-choice`, and `mixed-choice`
+fixtures green (`2026-04-22`).
+
 Workspace warning policy: `.cargo/config.toml` now denies warnings, and
 `make gate` is the unified local entry point for format, check, and a
 timeboxed test pass. Any standalone `cargo test` command should also be
