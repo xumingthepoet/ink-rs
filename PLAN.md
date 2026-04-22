@@ -21,8 +21,8 @@ Core commands to run after every completed milestone:
 - [x] `cargo check --workspace`
 - [x] `cargo test --workspace`
 
-Current last verified milestone: Milestone 7 inline conditional parsing slice
-(`2026-04-22`).
+Current last verified milestone: Milestone 7 brace multiline conditional and
+sequence parsing slice (`2026-04-22`).
 
 ## Rules
 
@@ -240,7 +240,7 @@ cargo check --workspace
 - [x] Port variable declarations, assignments, references, constants, and
   externals.
 - [x] Port list definitions and list values.
-- [ ] Port conditionals, sequences, function calls, returns, and tunnels.
+- [x] Port conditionals, sequences, function calls, returns, and tunnels.
 - [ ] Add feature tests for arithmetic, variables, lists, conditions, functions,
   and sequences.
 
@@ -318,7 +318,8 @@ cargo test --workspace
 
 ## Next Task
 
-Port conditionals, sequences, function calls, returns, and tunnels.
+Add feature tests for arithmetic, variables, lists, conditions, functions, and
+sequences.
 
 ## Risk Register
 

@@ -40,6 +40,15 @@ enum AssignmentOperator {
     Decrement,
 }
 
+#[derive(Debug, Default)]
+struct ConditionalBranchBuilder {
+    content: Vec<ObjectRef>,
+    own_expression: Option<ObjectRef>,
+    is_true_branch: bool,
+    is_else: bool,
+    matching_equality: bool,
+}
+
 impl<'source> InkParser<'source> {
     pub fn new(
         input_string: &'source str,
@@ -90,14 +99,32 @@ impl<'source> InkParser<'source> {
         let mut top_level_content = Vec::new();
         let mut current_flow: Option<ObjectRef> = None;
         let source_filename = self.source_filename.map(str::to_string);
+        let segments: Vec<&str> = self.input_string.split_inclusive('\n').collect();
 
-        if self.input_string.is_empty() {
+        if segments.is_empty() {
             return Ok(ParsedStory::new(top_level_content, false));
         }
 
-        for (line_index, segment) in self.input_string.split_inclusive('\n').enumerate() {
+        let mut line_index = 0;
+        while line_index < segments.len() {
+            let segment = segments[line_index];
             let had_newline = segment.ends_with('\n');
             let line_text = segment.strip_suffix('\n').unwrap_or(segment);
+
+            if let Some((logic, consumed_lines)) = Self::parse_brace_logic_block(
+                &segments,
+                line_index,
+                line_index + 1,
+                source_filename.clone(),
+            )? {
+                if let Some(parent) = current_flow.as_ref() {
+                    Object::add_content(parent, logic);
+                } else {
+                    top_level_content.push(logic);
+                }
+                line_index += consumed_lines;
+                continue;
+            }
 
             if let Some(statement) =
                 Self::parse_statement_line(line_text, line_index + 1, source_filename.clone())?
@@ -107,6 +134,7 @@ impl<'source> InkParser<'source> {
                 } else {
                     top_level_content.push(statement);
                 }
+                line_index += 1;
                 continue;
             }
 
@@ -115,6 +143,7 @@ impl<'source> InkParser<'source> {
             {
                 top_level_content.push(flow.clone());
                 current_flow = Some(flow);
+                line_index += 1;
                 continue;
             }
 
@@ -126,6 +155,7 @@ impl<'source> InkParser<'source> {
                 } else {
                     top_level_content.push(divert);
                 }
+                line_index += 1;
                 continue;
             }
 
@@ -137,6 +167,7 @@ impl<'source> InkParser<'source> {
                 } else {
                     top_level_content.push(sequence);
                 }
+                line_index += 1;
                 continue;
             }
 
@@ -148,6 +179,7 @@ impl<'source> InkParser<'source> {
                 } else {
                     top_level_content.push(conditional);
                 }
+                line_index += 1;
                 continue;
             }
 
@@ -157,6 +189,7 @@ impl<'source> InkParser<'source> {
             } else {
                 top_level_content.push(line);
             }
+            line_index += 1;
         }
 
         Ok(ParsedStory::new(top_level_content, false))
@@ -414,6 +447,422 @@ impl<'source> InkParser<'source> {
         }
 
         Ok(Some(Conditional::new(Some(condition), branches).object()))
+    }
+
+    fn parse_brace_logic_block(
+        segments: &[&str],
+        start_index: usize,
+        line_number: usize,
+        source_filename: Option<String>,
+    ) -> std::result::Result<Option<(ObjectRef, usize)>, Diagnostic> {
+        let first_segment = segments[start_index];
+        let line_text = first_segment.strip_suffix('\n').unwrap_or(first_segment);
+        let trimmed_start = line_text.trim_start();
+
+        if !trimmed_start.starts_with('{') || trimmed_start.ends_with('}') {
+            return Ok(None);
+        }
+
+        let header_text = trimmed_start[1..].trim_start();
+        let mut body_lines: Vec<(String, bool, usize)> = Vec::new();
+        let mut consumed_lines = 1;
+        let mut closed = false;
+
+        while start_index + consumed_lines < segments.len() {
+            let segment = segments[start_index + consumed_lines];
+            let inner_line_text = segment.strip_suffix('\n').unwrap_or(segment);
+            let trimmed = inner_line_text.trim_start();
+
+            if trimmed == "}" {
+                closed = true;
+                consumed_lines += 1;
+                break;
+            }
+
+            body_lines.push((
+                inner_line_text.to_string(),
+                segment.ends_with('\n'),
+                line_number + consumed_lines,
+            ));
+            consumed_lines += 1;
+        }
+
+        if !closed {
+            return Err(Diagnostic::new(
+                DiagnosticSeverity::Error,
+                source_filename,
+                line_number,
+                1,
+                "Expected closing '}' for brace logic block",
+            ));
+        }
+
+        if let Some(sequence_type) = Self::parse_brace_sequence_header(header_text) {
+            let sequence = Self::parse_brace_sequence_body(
+                sequence_type,
+                &body_lines,
+                source_filename.clone(),
+            )?;
+            return Ok(Some((sequence, consumed_lines)));
+        }
+
+        let initial_condition = if header_text.trim().is_empty() {
+            None
+        } else {
+            let Some(condition_text) = header_text.trim().strip_suffix(':') else {
+                return Err(Diagnostic::new(
+                    DiagnosticSeverity::Error,
+                    source_filename,
+                    line_number,
+                    1,
+                    "Expected ':' after conditional header",
+                ));
+            };
+
+            let condition_text = condition_text.trim();
+            if condition_text.is_empty() {
+                None
+            } else {
+                Some(Self::parse_expression_fragment(
+                    condition_text,
+                    line_number,
+                    source_filename.clone(),
+                )?)
+            }
+        };
+
+        let conditional = Self::parse_brace_conditional_body(
+            initial_condition,
+            &body_lines,
+            line_number,
+            source_filename,
+        )?;
+        Ok(Some((conditional, consumed_lines)))
+    }
+
+    fn parse_brace_sequence_header(header_text: &str) -> Option<SequenceType> {
+        let header_text = header_text.trim();
+        let header_text = header_text.strip_suffix(':')?.trim();
+
+        match header_text {
+            "once" => Some(SequenceType::Once),
+            "cycle" => Some(SequenceType::Cycle),
+            "shuffle" => Some(SequenceType::Shuffle),
+            "stopping" => Some(SequenceType::Stopping),
+            _ => None,
+        }
+    }
+
+    fn parse_brace_sequence_body(
+        sequence_type: SequenceType,
+        body_lines: &[(String, bool, usize)],
+        source_filename: Option<String>,
+    ) -> std::result::Result<ObjectRef, Diagnostic> {
+        let mut branches = Vec::new();
+        let mut current_branch: Option<Vec<ObjectRef>> = None;
+        let mut saw_branch = false;
+
+        for (line_text, had_newline, line_number) in body_lines {
+            let trimmed_start = line_text.trim_start();
+            if let Some(after_dash) = trimmed_start.strip_prefix('-') {
+                if let Some(branch_content) = current_branch.take() {
+                    branches.push(Self::build_content_list(branch_content));
+                }
+
+                saw_branch = true;
+                let mut branch_content = Vec::new();
+                let content_text = after_dash.trim_start();
+                if !content_text.is_empty() {
+                    branch_content.extend(Self::parse_branch_content_objects(
+                        content_text,
+                        *line_number,
+                        source_filename.clone(),
+                        false,
+                    )?);
+                }
+                current_branch = Some(branch_content);
+                continue;
+            }
+
+            if trimmed_start.is_empty() {
+                if let Some(branch_content) = current_branch.as_mut() {
+                    branch_content.extend(Self::parse_branch_content_objects(
+                        line_text,
+                        *line_number,
+                        source_filename.clone(),
+                        *had_newline,
+                    )?);
+                }
+                continue;
+            }
+
+            if !saw_branch {
+                return Err(Diagnostic::new(
+                    DiagnosticSeverity::Error,
+                    source_filename.clone(),
+                    *line_number,
+                    1,
+                    "Sequence branches must start with '-'",
+                ));
+            }
+
+            if let Some(branch_content) = current_branch.as_mut() {
+                branch_content.extend(Self::parse_branch_content_objects(
+                    line_text,
+                    *line_number,
+                    source_filename.clone(),
+                    *had_newline,
+                )?);
+            }
+        }
+
+        if let Some(branch_content) = current_branch.take() {
+            branches.push(Self::build_content_list(branch_content));
+        }
+
+        if branches.len() < 2 {
+            return Err(Diagnostic::new(
+                DiagnosticSeverity::Error,
+                source_filename,
+                body_lines
+                    .first()
+                    .map(|(_, _, line_number)| *line_number)
+                    .unwrap_or(1),
+                1,
+                "Sequence lines must contain at least two branches separated by '|'",
+            ));
+        }
+
+        Ok(Sequence::new(branches, sequence_type).object())
+    }
+
+    fn parse_brace_conditional_body(
+        initial_condition: Option<ObjectRef>,
+        body_lines: &[(String, bool, usize)],
+        line_number: usize,
+        source_filename: Option<String>,
+    ) -> std::result::Result<ObjectRef, Diagnostic> {
+        let mut branches = Vec::new();
+        let mut current_branch: Option<ConditionalBranchBuilder> = None;
+        let mut saw_plain_branch = false;
+
+        for (line_text, had_newline, line_number) in body_lines {
+            let trimmed_start = line_text.trim_start();
+
+            if let Some(after_dash) = trimmed_start.strip_prefix('-') {
+                if let Some(branch) = current_branch.take() {
+                    branches.push(Self::build_conditional_branch(branch));
+                }
+
+                let after_dash = after_dash.trim_start();
+                let mut branch = ConditionalBranchBuilder::default();
+
+                if after_dash.starts_with("else:") {
+                    branch.is_else = true;
+                    let content_text = after_dash["else:".len()..].trim_start();
+                    if !content_text.is_empty() {
+                        branch.content.extend(Self::parse_branch_content_objects(
+                            content_text,
+                            *line_number,
+                            source_filename.clone(),
+                            false,
+                        )?);
+                    }
+                } else if let Some((condition_text, content_text)) = after_dash.split_once(':') {
+                    let condition_text = condition_text.trim();
+                    if condition_text.is_empty() {
+                        if initial_condition.is_none() {
+                            return Err(Diagnostic::new(
+                                DiagnosticSeverity::Error,
+                                source_filename.clone(),
+                                *line_number,
+                                1,
+                                "Expected a condition before ':' in conditional branch",
+                            ));
+                        }
+                        branch.is_true_branch = !saw_plain_branch;
+                        saw_plain_branch = true;
+                        if !content_text.trim().is_empty() {
+                            branch.content.extend(Self::parse_branch_content_objects(
+                                content_text.trim_start(),
+                                *line_number,
+                                source_filename.clone(),
+                                false,
+                            )?);
+                        }
+                    } else if let Some(condition) = Self::parse_expression_fragment(
+                        condition_text,
+                        *line_number,
+                        source_filename.clone(),
+                    )
+                    .ok()
+                    {
+                        branch.own_expression = Some(condition);
+                        branch.matching_equality = initial_condition.is_some();
+                        if !content_text.trim().is_empty() {
+                            branch.content.extend(Self::parse_branch_content_objects(
+                                content_text.trim_start(),
+                                *line_number,
+                                source_filename.clone(),
+                                false,
+                            )?);
+                        }
+                    } else {
+                        branch.is_true_branch = !saw_plain_branch;
+                        saw_plain_branch = true;
+                        branch.content.extend(Self::parse_branch_content_objects(
+                            after_dash,
+                            *line_number,
+                            source_filename.clone(),
+                            false,
+                        )?);
+                    }
+                } else if initial_condition.is_some() {
+                    branch.is_true_branch = !saw_plain_branch;
+                    saw_plain_branch = true;
+                    if !after_dash.is_empty() {
+                        branch.content.extend(Self::parse_branch_content_objects(
+                            after_dash,
+                            *line_number,
+                            source_filename.clone(),
+                            false,
+                        )?);
+                    }
+                } else {
+                    return Err(Diagnostic::new(
+                        DiagnosticSeverity::Error,
+                        source_filename.clone(),
+                        *line_number,
+                        1,
+                        "Expected a conditional branch expression or 'else:' after '-'",
+                    ));
+                }
+
+                current_branch = Some(branch);
+                continue;
+            }
+
+            if trimmed_start.is_empty() {
+                if let Some(branch) = current_branch.as_mut() {
+                    branch.content.extend(Self::parse_branch_content_objects(
+                        line_text,
+                        *line_number,
+                        source_filename.clone(),
+                        *had_newline,
+                    )?);
+                }
+                continue;
+            }
+
+            if current_branch.is_none() {
+                if initial_condition.is_some() {
+                    let mut branch = ConditionalBranchBuilder::default();
+                    branch.is_true_branch = true;
+                    branch.content.extend(Self::parse_branch_content_objects(
+                        line_text,
+                        *line_number,
+                        source_filename.clone(),
+                        *had_newline,
+                    )?);
+                    current_branch = Some(branch);
+                    continue;
+                }
+
+                return Err(Diagnostic::new(
+                    DiagnosticSeverity::Error,
+                    source_filename.clone(),
+                    *line_number,
+                    1,
+                    "Expected a conditional branch starting with '-'",
+                ));
+            }
+
+            if let Some(branch) = current_branch.as_mut() {
+                branch.content.extend(Self::parse_branch_content_objects(
+                    line_text,
+                    *line_number,
+                    source_filename.clone(),
+                    *had_newline,
+                )?);
+            }
+        }
+
+        if let Some(branch) = current_branch.take() {
+            branches.push(Self::build_conditional_branch(branch));
+        }
+
+        if branches.is_empty() {
+            return Err(Diagnostic::new(
+                DiagnosticSeverity::Error,
+                source_filename,
+                line_number,
+                1,
+                "Expected conditional branches inside brace block",
+            ));
+        }
+
+        let conditional = Conditional::new(initial_condition, branches);
+        Ok(conditional.object())
+    }
+
+    fn build_conditional_branch(branch: ConditionalBranchBuilder) -> ConditionalSingleBranch {
+        let mut result = ConditionalSingleBranch::new(branch.content);
+        result.set_is_true_branch(branch.is_true_branch);
+        result.set_is_else(branch.is_else);
+        result.set_is_inline(false);
+        result.set_matching_equality(branch.matching_equality);
+        result.set_own_expression(branch.own_expression);
+        result
+    }
+
+    fn build_content_list(content: Vec<ObjectRef>) -> ContentList {
+        let list = ContentList::new();
+        for child in content {
+            list.add_content(child);
+        }
+        list.trim_trailing_whitespace();
+        list
+    }
+
+    fn parse_branch_content_objects(
+        line_text: &str,
+        line_number: usize,
+        source_filename: Option<String>,
+        had_newline: bool,
+    ) -> std::result::Result<Vec<ObjectRef>, Diagnostic> {
+        if let Some(statement) =
+            Self::parse_statement_line(line_text, line_number, source_filename.clone())?
+        {
+            return Ok(vec![statement]);
+        }
+
+        if let Some(divert) =
+            Self::parse_simple_divert_line(line_text, line_number, source_filename.clone())?
+        {
+            return Ok(vec![divert]);
+        }
+
+        if let Some(sequence) =
+            Self::parse_sequence_line(line_text, line_number, source_filename.clone())?
+        {
+            return Ok(vec![sequence]);
+        }
+
+        if let Some(conditional) =
+            Self::parse_conditional_line(line_text, line_number, source_filename)?
+        {
+            return Ok(vec![conditional]);
+        }
+
+        let mut result = Vec::new();
+        let content_text = line_text.trim_start();
+        if !content_text.is_empty() {
+            result.push(Text::new(content_text).object());
+        }
+        if had_newline {
+            result.push(Text::new("\n").object());
+        }
+        Ok(result)
     }
 
     fn parse_simple_divert_target(target_text: &str) -> Option<Path> {
@@ -1091,9 +1540,23 @@ impl<'source> InkParser<'source> {
     }
 
     fn find_unsupported_syntax(&self) -> Option<(usize, usize, &'static str)> {
+        let mut in_brace_block = false;
+
         for (line_index, line) in self.input_string.lines().enumerate() {
             let trimmed = line.trim_start();
             let column = line.len().saturating_sub(trimmed.len()) + 1;
+
+            if in_brace_block {
+                if trimmed == "}" {
+                    in_brace_block = false;
+                }
+                continue;
+            }
+
+            if trimmed.starts_with('{') && !trimmed.ends_with('}') {
+                in_brace_block = true;
+                continue;
+            }
 
             for marker in ["*", "-", "#", "{", "}"] {
                 if marker == "-" && trimmed.starts_with("->") {
@@ -1116,7 +1579,7 @@ impl<'source> InkParser<'source> {
 mod tests {
     use super::{CommentEliminator, InkParser};
     use crate::parsed::{
-        ExpressionKind, ObjectKind, ObjectRef, SequenceType, Story as ParsedStory,
+        ExpressionKind, NumberValue, ObjectKind, ObjectRef, SequenceType, Story as ParsedStory,
     };
 
     fn render_story(story: &ParsedStory) -> String {
@@ -1807,6 +2270,154 @@ mod tests {
     }
 
     #[test]
+    fn ink_parser_parses_multiline_conditionals() {
+        let mut parser = InkParser::new(
+            "{ x == 4:\n  The main clause\n- else:\n  other\n}",
+            Some("story.ink"),
+            None,
+        );
+        let result = parser.parse();
+
+        assert!(result.diagnostics.is_empty());
+        let story = result.parsed_story.expect("expected parsed story");
+        let content = story.content();
+
+        assert_eq!(content.len(), 1);
+        assert!(matches!(
+            content[0].borrow().kind(),
+            ObjectKind::Conditional
+        ));
+
+        let conditional_content = content[0].borrow().content().to_vec();
+        assert_eq!(conditional_content.len(), 3);
+        assert!(matches!(
+            conditional_content[0].borrow().kind(),
+            ObjectKind::Expression {
+                kind: ExpressionKind::Binary { .. }
+            }
+        ));
+        assert!(matches!(
+            conditional_content[1].borrow().kind(),
+            ObjectKind::ConditionalSingleBranch {
+                is_true_branch: true,
+                is_else: false,
+                is_inline: false,
+            }
+        ));
+        assert!(matches!(
+            conditional_content[2].borrow().kind(),
+            ObjectKind::ConditionalSingleBranch {
+                is_true_branch: false,
+                is_else: true,
+                is_inline: false,
+            }
+        ));
+    }
+
+    #[test]
+    fn ink_parser_parses_multiline_sequences() {
+        let mut parser = InkParser::new(
+            "{once:\n  - first\n  -\n  - second\n}",
+            Some("story.ink"),
+            None,
+        );
+        let result = parser.parse();
+
+        assert!(result.diagnostics.is_empty());
+        let story = result.parsed_story.expect("expected parsed story");
+        let content = story.content();
+
+        assert_eq!(content.len(), 1);
+        assert!(matches!(
+            content[0].borrow().kind(),
+            ObjectKind::Sequence {
+                sequence_type: SequenceType::Once,
+            }
+        ));
+
+        let branches = content[0].borrow().content().to_vec();
+        assert_eq!(branches.len(), 3);
+        assert!(matches!(
+            branches[0].borrow().kind(),
+            ObjectKind::ContentList { .. }
+        ));
+        assert!(matches!(
+            branches[0].borrow().content()[0].borrow().kind(),
+            ObjectKind::Text { text } if text == "first"
+        ));
+        assert!(matches!(
+            branches[1].borrow().kind(),
+            ObjectKind::ContentList { .. }
+        ));
+        assert!(branches[1].borrow().content().is_empty());
+        assert!(matches!(
+            branches[2].borrow().kind(),
+            ObjectKind::ContentList { .. }
+        ));
+        assert!(matches!(
+            branches[2].borrow().content()[0].borrow().kind(),
+            ObjectKind::Text { text } if text == "second"
+        ));
+    }
+
+    #[test]
+    fn ink_parser_parses_multiline_switch_conditionals() {
+        let mut parser = InkParser::new(
+            "{ 3:\n    - 3:\n    - 4:\n        txt\n}",
+            Some("story.ink"),
+            None,
+        );
+        let result = parser.parse();
+
+        assert!(result.diagnostics.is_empty());
+        let story = result.parsed_story.expect("expected parsed story");
+        let content = story.content();
+
+        assert_eq!(content.len(), 1);
+        assert!(matches!(
+            content[0].borrow().kind(),
+            ObjectKind::Conditional
+        ));
+
+        let conditional_content = content[0].borrow().content().to_vec();
+        assert_eq!(conditional_content.len(), 3);
+        assert!(matches!(
+            conditional_content[0].borrow().kind(),
+            ObjectKind::Expression {
+                kind: ExpressionKind::Number(NumberValue::Int(3))
+            }
+        ));
+        assert!(matches!(
+            conditional_content[1].borrow().kind(),
+            ObjectKind::ConditionalSingleBranch {
+                is_true_branch: false,
+                is_else: false,
+                is_inline: false,
+            }
+        ));
+        assert!(matches!(
+            conditional_content[1].borrow().content()[0].borrow().kind(),
+            ObjectKind::Expression {
+                kind: ExpressionKind::Number(NumberValue::Int(3))
+            }
+        ));
+        assert!(matches!(
+            conditional_content[2].borrow().kind(),
+            ObjectKind::ConditionalSingleBranch {
+                is_true_branch: false,
+                is_else: false,
+                is_inline: false,
+            }
+        ));
+        assert!(matches!(
+            conditional_content[2].borrow().content()[0].borrow().kind(),
+            ObjectKind::Expression {
+                kind: ExpressionKind::Number(NumberValue::Int(4))
+            }
+        ));
+    }
+
+    #[test]
     fn ink_parser_golden_cases_for_minimal_snippets() {
         let cases = [
             (
@@ -1838,6 +2449,16 @@ mod tests {
                 "inline_conditional",
                 "{ x > 3: yes | no }",
                 "Story\n  Conditional\n    Binary(>, VariableReference(x), Number(3))\n    ConditionalBranch(true=true, else=false, inline=true)\n      ContentList\n        Text(\"yes\")\n    ConditionalBranch(true=false, else=true, inline=true)\n      ContentList\n        Text(\"no\")",
+            ),
+            (
+                "brace_sequence",
+                "{once:\n  - first\n  -\n  - second\n}",
+                "Story\n  Sequence(type=Once)\n    ContentList\n      Text(\"first\")\n    ContentList\n    ContentList\n      Text(\"second\")",
+            ),
+            (
+                "brace_conditional",
+                "{ x == 4:\n  The main clause\n- else:\n  other\n}",
+                "Story\n  Conditional\n    Binary(==, VariableReference(x), Number(4))\n    ConditionalBranch(true=true, else=false, inline=false)\n      Text(\"The main clause\")\n      Text(\"\\n\")\n    ConditionalBranch(true=false, else=true, inline=false)\n      Text(\"other\")\n      Text(\"\\n\")",
             ),
         ];
 

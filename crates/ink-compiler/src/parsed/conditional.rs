@@ -44,6 +44,8 @@ impl fmt::Display for Conditional {
 #[derive(Debug, Clone)]
 pub struct ConditionalSingleBranch {
     object: ObjectRef,
+    own_expression: Option<ObjectRef>,
+    matching_equality: bool,
     is_true_branch: bool,
     is_else: bool,
     is_inline: bool,
@@ -62,6 +64,8 @@ impl ConditionalSingleBranch {
 
         Self {
             object,
+            own_expression: None,
+            matching_equality: false,
             is_true_branch: false,
             is_else: false,
             is_inline: false,
@@ -90,6 +94,17 @@ impl ConditionalSingleBranch {
         }
     }
 
+    pub fn set_own_expression(&mut self, value: Option<ObjectRef>) {
+        self.own_expression = value.clone();
+        if let Some(own_expression) = value {
+            Object::insert_content(&self.object, 0, own_expression);
+        }
+    }
+
+    pub fn set_matching_equality(&mut self, value: bool) {
+        self.matching_equality = value;
+    }
+
     pub fn set_is_inline(&mut self, value: bool) {
         self.is_inline = value;
         if let ObjectKind::ConditionalSingleBranch { is_inline, .. } =
@@ -109,6 +124,14 @@ impl ConditionalSingleBranch {
 
     pub fn is_inline(&self) -> bool {
         self.is_inline
+    }
+
+    pub fn matching_equality(&self) -> bool {
+        self.matching_equality
+    }
+
+    pub fn own_expression(&self) -> Option<ObjectRef> {
+        self.own_expression.clone()
     }
 
     pub fn content(&self) -> Vec<ObjectRef> {
@@ -170,5 +193,16 @@ mod tests {
             branch.to_string(),
             "ConditionalBranch(true=true, else=false, inline=true)"
         );
+    }
+
+    #[test]
+    fn conditional_branch_tracks_own_expression() {
+        let mut branch = ConditionalSingleBranch::new(vec![Text::new("hello").object()]);
+        branch.set_own_expression(Some(Text::new("x == 3").object()));
+        branch.set_matching_equality(true);
+
+        assert!(branch.own_expression().is_some());
+        assert!(branch.matching_equality());
+        assert_eq!(branch.content().len(), 2);
     }
 }

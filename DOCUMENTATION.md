@@ -51,6 +51,8 @@ runtime instead of rewriting runtime execution.
   `once: a | b` and models them as parsed sequence nodes.
 - Ink parser now also recognizes simple inline conditional lines such as
   `{ x > 3: yes | no }` and models them as parsed conditional nodes.
+- Ink parser now also recognizes brace-based multiline conditional and
+  sequence blocks, including switch-style branch expressions.
 - Ink parser now has golden parser tests for minimal plain-text, knot, and
   divert snippets, including tunnel diverts.
 - Expression parser foundation is now ported with Pratt-style precedence
@@ -80,9 +82,10 @@ runtime instead of rewriting runtime execution.
 
 Milestone 1 is complete. Milestone 2 is complete. Milestone 3 is complete.
 Milestone 4 is complete. Milestone 5 is complete. Milestone 6 is complete.
-Milestone 7 is in progress, and the expression, variable-statement, and
-list-definition, return-statement, tunnel-divert, inline-sequence, and
-inline-conditional slices are complete.
+Milestone 7 is in progress, and the expression, variable-statement,
+list-definition, return-statement, tunnel-divert, inline-sequence,
+inline-conditional, and brace multiline conditional/sequence slices are
+complete.
 
 ## Verification Checklist
 
@@ -142,11 +145,12 @@ The ignored `blade-ink-rs/` directory must be present because the workspace uses
 - `InkParser::parse` now also recognizes simple inline conditional lines, but
   the broader multiline conditional grammar and runtime export behavior remain
   limited.
+- `InkParser::parse` now also recognizes brace-based multiline sequence and
+  conditional blocks, including switch-style branch expressions, but nested
+  brace logic and runtime export behavior remain limited.
 - Expression parsing currently covers a focused foundation subset: numeric and
   boolean literals, string expressions, variable paths, function calls, list
-  expressions, divert targets, unary operators, and binary precedence. The
-  list-definition, multiline conditionals, and broader sequence grammar slices
-  are still pending beyond the variable-statement helpers.
+  expressions, divert targets, unary operators, and binary precedence.
 - `InkParser::parse` now also recognizes `VAR`, `CONST`, `EXTERNAL`, and `~`
   logic lines for variable declarations, constants, externals, temporary
   assignments, and variable-reference expressions.
@@ -164,9 +168,9 @@ The ignored `blade-ink-rs/` directory must be present because the workspace uses
   runtime semantics are still limited.
 - Parsed return nodes are parsed, but compiler-side runtime export for
   function-return semantics is still pending.
-- Parsed inline conditional nodes are parsed, but multiline conditional
-  grammar and runtime export behavior are still limited.
-- The ink parser grammar is still pending.
+- Parsed inline and brace multiline conditional/sequence nodes are parsed, but
+  nested brace logic and runtime export behavior are still limited.
+- The ink parser grammar is still pending for the remaining unported features.
 - The C# `Glue` and `LegacyTag` `Wrap<T>` aliases are not yet ported as
   dedicated compiler-side wrappers because the corresponding runtime modules in
   `blade-ink-rs` are private; the generic `Wrap<T>` helper is in place for
@@ -176,6 +180,28 @@ The ignored `blade-ink-rs/` directory must be present because the workspace uses
   compiler crate failures.
 
 ## Audit Log
+
+### 2026-04-22
+
+- Continued Milestone 7 with the brace multiline conditional and sequence
+  parsing slice.
+- Added brace-block parsing for multiline sequences such as `{once: ... }` and
+  multiline conditionals such as `{ x == 4: ... }`.
+- Added support for switch-style conditional branches with own expressions in
+  the parsed hierarchy.
+- Added parser and golden tests covering multiline conditionals and sequences.
+
+Validation:
+
+```sh
+cargo fmt --all
+cargo test -p ink-compiler parser
+cargo check --workspace
+cargo test --workspace
+```
+
+Result: all passed. `blade-ink-rs/lib` emitted the same two existing warnings
+about unnecessary parentheses around trait object types.
 
 ### 2026-04-22
 
@@ -686,7 +712,8 @@ about unnecessary parentheses around trait object types.
 
 ## Next Task
 
-Port conditionals, sequences, function calls, returns, and tunnels.
+Add feature tests for arithmetic, variables, lists, conditions, functions, and
+sequences.
 
 ## Repo Structure
 
