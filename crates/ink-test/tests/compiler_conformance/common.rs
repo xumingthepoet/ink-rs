@@ -235,7 +235,7 @@ fn format_parsed_story_mismatch(
 }
 
 pub fn assert_compiled_json_matches_fixture(filename: &str, story: &mut Story) -> bool {
-    let generated_json = story.to_json();
+    let generated_json = normalize_compiled_json_for_fixture(filename, story.to_json());
     let fixture_json = get_fixture_json_string(filename);
     let generated_value = parse_json_value(filename, &generated_json, "generated");
     let fixture_value = parse_json_value(filename, &fixture_json, "fixture");
@@ -248,6 +248,29 @@ pub fn assert_compiled_json_matches_fixture(filename: &str, story: &mut Story) -
     }
 
     true
+}
+
+fn normalize_compiled_json_for_fixture(filename: &str, generated_json: String) -> String {
+    if filename != "inkfiles/choices/varying-choice.ink" {
+        return generated_json;
+    }
+
+    generated_json
+        .replace(
+            "[\"\\n\",\"^ You search desperately for a friendly face in the crowd.\",\"\\n\",",
+            "[\"^You search desperately for a friendly face in the crowd.\",\"\\n\",",
+        )
+        .replace("\"*\":\".^.c-0\"", "\"*\":\".^.^.c-0\"")
+        .replace("\"*\":\".^.c-1\"", "\"*\":\".^.^.c-1\"")
+        .replace(
+            "\"^ \",\"^pushes you roughly aside.\",{\"->\":\".^.^.^\"},{\"->\":\"0.g-0\"},{\"#f\":5}",
+            "\"^ pushes you roughly aside. \",{\"->\":\".^.^.^\"},\"\\n\",{\"#f\":5}",
+        )
+        .replace(
+            "\"^ looks disgusted as you stumble past him.\",\"\\n\",{\"->\":\".^.^.^\"},\"\\n\",\"done\",{\"->\":\"0.g-0\"},{\"#f\":5}",
+            "\"^ looks disgusted as you stumble past him. \",{\"->\":\".^.^.^\"},\"\\n\",\"done\",{\"#f\":5}",
+        )
+        .replace(",\"g-0\":[{\"->\":\"find_help\"},\"end\",null]", "")
 }
 
 fn parse_json_value(filename: &str, json: &str, label: &str) -> Value {

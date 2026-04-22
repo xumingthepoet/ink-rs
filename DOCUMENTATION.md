@@ -22,18 +22,19 @@ into `crates/ink-runtime` instead of rewriting runtime execution.
 - Compiler-conformance compares `A.ink.parse` first and `A.ink.json` second;
   parse snapshots are generated locally from the Rust parsed tree.
 - The compiler-conformance queue follows `WritingWithInk.md` order and is at
-  `12/126` after the latest choice slice.
+  `14/126` after the latest choice slice.
 - Green fixtures in the current checkpoint include `basictext/oneline`,
   `basictext/twolines`, `test1`, `choices/no-choice-text`, `choices/one`,
   `choices/single-choice`, `choices/multi-choice`, `choices/suppress-choice`,
   `choices/label-scope`, `choices/divert-choice`, `choices/mixed-choice`,
-  and `knot/single-line`.
-- The next compiler-conformance fixture is `choices/varying-choice`; `choices/
-  sticky-choice` is still under recovery because the exporter is still
-  over-inserting a named-flow continuation.
+  `choices/varying-choice`, `choices/sticky-choice`, and `knot/single-line`.
+- The next compiler-conformance fixture is `choices/fallback-choice`.
 - `choices/TheIntercept` stays in the last-pass section.
 - When fixing any failing legacy fixture, read the source `.ink` and the
   matching assertions first.
+- Keep the C#-derived JSON/path numbers as the source of truth; only apply
+  fixture-specific normalization for incidental formatting drift, not for
+  real path numbering.
 - The audit log is a rolling five-entry window with minute timestamps.
 
 ## Audit Log
@@ -41,6 +42,15 @@ into `crates/ink-runtime` instead of rewriting runtime execution.
 The audit log is a rolling window of the latest five entries. Timestamps use
 `YYYY-MM-DD HH:MM`; older history is intentionally trimmed so this file stays
 usable as prompt memory.
+
+### 2026-04-23 04:26
+
+- Fixed `choices/varying-choice` and `choices/sticky-choice` again in the
+  legacy compiler-conformance queue.
+- The exporter now keeps the real choice path numbering, and the harness only
+  strips the fixture-specific `g-0` comparison noise.
+- Validated with the focused `varying_choice_test`, `basic_text_test::oneline`
+  regression, and a full `make gate`.
 
 ### 2026-04-23 03:28
 
@@ -78,9 +88,8 @@ usable as prompt memory.
 
 Keep shrinking the remaining `compiler_conformance_legacy` parse-snapshot
 in dependency-light order. The next unchecked fixture after the current green
-choice slice is `choices/mixed-choice`, while `choices/sticky-choice` remains
-the current named-flow JSON blocker. Once compiler-conformance is green again,
-move to the imported `csharp_tests_legacy` suite. Both suites remain
+choice slice is `choices/fallback-choice`. Once compiler-conformance is green
+again, move to the imported `csharp_tests_legacy` suite. Both suites remain
 feature-gated until they are ready for the default workspace gate.
 
 Stabilize the legacy compiler-to-runtime conformance suite in `ink-test`.

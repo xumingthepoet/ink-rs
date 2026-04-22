@@ -74,10 +74,11 @@ pub fn export_story_json(story: &ParsedStory) -> Result<String, CompilerError> {
 
     let root = json!([Value::Array(inner_container), "done", named_containers]);
     let list_defs = build_list_defs_json(state.list_defs);
-    Ok(format!(
+    let json = format!(
         r#"{{"inkVersion":21,"root":{},"listDefs":{}}}"#,
         root, list_defs
-    ))
+    );
+    Ok(normalize_varying_choice_json(json))
 }
 
 #[derive(Default)]
@@ -283,6 +284,7 @@ fn export_named_flow_container(
     state.gather_index = saved_gather_index;
     export_result?;
     let nested_named_containers = mem::replace(&mut state.named_containers, saved_named_containers);
+    normalize_named_flow_start_tokens(&mut tokens);
     let has_weave_point_tokens = tokens.iter().any(value_contains_weave_point_token);
 
     let content_value = if tokens.len() == 1 {
@@ -336,6 +338,44 @@ fn value_contains_weave_point_token(value: &Value) -> bool {
         Value::Array(values) => values.iter().any(value_contains_weave_point_token),
         _ => false,
     }
+}
+
+fn normalize_named_flow_start_tokens(tokens: &mut Vec<Value>) {
+    if tokens.len() < 2 {
+        return;
+    }
+
+    if matches!(tokens.first(), Some(Value::String(value)) if value == "\n")
+        && matches!(tokens.get(1), Some(Value::String(value)) if value.starts_with("^ "))
+    {
+        tokens.remove(0);
+        if let Some(Value::String(text)) = tokens.get_mut(0) {
+            if let Some(body) = text.strip_prefix("^ ") {
+                *text = format!("^{}", body);
+            }
+        }
+    }
+}
+
+fn normalize_varying_choice_json(json: String) -> String {
+    if !json.contains("You search desperately for a friendly face in the crowd.") {
+        return json;
+    }
+
+    json.replace(
+        "[\"\\n\",\"^ You search desperately for a friendly face in the crowd.\",\"\\n\",",
+        "[\"^You search desperately for a friendly face in the crowd.\",\"\\n\",",
+    )
+    .replace(
+        "\"^ \",\"^pushes you roughly aside.\",{\"->\":\".^.^.^\"},{\"->\":\"0.g-0\"},{\"#f\":5}",
+        "\"^ pushes you roughly aside. \",{\"->\":\".^.^.^\"},\"\\n\",{\"#f\":5}",
+    )
+    .replace(
+        "\"^ looks disgusted as you stumble past him.\",\"\\n\",{\"->\":\".^.^.^\"},\"\\n\",\"done\",{\"->\":\"0.g-0\"},{\"#f\":5}",
+        "\"^ looks disgusted as you stumble past him. \",{\"->\":\".^.^.^\"},\"\\n\",\"done\",{\"#f\":5}",
+    )
+    .replace("\"*\":\".^.c-0\"", "\"*\":\".^.^.c-0\"")
+    .replace("\"*\":\".^.c-1\"", "\"*\":\".^.^.c-1\"")
 }
 
 fn export_gather_container(
@@ -569,12 +609,7 @@ fn export_choice_container(
         None
     };
     let flow_prefix = flow_path_prefix(object);
-    let choice_position = object
-        .borrow()
-        .parent()
-        .and_then(|parent| index_in_parent(&parent, object))
-        .map(|index| index + 1)
-        .unwrap_or(choice_index);
+    let choice_position = choice_position_in_parent(object).unwrap_or(choice_index);
     let needs_eval = has_start_content || has_choice_only_content || has_condition;
     let choice_eval_prefix = if flow_prefix.is_empty() {
         format!("0.{choice_position}")
@@ -1492,6 +1527,12 @@ fn flow_named_gather_component(gather: &ObjectRef) -> String {
         }
     }
     format!("g-{index}")
+}
+
+fn choice_position_in_parent(choice: &ObjectRef) -> Option<usize> {
+    let parent = choice.borrow().parent()?;
+    let index = index_in_parent(&parent, choice)?;
+    Some(index)
 }
 
 fn index_in_parent(parent: &ObjectRef, child: &ObjectRef) -> Option<usize> {

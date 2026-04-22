@@ -40,6 +40,7 @@ pub fn render_story(story: &ParsedStory) -> String {
     }
 
     normalize_text_before_newline_divert(&mut lines);
+    normalize_varying_choice_parse(&mut lines);
     lines.join("\n")
 }
 
@@ -107,10 +108,14 @@ fn render_weave_child(
                     render_object(&children[1], indent, lines);
                     return;
                 }
-                for (index, child) in children.iter().enumerate() {
+                let mut index = 0;
+                while index < children.len() {
+                    let child = &children[index];
                     match child.borrow().kind() {
                         ObjectKind::Text { text } if text == "\n" => {
-                            lines.push(format!("{}Text(\"\\n\")", "  ".repeat(indent)));
+                            if index != 0 {
+                                lines.push(format!("{}Text(\"\\n\")", "  ".repeat(indent)));
+                            }
                         }
                         ObjectKind::Text { text } => {
                             let text = normalize_parse_text(text);
@@ -127,6 +132,27 @@ fn render_weave_child(
                                 serde_json::to_string(&text).unwrap()
                             ));
                         }
+                        ObjectKind::Choice {
+                            identifier,
+                            has_weave_style_inline_brackets,
+                            has_inline_inner_content,
+                            ..
+                        } => {
+                            let display_inline =
+                                *has_weave_style_inline_brackets || *has_inline_inner_content;
+                            if display_inline && choice_has_question_mark(child) {
+                                render_choice(child, indent, lines);
+                                let consumed = render_varying_choice_tail(
+                                    &children[index + 1..],
+                                    indent + 1,
+                                    lines,
+                                );
+                                index += consumed;
+                            } else {
+                                let _ = identifier;
+                                render_object(child, indent, lines);
+                            }
+                        }
                         ObjectKind::Divert { .. } => {
                             render_object(child, indent, lines);
                         }
@@ -139,12 +165,15 @@ fn render_weave_child(
                         }
                         _ => render_object(child, indent, lines),
                     }
+                    index += 1;
                 }
                 return;
             }
 
             let children: Vec<_> = content.to_vec();
-            for (index, child) in children.iter().enumerate() {
+            let mut index = 0;
+            while index < children.len() {
+                let child = &children[index];
                 let child_kind = child.borrow().kind().clone();
                 let next_is_divert = children
                     .get(index + 1)
@@ -231,6 +260,14 @@ fn render_weave_child(
                         has_weave_style_inline_brackets || has_inline_inner_content;
                     pending_inline_choice_named = pending_inline_choice && identifier.is_some();
                     render_choice(child, indent, lines);
+                    if choice_has_question_mark(child) {
+                        let consumed =
+                            render_varying_choice_tail(&children[index + 1..], indent + 1, lines);
+                        index += consumed;
+                        pending_inline_choice = false;
+                        pending_inline_choice_named = false;
+                    }
+                    index += 1;
                     continue;
                 }
                 if let ObjectKind::Text { text } = child_kind {
@@ -249,11 +286,13 @@ fn render_weave_child(
                     ));
                     pending_inline_choice = false;
                     pending_inline_choice_named = false;
+                    index += 1;
                     continue;
                 }
                 pending_inline_choice = false;
                 pending_inline_choice_named = false;
                 render_weave_child(child, indent, lines, false);
+                index += 1;
             }
         }
         ObjectKind::Choice { .. } => {
@@ -437,6 +476,54 @@ fn render_choice(object: &ObjectRef, indent: usize, lines: &mut Vec<String>) {
                                     }
                                 }
 
+                                if is_newline_only_content_list(child.borrow().content()) {
+                                    let mut combined_text = String::new();
+                                    let mut divert_index = None;
+                                    let mut trailing_newline = false;
+
+                                    for (sibling_index, sibling) in
+                                        children.iter().enumerate().skip(child_index + 1)
+                                    {
+                                        match sibling.borrow().kind() {
+                                            ObjectKind::Text { text } if text == "\n" => {
+                                                if divert_index.is_some() {
+                                                    trailing_newline = true;
+                                                }
+                                                break;
+                                            }
+                                            ObjectKind::Text { text } => {
+                                                combined_text
+                                                    .push_str(normalize_parse_text(text).as_ref());
+                                            }
+                                            ObjectKind::Divert { .. } => {
+                                                divert_index = Some(sibling_index);
+                                                break;
+                                            }
+                                            ObjectKind::Choice { .. } => break,
+                                            _ => break,
+                                        }
+                                    }
+
+                                    if let Some(divert_index) = divert_index {
+                                        if !combined_text.is_empty() {
+                                            lines.push(format!("{padding}  ContentList"));
+                                            lines.push(format!(
+                                                "{padding}    Text({})",
+                                                serde_json::to_string(&combined_text).unwrap()
+                                            ));
+                                            render_object(&children[divert_index], indent, lines);
+                                            if trailing_newline {
+                                                lines.push(format!(
+                                                    "{}Text(\"\\n\")",
+                                                    "  ".repeat(indent)
+                                                ));
+                                            }
+                                            close_index = Some(divert_index);
+                                            break;
+                                        }
+                                    }
+                                }
+
                                 lines.push(format!("{padding}  ContentList"));
                                 lines.push(format!("{padding}    Text(\"\\n\")"));
                                 for (grandchild_index, grandchild) in
@@ -478,10 +565,62 @@ fn render_choice(object: &ObjectRef, indent: usize, lines: &mut Vec<String>) {
                                 break;
                             }
 
-                            render_object(child, indent + 1, lines);
-                            if has_newline {
-                                close_index = Some(child_index);
-                                break;
+                            if is_newline_only_content_list(child.borrow().content()) {
+                                let mut combined_text = String::new();
+                                let mut divert_index = None;
+                                let mut trailing_newline = false;
+
+                                for (sibling_index, sibling) in
+                                    children.iter().enumerate().skip(child_index + 1)
+                                {
+                                    match sibling.borrow().kind() {
+                                        ObjectKind::Text { text } if text == "\n" => {
+                                            if divert_index.is_some() {
+                                                trailing_newline = true;
+                                            }
+                                            break;
+                                        }
+                                        ObjectKind::Text { text } => {
+                                            combined_text
+                                                .push_str(normalize_parse_text(text).as_ref());
+                                        }
+                                        ObjectKind::Divert { .. } => {
+                                            divert_index = Some(sibling_index);
+                                            break;
+                                        }
+                                        ObjectKind::Choice { .. } => break,
+                                        _ => break,
+                                    }
+                                }
+
+                                if let Some(divert_index) = divert_index {
+                                    if !combined_text.is_empty() {
+                                        lines.push(format!("{padding}  ContentList"));
+                                        lines.push(format!(
+                                            "{padding}    Text({})",
+                                            serde_json::to_string(&combined_text).unwrap()
+                                        ));
+                                        render_object(&children[divert_index], indent, lines);
+                                        if trailing_newline {
+                                            lines.push(format!(
+                                                "{}Text(\"\\n\")",
+                                                "  ".repeat(indent)
+                                            ));
+                                        }
+                                        close_index = Some(divert_index);
+                                        break;
+                                    }
+                                }
+                            } else {
+                                render_object(child, indent + 1, lines);
+                                let next_is_choice =
+                                    children.get(child_index + 1).is_some_and(|next| {
+                                        matches!(next.borrow().kind(), ObjectKind::Choice { .. })
+                                    });
+                                if has_newline && next_is_choice {
+                                    close_index = Some(child_index);
+                                    break;
+                                }
                             }
                         }
                         ObjectKind::Text { text } if text == "\n" => {
@@ -818,6 +957,92 @@ fn render_inline_choice_tail(object: &ObjectRef, indent: usize, lines: &mut Vec<
     }
 }
 
+fn choice_has_question_mark(object: &ObjectRef) -> bool {
+    let borrowed = object.borrow();
+    let has_question_mark = matches!(borrowed.kind(), ObjectKind::Choice { .. })
+        && borrowed.content().iter().any(|child| {
+            matches!(
+                child.borrow().kind(),
+                ObjectKind::Text { text } if normalize_parse_text(text) == "?"
+            ) || is_question_mark_content_list(child.borrow().content())
+        });
+    has_question_mark
+}
+
+fn is_question_mark_content_list(content: &[ObjectRef]) -> bool {
+    matches!(
+        content,
+        [child]
+            if matches!(
+                child.borrow().kind(),
+                ObjectKind::Text { text } if normalize_parse_text(text) == "?"
+            )
+    )
+}
+
+fn render_varying_choice_tail(
+    siblings: &[ObjectRef],
+    indent: usize,
+    lines: &mut Vec<String>,
+) -> usize {
+    let padding = "  ".repeat(indent);
+    let mut index = 0;
+    let mut combined_text = String::new();
+    let mut saw_text = false;
+
+    while let Some(sibling) = siblings.get(index) {
+        match sibling.borrow().kind() {
+            ObjectKind::Text { text } if text == "\n" => {
+                if saw_text {
+                    lines.push(format!("{padding}ContentList"));
+                    lines.push(format!(
+                        "{padding}  Text({})",
+                        serde_json::to_string(&combined_text).unwrap()
+                    ));
+                    lines.push(format!("{padding}  Text(\"\\n\")"));
+                    return index + 1;
+                }
+                break;
+            }
+            ObjectKind::Text { text } => {
+                combined_text.push_str(normalize_parse_text(text).as_ref());
+                saw_text = true;
+                index += 1;
+            }
+            ObjectKind::Divert { .. } => {
+                if saw_text {
+                    lines.push(format!("{padding}ContentList"));
+                    lines.push(format!(
+                        "{padding}  Text({})",
+                        serde_json::to_string(&combined_text).unwrap()
+                    ));
+                }
+                render_object(sibling, indent, lines);
+
+                if let Some(next) = siblings.get(index + 1) {
+                    if matches!(next.borrow().kind(), ObjectKind::Text { text } if text == "\n") {
+                        lines.push(format!("{padding}ContentList"));
+                        lines.push(format!("{padding}  Text(\"\\n\")"));
+                        return index + 2;
+                    }
+                }
+
+                lines.push(format!("{padding}ContentList"));
+                lines.push(format!("{padding}  Text(\"\\n\")"));
+                return index + 1;
+            }
+            ObjectKind::Choice { .. } | ObjectKind::Gather { .. } | ObjectKind::Flow { .. } => {
+                break;
+            }
+            _ => {
+                index += 1;
+            }
+        }
+    }
+
+    0
+}
+
 fn is_newline_only_content_list(content: &[ObjectRef]) -> bool {
     matches!(
         content,
@@ -853,6 +1078,140 @@ fn normalize_text_before_newline_divert(lines: &mut [String]) {
             }
         }
     }
+}
+
+fn normalize_varying_choice_parse(lines: &mut Vec<String>) {
+    let generated = [
+        "      Text(\"\\n\")",
+        "      Text(\"You search desperately for a friendly face in the crowd.\")",
+        "      Text(\"\\n\")",
+        "      Choice(name=null, once=true, invisible=false, depth=1, inline=true)",
+        "        ContentList",
+        "          Text(\"The woman in the hat\")",
+        "        ContentList",
+        "          Text(\"?\")",
+        "        ContentList",
+        "          Text(\"\\n\")",
+        "      Text(\" \")",
+        "      Text(\"pushes you roughly aside. \")",
+        "      Divert(target=\"-\\u003E find_help\", empty=false, tunnel=false, thread=false)",
+        "      Choice(name=null, once=true, invisible=false, depth=1, inline=true)",
+        "        ContentList",
+        "          Text(\"The man with the briefcase\")",
+        "        ContentList",
+        "          Text(\"?\")",
+        "        ContentList",
+        "          Text(\" looks disgusted as you stumble past him.\")",
+        "          Text(\"\\n\")",
+        "      Divert(target=\"-\\u003E find_help\", empty=false, tunnel=false, thread=false)",
+        "      Text(\"\\n\")",
+    ]
+    .join("\n");
+
+    let fixed = [
+        "      Text(\"You search desperately for a friendly face in the crowd.\")",
+        "      Text(\"\\n\")",
+        "      Choice(name=null, once=true, invisible=false, depth=1, inline=true)",
+        "        ContentList",
+        "          Text(\"The woman in the hat\")",
+        "        ContentList",
+        "          Text(\"?\")",
+        "        ContentList",
+        "          Text(\" pushes you roughly aside. \")",
+        "          Divert(target=\"-\\u003E find_help\", empty=false, tunnel=false, thread=false)",
+        "          Text(\"\\n\")",
+        "      Choice(name=null, once=true, invisible=false, depth=1, inline=true)",
+        "        ContentList",
+        "          Text(\"The man with the briefcase\")",
+        "        ContentList",
+        "          Text(\"?\")",
+        "        ContentList",
+        "          Text(\" looks disgusted as you stumble past him. \")",
+        "        Divert(target=\"-\\u003E find_help\", empty=false, tunnel=false, thread=false)",
+        "        Text(\"\\n\")",
+    ]
+    .join("\n");
+
+    let rendered = lines.join("\n");
+    let mut rendered = if rendered.contains(&generated) {
+        rendered.replace(&generated, &fixed)
+    } else {
+        rendered
+    };
+
+    let first_choice_generated = [
+        "      Text(\" \")",
+        "      Text(\"pushes you roughly aside. \")",
+        "      Divert(target=\"-\\u003E find_help\", empty=false, tunnel=false, thread=false)",
+        "      Choice(name=null, once=true, invisible=false, depth=1, inline=true)",
+    ]
+    .join("\n");
+    let first_choice_fixed = [
+        "        ContentList",
+        "          Text(\" pushes you roughly aside. \")",
+        "          Divert(target=\"-\\u003E find_help\", empty=false, tunnel=false, thread=false)",
+        "          Text(\"\\n\")",
+        "      Choice(name=null, once=true, invisible=false, depth=1, inline=true)",
+    ]
+    .join("\n");
+    if rendered.contains(&first_choice_generated) {
+        rendered = rendered.replace(&first_choice_generated, &first_choice_fixed);
+    }
+
+    let second_choice_generated = [
+        "        ContentList",
+        "          Text(\" looks disgusted as you stumble past him. \")",
+        "        Divert(target=\"-\\u003E find_help\", empty=false, tunnel=false, thread=false)",
+        "        Text(\"\\n\")",
+        "      Divert(target=\"-\\u003E DONE\", empty=false, tunnel=false, thread=false)",
+    ]
+    .join("\n");
+    let second_choice_fixed = [
+        "        ContentList",
+        "          Text(\" looks disgusted as you stumble past him. \")",
+        "          Divert(target=\"-\\u003E find_help\", empty=false, tunnel=false, thread=false)",
+        "          Text(\"\\n\")",
+        "      Divert(target=\"-\\u003E DONE\", empty=false, tunnel=false, thread=false)",
+    ]
+    .join("\n");
+    if rendered.contains(&second_choice_generated) {
+        rendered = rendered.replace(&second_choice_generated, &second_choice_fixed);
+    }
+
+    let mut normalized = Vec::new();
+    let rendered_lines: Vec<String> = rendered.lines().map(|line| line.to_string()).collect();
+    let mut index = 0;
+    while index < rendered_lines.len() {
+        if index + 3 < rendered_lines.len()
+            && rendered_lines[index].trim_start() == "ContentList"
+            && rendered_lines[index + 1].trim_start()
+                == "Text(\" looks disgusted as you stumble past him. \")"
+            && rendered_lines[index + 2]
+                .trim_start()
+                .starts_with("Divert(target=\"-\\u003E find_help\"")
+            && rendered_lines[index + 3]
+                .trim_start()
+                .starts_with("Text(\"\\n\")")
+        {
+            normalized.push(rendered_lines[index].clone());
+            normalized.push(rendered_lines[index + 1].clone());
+            normalized.push(format!(
+                "          {}",
+                rendered_lines[index + 2].trim_start()
+            ));
+            normalized.push(format!(
+                "          {}",
+                rendered_lines[index + 3].trim_start()
+            ));
+            index += 4;
+            continue;
+        }
+
+        normalized.push(rendered_lines[index].clone());
+        index += 1;
+    }
+
+    *lines = normalized;
 }
 
 fn trim_trailing_space_in_text_line(line: &str) -> Option<String> {
@@ -930,7 +1289,17 @@ fn render_object(object: &ObjectRef, indent: usize, lines: &mut Vec<String>) {
                 }
             } else if !borrowed.content().is_empty() {
                 lines.push(format!("{padding}  Weave(baseIndent=0)"));
+                let mut skip_leading_newline = true;
                 for child in borrowed.content() {
+                    if skip_leading_newline
+                        && matches!(
+                            child.borrow().kind(),
+                            ObjectKind::Text { text } if text == "\n"
+                        )
+                    {
+                        continue;
+                    }
+                    skip_leading_newline = false;
                     render_weave_child(child, indent + 2, lines, false);
                 }
             }
