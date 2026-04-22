@@ -25,16 +25,17 @@ into `crates/ink-runtime` instead of rewriting runtime execution.
   the `compiler-conformance` feature while the remaining failures are fixed.
 - The compiler-conformance choice slice now has the basic `no-choice`, `one`,
   `single-choice`, `suppress-choice`, and `mixed-choice` fixtures green.
+- The compiler-conformance choice/divert/sequence slice now also has
+  `divert-on-choice` and `variable_text::sequence` green.
 - The current compiler-conformance slice has made the simple divert and glue
   fixtures green and updated the trusted parser snapshots to reflect inline
   divert splitting inside conditional fixtures.
 - During Milestone 13, compiler-conformance progress is checkpointed in small
   commits after each few passing fixtures so the remaining work stays
   resumable and bounded.
-- The legacy compiler-to-runtime suite is still not green under the feature
-  gate; the current blocker is unsupported choice conditions/named choices,
-  gather syntax, and the resulting step-limit failures in the
-  `variable_text` fixtures.
+- The legacy compiler-to-runtime suite is green under the feature gate, so
+  the next step is to remove the gate and fold it into the default workspace
+  test run.
 - The documented test loop now treats every long-running `cargo test` path as
   timeboxed, and `make gate` wraps the workspace test pass with a timeout as
   well.

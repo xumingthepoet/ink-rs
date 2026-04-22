@@ -209,9 +209,27 @@ impl<'source> InkParser<'source> {
                 continue;
             }
 
-            if let Some(sequence) =
-                Self::parse_sequence_line(line_text, line_index + 1, source_filename.clone())?
-            {
+            if let Some(sequence) = Self::parse_sequence_line(
+                line_text,
+                line_index + 1,
+                source_filename.clone(),
+                had_newline,
+            )? {
+                if let Some(parent) = current_flow.as_ref() {
+                    Object::add_content(parent, sequence);
+                } else {
+                    top_level_content.push(sequence);
+                }
+                line_index += 1;
+                continue;
+            }
+
+            if let Some(sequence) = Self::parse_inline_sequence_line(
+                line_text,
+                line_index + 1,
+                source_filename.clone(),
+                had_newline,
+            )? {
                 if let Some(parent) = current_flow.as_ref() {
                     Object::add_content(parent, sequence);
                 } else {
@@ -573,12 +591,22 @@ impl<'source> InkParser<'source> {
 
         let mut inner_content = ChoiceBodyBuilder::default();
         let mut has_inline_inner_content = false;
+        let mut has_simple_inner_divert = false;
         if !inner_tail_text.is_empty() {
+            has_simple_inner_divert = inner_tail_text.trim_start().starts_with("->");
             choice.set_has_inline_inner_content(true);
             has_inline_inner_content = true;
+            if inner_tail_text.starts_with(char::is_whitespace) {
+                inner_content.inner_content.push(Text::new(" ").object());
+            }
             inner_content
                 .inner_content
-                .push(Self::build_content_line(inner_tail_text, false));
+                .extend(Self::parse_branch_content_objects(
+                    inner_tail_text.trim_start(),
+                    line_number,
+                    source_filename.clone(),
+                    false,
+                )?);
         }
 
         let mut consumed_lines = 1usize;
@@ -610,7 +638,7 @@ impl<'source> InkParser<'source> {
             consumed_lines += 1;
         }
 
-        if has_inline_inner_content && consumed_lines > 1 {
+        if has_inline_inner_content && consumed_lines > 1 && !has_simple_inner_divert {
             inner_content
                 .inner_content
                 .insert(1, Text::new("\n").object());
@@ -741,6 +769,7 @@ impl<'source> InkParser<'source> {
         line_text: &str,
         line_number: usize,
         source_filename: Option<String>,
+        _had_newline: bool,
     ) -> std::result::Result<Option<ObjectRef>, Diagnostic> {
         let trimmed_start = line_text.trim_start();
         let (sequence_type, remainder) =
@@ -778,6 +807,86 @@ impl<'source> InkParser<'source> {
         }
 
         Ok(Some(Sequence::new(branches, sequence_type).object()))
+    }
+
+    fn parse_inline_sequence_line(
+        line_text: &str,
+        _line_number: usize,
+        _source_filename: Option<String>,
+        had_newline: bool,
+    ) -> std::result::Result<Option<ObjectRef>, Diagnostic> {
+        let line_text = line_text.trim_start();
+        let Some(open_index) = line_text.find('{') else {
+            return Ok(None);
+        };
+
+        let Some(close_index) = Self::find_matching_brace(line_text, open_index) else {
+            return Ok(None);
+        };
+
+        let inner = &line_text[open_index + 1..close_index];
+        if !inner.contains('|') || inner.contains(':') {
+            return Ok(None);
+        }
+
+        let prefix = &line_text[..open_index];
+        let suffix = &line_text[close_index + 1..];
+
+        let mut branches = Vec::new();
+        for branch_text in inner.split('|') {
+            let branch = ContentList::new();
+            let branch_text = branch_text.trim();
+            if !branch_text.is_empty() {
+                branch.add_content(Text::new(branch_text).object());
+            }
+            branch.trim_trailing_whitespace();
+            branches.push(branch);
+        }
+
+        if branches.len() < 2 {
+            return Ok(None);
+        }
+
+        let sequence = Sequence::new(branches, SequenceType::Stopping).object();
+        if prefix.is_empty() && suffix.is_empty() {
+            return Ok(Some(sequence));
+        }
+
+        let line = ContentList::new();
+        if !prefix.is_empty() {
+            line.add_content(Text::new(prefix).object());
+        }
+        line.add_content(sequence);
+        if !suffix.is_empty() {
+            line.add_content(Text::new(suffix).object());
+        }
+        if had_newline {
+            line.add_content(Text::new("\n").object());
+        }
+
+        Ok(Some(line.object()))
+    }
+
+    fn find_matching_brace(input: &str, open_index: usize) -> Option<usize> {
+        let mut depth = 0usize;
+
+        for (index, character) in input.char_indices().skip(open_index) {
+            match character {
+                '{' => depth += 1,
+                '}' => {
+                    if depth == 0 {
+                        return None;
+                    }
+                    depth -= 1;
+                    if depth == 0 {
+                        return Some(index);
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        None
     }
 
     fn parse_conditional_line(
@@ -928,12 +1037,17 @@ impl<'source> InkParser<'source> {
     fn parse_brace_sequence_header(header_text: &str) -> Option<SequenceType> {
         let header_text = header_text.trim();
         let header_text = header_text.strip_suffix(':')?.trim();
+        let words = header_text.split_whitespace().collect::<Vec<_>>();
 
-        match header_text {
-            "once" => Some(SequenceType::Once),
-            "cycle" => Some(SequenceType::Cycle),
-            "shuffle" => Some(SequenceType::Shuffle),
-            "stopping" => Some(SequenceType::Stopping),
+        match words.as_slice() {
+            ["once"] => Some(SequenceType::Once),
+            ["cycle"] => Some(SequenceType::Cycle),
+            ["shuffle"] => Some(SequenceType::Shuffle),
+            ["stopping"] => Some(SequenceType::Stopping),
+            ["shuffle", "once"] | ["once", "shuffle"] => Some(SequenceType::ShuffleOnce),
+            ["shuffle", "stopping"] | ["stopping", "shuffle"] => {
+                Some(SequenceType::ShuffleStopping)
+            }
             _ => None,
         }
     }
@@ -1228,8 +1342,17 @@ impl<'source> InkParser<'source> {
         }
 
         if let Some(sequence) =
-            Self::parse_sequence_line(line_text, line_number, source_filename.clone())?
+            Self::parse_sequence_line(line_text, line_number, source_filename.clone(), had_newline)?
         {
+            return Ok(vec![sequence]);
+        }
+
+        if let Some(sequence) = Self::parse_inline_sequence_line(
+            line_text,
+            line_number,
+            source_filename.clone(),
+            had_newline,
+        )? {
             return Ok(vec![sequence]);
         }
 
@@ -2366,6 +2489,39 @@ mod tests {
         assert!(matches!(
             branches[1].borrow().content()[0].borrow().kind(),
             ObjectKind::Text { text } if text == "second"
+        ));
+    }
+
+    #[test]
+    fn ink_parser_parses_inline_sequences_with_leading_text() {
+        let mut parser = InkParser::new(
+            "    The radio hissed into life. {\"Three!\"|\"Two!\"|\"One!\"}",
+            Some("story.ink"),
+            None,
+        );
+        let result = parser.parse();
+
+        assert!(result.diagnostics.is_empty());
+        let story = result.parsed_story.expect("expected parsed story");
+        let content = story.content();
+
+        assert_eq!(content.len(), 1);
+        assert!(matches!(
+            content[0].borrow().kind(),
+            ObjectKind::ContentList { .. }
+        ));
+
+        let line_content = content[0].borrow().content().to_vec();
+        assert_eq!(line_content.len(), 2);
+        assert!(matches!(
+            line_content[0].borrow().kind(),
+            ObjectKind::Text { text } if text == "The radio hissed into life. "
+        ));
+        assert!(matches!(
+            line_content[1].borrow().kind(),
+            ObjectKind::Sequence {
+                sequence_type: SequenceType::Stopping,
+            }
         ));
     }
 

@@ -8,6 +8,8 @@ pub enum SequenceType {
     Cycle,
     Shuffle,
     Once,
+    ShuffleStopping,
+    ShuffleOnce,
 }
 
 impl fmt::Display for SequenceType {
@@ -17,9 +19,32 @@ impl fmt::Display for SequenceType {
             SequenceType::Cycle => "Cycle",
             SequenceType::Shuffle => "Shuffle",
             SequenceType::Once => "Once",
+            SequenceType::ShuffleStopping => "ShuffleStopping",
+            SequenceType::ShuffleOnce => "ShuffleOnce",
         };
 
         f.write_str(label)
+    }
+}
+
+impl SequenceType {
+    pub fn is_once(self) -> bool {
+        matches!(self, SequenceType::Once | SequenceType::ShuffleOnce)
+    }
+
+    pub fn is_cycle(self) -> bool {
+        matches!(self, SequenceType::Cycle)
+    }
+
+    pub fn is_shuffle(self) -> bool {
+        matches!(
+            self,
+            SequenceType::Shuffle | SequenceType::ShuffleStopping | SequenceType::ShuffleOnce
+        )
+    }
+
+    pub fn is_stopping(self) -> bool {
+        matches!(self, SequenceType::Stopping | SequenceType::ShuffleStopping)
     }
 }
 

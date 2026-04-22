@@ -4,12 +4,18 @@ use serde_json::{json, Map, Value};
 
 use crate::{
     error::CompilerError,
-    parsed::{ExpressionKind, ObjectKind, ObjectRef, Path, Story as ParsedStory},
+    parsed::{ExpressionKind, ObjectKind, ObjectRef, Path, SequenceType, Story as ParsedStory},
 };
 
 pub fn export_story_json(story: &ParsedStory) -> Result<String, CompilerError> {
     let mut state = ExportState::default();
     let top_level_content = story.content();
+    let top_level_has_weave_points = top_level_content.iter().any(|object| {
+        matches!(
+            object.borrow().kind(),
+            ObjectKind::Choice { .. } | ObjectKind::Gather { .. }
+        )
+    });
     state.last_top_level_kind = top_level_content
         .last()
         .map(|object| object.borrow().kind().clone());
@@ -17,19 +23,19 @@ pub fn export_story_json(story: &ParsedStory) -> Result<String, CompilerError> {
     export_children(top_level_content, &mut state, &mut main_content, true)?;
     state.main_content = main_content;
 
-    if !matches!(
-        state.last_top_level_kind,
-        Some(ObjectKind::Choice { .. } | ObjectKind::Gather { .. })
-    ) && !matches!(state.main_content.last(), Some(Value::String(value)) if value == "\n")
+    if !top_level_has_weave_points
+        && !matches!(
+            state.last_top_level_kind,
+            Some(ObjectKind::Choice { .. } | ObjectKind::Gather { .. })
+        )
+        && !matches!(state.main_content.last(), Some(Value::String(value)) if value == "\n")
     {
         state.main_content.push(Value::String("\n".to_string()));
     }
 
     let mut inner_container = state.main_content;
-    if !matches!(
-        state.last_top_level_kind,
-        Some(ObjectKind::Choice { .. } | ObjectKind::Gather { .. })
-    ) {
+    if !top_level_has_weave_points {
+        inner_container.push(Value::String("end".to_string()));
         inner_container.push(Value::Null);
     }
 
@@ -127,8 +133,11 @@ fn export_object_into(
                 choice_named_content.into_iter().collect::<Map<_, _>>(),
             ));
         }
+        ObjectKind::Sequence { sequence_type } => {
+            let sequence_container = export_sequence_container(&content, sequence_type, state)?;
+            tokens.push(sequence_container);
+        }
         ObjectKind::Gather { .. }
-        | ObjectKind::Sequence { .. }
         | ObjectKind::Conditional
         | ObjectKind::ConditionalSingleBranch { .. }
         | ObjectKind::ConstantDeclaration { .. }
@@ -183,14 +192,120 @@ fn export_named_flow_container(
     let mut tokens = Vec::new();
     export_children(flow_content.to_vec(), state, &mut tokens, false)?;
 
-    if !matches!(tokens.last(), Some(Value::String(value)) if value == "\n") {
-        tokens.push(Value::String("\n".to_string()));
+    let should_wrap = flow_content.iter().any(|object| {
+        matches!(
+            object.borrow().kind(),
+            ObjectKind::Choice { .. }
+                | ObjectKind::Gather { .. }
+                | ObjectKind::Sequence { .. }
+                | ObjectKind::Conditional
+                | ObjectKind::ConditionalSingleBranch { .. }
+        )
+    });
+
+    if should_wrap {
+        Ok(Value::Array(vec![Value::Array(tokens), Value::Null]))
+    } else {
+        tokens.push(Value::Null);
+        Ok(Value::Array(tokens))
+    }
+}
+
+fn export_sequence_container(
+    sequence_content: &[ObjectRef],
+    sequence_type: SequenceType,
+    state: &mut ExportState,
+) -> Result<Value, CompilerError> {
+    let is_once = sequence_type.is_once();
+    let is_cycle = sequence_type.is_cycle();
+    let is_shuffle = sequence_type.is_shuffle();
+    let is_stopping = sequence_type.is_stopping();
+    let sequence_branch_count = if is_once {
+        sequence_content.len() + 1
+    } else {
+        sequence_content.len()
+    };
+
+    let mut outer_tokens = vec![json!("ev"), json!("visit")];
+
+    if is_stopping || is_once {
+        outer_tokens.push(json!(sequence_branch_count - 1));
+        outer_tokens.push(json!("MIN"));
+    } else if is_cycle {
+        outer_tokens.push(json!(sequence_content.len()));
+        outer_tokens.push(json!("%"));
     }
 
-    tokens.push(Value::String("end".to_string()));
-    tokens.push(Value::Null);
+    if is_shuffle {
+        if is_stopping || is_once {
+            outer_tokens.push(json!("du"));
+            let last_idx = if is_stopping {
+                sequence_content.len().saturating_sub(1)
+            } else {
+                sequence_content.len()
+            };
+            outer_tokens.push(json!(last_idx));
+            outer_tokens.push(json!("=="));
 
-    Ok(Value::Array(tokens))
+            let post_shuffle_no_op_index = outer_tokens.len() + 3;
+            outer_tokens.push(json!({
+                "->": format!(".^.{}", post_shuffle_no_op_index),
+                "c": true,
+            }));
+        }
+
+        let element_count_to_shuffle = if is_stopping {
+            sequence_content.len().saturating_sub(1)
+        } else {
+            sequence_content.len()
+        };
+        outer_tokens.push(json!(element_count_to_shuffle));
+        outer_tokens.push(json!("seq"));
+
+        if is_stopping || is_once {
+            outer_tokens.push(json!("nop"));
+        }
+    }
+
+    outer_tokens.push(json!("/ev"));
+    outer_tokens.push(json!("ev"));
+
+    let post_sequence_no_op_index =
+        outer_tokens.len() + (sequence_branch_count * 6).saturating_sub(1);
+    let mut branch_named_content = BTreeMap::new();
+
+    for branch_index in 0..sequence_branch_count {
+        if branch_index > 0 {
+            outer_tokens.push(json!("ev"));
+        }
+
+        outer_tokens.push(json!("du"));
+        outer_tokens.push(json!(branch_index));
+        outer_tokens.push(json!("=="));
+        outer_tokens.push(json!("/ev"));
+        outer_tokens.push(json!({
+            "->": format!(".^.s{branch_index}"),
+            "c": true,
+        }));
+
+        let mut branch_tokens = vec![json!("pop")];
+        if let Some(branch_content) = sequence_content.get(branch_index) {
+            branch_tokens.extend(export_content_list_tokens(branch_content, state)?);
+        }
+        branch_tokens.push(json!({
+            "->": format!(".^.^.{post_sequence_no_op_index}"),
+        }));
+        branch_tokens.push(Value::Null);
+        branch_named_content.insert(format!("s{branch_index}"), Value::Array(branch_tokens));
+    }
+
+    outer_tokens.push(json!("nop"));
+    branch_named_content.insert("#f".to_string(), json!(5));
+    outer_tokens.push(Value::Object(
+        branch_named_content.into_iter().collect::<Map<_, _>>(),
+    ));
+
+    Ok(Value::Array(outer_tokens))
 }
 
 fn export_choice_container(
@@ -282,7 +397,12 @@ fn export_choice_container(
         }
         flags
     };
-    outer_tokens.push(json!({"*": format!("0.c-{choice_index}"), "flg": flags}));
+    let choice_path = if has_start_content {
+        format!("0.c-{choice_index}")
+    } else {
+        format!(".^.c-{choice_index}")
+    };
+    outer_tokens.push(json!({"*": choice_path, "flg": flags}));
 
     if let Some(start_content) = start_content {
         let mut s_tokens = Vec::new();
@@ -316,7 +436,8 @@ fn export_choice_container(
         Vec::new()
     };
 
-    if !has_inline_inner_content
+    if has_start_content
+        && !has_inline_inner_content
         && !matches!(body_tokens.first(), Some(Value::String(value)) if value == "\n")
     {
         body_tokens.insert(0, Value::String("\n".to_string()));
@@ -324,22 +445,37 @@ fn export_choice_container(
 
     inner_tokens.extend(body_tokens);
 
-    if !matches!(
-        inner_tokens.last(),
-        Some(Value::String(value)) if value == "done" || value == "end"
-    ) {
-        inner_tokens.push(Value::String("end".to_string()));
+    if has_start_content {
+        if !matches!(
+            inner_tokens.last(),
+            Some(Value::String(value)) if value == "done" || value == "end"
+        ) {
+            inner_tokens.push(Value::String("end".to_string()));
+        }
+
+        inner_tokens.push(json!({"->": format!("0.g-{choice_index}")}));
+        inner_tokens.push(json!({"#f":5}));
+
+        choice_named_content.insert(format!("c-{choice_index}"), Value::Array(inner_tokens));
+        choice_named_content.insert(
+            format!("g-{choice_index}"),
+            Value::Array(vec![Value::String("done".to_string()), Value::Null]),
+        );
+    } else {
+        if !matches!(
+            inner_tokens.last(),
+            Some(Value::String(value)) if value == "\n"
+        ) {
+            inner_tokens.push(Value::String("\n".to_string()));
+        }
+        inner_tokens.push(json!({"#f":5}));
+        choice_named_content.insert(format!("c-{choice_index}"), Value::Array(inner_tokens));
     }
-
-    inner_tokens.push(json!({"->": format!("0.g-{choice_index}")}));
-    inner_tokens.push(json!({"#f":5}));
-
-    choice_named_content.insert(format!("c-{choice_index}"), Value::Array(inner_tokens));
-    choice_named_content.insert(
-        format!("g-{choice_index}"),
-        Value::Array(vec![Value::String("done".to_string()), Value::Null]),
-    );
-    tokens.push(Value::Array(outer_tokens));
+    if has_start_content {
+        tokens.push(Value::Array(outer_tokens));
+    } else {
+        tokens.extend(outer_tokens);
+    }
     Ok(choice_named_content)
 }
 
@@ -671,16 +807,22 @@ mod tests {
 
     #[test]
     fn rejects_non_text_nodes() {
-        let story = Story::new(
-            vec![Sequence::new(
-                vec![ContentList::new(), ContentList::new()],
-                SequenceType::Once,
-            )
-            .object()],
-            false,
-        );
+        let line = ContentList::new();
+        line.add_content(Text::new("Hello ").object());
 
-        assert!(export_story_json(&story).is_err());
+        let first = ContentList::new();
+        first.add_content(Text::new("One").object());
+
+        let second = ContentList::new();
+        second.add_content(Text::new("Two").object());
+
+        line.add_content(Sequence::new(vec![first, second], SequenceType::Stopping).object());
+        line.add_content(Text::new("\n").object());
+
+        let story = Story::new(vec![line.object()], false);
+
+        let json = export_story_json(&story).expect("expected sequence story export");
+        let _runtime_story = RuntimeStory::new(&json).expect("expected runtime story to load");
     }
 
     #[test]
@@ -698,6 +840,7 @@ mod tests {
             vec![
                 Text::new("We hurried home to Savile Row as fast as we could.").object(),
                 Text::new("\n").object(),
+                Divert::new(Some(Path::new(vec![Identifier::new("END")]))).object(),
             ],
             Vec::new(),
             false,
@@ -707,7 +850,6 @@ mod tests {
         let json = export_story_json(&story).expect("expected divert story export");
         assert!(json.contains("\"->\":\"hurry_home\""));
         assert!(json.contains("\"hurry_home\""));
-        assert!(json.contains("\"end\""));
 
         let mut runtime_story = RuntimeStory::new(&json).expect("expected runtime story to load");
         let mut output = String::new();

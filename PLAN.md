@@ -25,9 +25,8 @@ Core commands to run after every completed milestone:
 Current last verified milestone: Milestone 13 compiler-conformance gate
 slice (`2026-04-22`).
 
-Current verified checkpoint: compiler-conformance choice slice with
-`no-choice`, `one`, `single-choice`, `suppress-choice`, and `mixed-choice`
-fixtures green (`2026-04-22`).
+Current verified checkpoint: the full feature-gated legacy
+compiler-conformance suite is green (`2026-04-22`).
 
 Workspace warning policy: `.cargo/config.toml` now denies warnings, and
 `make gate` is the unified local entry point for format, check, and a
@@ -484,11 +483,8 @@ timeout 30s cargo test --workspace
 
 ## Next Task
 
-Fix the remaining compiler-conformance blockers in the choice/gather area
-before attempting any promotion work. The current suite still fails on
-unsupported `*` / `+` choice syntax, `-` gather syntax, and the related
-`variable_text` step-limit cases, so those are the next dependency-light
-parser/runtime slices to port.
+Remove the `compiler-conformance` feature gate once the legacy suite is green
+and include it in the default workspace test run.
 
 ## Risk Register
 
