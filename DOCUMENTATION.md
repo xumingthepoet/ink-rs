@@ -107,6 +107,8 @@ runtime instead of rewriting runtime execution.
   a parser-level conformance snapshot.
 - The trusted `blade-ink-rs` function fixture `function/setvar-func.ink` now
   also has a parser-level conformance snapshot.
+- The trusted `blade-ink-rs` function fixture `function/rnd-func.ink` now
+  also has a parser-level conformance snapshot.
 - The trusted `blade-ink-rs` `conditional/iftrue.ink` fixture now also has a
   parser-level conformance snapshot.
 - The trusted `blade-ink-rs` `conditional/ifelse.ink` fixture now also has a
@@ -242,6 +244,8 @@ Pass a second argument to write the JSON to a file instead of stdout.
 - Function definitions with parameter lists still render their flow names
   using the current partial header split, so `func-basic.ink` currently shows
   `lerp(a,` in the parser snapshot.
+- Builtin-style `~ SEED_RANDOM(10)` lines currently render as function calls in
+  the parser snapshot for `function/rnd-func.ink`.
 - The parser snapshot for `function/func-inline.ink` shows the inline
   function-call story and trailing return body in stable parsed hierarchy
   form.
@@ -254,6 +258,9 @@ Pass a second argument to write the JSON to a file instead of stdout.
 - The parser snapshot for `function/setvar-func.ink` shows the top-level
   function call assignment, the trailing text/divert, and the function body
   with the current setvar parsing behavior.
+- The parser snapshot for `function/rnd-func.ink` shows the builtin
+  `SEED_RANDOM` call and the four rolling-dice lines in stable parsed
+  hierarchy form.
 - The ink parser grammar is still pending for the remaining unported features.
 - Feature coverage for arithmetic, variables, lists, conditions, functions, and
   sequences now exists as a stable parser snapshot test.
@@ -287,6 +294,25 @@ Pass a second argument to write the JSON to a file instead of stdout.
   runtime and parser snapshots, not the full official test suite.
 
 ## Audit Log
+
+### 2026-04-22
+
+- Added a parser-level conformance snapshot for `blade-ink-rs` function
+  fixture `function/rnd-func.ink`.
+- The snapshot verifies the parser keeps the builtin `SEED_RANDOM` call and
+  the four rolling-dice text lines in stable parsed hierarchy form.
+
+Validation:
+
+```sh
+cargo fmt --all --check
+cargo test -p ink-compiler ink_parser_parses_trusted_function_rnd_fixture
+cargo check --workspace
+cargo test --workspace
+```
+
+Result: all passed. The only remaining warnings are the two existing
+`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
 
 ### 2026-04-22
 

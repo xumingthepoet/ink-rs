@@ -2867,6 +2867,26 @@ to Savile Row\n\
     }
 
     #[test]
+    fn ink_parser_parses_trusted_function_rnd_fixture() {
+        let source =
+            load_workspace_text("blade-ink-rs/conformance-tests/inkfiles/function/rnd-func.ink");
+        let mut parser = InkParser::new(&source, Some("rnd-func.ink"), None);
+        let result = parser.parse();
+
+        assert!(
+            result.diagnostics.is_empty(),
+            "unexpected diagnostics: {:#?}",
+            result.diagnostics
+        );
+
+        let story = result.parsed_story.expect("expected parsed story");
+        assert_eq!(
+            render_story(&story),
+            "Story\n  FunctionCall(SEED_RANDOM, args=1)\n  ContentList\n    Text(\"\\n\")\n  ContentList\n    Text(\"Rolling dice 1: {RANDOM(1,6)}.\")\n    Text(\"\\n\")\n  ContentList\n    Text(\"Rolling dice 2: {RANDOM(1,6)}.\")\n    Text(\"\\n\")\n  ContentList\n    Text(\"Rolling dice 3: {RANDOM(1,6)}.\")\n    Text(\"\\n\")\n  ContentList\n    Text(\"Rolling dice 4: {RANDOM(1,6)}.\")"
+        );
+    }
+
+    #[test]
     fn ink_parser_feature_cases_cover_arithmetic_variables_lists_conditions_functions_and_sequences(
     ) {
         let cases = [
