@@ -2686,6 +2686,26 @@ to Savile Row\n\
     }
 
     #[test]
+    fn ink_parser_parses_trusted_conditional_iftrue_fixture() {
+        let source =
+            load_workspace_text("blade-ink-rs/conformance-tests/inkfiles/conditional/iftrue.ink");
+        let mut parser = InkParser::new(&source, Some("iftrue.ink"), None);
+        let result = parser.parse();
+
+        assert!(
+            result.diagnostics.is_empty(),
+            "unexpected diagnostics: {:#?}",
+            result.diagnostics
+        );
+
+        let story = result.parsed_story.expect("expected parsed story");
+        assert_eq!(
+            render_story(&story),
+            "Story\n  ContentList\n    Text(\"\\n\")\n  VariableAssignment(name=\"x\", global=true, temp=false)\n    Number(2)\n  VariableAssignment(name=\"y\", global=true, temp=false)\n    Number(0)\n  Conditional\n    Binary(>, VariableReference(x), Number(0))\n    ConditionalBranch(true=true, else=false, inline=false)\n      VariableAssignment(name=\"y\", global=false, temp=false)\n        Binary(-, VariableReference(x), Number(1))\n  ContentList\n    Text(\"        The value is {y}. -> END\")\n    Text(\"\\n\")"
+        );
+    }
+
+    #[test]
     fn ink_parser_feature_cases_cover_arithmetic_variables_lists_conditions_functions_and_sequences(
     ) {
         let cases = [

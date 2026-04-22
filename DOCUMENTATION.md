@@ -93,6 +93,8 @@ runtime instead of rewriting runtime execution.
   `basictext` fixtures from `blade-ink-rs`.
 - The trusted `blade-ink-rs` `basictext/twolines.ink` fixture now also has a
   parser-level conformance snapshot.
+- The trusted `blade-ink-rs` `conditional/iftrue.ink` fixture now also has a
+  parser-level conformance snapshot.
 - The trusted `blade-ink-rs` divert fixture `divert/simple-divert.ink` now has
   a parser-level conformance snapshot.
 - The trusted `blade-ink-rs` glue/divert fixture `glue/glue-with-divert.ink`
@@ -254,6 +256,25 @@ Pass a second argument to write the JSON to a file instead of stdout.
   runtime and parser snapshots, not the full official test suite.
 
 ## Audit Log
+
+### 2026-04-22
+
+- Added a parser-level conformance snapshot for `blade-ink-rs` conditional
+  fixture `conditional/iftrue.ink`.
+- The snapshot verifies the parser keeps variable declarations, a conditional
+  branch, and trailing text in stable parsed hierarchy form.
+
+Validation:
+
+```sh
+cargo fmt --all --check
+cargo test -p ink-compiler ink_parser_parses_trusted_conditional_iftrue_fixture
+cargo check --workspace
+cargo test --workspace
+```
+
+Result: all passed. The only remaining warnings are the two existing
+`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
 
 ### 2026-04-22
 
