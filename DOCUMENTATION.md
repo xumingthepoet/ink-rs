@@ -105,6 +105,8 @@ runtime instead of rewriting runtime execution.
   now also has a parser-level conformance snapshot.
 - The trusted `blade-ink-rs` glue fixture `glue/testbugfix1.ink` now also has
   a parser-level conformance snapshot.
+- The trusted `blade-ink-rs` function fixture `function/setvar-func.ink` now
+  also has a parser-level conformance snapshot.
 - The trusted `blade-ink-rs` `conditional/iftrue.ink` fixture now also has a
   parser-level conformance snapshot.
 - The trusted `blade-ink-rs` `conditional/ifelse.ink` fixture now also has a
@@ -249,6 +251,9 @@ Pass a second argument to write the JSON to a file instead of stdout.
 - The parser snapshot for `glue/testbugfix1.ink` shows the `A` / `C` glue
   story, the inline `{f():X}` conditional, and the function body with the
   current return parsing behavior.
+- The parser snapshot for `function/setvar-func.ink` shows the top-level
+  function call assignment, the trailing text/divert, and the function body
+  with the current setvar parsing behavior.
 - The ink parser grammar is still pending for the remaining unported features.
 - Feature coverage for arithmetic, variables, lists, conditions, functions, and
   sequences now exists as a stable parser snapshot test.
@@ -282,6 +287,27 @@ Pass a second argument to write the JSON to a file instead of stdout.
   runtime and parser snapshots, not the full official test suite.
 
 ## Audit Log
+
+### 2026-04-22
+
+- Added a parser-level conformance snapshot for `blade-ink-rs` function
+  fixture `function/setvar-func.ink`.
+- The snapshot verifies the parser keeps the top-level function call
+  assignment, trailing text, trailing divert, and function body in stable
+  parsed hierarchy form. It also records the current function-header split for
+  parameterized function names.
+
+Validation:
+
+```sh
+cargo fmt --all --check
+cargo test -p ink-compiler ink_parser_parses_trusted_function_setvar_fixture
+cargo check --workspace
+cargo test --workspace
+```
+
+Result: all passed. The only remaining warnings are the two existing
+`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
 
 ### 2026-04-22
 

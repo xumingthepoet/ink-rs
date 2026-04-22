@@ -2847,6 +2847,26 @@ to Savile Row\n\
     }
 
     #[test]
+    fn ink_parser_parses_trusted_function_setvar_fixture() {
+        let source =
+            load_workspace_text("blade-ink-rs/conformance-tests/inkfiles/function/setvar-func.ink");
+        let mut parser = InkParser::new(&source, Some("setvar-func.ink"), None);
+        let result = parser.parse();
+
+        assert!(
+            result.diagnostics.is_empty(),
+            "unexpected diagnostics: {:#?}",
+            result.diagnostics
+        );
+
+        let story = result.parsed_story.expect("expected parsed story");
+        assert_eq!(
+            render_story(&story),
+            "Story\n  FunctionCall(herp, args=2)\n  ContentList\n    Text(\"  The value is {x}.\")\n    Text(\"\\n\")\n  Divert(target=\"-> END\", empty=false, tunnel=false, thread=false)\n  ContentList\n    Text(\"\\n\")\n  Flow(level=Knot, name=\"herp(a,\", function=true)\n    VariableAssignment(name=\"x\", global=true, temp=false)\n      Number(0)\n    VariableAssignment(name=\"x\", global=false, temp=false)\n      Binary(*, VariableReference(a), VariableReference(b))"
+        );
+    }
+
+    #[test]
     fn ink_parser_feature_cases_cover_arithmetic_variables_lists_conditions_functions_and_sequences(
     ) {
         let cases = [
