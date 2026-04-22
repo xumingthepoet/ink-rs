@@ -88,6 +88,9 @@ runtime instead of rewriting runtime execution.
   the official include examples from `ink-csharp/tests`.
 - The trusted conformance baseline now covers both the one-line and two-line
   `basictext` fixtures from `blade-ink-rs`.
+- Official C# include-chain fixtures now have a parser-level conformance
+  snapshot covering BOM stripping, recursive include expansion, a variable
+  declaration, and a knot with a divert.
 - `CommentEliminator` now strips a leading UTF-8 BOM, and compiler-level
   regression tests cover both direct-source and include-file BOM handling.
 - Remaining compiler/runtime incompatibilities are now documented in the
@@ -104,8 +107,8 @@ inline-conditional, brace multiline conditional/sequence, and feature-test
 slices are complete.
 Milestone 8 is complete, including include handling, plugin-scope
 documentation, and the minimal manual compilation example.
-Milestone 9 is complete: the conformance harness, regression tests, and
-remaining incompatibility notes are all documented.
+Milestone 9 is complete: the conformance harness, regression tests, remaining
+incompatibility notes, and parser-level trusted snapshots are all documented.
 
 ## Verification Checklist
 
@@ -237,6 +240,26 @@ Pass a second argument to write the JSON to a file instead of stdout.
 
 ### 2026-04-22
 
+- Added a parser-level conformance snapshot for the official C# include chain
+  in `test_included_file3.ink` and `test_included_file4.ink`.
+- The snapshot verifies BOM stripping, recursive include expansion, a
+  variable declaration, blank-line preservation, and a knot/divert pair.
+
+Validation:
+
+```sh
+cargo fmt --all --check
+cargo test -p ink-compiler ink_parser_parses_official_recursive_include_chain
+cargo test -p ink-compiler --test conformance_harness
+cargo check --workspace
+cargo test --workspace
+```
+
+Result: all passed. The only remaining warnings are the two existing
+`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
+
+### 2026-04-22
+
 - Expanded the Milestone 9 conformance harness baseline to cover both
   `basictext/oneline` and `basictext/twolines` from `blade-ink-rs`.
 
@@ -280,6 +303,23 @@ Validation:
 ```sh
 cargo fmt --all --check
 cargo test -p ink-compiler --test api_contract
+cargo check --workspace
+cargo test --workspace
+```
+
+Result: all passed. The only remaining warnings are the two existing
+`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
+
+### 2026-04-22
+
+- Expanded trusted conformance coverage with a parser snapshot for the official
+  C# include chain in `test_included_file3.ink` and `test_included_file4.ink`.
+
+Validation:
+
+```sh
+cargo fmt --all --check
+cargo test -p ink-compiler --test conformance_harness
 cargo check --workspace
 cargo test --workspace
 ```

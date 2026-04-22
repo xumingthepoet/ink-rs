@@ -1688,10 +1688,57 @@ impl<'source> InkParser<'source> {
 
 #[cfg(test)]
 mod tests {
+    use std::{
+        collections::HashMap,
+        fs, io,
+        path::{Path, PathBuf},
+        sync::Arc,
+    };
+
     use super::{CommentEliminator, InkParser};
     use crate::parsed::{
         ExpressionKind, NumberValue, ObjectKind, ObjectRef, SequenceType, Story as ParsedStory,
     };
+    use crate::results::FileHandler;
+
+    #[derive(Debug)]
+    struct IncludeFileHandler {
+        files: HashMap<PathBuf, String>,
+    }
+
+    impl IncludeFileHandler {
+        fn new(files: HashMap<PathBuf, String>) -> Self {
+            Self { files }
+        }
+    }
+
+    impl FileHandler for IncludeFileHandler {
+        fn resolve_ink_filename(&self, include_name: &str) -> PathBuf {
+            workspace_root().join("ink-csharp/tests").join(include_name)
+        }
+
+        fn load_ink_file_contents(&self, full_filename: &Path) -> io::Result<String> {
+            self.files.get(full_filename).cloned().ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::NotFound,
+                    format!("missing include: {}", full_filename.display()),
+                )
+            })
+        }
+    }
+
+    fn workspace_root() -> std::path::PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .and_then(Path::parent)
+            .expect("workspace root")
+            .to_path_buf()
+    }
+
+    fn load_workspace_text(relative_path: &str) -> String {
+        fs::read_to_string(workspace_root().join(relative_path))
+            .unwrap_or_else(|error| panic!("failed to read {relative_path}: {error}"))
+    }
 
     fn render_story(story: &ParsedStory) -> String {
         let mut lines = vec!["Story".to_string()];
@@ -2636,5 +2683,36 @@ mod tests {
                 "case {name} produced an unexpected feature snapshot"
             );
         }
+    }
+
+    #[test]
+    fn ink_parser_parses_official_recursive_include_chain() {
+        let source = load_workspace_text("ink-csharp/tests/test_included_file3.ink");
+        let source_filename = workspace_root()
+            .join("ink-csharp/tests/test_included_file3.ink")
+            .to_string_lossy()
+            .into_owned();
+        let mut files = HashMap::new();
+        files.insert(
+            workspace_root().join("ink-csharp/tests/test_included_file4.ink"),
+            load_workspace_text("ink-csharp/tests/test_included_file4.ink"),
+        );
+        let file_handler: Arc<dyn FileHandler> = Arc::new(IncludeFileHandler::new(files));
+
+        let mut parser =
+            InkParser::new(&source, Some(source_filename.as_str()), Some(file_handler));
+        let result = parser.parse();
+
+        assert!(
+            result.diagnostics.is_empty(),
+            "unexpected diagnostics: {:#?}",
+            result.diagnostics
+        );
+
+        let story = result.parsed_story.expect("expected parsed story");
+        assert_eq!(
+            render_story(&story),
+            "Story\n  VariableAssignment(name=\"t2\", global=true, temp=false)\n    Number(5)\n  ContentList\n    Text(\"\\n\")\n  ContentList\n    Text(\"The value of a variable in test file 2 is { t2 }.\")\n    Text(\"\\n\")\n  ContentList\n    Text(\"\\n\")\n  Text(\"\\n\")\n  Flow(level=Knot, name=\"knot_in_2\", function=false)\n    ContentList\n      Text(\" The value when accessed from knot_in_2 is { t2 }.\")\n      Text(\"\\n\")\n    Divert(target=\"-> END\", empty=false, tunnel=false, thread=false)"
+        );
     }
 }

@@ -21,7 +21,7 @@ Core commands to run after every completed milestone:
 - [x] `cargo check --workspace`
 - [x] `cargo test --workspace`
 
-Current last verified milestone: Milestone 9 conformance coverage slice
+Current last verified milestone: Milestone 9 parser include-chain slice
 (`2026-04-22`).
 
 ## Rules
