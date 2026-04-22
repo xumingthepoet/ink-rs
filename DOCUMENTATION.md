@@ -55,8 +55,12 @@ into `crates/ink-runtime` instead of rewriting runtime execution.
 - The compiler-conformance fixture queue is tracked in
   `COMPILER_CONFORMANCE_CHECKLIST.md`, and it is now ordered to match the
   broad syntax progression in `WritingWithInk.md` rather than the old folder
-  order. The file header now shows an explicit progress count (`111/126`) so
-  batch progress is visible at a glance.
+  order. The file header now shows the actual current green count (`6/126`)
+  so batch progress is visible at a glance.
+- The next compiler-conformance blocker after the six green fixtures is
+  `choices/no-choice-text`: the exporter still needs a deeper choice-to-gather
+  handoff for the root choice-only branch, even though the official `.parse`
+  and `.json` fixtures are already in place.
 - `TheIntercept` is intentionally deferred to the new last-pass fixture
   section because it combines several syntax features and is too broad for the
   current low-dependency compiler-conformance queue.

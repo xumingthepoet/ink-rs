@@ -557,6 +557,12 @@ fn export_choice_container(
     } else {
         choice_index
     };
+    if std::env::var_os("INK_DEBUG_CHOICE").is_some() {
+        eprintln!(
+            "choice debug: choice_index={choice_index} has_start_content={has_start_content} has_choice_only_content={has_choice_only_content} has_condition={has_condition} inline={has_inline_inner_content} branch_gather_target={:?}",
+            branch_gather_target
+        );
+    }
     if needs_eval {
         outer_tokens.push(json!("ev"));
     }
@@ -836,6 +842,15 @@ fn export_children(
     allow_named_flow: bool,
     inherited_gather_target: Option<String>,
 ) -> Result<(), CompilerError> {
+    if std::env::var_os("INK_DEBUG_CHOICE").is_some() {
+        eprintln!(
+            "export_children kinds: {:?}",
+            children
+                .iter()
+                .map(|child| child.borrow().kind().clone())
+                .collect::<Vec<_>>()
+        );
+    }
     let mut pending_choice_named_contents: Vec<BTreeMap<String, Value>> = Vec::new();
 
     for (index, child) in children.iter().enumerate() {
@@ -906,6 +921,29 @@ fn gather_target_for_choice(
     for child in children.iter().skip(current_index + 1) {
         match child.borrow().kind() {
             ObjectKind::Choice { .. } => continue,
+            ObjectKind::Divert { target, .. } => {
+                if matches!(
+                    target.as_ref().and_then(|path| path.dot_separated_components()),
+                    Some(ref target) if target == "DONE" || target == "END"
+                ) {
+                    continue;
+                }
+                return None;
+            }
+            ObjectKind::Text { .. }
+            | ObjectKind::ContentList { .. }
+            | ObjectKind::AuthorWarning { .. }
+            | ObjectKind::Tag { .. }
+            | ObjectKind::Sequence { .. }
+            | ObjectKind::Conditional { .. }
+            | ObjectKind::ConditionalSingleBranch { .. }
+            | ObjectKind::VariableAssignment { .. }
+            | ObjectKind::ConstantDeclaration { .. }
+            | ObjectKind::ExternalDeclaration { .. }
+            | ObjectKind::Expression { .. }
+            | ObjectKind::ListDefinition { .. }
+            | ObjectKind::ListElementDefinition { .. }
+            | ObjectKind::Generic => continue,
             ObjectKind::Gather { identifier, .. } => {
                 let gather_name = identifier
                     .as_ref()
@@ -918,7 +956,58 @@ fn gather_target_for_choice(
         }
     }
 
-    inherited_gather_target
+    let choice_has_only_content = matches!(
+        children[current_index].borrow().kind(),
+        ObjectKind::Choice {
+            has_start_content: false,
+            has_choice_only_content: true,
+            ..
+        }
+    );
+    let gather_fallback =
+        choice_has_only_content.then(|| format!("0.g-{}", _state.gather_index));
+
+    next_gather_sibling_target(&children[current_index])
+        .or(gather_fallback)
+        .or(inherited_gather_target)
+}
+
+fn next_gather_sibling_target(object: &ObjectRef) -> Option<String> {
+    let mut current = Some(object.clone());
+
+    while let Some(node) = current {
+        if std::env::var_os("INK_DEBUG_CHOICE").is_some() {
+            eprintln!(
+                "searching gather from node: {:?}",
+                node.borrow().kind().clone()
+            );
+        }
+        let parent = node.borrow().parent()?;
+        let siblings = parent.borrow().content().to_vec();
+        let mut found_self = false;
+
+        for sibling in siblings {
+            if Rc::ptr_eq(&sibling, &node) {
+                found_self = true;
+                continue;
+            }
+            if !found_self {
+                continue;
+            }
+            if let ObjectKind::Gather { identifier, .. } = sibling.borrow().kind() {
+                let gather_name = identifier
+                    .as_ref()
+                    .filter(|identifier| !identifier.name.is_empty())
+                    .map(|identifier| identifier.name.clone())
+                    .unwrap_or_else(|| flow_named_gather_component(&sibling));
+                return Some(format!(".^.^.{gather_name}"));
+            }
+        }
+
+        current = Some(parent);
+    }
+
+    None
 }
 
 fn export_gather_named_content(
@@ -1359,7 +1448,7 @@ fn choice_path_prefix(object: &ObjectRef, has_start_content: bool) -> &'static s
         current = parent;
     }
 
-    ".^."
+    "0."
 }
 
 fn export_text_token(text: &str) -> Value {
