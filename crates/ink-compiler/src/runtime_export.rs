@@ -13,6 +13,10 @@ pub fn export_story_json(story: &ParsedStory) -> Result<String, CompilerError> {
         export_object(&object, &mut state)?;
     }
 
+    if !matches!(state.main_content.last(), Some(Value::String(value)) if value == "\n") {
+        state.main_content.push(Value::String("\n".to_string()));
+    }
+
     let mut inner_container = state.main_content;
     inner_container.push(Value::Null);
 
@@ -136,6 +140,24 @@ mod tests {
         assert!(json.contains("\"listDefs\":{}"));
         assert!(json.contains("^Hello"));
         assert!(json.contains("\"done\""));
+    }
+
+    #[test]
+    fn exports_plain_text_story_with_terminal_newline() {
+        let line = ContentList::new();
+        line.add_content(Text::new("Hello").object());
+        let story = Story::new(vec![line.object()], false);
+
+        let json = export_story_json(&story).expect("expected plain text story export");
+        let runtime_story = RuntimeStory::new(&json).expect("expected runtime story to load");
+
+        let mut output = String::new();
+        let mut story = runtime_story;
+        while story.can_continue() {
+            output.push_str(&story.cont().expect("continue story"));
+        }
+
+        assert_eq!(output, "Hello\n");
     }
 
     #[test]

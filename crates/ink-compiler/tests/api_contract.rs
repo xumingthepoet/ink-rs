@@ -151,7 +151,7 @@ fn compile_returns_a_runtime_story_for_plain_text_story() {
     let mut story = result.story.expect("expected runtime story");
     assert!(result.diagnostics.is_empty());
     assert!(story.can_continue());
-    assert_eq!(story.cont().unwrap(), "Hello world");
+    assert_eq!(story.cont().unwrap(), "Hello world\n");
     assert!(!story.can_continue());
 }
 
@@ -164,7 +164,7 @@ fn compiler_strips_utf8_bom_from_source_text() {
     let mut story = result.story.expect("expected runtime story");
     assert!(result.diagnostics.is_empty());
     assert!(story.can_continue());
-    assert_eq!(story.cont().unwrap(), "Hello world");
+    assert_eq!(story.cont().unwrap(), "Hello world\n");
     assert!(!story.can_continue());
 }
 
