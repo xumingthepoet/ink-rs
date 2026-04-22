@@ -436,14 +436,16 @@ impl<'source> InkParser<'source> {
             }));
         }
 
-        if target_tokens.next().is_some() {
-            return Err(Diagnostic::new(
-                DiagnosticSeverity::Error,
-                source_filename,
-                line_number,
-                line_indent + 2,
-                "Simple divert targets must be a single knot or stitch name",
-            ));
+        if let Some(extra_token) = target_tokens.next() {
+            if extra_token != "->" || target_tokens.next().is_some() {
+                return Err(Diagnostic::new(
+                    DiagnosticSeverity::Error,
+                    source_filename,
+                    line_number,
+                    line_indent + 2,
+                    "Simple divert targets must be a single knot or stitch name",
+                ));
+            }
         }
 
         let target = Self::parse_simple_divert_target(target_text).ok_or_else(|| {
@@ -2945,12 +2947,47 @@ to Savile Row\n\
         let render = render_story(&story);
         assert!(render.contains("FunctionCall(derp, args=2)"));
         assert!(render.contains("Text(\"    The values are {x} and {y} and {z}.\")"));
-        assert!(render.contains("Divert(target=\"-> END\", empty=false, tunnel=false, thread=false)"));
+        assert!(
+            render.contains("Divert(target=\"-> END\", empty=false, tunnel=false, thread=false)")
+        );
         assert!(render.contains("Flow(level=Knot, name=\"derp(a,\", function=true)"));
         assert!(render.contains("Conditional"));
         assert!(render.contains("Binary(==, VariableReference(x), Number(0))"));
         assert!(render.contains("Binary(>, VariableReference(x), Number(0))"));
         assert!(render.contains("VariableAssignment(name=\"z\", global=true, temp=false)"));
+    }
+
+    #[test]
+    fn ink_parser_parses_trusted_function_evaluating_variablestate_bug_fixture() {
+        let source = load_workspace_text(
+            "blade-ink-rs/conformance-tests/inkfiles/function/evaluating-function-variablestate-bug.ink",
+        );
+        let mut parser = InkParser::new(
+            &source,
+            Some("evaluating-function-variablestate-bug.ink"),
+            None,
+        );
+        let result = parser.parse();
+
+        assert!(
+            result.diagnostics.is_empty(),
+            "unexpected diagnostics: {:#?}",
+            result.diagnostics
+        );
+
+        let story = result.parsed_story.expect("expected parsed story");
+        let render = render_story(&story);
+        assert!(render
+            .contains("Divert(target=\"-> tunnel\", empty=false, tunnel=false, thread=false)"));
+        assert!(render.contains("Divert(target=\"->\", empty=false, tunnel=true, thread=false)"));
+        assert!(render.contains("Flow(level=Knot, name=\"function_to_evaluate()\", function=true)"));
+        assert!(render.contains("FunctionCall(zero_equals_, args=1)"));
+        assert!(render.contains("Flow(level=Knot, name=\"zero_equals_(k)\", function=true)"));
+        assert!(render.contains("FunctionCall(do_nothing, args=1)"));
+        assert!(render.contains("Flow(level=Knot, name=\"do_nothing(k)\", function=true)"));
+        assert!(render.contains("Conditional"));
+        assert!(render.contains("Return"));
+        assert!(render.contains("Binary(==, Number(0), VariableReference(k))"));
     }
 
     #[test]
