@@ -99,6 +99,8 @@ runtime instead of rewriting runtime execution.
   parser-level conformance snapshot.
 - The trusted `blade-ink-rs` `function/func-basic.ink` fixture now also has a
   parser-level conformance snapshot.
+- The trusted `blade-ink-rs` `function/func-inline.ink` fixture now also has a
+  parser-level conformance snapshot.
 - The trusted `blade-ink-rs` `conditional/iftrue.ink` fixture now also has a
   parser-level conformance snapshot.
 - The trusted `blade-ink-rs` `conditional/ifelse.ink` fixture now also has a
@@ -234,6 +236,9 @@ Pass a second argument to write the JSON to a file instead of stdout.
 - Function definitions with parameter lists still render their flow names
   using the current partial header split, so `func-basic.ink` currently shows
   `lerp(a,` in the parser snapshot.
+- The parser snapshot for `function/func-inline.ink` shows the inline
+  function-call story and trailing return body in stable parsed hierarchy
+  form.
 - The ink parser grammar is still pending for the remaining unported features.
 - Feature coverage for arithmetic, variables, lists, conditions, functions, and
   sequences now exists as a stable parser snapshot test.
@@ -267,6 +272,26 @@ Pass a second argument to write the JSON to a file instead of stdout.
   runtime and parser snapshots, not the full official test suite.
 
 ## Audit Log
+
+### 2026-04-22
+
+- Added a parser-level conformance snapshot for `blade-ink-rs` function
+  fixture `function/func-inline.ink`.
+- The snapshot verifies the parser keeps the inline function-call line, a
+  trailing divert, and the function return body in stable parsed hierarchy
+  form.
+
+Validation:
+
+```sh
+cargo fmt --all --check
+cargo test -p ink-compiler ink_parser_parses_trusted_function_inline_fixture
+cargo check --workspace
+cargo test --workspace
+```
+
+Result: all passed. The only remaining warnings are the two existing
+`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
 
 ### 2026-04-22
 

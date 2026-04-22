@@ -2786,6 +2786,26 @@ to Savile Row\n\
     }
 
     #[test]
+    fn ink_parser_parses_trusted_function_inline_fixture() {
+        let source =
+            load_workspace_text("blade-ink-rs/conformance-tests/inkfiles/function/func-inline.ink");
+        let mut parser = InkParser::new(&source, Some("func-inline.ink"), None);
+        let result = parser.parse();
+
+        assert!(
+            result.diagnostics.is_empty(),
+            "unexpected diagnostics: {:#?}",
+            result.diagnostics
+        );
+
+        let story = result.parsed_story.expect("expected parsed story");
+        assert_eq!(
+            render_story(&story),
+            "Story\n  ContentList\n    Text(\"The value of x is {lerp(2, 8, 0.4)}.\")\n    Text(\"\\n\")\n  Divert(target=\"-> END\", empty=false, tunnel=false, thread=false)\n  ContentList\n    Text(\"\\n\")\n  Flow(level=Knot, name=\"lerp(a,\", function=true)\n    Return\n      Binary(+, Binary(*, Binary(-, VariableReference(b), VariableReference(a)), VariableReference(k)), VariableReference(a))"
+        );
+    }
+
+    #[test]
     fn ink_parser_feature_cases_cover_arithmetic_variables_lists_conditions_functions_and_sequences(
     ) {
         let cases = [
