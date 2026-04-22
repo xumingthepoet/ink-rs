@@ -21,6 +21,9 @@ just `继续`.
     commit.
 13. End with a concise summary and mention any validation not run.
 
+For a full local verification pass, `make gate` is the preferred unified entry
+point. It runs format, check, and test with workspace warnings denied.
+
 ## Non-Negotiable Continuation Rule
 
 When the user says `继续`, do not stop after planning or after one read-only

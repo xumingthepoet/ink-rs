@@ -171,11 +171,11 @@ impl StoryState {
         &self.current_warnings
     }
 
-    pub fn get_output_stream(&self) -> &Vec<Rc<(dyn RTObject)>> {
+    pub fn get_output_stream(&self) -> &Vec<Rc<dyn RTObject>> {
         &self.current_flow.output_stream
     }
 
-    fn get_output_stream_mut(&mut self) -> &mut Vec<Rc<(dyn RTObject)>> {
+    fn get_output_stream_mut(&mut self) -> &mut Vec<Rc<dyn RTObject>> {
         &mut self.current_flow.output_stream
     }
 

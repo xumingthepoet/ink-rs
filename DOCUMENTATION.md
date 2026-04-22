@@ -98,6 +98,8 @@ into `crates/ink-runtime` instead of rewriting runtime execution.
   the expected location.
 - A new `ink-test` crate now hosts the package-level integration tests and
   copied fixture data used by the conformance harness and runtime smoke tests.
+- The workspace now treats warnings as errors via `.cargo/config.toml`, and
+  `make gate` is the unified local wrapper for format, check, and test.
 - The conformance harness now compares compiler output against copied trusted
   fixtures under `crates/ink-test/fixtures` and compiler behavior against the
   copied official include examples there as well.
@@ -323,9 +325,8 @@ Pass a second argument to write the JSON to a file instead of stdout.
   C# include story; broader conformance coverage is still pending.
 - The leading UTF-8 BOM stripping fix is now covered by parser and API
   contract regression tests.
-- `cargo check --workspace` reports warnings from ignored dependency
-  `blade-ink-rs/lib`; these are upstream/local reference warnings, not current
-  compiler crate failures.
+- `cargo check --workspace` is now warning-free because the workspace denies
+  warnings; `make gate` is the preferred local verification entry point.
 
 ## Remaining Incompatibilities
 

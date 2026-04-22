@@ -20,9 +20,13 @@ Core commands to run after every completed milestone:
 - [x] `cargo fmt --all --check`
 - [x] `cargo check --workspace`
 - [x] `cargo test --workspace`
+- [x] `make gate`
 
 Current last verified milestone: Milestone 10 runtime/test relocation slice
 (`2026-04-22`).
+
+Workspace warning policy: `.cargo/config.toml` now denies warnings, and
+`make gate` is the unified local entry point for format, check, and test.
 
 ## Rules
 
