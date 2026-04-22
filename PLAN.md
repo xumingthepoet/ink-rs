@@ -21,7 +21,7 @@ Core commands to run after every completed milestone:
 - [x] `cargo check --workspace`
 - [x] `cargo test --workspace`
 
-Current last verified milestone: Milestone 9 function evaluating-function-variablestate-bug fixture slice
+Current last verified milestone: Milestone 10 runtime crate relocation scaffold
 (`2026-04-22`).
 
 ## Rules
@@ -317,9 +317,38 @@ cargo fmt --all --check
 cargo test --workspace
 ```
 
+## Milestone 10: Runtime Crate Relocation
+
+- [x] Scaffold `crates/ink-runtime` with the copied `blade-ink-rs/lib/src`
+  runtime tree.
+- [x] Point the workspace runtime dependency at `crates/ink-runtime`.
+- [ ] Update docs and tests to treat `crates/ink-runtime` as the canonical
+  runtime home, then remove the legacy `blade-ink-rs/lib` path dependency.
+
+Primary Rust references:
+
+- `blade-ink-rs/lib/src/`
+- `crates/ink-runtime/src/`
+
+Acceptance:
+
+- The workspace builds and tests against `crates/ink-runtime`.
+- The old `blade-ink-rs/lib` path dependency is no longer used by the
+  workspace.
+- Runtime tests continue to pass without conformance regression.
+
+Validation:
+
+```sh
+cargo fmt --all --check
+cargo check --workspace
+cargo test --workspace
+```
+
 ## Next Task
 
-No unchecked required tasks remain.
+Update docs and tests to treat `crates/ink-runtime` as the canonical runtime
+home, then remove the legacy `blade-ink-rs/lib` path dependency.
 
 ## Risk Register
 

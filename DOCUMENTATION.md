@@ -73,6 +73,9 @@ runtime instead of rewriting runtime execution.
 - Compiler-owned runtime export now emits minimal plain-text story JSON plus
   `listDefs` metadata for parsed list declarations and loads successfully
   through `bladeink::story::Story::new`.
+- The runtime crate has been copied into `crates/ink-runtime`, and the
+  workspace dependency now points at that location instead of
+  `blade-ink-rs/lib`.
 - Compiler-owned runtime export normalizes a missing terminal newline for
   plain-text stories so trusted runtime output stays stable across source
   files that do not end with `\n`.
@@ -158,6 +161,8 @@ Milestone 8 is complete, including include handling, plugin-scope
 documentation, and the minimal manual compilation example.
 Milestone 9 is complete: the conformance harness, regression tests, remaining
 incompatibility notes, and parser-level trusted snapshots are all documented.
+Milestone 10 has started: the runtime crate has been relocated into
+`crates/ink-runtime` and the workspace now points at it.
 
 ## Verification Checklist
 
@@ -203,6 +208,8 @@ Pass a second argument to write the JSON to a file instead of stdout.
 
 - `Compiler::compile_json` now exports minimal plain-text story JSON, but the
   full compiler output path is still limited to plain-text stories.
+- `blade-ink-rs/lib` remains in the repository as a reference tree during the
+  runtime relocation, but the workspace now builds against `crates/ink-runtime`.
 - The parsed hierarchy currently has the object tree, path primitives, and a
   root-story wrapper with content-node leaf wrappers.
 - Parsed `Weave`, `Choice`, and `Gather` wrappers now exist with indentation
@@ -320,8 +327,21 @@ Pass a second argument to write the JSON to a file instead of stdout.
 - Plugin hooks and dynamic plugin discovery remain intentionally deferred.
 - The conformance harness currently covers a small trusted subset of trusted
   runtime and parser snapshots, not the full official test suite.
+- The runtime relocation is not complete until the legacy `blade-ink-rs/lib`
+  path dependency and its local reference tree can be removed.
 
 ## Audit Log
+
+### 2026-04-22
+
+- Added a new runtime migration step by copying the `blade-ink-rs/lib/src`
+  tree into `crates/ink-runtime/src`.
+- The workspace dependency now points at `crates/ink-runtime`, which keeps the
+  compiler and tests building against the relocated runtime source.
+- Validation: `cargo fmt --all --check`, `cargo check --workspace`,
+  `cargo test --workspace`.
+- Result: all passed; only the existing `crates/ink-runtime/src/story_state.rs`
+  warnings remain.
 
 ### 2026-04-22
 

@@ -1,10 +1,9 @@
 [workspace]
-members = ["crates/ink-compiler"]
+members = ["crates/ink-compiler", "crates/ink-runtime"]
 resolver = "2"
 
 [workspace.package]
 edition = "2021"
 
 [workspace.dependencies]
-bladeink = { path = "blade-ink-rs/lib" }
-
+bladeink = { path = "crates/ink-runtime" }
