@@ -475,7 +475,8 @@ Current blocker while the imported suites are being stabilized:
 - The imported legacy compiler-to-runtime suite is the highest-priority
   remaining suite, followed by the imported csharp suite. Both stay
   feature-gated so the default gate stays green until the remaining migration
-  work is complete.
+  work is complete. The `divert_choice` checkpoint is green; `label_scope`
+  still times out and is the current compiler-conformance blocker.
 
 Acceptance:
 

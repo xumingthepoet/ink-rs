@@ -29,15 +29,17 @@ into `crates/ink-runtime` instead of rewriting runtime execution.
   continues.
 - The compiler-conformance choice/divert/sequence slice now has the basic
   `no-choice`, `one`, `single-choice`, `suppress-choice`, `mixed-choice`,
-  `divert-on-choice`, and `variable_text::sequence` fixtures green.
+  `divert-on-choice`, and `variable_text::sequence` fixtures green, and the
+  `divert_choice` checkpoint is now green as well.
 - The current compiler-conformance slice has made the simple divert and glue
   fixtures green, updated the trusted parser snapshots to reflect inline
   divert splitting inside conditional fixtures, and was later feature-gated
   again so the default gate could stay green while migration continues.
-- `compiler_conformance::choice_test::sticky_choice_test` is now green after
-  the parser started splitting inline diverts inside branch content, but
-  path-resolution-heavy choice fixtures such as `divert_choice` and
-  `label_scope` still need follow-up work.
+- `compiler_conformance::choice_test::sticky_choice_test` and
+  `compiler_conformance::choice_test::divert_choice_test` are now green after
+  the parser started splitting inline diverts inside branch content and the
+  exporter adjusted choice token spacing/path handling, but the
+  path-resolution-heavy `label_scope` fixture still times out.
 - During Milestone 13, compiler-conformance progress is checkpointed in small
   commits after each few passing fixtures so the remaining work stays
   resumable and bounded.

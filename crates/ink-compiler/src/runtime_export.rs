@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, rc::Rc};
+use std::{collections::BTreeMap, mem, rc::Rc};
 
 use serde_json::{json, Map, Value};
 
@@ -23,7 +23,19 @@ pub fn export_story_json(story: &ParsedStory) -> Result<String, CompilerError> {
     export_children(top_level_content, &mut state, &mut main_content, true, None)?;
     state.main_content = main_content;
 
-    if !top_level_has_weave_points
+    let has_named_containers = !state.named_containers.is_empty();
+    if has_named_containers {
+        if matches!(state.main_content.last(), Some(Value::String(value)) if value == "\n") {
+            state.main_content.pop();
+        }
+        if !matches!(state.main_content.last(), Some(Value::Array(value)) if matches!(value.as_slice(), [Value::String(marker), Value::Object(_)] if marker == "done"))
+        {
+            state.main_content.push(json!([
+                Value::String("done".to_string()),
+                json!({"#n":"g-0"})
+            ]));
+        }
+    } else if !top_level_has_weave_points
         && !matches!(
             state.last_top_level_kind,
             Some(ObjectKind::Choice { .. } | ObjectKind::Gather { .. })
@@ -34,7 +46,9 @@ pub fn export_story_json(story: &ParsedStory) -> Result<String, CompilerError> {
     }
 
     let mut inner_container = state.main_content;
-    if !top_level_has_weave_points {
+    if has_named_containers {
+        inner_container.push(Value::Null);
+    } else if !top_level_has_weave_points {
         inner_container.push(Value::String("end".to_string()));
         inner_container.push(Value::Null);
     }
@@ -69,6 +83,8 @@ struct ExportState {
     choice_index: usize,
     gather_index: usize,
     last_top_level_kind: Option<ObjectKind>,
+    named_flow_depth: usize,
+    named_flow_entry_emitted: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -123,11 +139,15 @@ fn export_object_into(
             if allow_named_flow {
                 if let Some(name) = name {
                     let container = export_named_flow_container(
-                        &content,
+                        object,
                         state,
                         inherited_gather_target.clone(),
                     )?;
                     state.named_containers.insert(name.clone(), container);
+                    if state.named_flow_depth > 0 && !state.named_flow_entry_emitted {
+                        tokens.push(json!({"->": format!(".^.{name}")}));
+                        state.named_flow_entry_emitted = true;
+                    }
                 } else {
                     export_children(content, state, tokens, false, inherited_gather_target)?;
                 }
@@ -153,7 +173,6 @@ fn export_object_into(
                 has_start_content,
                 has_choice_only_content,
                 has_inline_inner_content,
-                tokens.len(),
                 None,
                 inherited_gather_target.clone(),
                 tokens,
@@ -224,35 +243,87 @@ fn export_object_into(
 }
 
 fn export_named_flow_container(
-    flow_content: &[ObjectRef],
+    flow: &ObjectRef,
     state: &mut ExportState,
     inherited_gather_target: Option<String>,
 ) -> Result<Value, CompilerError> {
+    let flow_content = {
+        let borrowed = flow.borrow();
+        borrowed.content().to_vec()
+    };
     let mut tokens = Vec::new();
-    export_children(
+    let saved_named_containers = mem::take(&mut state.named_containers);
+    let saved_choice_index = state.choice_index;
+    let saved_gather_index = state.gather_index;
+    let saved_named_flow_entry_emitted = state.named_flow_entry_emitted;
+    let flow_target = next_flow_sibling_target(flow);
+    state.named_flow_depth += 1;
+    state.named_flow_entry_emitted = false;
+    let export_result = export_children(
         flow_content.to_vec(),
         state,
         &mut tokens,
-        false,
-        inherited_gather_target,
-    )?;
+        true,
+        flow_target.or(inherited_gather_target),
+    );
+    state.named_flow_depth -= 1;
+    state.named_flow_entry_emitted = saved_named_flow_entry_emitted;
+    state.choice_index = saved_choice_index;
+    state.gather_index = saved_gather_index;
+    export_result?;
+    let nested_named_containers = mem::replace(&mut state.named_containers, saved_named_containers);
+    let has_weave_point_tokens = tokens.iter().any(value_contains_weave_point_token);
 
-    let should_wrap = flow_content.iter().any(|object| {
-        matches!(
-            object.borrow().kind(),
-            ObjectKind::Choice { .. }
-                | ObjectKind::Gather { .. }
-                | ObjectKind::Sequence { .. }
-                | ObjectKind::Conditional
-                | ObjectKind::ConditionalSingleBranch { .. }
-        )
-    });
-
-    if should_wrap {
-        Ok(Value::Array(vec![Value::Array(tokens), Value::Null]))
+    let content_value = if tokens.len() == 1 {
+        tokens.into_iter().next().unwrap()
     } else {
-        tokens.push(Value::Null);
-        Ok(Value::Array(tokens))
+        Value::Array(tokens)
+    };
+    if nested_named_containers.is_empty() {
+        return match content_value {
+            Value::Array(values) => {
+                if has_weave_point_tokens {
+                    let inner_values = if matches!(values.last(), Some(Value::Null)) {
+                        values[..values.len() - 1].to_vec()
+                    } else {
+                        values
+                    };
+                    return Ok(Value::Array(vec![Value::Array(inner_values), Value::Null]));
+                }
+
+                if matches!(values.last(), Some(Value::Null)) {
+                    return Ok(Value::Array(values));
+                }
+
+                let mut flat_tokens = values;
+                flat_tokens.push(Value::Null);
+                Ok(Value::Array(flat_tokens))
+            }
+            value => Ok(Value::Array(vec![value, Value::Null])),
+        };
+    }
+
+    let named_children_value =
+        Value::Object(nested_named_containers.into_iter().collect::<Map<_, _>>());
+
+    let mut content_array = match content_value {
+        Value::Array(values) => values,
+        value => vec![value],
+    };
+    content_array.push(named_children_value);
+
+    Ok(Value::Array(vec![Value::Array(content_array), Value::Null]))
+}
+
+fn value_contains_weave_point_token(value: &Value) -> bool {
+    match value {
+        Value::Object(map) => {
+            map.contains_key("*")
+                || map.contains_key("CNT?")
+                || map.values().any(value_contains_weave_point_token)
+        }
+        Value::Array(values) => values.iter().any(value_contains_weave_point_token),
+        _ => false,
     }
 }
 
@@ -262,6 +333,7 @@ fn export_gather_container(
     inherited_gather_target: Option<String>,
 ) -> Result<Value, CompilerError> {
     let mut tokens = Vec::new();
+    let gathered_target = inherited_gather_target.clone();
     export_children(
         gather_content.to_vec(),
         state,
@@ -275,16 +347,50 @@ fn export_gather_container(
         tokens.pop();
     }
 
-    if !matches!(tokens.last(), Some(Value::String(value)) if value == "\n") {
+    let explicit_divert_index = tokens.iter().rposition(is_runtime_divert_token);
+    if let Some(divert_index) = explicit_divert_index {
+        if gathered_target.is_some()
+            && (divert_index == 0
+                || !matches!(tokens.get(divert_index - 1), Some(Value::String(value)) if value == "\n"))
+        {
+            tokens.insert(divert_index, Value::String("\n".to_string()));
+        }
+    } else if !matches!(tokens.last(), Some(Value::String(value)) if value == "\n") {
         tokens.push(Value::String("\n".to_string()));
     }
-    tokens.push(Value::String("end".to_string()));
-    tokens.push(json!([
-        Value::String("done".to_string()),
-        json!({"#n": format!("g-{}", state.gather_index)})
-    ]));
-    tokens.push(Value::Null);
+
+    if explicit_divert_index.is_none() {
+        if let Some(target) = gathered_target {
+            tokens.push(json!({"->": target}));
+            tokens.push(json!({"#f":5}));
+        } else {
+            tokens.push(Value::String("end".to_string()));
+            tokens.push(json!([
+                Value::String("done".to_string()),
+                json!({"#n": format!("g-{}", state.gather_index)})
+            ]));
+            tokens.push(Value::Null);
+        }
+    } else {
+        if gathered_target.is_none() {
+            if !matches!(tokens.last(), Some(Value::String(value)) if value == "end") {
+                tokens.push(Value::String("end".to_string()));
+            }
+            if !matches!(tokens.last(), Some(Value::Null)) {
+                tokens.push(Value::Null);
+            }
+        } else if !matches!(tokens.last(), Some(Value::Object(map)) if map.contains_key("#f")) {
+            tokens.push(json!({"#f":5}));
+        }
+    }
     Ok(Value::Array(tokens))
+}
+
+fn is_runtime_divert_token(value: &Value) -> bool {
+    let Value::Object(map) = value else {
+        return false;
+    };
+    map.contains_key("->") || map.contains_key("->t->")
 }
 
 fn export_sequence_container(
@@ -393,7 +499,6 @@ fn export_choice_container(
     has_start_content: bool,
     has_choice_only_content: bool,
     has_inline_inner_content: bool,
-    outer_index: usize,
     branch_gather_target: Option<String>,
     inherited_gather_target: Option<String>,
     tokens: &mut Vec<Value>,
@@ -425,6 +530,7 @@ fn export_choice_container(
     } else {
         None
     };
+    let flow_prefix = flow_path_prefix(object);
     let needs_eval = has_start_content || has_choice_only_content || has_condition;
 
     if needs_eval {
@@ -433,7 +539,7 @@ fn export_choice_container(
 
     if let Some(_start_content) = start_content.as_ref() {
         outer_tokens.push(json!({
-            "^->": format!("0.{outer_index}.$r1")
+            "^->": format!("{flow_prefix}.0.0.$r1")
         }));
         outer_tokens.push(json!({"temp=":"$r"}));
         outer_tokens.push(json!("str"));
@@ -481,11 +587,7 @@ fn export_choice_container(
         }
         flags
     };
-    let choice_path = if has_start_content {
-        format!("0.c-{choice_index}")
-    } else {
-        format!(".^.c-{choice_index}")
-    };
+    let choice_path = format!(".^.c-{choice_index}");
     outer_tokens.push(json!({"*": choice_path, "flg": flags}));
 
     if let Some(start_content) = start_content {
@@ -510,13 +612,11 @@ fn export_choice_container(
     if has_start_content {
         inner_tokens.push(json!("ev"));
         inner_tokens.push(json!({
-            "^->": format!("0.c-{choice_index}.$r2")
+            "^->": format!("{flow_prefix}.0.c-{choice_index}.$r2")
         }));
         inner_tokens.push(json!("/ev"));
         inner_tokens.push(json!({"temp=":"$r"}));
-        inner_tokens.push(json!({
-            "->": format!("0.{outer_index}.s")
-        }));
+        inner_tokens.push(json!({"->":".^.^.0.s"}));
         inner_tokens.push(Value::Array(vec![json!({"#n":"$r2"})]));
     }
 
@@ -559,30 +659,40 @@ fn export_choice_container(
             inner_tokens.push(Value::String("end".to_string()));
         }
 
-        let branch_target = branch_gather_target
-            .clone()
-            .unwrap_or_else(|| format!("0.g-{choice_index}"));
-        inner_tokens.push(json!({"->": branch_target}));
+        if let Some(branch_target) = branch_gather_target.clone() {
+            inner_tokens.push(json!({"->": branch_target}));
+        }
         inner_tokens.push(json!({"#f":5}));
 
         choice_named_content.insert(format!("c-{choice_index}"), Value::Array(inner_tokens));
-        if branch_gather_target.is_none() {
-            choice_named_content.insert(
-                format!("g-{choice_index}"),
-                Value::Array(vec![Value::String("done".to_string()), Value::Null]),
-            );
-        }
     } else {
+        if !has_inline_inner_content
+            && !matches!(inner_tokens.first(), Some(Value::String(value)) if value == "\n")
+        {
+            inner_tokens.insert(0, Value::String("\n".to_string()));
+        }
+        if has_inline_inner_content
+            && !matches!(
+                inner_tokens.last(),
+                Some(Value::String(value)) if value == "\n"
+            )
+        {
+            inner_tokens.push(Value::String("\n".to_string()));
+        }
         if let Some(branch_gather_target) = branch_gather_target {
             inner_tokens.push(json!({"->": branch_gather_target}));
         }
-        if !matches!(
-            inner_tokens.last(),
-            Some(Value::String(value)) if value == "\n"
-        ) {
-            inner_tokens.push(Value::String("\n".to_string()));
-        }
         inner_tokens.push(json!({"#f":5}));
+        if !has_inline_inner_content
+            && matches!(inner_tokens.first(), Some(Value::String(value)) if value == "\n")
+        {
+            if let Some(Value::String(text)) = inner_tokens.get_mut(1) {
+                if text.starts_with('^') && !text.ends_with(' ') {
+                    text.push(' ');
+                }
+            }
+        }
+        merge_leading_space_text_tokens(&mut inner_tokens);
         choice_named_content.insert(format!("c-{choice_index}"), Value::Array(inner_tokens));
     }
     if has_start_content {
@@ -631,9 +741,18 @@ fn normalize_text_token_sequences(tokens: &mut Vec<Value>) {
                 && next_text == "\n"
                 && !next_body.is_empty()
             {
-                normalized.push(Value::String(format!("^{}{}", current_body, next_body)));
                 normalized.push(Value::String("\n".to_string()));
+                normalized.push(Value::String(format!("^{}", next_body)));
                 index += 3;
+                continue;
+            }
+            if current_body.chars().all(|c| c == ' ' || c == '\t') && next_text.starts_with('^') {
+                let next_text_body = next_text.strip_prefix('^').unwrap_or(next_text);
+                normalized.push(Value::String(format!(
+                    "^{}{}",
+                    current_body, next_text_body
+                )));
+                index += 2;
                 continue;
             }
         }
@@ -645,6 +764,32 @@ fn normalize_text_token_sequences(tokens: &mut Vec<Value>) {
     }
 
     *tokens = normalized;
+}
+
+fn merge_leading_space_text_tokens(tokens: &mut Vec<Value>) {
+    if tokens.len() < 2 {
+        return;
+    }
+
+    let Some(Value::String(first_text)) = tokens.first() else {
+        return;
+    };
+    let Some(Value::String(second_text)) = tokens.get(1) else {
+        return;
+    };
+
+    let first_body = first_text.strip_prefix('^').unwrap_or(first_text);
+    if !first_body.chars().all(|c| c == ' ' || c == '\t') || !second_text.starts_with('^') {
+        return;
+    }
+
+    let merged = format!(
+        "^{}{}",
+        first_body,
+        second_text.strip_prefix('^').unwrap_or(second_text)
+    );
+    tokens.drain(0..2);
+    tokens.insert(0, Value::String(merged));
 }
 
 fn export_children(
@@ -677,7 +822,6 @@ fn export_children(
                     has_start_content,
                     has_choice_only_content,
                     has_inline_inner_content,
-                    tokens.len(),
                     gather_target_for_choice(
                         &children,
                         index,
@@ -719,13 +863,20 @@ fn export_children(
 fn gather_target_for_choice(
     children: &[ObjectRef],
     current_index: usize,
-    state: &ExportState,
+    _state: &ExportState,
     inherited_gather_target: Option<String>,
 ) -> Option<String> {
     for child in children.iter().skip(current_index + 1) {
         match child.borrow().kind() {
             ObjectKind::Choice { .. } => continue,
-            ObjectKind::Gather { .. } => return Some(format!("0.g-{}", state.gather_index)),
+            ObjectKind::Gather { identifier, .. } => {
+                let gather_name = identifier
+                    .as_ref()
+                    .filter(|identifier| !identifier.name.is_empty())
+                    .map(|identifier| identifier.name.clone())
+                    .unwrap_or_else(|| flow_named_gather_component(child));
+                return Some(format!(".^.^.{gather_name}"));
+            }
             _ => return None,
         }
     }
@@ -753,10 +904,41 @@ fn export_gather_named_content(
         .map(|identifier| identifier.name)
         .unwrap_or_else(|| format!("g-{}", generated_index));
 
-    let container = export_gather_container(&content, state, _inherited_gather_target)?;
+    let next_flow_target = next_flow_sibling_target(object);
+    let container = export_gather_container(&content, state, next_flow_target)?;
     Ok(vec![(gather_name, container)]
         .into_iter()
         .collect::<BTreeMap<_, _>>())
+}
+
+fn next_flow_sibling_target(object: &ObjectRef) -> Option<String> {
+    let mut current = Some(object.clone());
+    let mut nearest_flow = None;
+    while let Some(node) = current {
+        if matches!(node.borrow().kind(), ObjectKind::Flow { .. }) {
+            nearest_flow = Some(node.clone());
+            break;
+        }
+        current = node.borrow().parent();
+    }
+
+    let flow = nearest_flow?;
+    let parent = flow.borrow().parent()?;
+    let siblings = parent.borrow().content().to_vec();
+    let mut found_self = false;
+    for sibling in siblings {
+        if Rc::ptr_eq(&sibling, &flow) {
+            found_self = true;
+            continue;
+        }
+        if !found_self {
+            continue;
+        }
+        if matches!(sibling.borrow().kind(), ObjectKind::Flow { .. }) {
+            return Some(runtime_target_path_string(&sibling).as_string());
+        }
+    }
+    None
 }
 
 fn flush_pending_choice_named_contents(
@@ -951,6 +1133,9 @@ fn export_divert_token(context: &ObjectRef, target: Option<&Path>, is_tunnel: bo
     let target = target
         .and_then(|path| {
             let resolved = path.resolve_from_context(context)?;
+            if matches!(resolved.borrow().kind(), ObjectKind::Choice { .. }) {
+                return Some(format!(".^.^.{}", choice_named_component(&resolved)));
+            }
             if matches!(resolved.borrow().kind(), ObjectKind::Flow { .. })
                 && path.number_of_components() == 1
             {
@@ -972,19 +1157,16 @@ fn export_compact_path_string(context: &ObjectRef, path: &Path) -> Option<String
 
 fn export_compact_logic_path_string(context: &ObjectRef, path: &Path) -> Option<String> {
     let target = path.resolve_from_context(context)?;
-    let current_path = runtime_logic_context_path_string(context);
-    let target_path = runtime_target_path_string(&target);
-    Some(compact_runtime_path_string(&current_path, &target_path))
+    if matches!(target.borrow().kind(), ObjectKind::Choice { .. }) {
+        return Some(format!(".^.{}", choice_named_component(&target)));
+    }
+    Some(runtime_target_path_string(&target).as_string())
 }
 
 fn runtime_context_path_string(context: &ObjectRef) -> RuntimePath {
     let mut components = runtime_target_path_components(context);
     components.push("0".to_string());
     RuntimePath::new(components)
-}
-
-fn runtime_logic_context_path_string(context: &ObjectRef) -> RuntimePath {
-    RuntimePath::new(runtime_target_path_components(context))
 }
 
 fn runtime_target_path_string(target: &ObjectRef) -> RuntimePath {
@@ -995,48 +1177,45 @@ fn runtime_target_path_components(target: &ObjectRef) -> Vec<String> {
     let ancestry = target.borrow().ancestry();
     let mut components = Vec::new();
 
-    for ancestor in &ancestry {
-        let borrowed = ancestor.borrow();
+    for node in ancestry.iter().chain(std::iter::once(target)) {
+        let borrowed = node.borrow();
+        let is_target = Rc::ptr_eq(node, target);
         match borrowed.kind() {
+            ObjectKind::ContentList { .. } => {}
             ObjectKind::Flow {
                 name: Some(name), ..
-            } => {
-                components.push(name.clone());
+            } => components.push(name.clone()),
+            ObjectKind::Gather { identifier, .. } if is_target => {
+                let gather_name = identifier
+                    .as_ref()
+                    .filter(|identifier| !identifier.name.is_empty())
+                    .map(|identifier| identifier.name.clone())
+                    .unwrap_or_else(|| flow_named_gather_component(node));
+                components.push("0".to_string());
+                components.push(gather_name);
             }
-            ObjectKind::Choice { .. } => {
-                components.push(choice_runtime_component(&ancestor));
+            ObjectKind::Choice { .. } if is_target => {
+                components.push("0".to_string());
+                components.push(choice_named_component(node));
             }
-            ObjectKind::Gather { identifier, .. } => {
-                components.push(flow_named_gather_component(&ancestor, identifier.clone()));
+            _ => {
+                if let Some(parent) = borrowed.parent() {
+                    if let Some(index) = index_in_parent(&parent, node) {
+                        components.push(index.to_string());
+                    }
+                }
             }
-            _ => {}
         }
-    }
-
-    let borrowed = target.borrow();
-    match borrowed.kind() {
-        ObjectKind::Flow {
-            name: Some(name), ..
-        } => components.push(name.clone()),
-        ObjectKind::Choice { .. } | ObjectKind::Gather { .. } => match borrowed.kind() {
-            ObjectKind::Choice { .. } => {
-                components.push(choice_runtime_component(target));
-            }
-            ObjectKind::Gather { identifier, .. } => {
-                components.push(flow_named_gather_component(target, identifier.clone()));
-            }
-            _ => {}
-        },
-        _ => {}
     }
 
     components
 }
 
-fn choice_runtime_component(choice: &ObjectRef) -> String {
+fn choice_named_component(choice: &ObjectRef) -> String {
     let Some(parent) = choice.borrow().parent() else {
         return "c-0".to_string();
     };
+
     let mut index = 0usize;
     for sibling in parent.borrow().content().iter() {
         if Rc::ptr_eq(sibling, choice) {
@@ -1046,19 +1225,11 @@ fn choice_runtime_component(choice: &ObjectRef) -> String {
             index += 1;
         }
     }
+
     format!("c-{index}")
 }
 
-fn flow_named_gather_component(
-    gather: &ObjectRef,
-    identifier: Option<crate::parsed::Identifier>,
-) -> String {
-    if let Some(identifier) = identifier {
-        if !identifier.name.is_empty() {
-            return identifier.name;
-        }
-    }
-
+fn flow_named_gather_component(gather: &ObjectRef) -> String {
     let Some(parent) = gather.borrow().parent() else {
         return "g-0".to_string();
     };
@@ -1072,6 +1243,14 @@ fn flow_named_gather_component(
         }
     }
     format!("g-{index}")
+}
+
+fn index_in_parent(parent: &ObjectRef, child: &ObjectRef) -> Option<usize> {
+    parent
+        .borrow()
+        .content()
+        .iter()
+        .position(|sibling| Rc::ptr_eq(sibling, child))
 }
 
 fn compact_runtime_path_string(current: &RuntimePath, target: &RuntimePath) -> String {
@@ -1102,11 +1281,37 @@ fn compact_runtime_path_string(current: &RuntimePath, target: &RuntimePath) -> S
     }
 }
 
+fn flow_path_prefix(object: &ObjectRef) -> String {
+    let mut names = Vec::new();
+    let mut current = Some(object.clone());
+
+    while let Some(node) = current {
+        let (kind, parent) = {
+            let borrowed = node.borrow();
+            (borrowed.kind().clone(), borrowed.parent())
+        };
+
+        if let ObjectKind::Flow {
+            name: Some(name), ..
+        } = kind
+        {
+            names.push(name);
+        }
+
+        current = parent;
+    }
+
+    names.reverse();
+    names.join(".")
+}
+
 fn export_text_token(text: &str) -> Value {
     if text == "\n" {
         json!("\n")
     } else {
-        json!(format!("^{}", text))
+        let leading_whitespace = text.chars().take_while(|c| *c == ' ' || *c == '\t').count();
+        let prefix = if leading_whitespace == 1 { " " } else { "" };
+        json!(format!("^{}{}", prefix, &text[leading_whitespace..]))
     }
 }
 

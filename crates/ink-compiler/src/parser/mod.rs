@@ -176,7 +176,21 @@ impl<'source> InkParser<'source> {
             if let Some(flow) =
                 Self::parse_flow_header(line_text, line_index + 1, source_filename.clone())?
             {
-                top_level_content.push(flow.clone());
+                if matches!(
+                    flow.borrow().kind(),
+                    ObjectKind::Flow {
+                        flow_level: FlowLevel::Stitch,
+                        ..
+                    }
+                ) {
+                    if let Some(parent_flow) = find_parent_knot_for_stitch(current_flow.as_ref()) {
+                        Object::add_content(&parent_flow, flow.clone());
+                    } else {
+                        top_level_content.push(flow.clone());
+                    }
+                } else {
+                    top_level_content.push(flow.clone());
+                }
                 current_flow = Some(flow);
                 line_index += 1;
                 continue;
@@ -2283,6 +2297,42 @@ impl<'source> InkParser<'source> {
     }
 }
 
+fn find_parent_knot_for_stitch(current_flow: Option<&ObjectRef>) -> Option<ObjectRef> {
+    let mut ancestor = current_flow.cloned();
+    while let Some(flow) = ancestor {
+        let (kind, next_parent) = {
+            let borrowed = flow.borrow();
+            (borrowed.kind().clone(), borrowed.parent())
+        };
+
+        match kind {
+            ObjectKind::Flow {
+                flow_level: FlowLevel::Knot,
+                ..
+            } => return Some(flow),
+            ObjectKind::Flow {
+                flow_level: FlowLevel::Stitch,
+                ..
+            } => {
+                if let Some(parent) = next_parent.as_ref() {
+                    if matches!(
+                        parent.borrow().kind(),
+                        ObjectKind::Flow {
+                            flow_level: FlowLevel::Knot,
+                            ..
+                        }
+                    ) {
+                        return Some(parent.clone());
+                    }
+                }
+            }
+            _ => {}
+        }
+        ancestor = next_parent;
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::{CommentEliminator, InkParser};
@@ -2541,7 +2591,7 @@ mod tests {
         let story = result.parsed_story.expect("expected parsed story");
         let content = story.content();
 
-        assert_eq!(content.len(), 3);
+        assert_eq!(content.len(), 2);
         assert!(matches!(
             content[0].borrow().kind(),
             ObjectKind::ContentList { .. }
@@ -2555,7 +2605,7 @@ mod tests {
             } if name.as_deref() == Some("start")
         ));
         assert!(matches!(
-            content[2].borrow().kind(),
+            content[1].borrow().content()[1].borrow().kind(),
             ObjectKind::Flow {
                 flow_level: crate::parsed::FlowLevel::Stitch,
                 name,
@@ -2564,7 +2614,7 @@ mod tests {
         ));
 
         let knot_content = content[1].borrow().content().to_vec();
-        assert_eq!(knot_content.len(), 1);
+        assert_eq!(knot_content.len(), 2);
         assert!(matches!(
             knot_content[0].borrow().kind(),
             ObjectKind::ContentList { .. }
@@ -2572,6 +2622,22 @@ mod tests {
         assert!(matches!(
             knot_content[0].borrow().content()[0].borrow().kind(),
             ObjectKind::Text { text } if text == "Knot body"
+        ));
+        assert!(matches!(
+            knot_content[1].borrow().kind(),
+            ObjectKind::Flow {
+                flow_level: crate::parsed::FlowLevel::Stitch,
+                name,
+                is_function: false,
+            } if name.as_deref() == Some("stitch")
+        ));
+        assert!(matches!(
+            knot_content[1].borrow().content()[0].borrow().kind(),
+            ObjectKind::ContentList { .. }
+        ));
+        assert!(matches!(
+            knot_content[1].borrow().content()[0].borrow().content()[0].borrow().kind(),
+            ObjectKind::Text { text } if text == "Stitch body"
         ));
     }
 
