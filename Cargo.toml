@@ -9,6 +9,3 @@ resolver = "2"
 
 [workspace.package]
 edition = "2021"
-
-[workspace.dependencies]
-bladeink = { package = "ink-runtime", path = "crates/ink-runtime" }

@@ -104,8 +104,8 @@ into `crates/ink-runtime` instead of rewriting runtime execution.
   `listDefs` metadata for parsed list declarations and loads successfully
   through `bladeink::story::Story::new`.
 - The runtime crate has been copied into `crates/ink-runtime`, and the
-  workspace dependency now points at that location instead of the legacy
-  `blade-ink-rs/lib` tree.
+  compiler/test crates now depend on that location directly instead of the
+  legacy `blade-ink-rs/lib` tree.
 - The runtime Cargo package is named `ink-runtime`, while the exported Rust
   library crate remains `bladeink` for compatibility with existing imports.
 - Compiler-owned runtime export normalizes a missing terminal newline for
@@ -541,8 +541,8 @@ Pass a second argument to write the JSON to a file instead of stdout.
 
 - Added a new runtime migration step by copying the `blade-ink-rs/lib/src`
   tree into `crates/ink-runtime/src`.
-- The workspace dependency now points at `crates/ink-runtime`, which keeps the
-  compiler and tests building against the relocated runtime source.
+- The compiler and tests now depend directly on `crates/ink-runtime`, which
+  keeps the workspace building against the relocated runtime source.
 - Validation: `cargo fmt --all --check`, `cargo check --workspace`,
   `cargo test --workspace`.
 - Result: all passed; only the existing `crates/ink-runtime/src/story_state.rs`
