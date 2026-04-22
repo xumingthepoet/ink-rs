@@ -13,6 +13,7 @@ pub use whitespace::{
     whitespace,
 };
 
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use crate::{
@@ -20,10 +21,10 @@ use crate::{
     parsed::{
         Conditional, ConditionalSingleBranch, ConstantDeclaration, ContentList, Divert,
         ExternalDeclaration, FlowLevel, Identifier, Knot, ListDefinition, ListElementDefinition,
-        Object, ObjectRef, Path, Return, Sequence, SequenceType, Stitch, Story as ParsedStory,
-        Text, VariableAssignment,
+        Object, ObjectKind, ObjectRef, Path, Return, Sequence, SequenceType, Stitch,
+        Story as ParsedStory, Text, VariableAssignment,
     },
-    results::{FileHandler, ParseResult},
+    results::{DefaultFileHandler, FileHandler, ParseResult},
 };
 
 #[derive(Debug)]
@@ -84,6 +85,14 @@ impl<'source> InkParser<'source> {
     }
 
     fn parse_plain_text_story(&self) -> std::result::Result<ParsedStory, Diagnostic> {
+        let mut open_files = HashSet::new();
+        self.parse_plain_text_story_with_open_files(&mut open_files)
+    }
+
+    fn parse_plain_text_story_with_open_files(
+        &self,
+        open_files: &mut HashSet<std::path::PathBuf>,
+    ) -> std::result::Result<ParsedStory, Diagnostic> {
         if let Some((line, column, marker)) = self.find_unsupported_syntax() {
             return Err(Diagnostic::new(
                 DiagnosticSeverity::Error,
@@ -98,6 +107,7 @@ impl<'source> InkParser<'source> {
 
         let mut top_level_content = Vec::new();
         let mut current_flow: Option<ObjectRef> = None;
+        let mut appended_flows = Vec::new();
         let source_filename = self.source_filename.map(str::to_string);
         let segments: Vec<&str> = self.input_string.split_inclusive('\n').collect();
 
@@ -110,6 +120,26 @@ impl<'source> InkParser<'source> {
             let segment = segments[line_index];
             let had_newline = segment.ends_with('\n');
             let line_text = segment.strip_suffix('\n').unwrap_or(segment);
+
+            if let Some((mut include_content, include_flows)) = Self::parse_include_line(
+                line_text,
+                line_index + 1,
+                source_filename.clone(),
+                self.file_handler.clone(),
+                open_files,
+            )? {
+                if let Some(parent) = current_flow.as_ref() {
+                    for object in include_content.drain(..) {
+                        Object::add_content(parent, object);
+                    }
+                } else {
+                    top_level_content.append(&mut include_content);
+                }
+
+                appended_flows.extend(include_flows);
+                line_index += 1;
+                continue;
+            }
 
             if let Some((logic, consumed_lines)) = Self::parse_brace_logic_block(
                 &segments,
@@ -192,7 +222,88 @@ impl<'source> InkParser<'source> {
             line_index += 1;
         }
 
+        top_level_content.extend(appended_flows);
+
         Ok(ParsedStory::new(top_level_content, false))
+    }
+
+    fn parse_include_line(
+        line_text: &str,
+        line_number: usize,
+        source_filename: Option<String>,
+        file_handler: Option<Arc<dyn FileHandler>>,
+        open_files: &mut HashSet<std::path::PathBuf>,
+    ) -> std::result::Result<Option<(Vec<ObjectRef>, Vec<ObjectRef>)>, Diagnostic> {
+        let trimmed_start = line_text.trim_start();
+        let Some(remainder) = Self::strip_keyword(trimmed_start, "INCLUDE") else {
+            return Ok(None);
+        };
+
+        let include_name = remainder.trim();
+        if include_name.is_empty() {
+            return Err(Diagnostic::new(
+                DiagnosticSeverity::Error,
+                source_filename,
+                line_number,
+                1,
+                "Expected filename for include statement",
+            ));
+        }
+
+        let file_handler: Arc<dyn FileHandler> =
+            file_handler.unwrap_or_else(|| Arc::new(DefaultFileHandler));
+        let full_filename = file_handler.resolve_ink_filename(include_name);
+        if !open_files.insert(full_filename.clone()) {
+            return Err(Diagnostic::new(
+                DiagnosticSeverity::Error,
+                source_filename,
+                line_number,
+                1,
+                format!(
+                    "Recursive INCLUDE detected: '{}' is already open.",
+                    full_filename.display()
+                ),
+            ));
+        }
+
+        let included_result = match file_handler.load_ink_file_contents(&full_filename) {
+            Ok(included_string) => {
+                let included_filename = full_filename.to_string_lossy().into_owned();
+                let included_parser = InkParser::new(
+                    &included_string,
+                    Some(included_filename.as_str()),
+                    Some(file_handler.clone()),
+                );
+                included_parser.parse_plain_text_story_with_open_files(open_files)
+            }
+            Err(_) => Err(Diagnostic::new(
+                DiagnosticSeverity::Error,
+                source_filename,
+                line_number,
+                1,
+                format!("Failed to load: '{include_name}'"),
+            )),
+        };
+
+        open_files.remove(&full_filename);
+
+        let included_story = included_result?;
+        let mut non_flow_content = Vec::new();
+        let mut flows_from_other_files = Vec::new();
+
+        for sub_story_obj in included_story.content() {
+            if matches!(sub_story_obj.borrow().kind(), ObjectKind::Flow { .. }) {
+                flows_from_other_files.push(sub_story_obj);
+            } else {
+                non_flow_content.push(sub_story_obj);
+            }
+        }
+
+        if !non_flow_content.is_empty() {
+            non_flow_content.push(Text::new("\n").object());
+        }
+
+        Ok(Some((non_flow_content, flows_from_other_files)))
     }
 
     fn build_content_line(line_text: &str, had_newline: bool) -> ObjectRef {

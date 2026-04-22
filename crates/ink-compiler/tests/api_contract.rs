@@ -1,4 +1,6 @@
 use std::{
+    collections::HashMap,
+    io,
     path::{Path, PathBuf},
     sync::{
         atomic::{AtomicUsize, Ordering},
@@ -32,6 +34,40 @@ impl FileHandler for MockFileHandler {
     fn load_ink_file_contents(&self, _full_filename: &Path) -> std::io::Result<String> {
         self.load_calls.fetch_add(1, Ordering::SeqCst);
         Ok("-> done".to_string())
+    }
+}
+
+#[derive(Debug)]
+struct IncludeFileHandler {
+    resolve_calls: AtomicUsize,
+    load_calls: AtomicUsize,
+    files: HashMap<PathBuf, String>,
+}
+
+impl IncludeFileHandler {
+    fn new(files: HashMap<PathBuf, String>) -> Self {
+        Self {
+            resolve_calls: AtomicUsize::new(0),
+            load_calls: AtomicUsize::new(0),
+            files,
+        }
+    }
+}
+
+impl FileHandler for IncludeFileHandler {
+    fn resolve_ink_filename(&self, include_name: &str) -> PathBuf {
+        self.resolve_calls.fetch_add(1, Ordering::SeqCst);
+        PathBuf::from("/virtual").join(include_name)
+    }
+
+    fn load_ink_file_contents(&self, full_filename: &Path) -> io::Result<String> {
+        self.load_calls.fetch_add(1, Ordering::SeqCst);
+        self.files.get(full_filename).cloned().ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::NotFound,
+                format!("missing include: {}", full_filename.display()),
+            )
+        })
     }
 }
 
@@ -117,6 +153,73 @@ fn compile_returns_a_runtime_story_for_plain_text_story() {
     assert!(story.can_continue());
     assert_eq!(story.cont().unwrap(), "Hello world");
     assert!(!story.can_continue());
+}
+
+#[test]
+fn compiler_compile_json_expands_includes_through_file_handler() {
+    let mut files = HashMap::new();
+    files.insert(
+        PathBuf::from("/virtual/chapter.ink"),
+        "Included line.".to_string(),
+    );
+
+    let file_handler = Arc::new(IncludeFileHandler::new(files));
+    let handler: Arc<dyn FileHandler> = file_handler.clone();
+    let mut compiler = Compiler::new(
+        "Prelude.\nINCLUDE chapter.ink\nPostlude.",
+        Some(CompilerOptions {
+            source_filename: Some("/virtual/main.ink".to_string()),
+            count_all_visits: false,
+            file_handler: Some(handler),
+        }),
+    );
+
+    let result = compiler.compile_json();
+
+    let json = result
+        .json
+        .expect("expected runtime JSON for include story");
+    assert!(json.contains("Prelude."));
+    assert!(json.contains("Included line."));
+    assert!(json.contains("Postlude."));
+    assert!(result.diagnostics.is_empty());
+    assert_eq!(file_handler.resolve_calls.load(Ordering::SeqCst), 1);
+    assert_eq!(file_handler.load_calls.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn compiler_reports_includes_diagnostics_with_included_source_filename() {
+    let mut files = HashMap::new();
+    files.insert(
+        PathBuf::from("/virtual/broken.ink"),
+        "* invalid".to_string(),
+    );
+
+    let file_handler = Arc::new(IncludeFileHandler::new(files));
+    let handler: Arc<dyn FileHandler> = file_handler.clone();
+    let mut compiler = Compiler::new(
+        "INCLUDE broken.ink",
+        Some(CompilerOptions {
+            source_filename: Some("/virtual/main.ink".to_string()),
+            count_all_visits: false,
+            file_handler: Some(handler),
+        }),
+    );
+
+    let result = compiler.parse();
+
+    let diagnostic = result
+        .diagnostics
+        .first()
+        .expect("expected include diagnostic");
+    assert_eq!(
+        diagnostic.source_filename.as_deref(),
+        Some("/virtual/broken.ink")
+    );
+    assert_eq!(diagnostic.severity, DiagnosticSeverity::Error);
+    assert!(diagnostic.message.contains("unsupported syntax"));
+    assert_eq!(file_handler.resolve_calls.load(Ordering::SeqCst), 1);
+    assert_eq!(file_handler.load_calls.load(Ordering::SeqCst), 1);
 }
 
 #[test]

@@ -164,8 +164,9 @@ The ignored `blade-ink-rs/` directory must be present because the workspace uses
 - `Compiler::compile_json` now exports minimal plain-text story JSON plus
   `listDefs` metadata for parsed list declarations, and `Compiler::compile`
   can load that JSON through `bladeink`.
-- `CompilerOptions` now accepts an injectable file handler, but include parsing
-  is not implemented yet.
+- `CompilerOptions` now accepts an injectable file handler, and `InkParser`
+  now resolves `INCLUDE` lines through that abstraction with recursive include
+  tracking and source-file diagnostics.
 - Parsed list declarations populate runtime `listDefs`, but broader list-driven
   runtime semantics are still limited.
 - Parsed return nodes are parsed, but compiler-side runtime export for
@@ -184,6 +185,26 @@ The ignored `blade-ink-rs/` directory must be present because the workspace uses
   compiler crate failures.
 
 ## Audit Log
+
+### 2026-04-22
+
+- Completed the Milestone 8 include-handling slice.
+- Added parser include expansion through the compiler-owned file handler
+  abstraction, including recursive include tracking and source filename
+  propagation for included-file diagnostics.
+- Added API contract tests covering include expansion through a custom file
+  handler, file-handler call counts, and included-file diagnostic filenames.
+
+Validation:
+
+```sh
+cargo fmt --all --check
+cargo test -p ink-compiler includes
+cargo check --workspace
+```
+
+Result: all passed. The only remaining warnings are the two existing
+`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
 
 ### 2026-04-22
 
@@ -736,7 +757,7 @@ about unnecessary parentheses around trait object types.
 
 ## Next Task
 
-Port include handling and file handler abstraction.
+Decide plugin support scope and document any deliberate deferral.
 
 ## Repo Structure
 

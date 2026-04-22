@@ -87,6 +87,9 @@ The first parsed-hierarchy slice uses reference-counted tree nodes:
   parsing slice, not the final full grammar.
 - Simple divert lines are now recognized by line prefix and become parsed
   `Divert` nodes; the full divert grammar is still pending.
+- `INCLUDE` lines are now resolved through the compiler-owned `FileHandler`
+  abstraction, recursively parsed, and flattened so non-flow content appears at
+  the include site while flow content is appended to the owning story.
 
 ## Runtime Export
 
