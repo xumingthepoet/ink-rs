@@ -2806,6 +2806,27 @@ to Savile Row\n\
     }
 
     #[test]
+    fn ink_parser_parses_trusted_glue_left_right_matching_fixture() {
+        let source = load_workspace_text(
+            "blade-ink-rs/conformance-tests/inkfiles/glue/left-right-glue-matching.ink",
+        );
+        let mut parser = InkParser::new(&source, Some("left-right-glue-matching.ink"), None);
+        let result = parser.parse();
+
+        assert!(
+            result.diagnostics.is_empty(),
+            "unexpected diagnostics: {:#?}",
+            result.diagnostics
+        );
+
+        let story = result.parsed_story.expect("expected parsed story");
+        assert_eq!(
+            render_story(&story),
+            "Story\n  ContentList\n    Text(\"A line.\")\n    Text(\"\\n\")\n  Conditional\n    FunctionCall(f, args=0)\n    ConditionalBranch(true=true, else=false, inline=false)\n      Text(\"Another line.\")\n      Text(\"\\n\")\n  ContentList\n    Text(\"\\n\")\n  Flow(level=Knot, name=\"f\", function=true)\n    Conditional\n      Number(false)\n      ConditionalBranch(true=true, else=false, inline=true)\n        ContentList\n          Text(\"nothing\")\n    Return\n      Number(true)"
+        );
+    }
+
+    #[test]
     fn ink_parser_feature_cases_cover_arithmetic_variables_lists_conditions_functions_and_sequences(
     ) {
         let cases = [
