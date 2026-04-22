@@ -266,13 +266,15 @@ fn compiler_reports_includes_diagnostics_with_included_source_filename() {
 }
 
 #[test]
-fn compile_json_rejects_structured_story_for_now() {
-    let mut compiler = Compiler::new("== start ==\nHello", None);
+fn compile_json_handles_simple_divert_story() {
+    let mut compiler = Compiler::new(
+        "We arrived into London at 9.45pm exactly.\n-> hurry_home\n\n=== hurry_home ===\nWe hurried home to Savile Row as fast as we could. -> END",
+        None,
+    );
 
     let result = compiler.compile_json();
 
-    assert!(result.json.is_none());
-    assert!(result.has_errors());
-    assert_eq!(result.diagnostics.len(), 1);
-    assert_eq!(result.diagnostics[0].severity, DiagnosticSeverity::Error);
+    let json = result.json.expect("expected runtime JSON");
+    assert!(json.contains("hurry_home"));
+    assert!(result.diagnostics.is_empty());
 }

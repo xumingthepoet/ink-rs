@@ -308,16 +308,49 @@ impl<'source> InkParser<'source> {
 
     fn build_content_line(line_text: &str, had_newline: bool) -> ObjectRef {
         let line = ContentList::new();
-        if !line_text.is_empty() {
-            line.add_content(Text::new(line_text).object());
+        if let Some((text, divert_target)) = Self::split_inline_divert(line_text) {
+            if !text.is_empty() {
+                line.add_content(Text::new(text).object());
+            }
+            line.add_content(Divert::new(Some(divert_target)).object());
+        } else {
+            if !line_text.is_empty() {
+                line.add_content(Text::new(line_text).object());
+            }
+            line.trim_trailing_whitespace();
         }
-        line.trim_trailing_whitespace();
 
         if had_newline {
             line.add_content(Text::new("\n").object());
         }
 
         line.object()
+    }
+
+    fn split_inline_divert(line_text: &str) -> Option<(&str, Path)> {
+        let index = line_text.rfind("->")?;
+        if index == 0 {
+            return None;
+        }
+
+        let remainder = line_text[index + 2..].trim_start();
+        if remainder.is_empty() {
+            return None;
+        }
+
+        let mut target_tokens = remainder.split_whitespace();
+        let target_text = target_tokens.next()?;
+        if target_tokens.next().is_some() {
+            return None;
+        }
+
+        let target = match target_text {
+            "END" => Path::from_identifier(Identifier::new("END")),
+            "DONE" => Path::from_identifier(Identifier::new("DONE")),
+            _ => Self::parse_simple_divert_target(target_text)?,
+        };
+
+        Some((&line_text[..index], target))
     }
 
     fn parse_flow_header(
@@ -2320,7 +2353,7 @@ We arrived into London at 9.45pm exactly.\n\
 \n\
 === hurry_home ===\n\
 We hurried home to Savile Row as fast as we could. -> END",
-                "Story\n  ContentList\n    Text(\"We arrived into London at 9.45pm exactly.\")\n    Text(\"\\n\")\n  Divert(target=\"-> hurry_home\", empty=false, tunnel=false, thread=false)\n  ContentList\n    Text(\"\\n\")\n  Flow(level=Knot, name=\"hurry_home\", function=false)\n    ContentList\n      Text(\"We hurried home to Savile Row as fast as we could. -> END\")",
+                "Story\n  ContentList\n    Text(\"We arrived into London at 9.45pm exactly.\")\n    Text(\"\\n\")\n  Divert(target=\"-> hurry_home\", empty=false, tunnel=false, thread=false)\n  ContentList\n    Text(\"\\n\")\n  Flow(level=Knot, name=\"hurry_home\", function=false)\n    ContentList\n      Text(\"We hurried home to Savile Row as fast as we could. \")\n      Divert(target=\"-> END\", empty=false, tunnel=false, thread=false)",
             ),
             (
                 "glue_with_divert",

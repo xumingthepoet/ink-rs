@@ -24,6 +24,9 @@ into `crates/ink-runtime` instead of rewriting runtime execution.
   `crates/ink-test/tests/compiler_conformance_legacy.rs` and is gated behind
   the `compiler-conformance` feature so it can stay available without breaking
   the default workspace while compiler coverage is still growing.
+- The current compiler-conformance slice has made the simple divert and glue
+  fixtures green and updated the trusted parser snapshots to reflect inline
+  divert splitting inside conditional fixtures.
 - The documented test loop now treats every long-running `cargo test` path as
   timeboxed, and `make gate` wraps the workspace test pass with a timeout as
   well.
@@ -367,6 +370,23 @@ Pass a second argument to write the JSON to a file instead of stdout.
 - External fixture-driven parser snapshots now live in `crates/ink-test/tests/`.
 
 ## Audit Log
+
+### 2026-04-22
+
+- Updated the trusted parser snapshots for conditional fixtures after inline
+  divert splitting landed, and advanced the compiler-conformance slice on the
+  simple divert and glue fixtures.
+- Validation: `cargo test -p ink-compiler runtime_export`,
+  `cargo test -p ink-test --features compiler-conformance --test
+  compiler_conformance_legacy compiler_conformance::divert_test::simple_divert_test
+  -- --exact`, `cargo test -p ink-test --features compiler-conformance --test
+  compiler_conformance_legacy compiler_conformance::glue_test::simple_glue_test
+  -- --exact`, `cargo test -p ink-test --test api_contract
+  compile_json_handles_simple_divert_story -- --exact`, `cargo fmt --all
+  --check`, `make gate`.
+- Result: the narrow runtime/parser/API checks passed and the default workspace
+  gate stayed green; remaining compiler-conformance failures are still in the
+  choice-heavy and function-heavy fixtures.
 
 ### 2026-04-22
 

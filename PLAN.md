@@ -478,6 +478,11 @@ timeout 30s cargo test --workspace
 ## Next Task
 
 Stabilize the legacy compiler-to-runtime conformance suite in `ink-test`.
+Focus on the simplest remaining dependencies first. The current parser and
+runtime slice has already made basic text, simple diverts, simple glue, and the
+trusted conditional snapshots stable, so the next highest-value work is the
+choice-heavy and function-heavy conformance cases that still rely on more of
+the ink grammar.
 
 ## Risk Register
 
