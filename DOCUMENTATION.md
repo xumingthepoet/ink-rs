@@ -80,6 +80,9 @@ runtime instead of rewriting runtime execution.
   compiler crate does not implement dynamic plugin discovery or PreParse /
   PostParse / PostExport hooks, and that scope is documented as out of band
   until there is a concrete compatibility need.
+- A minimal `ink_compile` example now provides a manual compile path for `.ink`
+  files, rooted to the source file directory so relative includes resolve in
+  the expected location.
 - Long-horizon project memory docs now exist.
 
 ## Current Milestone
@@ -90,6 +93,8 @@ Milestone 7 task list is complete, and the expression, variable-statement,
 list-definition, return-statement, tunnel-divert, inline-sequence,
 inline-conditional, brace multiline conditional/sequence, and feature-test
 slices are complete.
+Milestone 8 is complete, including include handling, plugin-scope
+documentation, and the minimal manual compilation example.
 
 ## Verification Checklist
 
@@ -109,6 +114,14 @@ cargo test --workspace
 
 The ignored `blade-ink-rs/` directory must be present because the workspace uses
 `blade-ink-rs/lib` as a path dependency.
+
+For manual compilation, run:
+
+```sh
+cargo run -p ink-compiler --example ink_compile -- path/to/story.ink
+```
+
+Pass a second argument to write the JSON to a file instead of stdout.
 
 ## Decisions
 
@@ -184,6 +197,9 @@ The ignored `blade-ink-rs/` directory must be present because the workspace uses
   dedicated compiler-side wrappers because the corresponding runtime modules in
   `blade-ink-rs` are private; the generic `Wrap<T>` helper is in place for
   future use.
+- The `ink_compile` example is intentionally minimal and prints JSON to stdout
+  or writes it to an optional output path; richer CLI ergonomics remain out of
+  scope.
 - `cargo check --workspace` reports warnings from ignored dependency
   `blade-ink-rs/lib`; these are upstream/local reference warnings, not current
   compiler crate failures.
@@ -205,6 +221,25 @@ Validation:
 cargo fmt --all --check
 cargo test -p ink-compiler includes
 cargo check --workspace
+```
+
+Result: all passed. The only remaining warnings are the two existing
+`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
+
+### 2026-04-22
+
+- Completed the Milestone 8 manual compilation slice.
+- Added a minimal `ink_compile` example and a smoke test that compiles a story
+  with a relative include through the CLI path.
+- Documented the manual compilation command in the project memory.
+
+Validation:
+
+```sh
+cargo fmt --all --check
+cargo test -p ink-compiler cli_compiles_a_story_with_relative_includes
+cargo check --workspace
+cargo test --workspace
 ```
 
 Result: all passed. The only remaining warnings are the two existing

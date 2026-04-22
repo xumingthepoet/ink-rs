@@ -21,7 +21,7 @@ Core commands to run after every completed milestone:
 - [x] `cargo check --workspace`
 - [x] `cargo test --workspace`
 
-Current last verified milestone: Milestone 8 plugin scope decision slice
+Current last verified milestone: Milestone 8 manual compilation slice
 (`2026-04-22`).
 
 ## Rules
@@ -273,8 +273,8 @@ cargo test --workspace
 
 - [x] Port include handling and file handler abstraction.
 - [x] Decide plugin support scope and document any deliberate deferral.
-- [ ] Add a small CLI or example if needed for manual compilation.
-- [ ] Add tests for includes and source filename diagnostics.
+- [x] Add a small CLI or example if needed for manual compilation.
+- [x] Add tests for includes and source filename diagnostics.
 
 Primary C# references:
 
@@ -319,7 +319,8 @@ cargo test --workspace
 
 ## Next Task
 
-Add a small CLI or example if needed for manual compilation.
+Build a conformance harness using local examples from `blade-ink-rs` and
+official `ink-csharp/tests`.
 
 ## Risk Register
 
