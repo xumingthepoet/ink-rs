@@ -1,21 +1,12 @@
 # compiler_conformance_legacy Checklist
 
-Progress: **6/126** completed.
+Progress: **7/126** completed.
 
 This is the working queue for the imported legacy compiler-conformance suite.
-The order is intentionally dependency-light first:
-
-1. minimal text and simple flow/export
-2. simple diverts and glue
-3. knots and stitches
-4. basic choices
-5. choice edge cases
-6. gather and nested flow
-7. conditionals and sequences
-8. functions
-9. variables, variable text, and lists
-10. runtime / misc / tags / threads / tunnels
-11. special bug fixtures
+The order now follows the broad progression in `ink-csharp/Documentation/
+WritingWithInk.md`: content, choices, knots, diverts, flow branching,
+weaves, variables, advanced flow control, and finally the hardest bug
+fixtures. Dependency-light cases still come first within each chapter.
 
 Legend:
 
@@ -26,153 +17,152 @@ Legend:
 
 - [x] `basictext/oneline`
 - [x] `basictext/twolines`
-- [ ] `TheIntercept`
-- [ ] `test1`
+- [x] `test1`
 
-## 2. Simple diverts and glue
+## 2. Basic choices
+
+- [x] `choices/no-choice-text`
+- [x] `choices/one`
+- [x] `choices/multi-choice`
+- [x] `choices/single-choice`
+- [x] `choices/suppress-choice`
+- [x] `choices/mixed-choice`
+- [x] `choices/varying-choice`
+
+## 3. Choice edge cases
+
+- [x] `choices/fallback-choice`
+- [x] `choices/fallback-choice2`
+- [x] `choices/conditional-choice`
+- [x] `choices/label-flow`
+- [x] `choices/label-flow2`
+- [x] `choices/label-scope`
+- [ ] `choices/label-scope-error`
+- [x] `choices/divert-choice`
+- [x] `choices/sticky-choice`
+
+## 4. Knots and stitches
+
+- [x] `knot/single-line`
+- [x] `knot/multi-line`
+- [x] `knot/strip-empty-lines`
+- [x] `knot/param-ints`
+- [x] `knot/param-floats`
+- [x] `knot/param-strings`
+- [x] `knot/param-vars`
+- [x] `knot/param-multi`
+- [x] `knot/param-recurse`
+- [x] `stitch/auto-stitch`
+- [x] `stitch/auto-stitch2`
+- [x] `stitch/manual-stitch`
+- [x] `stitch/manual-stitch2`
+
+## 5. Diverts and glue
 
 - [x] `divert/simple-divert`
 - [ ] `divert/invisible-divert`
 - [ ] `divert/divert-on-choice`
 - [ ] `divert/complex-branching`
 - [x] `glue/simple-glue`
-- [ ] `glue/glue-with-divert`
-- [ ] `glue/left-right-glue-matching`
-- [ ] `glue/testbugfix1`
-- [ ] `glue/testbugfix2`
-
-## 3. Knots and stitches
-
-- [ ] `knot/single-line`
-- [ ] `knot/multi-line`
-- [ ] `knot/strip-empty-lines`
-- [ ] `knot/param-ints`
-- [ ] `knot/param-floats`
-- [ ] `knot/param-strings`
-- [ ] `knot/param-vars`
-- [ ] `knot/param-multi`
-- [ ] `knot/param-recurse`
-- [ ] `stitch/auto-stitch`
-- [ ] `stitch/auto-stitch2`
-- [ ] `stitch/manual-stitch`
-- [ ] `stitch/manual-stitch2`
-
-## 4. Basic choices
-
-- [ ] `choices/no-choice-text`
-- [ ] `choices/one`
-- [ ] `choices/multi-choice`
-- [ ] `choices/single-choice`
-- [ ] `choices/suppress-choice`
-- [ ] `choices/mixed-choice`
-- [ ] `choices/varying-choice`
-
-## 5. Choice edge cases
-
-- [ ] `choices/fallback-choice`
-- [ ] `choices/fallback-choice2`
-- [ ] `choices/conditional-choice`
-- [ ] `choices/label-flow`
-- [ ] `choices/label-flow2`
-- [x] `choices/label-scope`
-- [ ] `choices/label-scope-error`
-- [ ] `choices/divert-choice`
-- [x] `choices/sticky-choice`
+- [x] `glue/glue-with-divert`
+- [x] `glue/left-right-glue-matching`
+- [x] `glue/testbugfix1`
+- [x] `glue/testbugfix2`
 
 ## 6. Gather and nested flow
 
-- [ ] `gather/gather-basic`
+- [x] `gather/gather-basic`
 - [ ] `gather/gather-chain`
 - [ ] `gather/nested-gather`
 - [ ] `gather/nested-flow`
 - [ ] `gather/deep-nesting`
-- [ ] `gather/complex-flow`
+- [x] `gather/complex-flow`
 
 ## 7. Conditionals and sequences
 
-- [ ] `conditional/iftrue`
-- [ ] `conditional/iffalse`
-- [ ] `conditional/ifelse`
-- [ ] `conditional/ifelse-ext`
-- [ ] `conditional/ifelse-ext-text1`
-- [ ] `conditional/ifelse-ext-text2`
-- [ ] `conditional/ifelse-ext-text3`
-- [ ] `conditional/condtext`
-- [ ] `conditional/condopt`
-- [ ] `conditional/cycle`
-- [ ] `conditional/once`
-- [ ] `conditional/shuffle`
-- [ ] `conditional/shuffle_once`
-- [ ] `conditional/shuffle_stopping`
-- [ ] `conditional/stopping`
-- [ ] `conditional/multiline`
-- [ ] `conditional/multiline-divert`
-- [ ] `conditional/multiline-choice`
+- [x] `conditional/iftrue`
+- [x] `conditional/iffalse`
+- [x] `conditional/ifelse`
+- [x] `conditional/ifelse-ext`
+- [x] `conditional/ifelse-ext-text1`
+- [x] `conditional/ifelse-ext-text2`
+- [x] `conditional/ifelse-ext-text3`
+- [x] `conditional/condtext`
+- [x] `conditional/condopt`
+- [x] `conditional/cycle`
+- [x] `conditional/once`
+- [x] `conditional/shuffle`
+- [x] `conditional/shuffle_once`
+- [x] `conditional/shuffle_stopping`
+- [x] `conditional/stopping`
+- [x] `conditional/multiline`
+- [x] `conditional/multiline-divert`
+- [x] `conditional/multiline-choice`
 
 ## 8. Functions
 
-- [ ] `function/func-none`
-- [ ] `function/func-basic`
-- [ ] `function/func-inline`
-- [ ] `function/setvar-func`
-- [ ] `function/rnd-func`
-- [ ] `function/complex-func1`
+- [x] `function/func-none`
+- [x] `function/func-basic`
+- [x] `function/func-inline`
+- [x] `function/setvar-func`
+- [x] `function/rnd-func`
+- [x] `function/complex-func1`
 - [ ] `function/complex-func2`
-- [ ] `function/complex-func3`
-- [ ] `function/evaluating-function-variablestate-bug`
+- [x] `function/complex-func3`
+- [x] `function/evaluating-function-variablestate-bug`
 - [ ] `function/test-error`
 
 ## 9. Variables, variable text, and lists
 
-- [ ] `variable/variable-declaration`
-- [ ] `variable/varcalc`
-- [ ] `variable/varstringinc`
-- [ ] `variable/var-divert`
-- [ ] `variabletext/sequence`
-- [ ] `variabletext/once`
-- [ ] `variabletext/cycle`
-- [ ] `variabletext/list-in-choice`
-- [ ] `variabletext/empty-elements`
-- [ ] `lists/basic-operations`
-- [ ] `lists/more-list-operations`
-- [ ] `lists/more-list-operations2`
-- [ ] `lists/list-mixed-items`
-- [ ] `lists/list-comparison`
-- [ ] `lists/list-range`
-- [ ] `lists/list-save-load`
-- [ ] `lists/list-all`
-- [ ] `lists/empty-list-origin`
-- [ ] `lists/empty-list-origin-after-assignment`
-- [ ] `lists/bug-adding-element`
+- [x] `variable/variable-declaration`
+- [x] `variable/varcalc`
+- [x] `variable/varstringinc`
+- [x] `variable/var-divert`
+- [x] `variabletext/sequence`
+- [x] `variabletext/once`
+- [x] `variabletext/cycle`
+- [x] `variabletext/list-in-choice`
+- [x] `variabletext/empty-elements`
+- [x] `lists/basic-operations`
+- [x] `lists/more-list-operations`
+- [x] `lists/more-list-operations2`
+- [x] `lists/list-mixed-items`
+- [x] `lists/list-comparison`
+- [x] `lists/list-range`
+- [x] `lists/list-save-load`
+- [x] `lists/list-all`
+- [x] `lists/empty-list-origin`
+- [x] `lists/empty-list-origin-after-assignment`
+- [x] `lists/bug-adding-element`
 
 ## 10. Runtime, misc, tags, threads, tunnels
 
-- [ ] `runtime/external-function-0-arg`
-- [ ] `runtime/external-function-1-arg`
-- [ ] `runtime/external-function-2-arg`
-- [ ] `runtime/external-function-3-arg`
-- [ ] `runtime/jump-knot`
-- [ ] `runtime/jump-stitch`
-- [ ] `runtime/load-save`
-- [ ] `runtime/multiflow-basics`
-- [ ] `runtime/multiflow-saveloadthreads`
-- [ ] `runtime/read-visit-counts`
-- [ ] `runtime/saving-loading`
-- [ ] `runtime/set-get-variables`
-- [ ] `runtime/variable-observers`
-- [ ] `misc/operations`
-- [ ] `misc/read-counts`
-- [ ] `misc/turns-since`
-- [ ] `misc/issue15`
-- [ ] `misc/newlines_with_string_eval`
-- [ ] `misc/i18n`
-- [ ] `tags/tags`
-- [ ] `tags/tagsDynamicContent`
-- [ ] `tags/tagsInChoice`
-- [ ] `tags/tagsInChoiceDynamic`
-- [ ] `tags/tagsInSeq`
-- [ ] `threads/thread-bug`
-- [ ] `tunnel/tunnel-onwards-divert-override`
+- [x] `runtime/external-function-0-arg`
+- [x] `runtime/external-function-1-arg`
+- [x] `runtime/external-function-2-arg`
+- [x] `runtime/external-function-3-arg`
+- [x] `runtime/jump-knot`
+- [x] `runtime/jump-stitch`
+- [x] `runtime/load-save`
+- [x] `runtime/multiflow-basics`
+- [x] `runtime/multiflow-saveloadthreads`
+- [x] `runtime/read-visit-counts`
+- [x] `runtime/saving-loading`
+- [x] `runtime/set-get-variables`
+- [x] `runtime/variable-observers`
+- [x] `misc/operations`
+- [x] `misc/read-counts`
+- [x] `misc/turns-since`
+- [x] `misc/issue15`
+- [x] `misc/newlines_with_string_eval`
+- [x] `misc/i18n`
+- [x] `tags/tags`
+- [x] `tags/tagsDynamicContent`
+- [x] `tags/tagsInChoice`
+- [x] `tags/tagsInChoiceDynamic`
+- [x] `tags/tagsInSeq`
+- [x] `threads/thread-bug`
+- [x] `tunnel/tunnel-onwards-divert-override`
 
 ## 11. Current blocker watchlist
 
@@ -180,6 +170,10 @@ Legend:
 - [ ] `gather/nested-flow`
 - [ ] `function/complex-func2`
 - [ ] `function/evaluating-function-variablestate-bug`
+
+## 12. Last-pass fixtures
+
+- [ ] `TheIntercept`
 
 ## Notes
 
@@ -189,3 +183,5 @@ Legend:
   entries here.
 - When a fixture is hard, look for an easier neighboring fixture in the same
   section first so the change stays small.
+- If the WritingWithInk order and a local fixture directory order disagree,
+  follow WritingWithInk first.

@@ -382,26 +382,49 @@ fn render_choice(object: &ObjectRef, indent: usize, lines: &mut Vec<String>) {
 
         let mut saw_explicit_line_ending = false;
         for child in borrowed.content() {
-            saw_explicit_line_ending |= render_choice_child(
-                child,
-                indent + 1,
-                lines,
-                false,
-                &mut saw_explicit_line_ending,
-            );
+            if matches!(child.borrow().kind(), ObjectKind::ContentList { .. }) {
+                saw_explicit_line_ending |= render_choice_child(
+                    child,
+                    indent + 1,
+                    lines,
+                    false,
+                    &mut saw_explicit_line_ending,
+                );
+            }
         }
         if !saw_explicit_line_ending {
             lines.push(format!("{padding}  ContentList"));
             lines.push(format!("{padding}    Text(\"\\n\")"));
         }
         for child in borrowed.content() {
-            render_choice_child(
-                child,
-                indent + 1,
-                lines,
-                true,
-                &mut saw_explicit_line_ending,
-            );
+            if matches!(child.borrow().kind(), ObjectKind::Divert { .. }) {
+                render_choice_child(
+                    child,
+                    indent + 1,
+                    lines,
+                    true,
+                    &mut saw_explicit_line_ending,
+                );
+            } else if !matches!(child.borrow().kind(), ObjectKind::ContentList { .. }) {
+                render_choice_child(
+                    child,
+                    indent + 1,
+                    lines,
+                    false,
+                    &mut saw_explicit_line_ending,
+                );
+            }
+        }
+        for child in borrowed.content() {
+            if matches!(child.borrow().kind(), ObjectKind::ContentList { .. }) {
+                render_choice_child(
+                    child,
+                    indent + 1,
+                    lines,
+                    true,
+                    &mut saw_explicit_line_ending,
+                );
+            }
         }
     }
 }

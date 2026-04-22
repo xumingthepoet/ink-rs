@@ -477,9 +477,11 @@ Current blocker while the imported suites are being stabilized:
 - The imported legacy compiler-to-runtime suite now has tokenizer-level
   `.ink.parse` snapshots wired in before `A.ink.json`, and the Rust parse
   renderer now matches the official dump for the basic text and
-  `choices/label-scope` fixtures. The next compiler-conformance work is to
-  align the remaining choice-heavy fixtures such as `choices/sticky-choice`
-  before the suite can be marked green again.
+  `choices/label-scope` fixtures. The checklist queue has been reordered to
+  follow the broad syntax progression in `WritingWithInk.md` so the next
+  compiler-conformance work always starts from the earliest dependency-light
+  syntax slice, before moving on to the remaining choice-heavy fixtures such
+  as `choices/sticky-choice`.
 
 Acceptance:
 

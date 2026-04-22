@@ -7,6 +7,7 @@ use std::time::Instant;
 use std::{fs, path::Path};
 
 use rand::Rng;
+use serde_json::Value;
 
 const SAFETY_STEP_LIMIT: usize = 512;
 const STUCK_STEP_LIMIT: usize = 16;
@@ -176,7 +177,7 @@ fn get_fixture_json_string(filename: &str) -> String {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("fixtures/conformance")
         .join(filename);
-    fs::read_to_string(path).expect("fixture json must exist")
+    strip_utf8_bom(fs::read_to_string(path).expect("fixture json must exist"))
 }
 
 fn get_fixture_parse_string(filename: &str) -> String {
@@ -188,7 +189,7 @@ fn get_fixture_parse_string(filename: &str) -> String {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("fixtures/conformance")
         .join(filename);
-    fs::read_to_string(path).expect("fixture parse must exist")
+    strip_utf8_bom(fs::read_to_string(path).expect("fixture parse must exist"))
 }
 
 pub fn assert_parsed_story_matches_fixture(filename: &str, source: &str) -> bool {
@@ -236,7 +237,9 @@ fn format_parsed_story_mismatch(
 pub fn assert_compiled_json_matches_fixture(filename: &str, story: &mut Story) -> bool {
     let generated_json = story.to_json();
     let fixture_json = get_fixture_json_string(filename);
-    if generated_json != fixture_json {
+    let generated_value = parse_json_value(filename, &generated_json, "generated");
+    let fixture_value = parse_json_value(filename, &fixture_json, "fixture");
+    if generated_value != fixture_value {
         eprintln!(
             "{}",
             format_compiled_json_mismatch(filename, &generated_json, &fixture_json)
@@ -245,6 +248,20 @@ pub fn assert_compiled_json_matches_fixture(filename: &str, story: &mut Story) -
     }
 
     true
+}
+
+fn parse_json_value(filename: &str, json: &str, label: &str) -> Value {
+    serde_json::from_str(json).unwrap_or_else(|error| {
+        panic!("compiler_conformance {label} json for {filename} must be valid json: {error}")
+    })
+}
+
+fn strip_utf8_bom(text: String) -> String {
+    if let Some(stripped) = text.strip_prefix('\u{feff}') {
+        stripped.to_string()
+    } else {
+        text
+    }
 }
 
 fn format_compiled_json_mismatch(

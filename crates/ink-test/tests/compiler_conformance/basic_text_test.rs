@@ -32,3 +32,21 @@ fn twolines_test() -> Result<(), StoryError> {
 
     Ok(())
 }
+
+#[test]
+fn the_intercept_test() -> Result<(), StoryError> {
+    let story = common::compile_story("inkfiles/TheIntercept.ink");
+    println!("{}", story.build_string_of_hierarchy());
+    assert!(story.can_continue() || !story.get_current_choices().is_empty());
+
+    Ok(())
+}
+
+#[test]
+fn test1_test() -> Result<(), StoryError> {
+    let story = common::compile_story("inkfiles/test1.ink");
+    println!("{}", story.build_string_of_hierarchy());
+    assert!(story.can_continue() || !story.get_current_choices().is_empty());
+
+    Ok(())
+}

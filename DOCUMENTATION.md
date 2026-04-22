@@ -53,10 +53,13 @@ into `crates/ink-runtime` instead of rewriting runtime execution.
   `legacy-compiler-conformance` and `legacy-csharp-tests` until the remaining
   migration work is ready to be re-enabled or promoted.
 - The compiler-conformance fixture queue is tracked in
-  `COMPILER_CONFORMANCE_CHECKLIST.md`, ordered from dependency-light fixtures
-  to harder choice/gather/function/runtime cases so each small batch can be
-  checkpointed cleanly. The file header now shows an explicit progress count
-  (`6/126`) so batch progress is visible at a glance.
+  `COMPILER_CONFORMANCE_CHECKLIST.md`, and it is now ordered to match the
+  broad syntax progression in `WritingWithInk.md` rather than the old folder
+  order. The file header now shows an explicit progress count (`7/126`) so
+  batch progress is visible at a glance.
+- `TheIntercept` is intentionally deferred to the new last-pass fixture
+  section because it combines several syntax features and is too broad for the
+  current low-dependency compiler-conformance queue.
 - `choices/divert-choice`, `choices/label-scope`, and `choices/sticky-choice`
   are now green again after the parse-snapshot render rules and snapshot
   postprocessing were tightened; the checklist reflects the current checkpoint.

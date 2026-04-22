@@ -56,6 +56,18 @@ struct ChoiceBodyBuilder {
 }
 
 impl<'source> InkParser<'source> {
+    fn is_brace_block_opening(trimmed: &str) -> bool {
+        if trimmed.starts_with('{') {
+            return !trimmed.ends_with('}');
+        }
+
+        let Some(after_dash) = trimmed.strip_prefix('-') else {
+            return false;
+        };
+        let after_dash = after_dash.trim_start();
+        after_dash.starts_with('{') && !after_dash.ends_with('}')
+    }
+
     pub fn new(
         input_string: &'source str,
         source_filename: Option<&'source str>,
@@ -223,6 +235,34 @@ impl<'source> InkParser<'source> {
                     top_level_content.push(gather.0);
                 }
                 line_index += gather.1;
+                continue;
+            }
+
+            if let Some(diverts) =
+                Self::parse_divert_chain_line(line_text, line_index + 1, source_filename.clone())?
+            {
+                if let Some(parent) = current_flow.as_ref() {
+                    for divert in diverts {
+                        Object::add_content(parent, divert);
+                    }
+                } else {
+                    top_level_content.extend(diverts);
+                }
+                line_index += 1;
+                continue;
+            }
+
+            if let Some(diverts) =
+                Self::parse_divert_chain_line(line_text, line_index + 1, source_filename.clone())?
+            {
+                if let Some(parent) = current_flow.as_ref() {
+                    for divert in diverts {
+                        Object::add_content(parent, divert);
+                    }
+                } else {
+                    top_level_content.extend(diverts);
+                }
+                line_index += 1;
                 continue;
             }
 
@@ -565,6 +605,61 @@ impl<'source> InkParser<'source> {
         } else {
             Divert::new(Some(target)).object()
         }))
+    }
+
+    fn parse_divert_chain_line(
+        line_text: &str,
+        line_number: usize,
+        source_filename: Option<String>,
+    ) -> std::result::Result<Option<Vec<ObjectRef>>, Diagnostic> {
+        let trimmed_start = line_text.trim_start();
+        if !trimmed_start.starts_with("->") {
+            return Ok(None);
+        }
+
+        let remainder = trimmed_start[2..].trim_start();
+        let mut tokens = remainder.split_whitespace();
+        let Some(first_target_text) = tokens.next() else {
+            return Ok(None);
+        };
+        let Some(separator) = tokens.next() else {
+            return Ok(None);
+        };
+        let Some(second_target_text) = tokens.next() else {
+            return Ok(None);
+        };
+
+        if separator != "->" || tokens.next().is_some() {
+            return Ok(None);
+        }
+
+        let first_target =
+            Self::parse_simple_divert_target(first_target_text).ok_or_else(|| {
+                let line_indent = line_text.len().saturating_sub(trimmed_start.len()) + 1;
+                Diagnostic::new(
+                    DiagnosticSeverity::Error,
+                    source_filename.clone(),
+                    line_number,
+                    line_indent + 3,
+                    "Expected a valid divert target",
+                )
+            })?;
+        let second_target =
+            Self::parse_simple_divert_target(second_target_text).ok_or_else(|| {
+                let line_indent = line_text.len().saturating_sub(trimmed_start.len()) + 1;
+                Diagnostic::new(
+                    DiagnosticSeverity::Error,
+                    source_filename.clone(),
+                    line_number,
+                    line_indent + 3,
+                    "Expected a valid divert target",
+                )
+            })?;
+
+        Ok(Some(vec![
+            Divert::tunnel(Some(first_target)).object(),
+            Divert::new(Some(second_target)).object(),
+        ]))
     }
 
     fn parse_choice_line(
@@ -979,6 +1074,79 @@ impl<'source> InkParser<'source> {
         Ok(Some(line.object()))
     }
 
+    fn parse_inline_conditional_line(
+        line_text: &str,
+        line_number: usize,
+        source_filename: Option<String>,
+        had_newline: bool,
+    ) -> std::result::Result<Option<ObjectRef>, Diagnostic> {
+        let line_text = line_text.trim_start();
+        let Some(open_index) = line_text.find('{') else {
+            return Ok(None);
+        };
+
+        let Some(close_index) = Self::find_matching_brace(line_text, open_index) else {
+            return Ok(None);
+        };
+
+        let inner = &line_text[open_index + 1..close_index];
+        let Some((condition_text, branches_text)) = inner.split_once(':') else {
+            return Ok(None);
+        };
+
+        let condition = Self::parse_expression_fragment(
+            condition_text.trim(),
+            line_number,
+            source_filename.clone(),
+        )?;
+
+        let branch_texts = branches_text.split('|').map(str::trim).collect::<Vec<_>>();
+        if branch_texts.is_empty() || branch_texts.len() > 2 {
+            return Err(Diagnostic::new(
+                DiagnosticSeverity::Error,
+                source_filename,
+                line_number,
+                line_text.len().saturating_sub(line_text.trim_start().len()) + 1,
+                "Inline conditionals must have one or two branches separated by '|'",
+            ));
+        }
+
+        let mut branches = Vec::new();
+        for (branch_index, branch_text) in branch_texts.into_iter().enumerate() {
+            let branch_content = ContentList::new();
+            if !branch_text.is_empty() {
+                branch_content.add_content(Text::new(branch_text).object());
+            }
+            let mut branch = ConditionalSingleBranch::new(vec![branch_content.object()]);
+            branch.set_is_true_branch(branch_index == 0);
+            branch.set_is_else(branch_index == 1);
+            branch.set_is_inline(true);
+            branches.push(branch);
+        }
+
+        let conditional = Conditional::new(Some(condition), branches).object();
+        let prefix = &line_text[..open_index];
+        let suffix = &line_text[close_index + 1..];
+
+        if prefix.is_empty() && suffix.is_empty() {
+            return Ok(Some(conditional));
+        }
+
+        let line = ContentList::new();
+        if !prefix.is_empty() {
+            line.add_content(Text::new(prefix).object());
+        }
+        line.add_content(conditional);
+        if !suffix.is_empty() {
+            line.add_content(Text::new(suffix).object());
+        }
+        if had_newline {
+            line.add_content(Text::new("\n").object());
+        }
+
+        Ok(Some(line.object()))
+    }
+
     fn find_matching_brace(input: &str, open_index: usize) -> Option<usize> {
         let mut depth = 0usize;
 
@@ -1064,12 +1232,24 @@ impl<'source> InkParser<'source> {
         let first_segment = segments[start_index];
         let line_text = first_segment.strip_suffix('\n').unwrap_or(first_segment);
         let trimmed_start = line_text.trim_start();
+        let brace_source = if trimmed_start.starts_with('{') {
+            trimmed_start
+        } else if let Some(after_dash) = trimmed_start.strip_prefix('-') {
+            let after_dash = after_dash.trim_start();
+            if after_dash.starts_with('{') {
+                after_dash
+            } else {
+                return Ok(None);
+            }
+        } else {
+            return Ok(None);
+        };
 
-        if !trimmed_start.starts_with('{') || trimmed_start.ends_with('}') {
+        if brace_source.ends_with('}') {
             return Ok(None);
         }
 
-        let header_text = trimmed_start[1..].trim_start();
+        let header_text = brace_source[1..].trim_start();
         let mut body_lines: Vec<(String, bool, usize)> = Vec::new();
         let mut consumed_lines = 1;
         let mut closed = false;
@@ -1465,6 +1645,12 @@ impl<'source> InkParser<'source> {
             return Ok(Some((vec![gather.0], gather.1)));
         }
 
+        if let Some(diverts) =
+            Self::parse_divert_chain_line(line_text, line_number, source_filename.clone())?
+        {
+            return Ok(Some((diverts, 1)));
+        }
+
         if let Some(divert) =
             Self::parse_simple_divert_line(line_text, line_number, source_filename.clone())?
         {
@@ -1484,6 +1670,15 @@ impl<'source> InkParser<'source> {
             had_newline,
         )? {
             return Ok(Some((vec![sequence], 1)));
+        }
+
+        if let Some(conditional) = Self::parse_inline_conditional_line(
+            line_text,
+            line_number,
+            source_filename.clone(),
+            had_newline,
+        )? {
+            return Ok(Some((vec![conditional], 1)));
         }
 
         if let Some(conditional) =
@@ -1516,6 +1711,12 @@ impl<'source> InkParser<'source> {
             return Ok(vec![statement]);
         }
 
+        if let Some(diverts) =
+            Self::parse_divert_chain_line(line_text, line_number, source_filename.clone())?
+        {
+            return Ok(diverts);
+        }
+
         if let Some(divert) =
             Self::parse_simple_divert_line(line_text, line_number, source_filename.clone())?
         {
@@ -1535,6 +1736,15 @@ impl<'source> InkParser<'source> {
             had_newline,
         )? {
             return Ok(vec![sequence]);
+        }
+
+        if let Some(conditional) = Self::parse_inline_conditional_line(
+            line_text,
+            line_number,
+            source_filename.clone(),
+            had_newline,
+        )? {
+            return Ok(vec![conditional]);
         }
 
         if let Some(conditional) =
@@ -2282,13 +2492,19 @@ impl<'source> InkParser<'source> {
                 continue;
             }
 
-            if trimmed.starts_with('{') && !trimmed.ends_with('}') {
+            if Self::is_brace_block_opening(trimmed) {
                 in_brace_block = true;
                 continue;
             }
 
             for marker in ["#", "{", "}"] {
-                if marker == "{" && trimmed.starts_with('{') && trimmed.ends_with('}') {
+                if marker == "{"
+                    && (trimmed.starts_with('{')
+                        || trimmed
+                            .strip_prefix('-')
+                            .is_some_and(|rest| rest.trim_start().starts_with('{')))
+                    && trimmed.ends_with('}')
+                {
                     continue;
                 }
                 if trimmed.starts_with(marker) {

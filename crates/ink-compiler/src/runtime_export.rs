@@ -361,7 +361,9 @@ fn export_gather_container(
         {
             tokens.insert(divert_index, Value::String("\n".to_string()));
         }
-    } else if !matches!(tokens.last(), Some(Value::String(value)) if value == "\n") {
+    } else if gathered_target.is_some()
+        && !matches!(tokens.last(), Some(Value::String(value)) if value == "\n")
+    {
         tokens.push(Value::String("\n".to_string()));
     }
 
@@ -371,10 +373,6 @@ fn export_gather_container(
             tokens.push(json!({"#f":5}));
         } else {
             tokens.push(Value::String("end".to_string()));
-            tokens.push(json!([
-                Value::String("done".to_string()),
-                json!({"#n": format!("g-{}", state.gather_index)})
-            ]));
             tokens.push(Value::Null);
         }
     } else {
@@ -554,14 +552,18 @@ fn export_choice_container(
     };
     let flow_prefix = flow_path_prefix(object);
     let needs_eval = has_start_content || has_choice_only_content || has_condition;
-
+    let choice_eval_index = if has_start_content {
+        choice_index + 2
+    } else {
+        choice_index
+    };
     if needs_eval {
         outer_tokens.push(json!("ev"));
     }
 
     if let Some(_start_content) = start_content.as_ref() {
         outer_tokens.push(json!({
-            "^->": format!("{flow_prefix}.0.0.$r1")
+            "^->": format!("{flow_prefix}.0.{choice_eval_index}.$r1")
         }));
         outer_tokens.push(json!({"temp=":"$r"}));
         outer_tokens.push(json!("str"));
@@ -609,7 +611,10 @@ fn export_choice_container(
         }
         flags
     };
-    let choice_path = format!("{}c-{choice_index}", choice_path_prefix(object));
+    let choice_path = format!(
+        "{}c-{choice_index}",
+        choice_path_prefix(object, has_start_content)
+    );
     outer_tokens.push(json!({"*": choice_path, "flg": flags}));
 
     if let Some(start_content) = start_content {
@@ -638,7 +643,7 @@ fn export_choice_container(
         }));
         inner_tokens.push(json!("/ev"));
         inner_tokens.push(json!({"temp=":"$r"}));
-        inner_tokens.push(json!({"->":".^.^.0.s"}));
+        inner_tokens.push(json!({"->": format!(".^.^.{choice_eval_index}.s")}));
         inner_tokens.push(Value::Array(vec![json!({"#n":"$r2"})]));
     }
 
@@ -1331,7 +1336,11 @@ fn flow_path_prefix(object: &ObjectRef) -> String {
     names.join(".")
 }
 
-fn choice_path_prefix(object: &ObjectRef) -> &'static str {
+fn choice_path_prefix(object: &ObjectRef, has_start_content: bool) -> &'static str {
+    if has_start_content {
+        return ".^.^.";
+    }
+
     let mut current = object.borrow().parent();
 
     while let Some(node) = current {
