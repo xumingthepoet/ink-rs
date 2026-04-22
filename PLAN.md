@@ -22,8 +22,8 @@ Core commands to run after every completed milestone:
 - [x] `cargo test --workspace`
 - [x] `make gate`
 
-Current last verified milestone: Milestone 11 parser snapshot relocation slice
-(`2026-04-22`).
+Current last verified milestone: Milestone 12 legacy runtime conformance import
+slice (`2026-04-22`).
 
 Workspace warning policy: `.cargo/config.toml` now denies warnings, and
 `make gate` is the unified local entry point for format, check, and test.
@@ -353,11 +353,6 @@ cargo check --workspace
 cargo test --workspace
 ```
 
-## Next Task
-
-No required milestones remain. Expand trusted conformance coverage further if
-desired.
-
 ## Milestone 11: Parser Snapshot Relocation
 
 - [x] Move the remaining parser trusted snapshots out of
@@ -386,6 +381,44 @@ cargo fmt --all --check
 cargo check --workspace
 cargo test --workspace
 ```
+
+## Milestone 12: Legacy Conformance Import
+
+- [x] Import the legacy runtime conformance suite from
+  `ink-tests-old/src/conformance` into `crates/ink-test`.
+- [ ] Import the legacy compiler-to-runtime conformance suite into
+  `crates/ink-test`.
+- [ ] Import the legacy `csharp_tests` suite into `crates/ink-test`.
+- [ ] Decide whether any remaining `ink-tests-old` fixtures or wrappers should
+  be retained after the migration completes.
+
+Primary Rust references:
+
+- `crates/ink-test/tests/conformance_legacy.rs`
+- `crates/ink-test/tests/conformance/`
+- `crates/ink-test/fixtures/conformance/`
+- `ink-tests-old/src/conformance/`
+
+Acceptance:
+
+- The legacy runtime conformance suite runs from `ink-test`.
+- The copied fixture tree under `crates/ink-test/fixtures/conformance/`
+  matches the legacy runtime tests.
+- The workspace still passes `cargo fmt --all --check`,
+  `cargo check --workspace`, and `cargo test --workspace`.
+
+Validation:
+
+```sh
+cargo fmt --all --check
+cargo test -p ink-test --test conformance_legacy
+cargo check --workspace
+cargo test --workspace
+```
+
+## Next Task
+
+Import the legacy compiler-to-runtime conformance suite into `ink-test`.
 
 ## Risk Register
 

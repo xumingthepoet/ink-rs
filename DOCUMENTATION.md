@@ -106,6 +106,11 @@ into `crates/ink-runtime` instead of rewriting runtime execution.
 - The conformance harness now compares compiler output against copied trusted
   fixtures under `crates/ink-test/fixtures` and compiler behavior against the
   copied official include examples there as well.
+- The legacy runtime conformance suite from `ink-tests-old/src/conformance`
+  now lives in `crates/ink-test/tests/conformance_legacy.rs` with helper
+  modules under `crates/ink-test/tests/conformance/` and copied fixtures under
+  `crates/ink-test/fixtures/conformance/`.
+- The legacy runtime conformance import currently covers 124 passing tests.
 - The trusted conformance baseline now covers both the one-line and two-line
   `basictext` fixtures from `blade-ink-rs`.
 - The trusted `blade-ink-rs` `basictext/oneline.ink` fixture now also has a
@@ -1477,9 +1482,30 @@ cargo test --workspace
 Result: all passed. `blade-ink-rs/lib` emitted the same two existing warnings
 about unnecessary parentheses around trait object types.
 
+### 2026-04-22
+
+- Imported the legacy runtime conformance suite from `ink-tests-old` into
+  `ink-test`.
+- Added a compatibility layer in `crates/ink-test/tests/conformance/api.rs`
+  so the old runtime conformance modules could remain nearly unchanged while
+  calling the new `bladeink` API.
+- Copied the runtime conformance fixtures into
+  `crates/ink-test/fixtures/conformance/`.
+- Added the legacy runtime suite entry point in
+  `crates/ink-test/tests/conformance_legacy.rs`.
+
+Validation:
+
+```sh
+cargo test -p ink-test --test conformance_legacy
+cargo fmt --all --check
+```
+
+Result: all passed.
+
 ## Next Task
 
-Expand trusted conformance coverage further.
+Import the legacy compiler-to-runtime conformance suite into `ink-test`.
 
 ## Repo Structure
 
