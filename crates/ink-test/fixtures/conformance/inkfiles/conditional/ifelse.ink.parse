@@ -1,0 +1,26 @@
+Story
+  Weave(baseIndent=0)
+    VariableAssignment(name="x", global=true, temp=false)
+      Number(0)
+    VariableAssignment(name="y", global=true, temp=false)
+      Number(3)
+    ContentList
+      Conditional
+        Binary(>, VariableReference(x), Number(0))
+        ConditionalBranch(true=true, else=false, inline=false)
+          Weave(baseIndent=0)
+            VariableAssignment(name="y", global=false, temp=false)
+              Binary(-, VariableReference(x), Number(1))
+        ConditionalBranch(true=false, else=true, inline=false)
+          Weave(baseIndent=0)
+            VariableAssignment(name="y", global=false, temp=false)
+              Binary(+, VariableReference(x), Number(1))
+    Text("\n")
+    Text("The value is ")
+    ContentList
+      VariableReference(y)
+    Text(". ")
+    Divert(target="-\u003E END", empty=false, tunnel=false, thread=false)
+    Text("\n")
+    Gather(name=null, depth=1)
+    Divert(target="-\u003E DONE", empty=false, tunnel=false, thread=false)

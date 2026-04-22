@@ -1,6 +1,8 @@
 #![allow(dead_code)]
 
 use crate::compiler_conformance::api::Story;
+use crate::compiler_conformance::parse_snapshot::render_story as render_parse_story;
+use ink_compiler::{Compiler, CompilerOptions};
 use std::time::Instant;
 use std::{fs, path::Path};
 
@@ -132,11 +134,20 @@ pub fn run_story(
 
 pub fn compile_story(filename: &str) -> Story {
     let source = get_ink_string(filename);
+    assert!(
+        profile_step("compare_parsed_story", || {
+            assert_parsed_story_matches_fixture(filename, &source)
+        }),
+        "parsed story differs for {filename}"
+    );
     let compiled_story = profile_step("compile_story", || Story::new(&source));
     let mut compiled_story = compiled_story;
-    let _ = profile_step("compare_compiled_json", || {
-        assert_compiled_json_matches_fixture(filename, &mut compiled_story)
-    });
+    assert!(
+        profile_step("compare_compiled_json", || {
+            assert_compiled_json_matches_fixture(filename, &mut compiled_story)
+        }),
+        "compiled json differs for {filename}"
+    );
     compiled_story
 }
 
@@ -166,6 +177,60 @@ fn get_fixture_json_string(filename: &str) -> String {
         .join("fixtures/conformance")
         .join(filename);
     fs::read_to_string(path).expect("fixture json must exist")
+}
+
+fn get_fixture_parse_string(filename: &str) -> String {
+    let filename = if let Some(prefix) = filename.strip_suffix(".ink") {
+        format!("{prefix}.ink.parse")
+    } else {
+        format!("{filename}.ink.parse")
+    };
+    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("fixtures/conformance")
+        .join(filename);
+    fs::read_to_string(path).expect("fixture parse must exist")
+}
+
+pub fn assert_parsed_story_matches_fixture(filename: &str, source: &str) -> bool {
+    let mut compiler = Compiler::new(
+        source.to_string(),
+        Some(CompilerOptions {
+            source_filename: Some(filename.to_string()),
+            ..Default::default()
+        }),
+    );
+    let parse_result = compiler.parse();
+    let Some(parsed_story) = parse_result.parsed_story else {
+        panic!("parse should succeed: {:?}", parse_result.diagnostics);
+    };
+
+    let generated_parse = render_parse_story(&parsed_story);
+    let fixture_parse = get_fixture_parse_string(filename);
+    if generated_parse != fixture_parse {
+        eprintln!(
+            "{}",
+            format_parsed_story_mismatch(filename, &generated_parse, &fixture_parse)
+        );
+        return false;
+    }
+
+    true
+}
+
+fn format_parsed_story_mismatch(
+    filename: &str,
+    generated_parse: &str,
+    fixture_parse: &str,
+) -> String {
+    let fixture_path = if let Some(prefix) = filename.strip_suffix(".ink") {
+        format!("fixtures/conformance/{prefix}.ink.parse")
+    } else {
+        format!("fixtures/conformance/{filename}.ink.parse")
+    };
+
+    format!(
+        "parsed story differs for {filename}\n--- generated ---\n{generated_parse}\n--- fixture ({fixture_path}) ---\n{fixture_parse}"
+    )
 }
 
 pub fn assert_compiled_json_matches_fixture(filename: &str, story: &mut Story) -> bool {

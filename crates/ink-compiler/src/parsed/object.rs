@@ -17,7 +17,7 @@ pub struct DebugMetadata {
 pub type ObjectRef = Rc<RefCell<Object>>;
 
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) enum ObjectKind {
+pub enum ObjectKind {
     Generic,
     ContentList {
         dont_flatten: bool,
@@ -134,7 +134,7 @@ impl Object {
         self.debug_metadata.is_some()
     }
 
-    pub(crate) fn kind(&self) -> &ObjectKind {
+    pub fn kind(&self) -> &ObjectKind {
         &self.kind
     }
 

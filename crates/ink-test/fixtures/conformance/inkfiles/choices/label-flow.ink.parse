@@ -1,0 +1,52 @@
+Story
+  Weave(baseIndent=0)
+    Divert(target="-\u003E meet_guard", empty=false, tunnel=false, thread=false)
+    Gather(name=null, depth=1)
+    Divert(target="-\u003E DONE", empty=false, tunnel=false, thread=false)
+  Flow(level=Knot, name="meet_guard", function=false)
+    Weave(baseIndent=0)
+      Text("The guard frowns at you.")
+      Text("\n")
+      Choice(name="greet", once=true, invisible=false, depth=1, inline=true)
+        ContentList
+          Text("Greet him")
+        ContentList
+          Text("\n")
+      Text("\u0027Greetings.\u0027")
+      Text("\n")
+      Choice(name="get_out", once=true, invisible=false, depth=1, inline=true)
+        ContentList
+          Text("\u0027Get out of my way")
+        ContentList
+          Text(".\u0027")
+        ContentList
+          Text(",\u0027 you tell the guard.")
+          Text("\n")
+      Gather(name=null, depth=1)
+      Text("\u0027Hmm,\u0027 replies the guard.")
+      Text("\n")
+      Choice(name=null, once=true, invisible=false, depth=1, inline=false)
+        ContentList
+          Text("\u0027Having a nice day?\u0027")
+        ContentList
+          Text("\n")
+        VariableReference(greet)
+      Choice(name=null, once=true, invisible=false, depth=1, inline=true)
+        ContentList
+          Text("\u0027Hmm?\u0027")
+        ContentList
+          Text(" you reply.        ")
+          Text("\n")
+      Choice(name=null, once=true, invisible=false, depth=1, inline=true)
+        ContentList
+          Text("Shove him aside")
+        ContentList
+          Text("\n")
+        VariableReference(get_out)
+      Text("You shove him sharply. He stares in reply, and draws his sword!")
+      Text("\n")
+      Divert(target="-\u003E END", empty=false, tunnel=false, thread=false)
+      Gather(name=null, depth=1)
+      Text("\u0027Mff,\u0027 the guard replies, and then offers you a paper bag. \u0027Toffee?\u0027")
+      Text("\n")
+      Divert(target="-\u003E END", empty=false, tunnel=false, thread=false)

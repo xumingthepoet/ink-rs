@@ -1,0 +1,29 @@
+Story
+  Weave(baseIndent=0)
+    VariableAssignment(name="list", global=true, temp=false)
+      ListDefinition(name="list")
+        ListElementDefinition(name="a", explicit=null, series=1, initial=false)
+        ListElementDefinition(name="b", explicit=null, series=2, initial=true)
+        ListElementDefinition(name="c", explicit=null, series=3, initial=false)
+        ListElementDefinition(name="d", explicit=null, series=4, initial=true)
+        ListElementDefinition(name="e", explicit=null, series=5, initial=false)
+    ContentList
+      VariableReference(list)
+    Text("\n")
+    ContentList
+      Binary(+, List(a, c), List(b, e))
+    Text("\n")
+    ContentList
+      Binary(^, List(a, b, c), List(c, b, e))
+    Text("\n")
+    ContentList
+      Binary(?, VariableReference(list), List(b, d, e))
+    Text("\n")
+    ContentList
+      Binary(?, VariableReference(list), List(d, b))
+    Text("\n")
+    ContentList
+      Binary(!?, VariableReference(list), List(c))
+    Text("\n")
+    Gather(name=null, depth=1)
+    Divert(target="-\u003E DONE", empty=false, tunnel=false, thread=false)

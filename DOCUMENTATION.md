@@ -27,6 +27,13 @@ into `crates/ink-runtime` instead of rewriting runtime execution.
 - The legacy csharp suite now lives in `crates/ink-test/tests/csharp_tests_legacy.rs`
   and is retained behind the `legacy-csharp-tests` feature while migration
   continues.
+- The compiler-conformance harness now compares `A.ink.parse` before
+  `A.ink.json`; the `.parse` snapshots are generated from the local C#
+  parse-dump helper and live beside the copied compiler fixtures.
+- Compiler-conformance green checks must be based on hard assertions. An
+  earlier version of the compare helper only printed parse/json diffs and
+  returned `bool`, which made "green" assessments unreliable. The helper now
+  asserts on mismatch so failures actually fail the test.
 - The compiler-conformance choice/divert/sequence slice now has the basic
   `no-choice`, `one`, `single-choice`, `suppress-choice`, `mixed-choice`,
   `divert-on-choice`, and `variable_text::sequence` fixtures green, and the
@@ -43,10 +50,11 @@ into `crates/ink-runtime` instead of rewriting runtime execution.
 - During Milestone 13, compiler-conformance progress is checkpointed in small
   commits after each few passing fixtures so the remaining work stays
   resumable and bounded.
-- Current Milestone 13 priority: fix the imported legacy compiler-conformance
-  suite first, then fix the imported csharp suite. Both remain feature-gated
-  behind `legacy-compiler-conformance` and `legacy-csharp-tests` until the
-  remaining migration work is ready to be re-enabled.
+- Current Milestone 13 priority: the imported legacy compiler-conformance
+  suite is now green, so the remaining highest-priority suite is the imported
+  csharp suite. Both remain feature-gated behind `legacy-compiler-conformance`
+  and `legacy-csharp-tests` until the remaining migration work is ready to be
+  re-enabled or promoted.
 - The documented test loop now treats every long-running `cargo test` path as
   timeboxed, and `make gate` wraps the workspace test pass with a timeout as
   well.
@@ -1666,6 +1674,34 @@ Validation:
 ```sh
 cargo test -p ink-test --test conformance_legacy
 cargo fmt --all --check
+```
+
+Result: all passed.
+
+### 2026-04-23
+
+- Added tokenizer-level `.ink.parse` snapshots for the full compiler-
+  conformance fixture set under `crates/ink-test/fixtures/conformance/inkfiles/`.
+- Added `crates/ink-test/tests/compiler_conformance/parse_snapshot.rs` to
+  render parsed stories into a stable text format that matches the official
+  C# parse dump helper.
+- Updated `crates/ink-test/tests/compiler_conformance/common.rs` so
+  compiler-conformance tests compare `A.ink.parse` before `A.ink.json` and
+  hard-fail on mismatch instead of only printing diffs.
+- Exposed read-only parsed AST accessors needed by the test renderer in
+  `crates/ink-compiler/src/parsed/object.rs` and
+  `crates/ink-compiler/src/parsed/mod.rs`.
+- Recorded the earlier false-green cause: the compare helper previously
+  returned `bool` and only logged diffs, which made status assessment
+  unreliable until it was changed to assert.
+
+Validation:
+
+```sh
+cargo test -p ink-test --test compiler_conformance_legacy --no-run
+cargo fmt --all --check
+git diff --check
+timeout 30s make gate
 ```
 
 Result: all passed.

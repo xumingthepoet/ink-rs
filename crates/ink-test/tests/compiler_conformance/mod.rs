@@ -2,6 +2,7 @@
 
 pub mod api;
 pub mod common;
+pub mod parse_snapshot;
 
 mod basic_text_test;
 mod choice_test;

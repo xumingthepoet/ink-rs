@@ -1,0 +1,20 @@
+Story
+  Weave(baseIndent=0)
+    VariableAssignment(name="v", global=true, temp=false)
+      String("")
+    VariableAssignment(name="v", global=false, temp=false)
+      String("a")
+    Choice(name=null, once=true, invisible=false, depth=1, inline=false)
+      ContentList
+        Text("inc")
+      ContentList
+        Text("\n")
+    VariableAssignment(name="v", global=false, temp=false)
+      Binary(+, VariableReference(v), String("b"))
+    ContentList
+      VariableReference(v)
+    Text(".")
+    Text("\n")
+    Divert(target="-\u003E END", empty=false, tunnel=false, thread=false)
+    Gather(name=null, depth=1)
+    Divert(target="-\u003E DONE", empty=false, tunnel=false, thread=false)

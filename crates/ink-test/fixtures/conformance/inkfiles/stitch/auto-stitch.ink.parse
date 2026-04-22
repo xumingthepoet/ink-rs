@@ -1,0 +1,28 @@
+Story
+  Weave(baseIndent=0)
+    Divert(target="-\u003E the_orient_express", empty=false, tunnel=false, thread=false)
+    Gather(name=null, depth=1)
+    Divert(target="-\u003E DONE", empty=false, tunnel=false, thread=false)
+  Flow(level=Knot, name="the_orient_express", function=false)
+    Flow(level=Stitch, name="in_first_class", function=false)
+      Weave(baseIndent=0)
+        Text("I settled my master.")
+        Text("\n")
+        Choice(name=null, once=true, invisible=false, depth=1, inline=true)
+          ContentList
+            Text("Move to third class")
+          ContentList
+            Text("\n")
+        Divert(target="-\u003E in_third_class", empty=false, tunnel=false, thread=false)
+        Choice(name=null, once=true, invisible=false, depth=1, inline=true)
+          ContentList
+            Text("Are you sure")
+          ContentList
+            Text(" ")
+            Divert(target="-\u003E the_orient_express", empty=false, tunnel=false, thread=false)
+            Text("\n")
+    Flow(level=Stitch, name="in_third_class", function=false)
+      Weave(baseIndent=0)
+        Text("I put myself in third.")
+        Text("\n")
+        Divert(target="-\u003E END", empty=false, tunnel=false, thread=false)

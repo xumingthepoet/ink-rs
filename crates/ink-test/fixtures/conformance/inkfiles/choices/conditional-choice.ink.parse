@@ -1,0 +1,42 @@
+Story
+  Weave(baseIndent=0)
+    Text("Test conditional choices")
+    Text("\n")
+    Choice(name=null, once=true, invisible=false, depth=1, inline=false)
+      ContentList
+        Text("not displayed")
+      ContentList
+        Text("\n")
+      MultipleCondition(Number(true), Number(false))
+    Choice(name=null, once=true, invisible=false, depth=1, inline=false)
+      ContentList
+        Text("one")
+      ContentList
+        Text("\n")
+      MultipleCondition(Number(true), Number(true), Binary(and, Number(true), Number(true)))
+    Choice(name=null, once=true, invisible=false, depth=1, inline=false)
+      ContentList
+        Text("not displayed")
+      ContentList
+        Text("\n")
+      Number(false)
+    Choice(name=null, once=true, invisible=false, depth=1, inline=false)
+      ContentList
+        Text("two")
+      ContentList
+        Text("\n")
+      Number(true)
+    Choice(name=null, once=true, invisible=false, depth=1, inline=false)
+      ContentList
+        Text("three")
+      ContentList
+        Text("\n")
+      MultipleCondition(Number(true), Number(true))
+    Choice(name=null, once=true, invisible=false, depth=1, inline=false)
+      ContentList
+        Text("four")
+      ContentList
+        Text("\n")
+      Number(true)
+    Gather(name=null, depth=1)
+    Divert(target="-\u003E DONE", empty=false, tunnel=false, thread=false)

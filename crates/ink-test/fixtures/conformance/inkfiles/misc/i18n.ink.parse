@@ -1,0 +1,13 @@
+Story
+  Weave(baseIndent=0)
+    Text("\u00E1\u00E9\u00ED\u00F3\u00FA \u00F1")
+    Text("\n")
+    Text("\u4F60\u597D ")
+    Tag(start=true, inChoice=false)
+    Text("\u00E1\u00E9")
+    Tag(start=false, inChoice=false)
+    Text("\n")
+    Text("\u4F60\u597D\u4E16\u754C")
+    Text("\n")
+    Gather(name=null, depth=1)
+    Divert(target="-\u003E DONE", empty=false, tunnel=false, thread=false)

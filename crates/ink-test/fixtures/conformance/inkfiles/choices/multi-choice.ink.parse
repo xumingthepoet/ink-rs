@@ -1,0 +1,22 @@
+Story
+  Weave(baseIndent=0)
+    Text("Hello, world!")
+    Text("\n")
+    Choice(name=null, once=true, invisible=false, depth=1, inline=false)
+      ContentList
+        Text("Hello back!")
+      ContentList
+        Text("\n")
+    Text("Nice to hear from you")
+    Text("\n")
+    Choice(name=null, once=true, invisible=false, depth=1, inline=false)
+      ContentList
+        Text("Goodbye")
+      ContentList
+        Text("\n")
+    Text("See you later")
+    Text("\n")
+    Gather(name=null, depth=1)
+    Divert(target="-\u003E END", empty=false, tunnel=false, thread=false)
+    Gather(name=null, depth=1)
+    Divert(target="-\u003E DONE", empty=false, tunnel=false, thread=false)

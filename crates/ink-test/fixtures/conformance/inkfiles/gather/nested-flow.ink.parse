@@ -1,0 +1,38 @@
+Story
+  Weave(baseIndent=0)
+    Text("Well, Poirot? Murder or suicide?\u0022")
+    Text("\n")
+    Choice(name=null, once=true, invisible=false, depth=1, inline=false)
+      ContentList
+        Text("\u0022Murder!\u0022")
+      ContentList
+        Text("\n")
+    Text("\u0022And who did it?\u0022")
+    Text("\n")
+    Weave(baseIndent=1)
+      Choice(name=null, once=true, invisible=false, depth=2, inline=false)
+        ContentList
+          Text("\u0022Detective-Inspector Japp!\u0022")
+        ContentList
+          Text("\n")
+      Choice(name=null, once=true, invisible=false, depth=2, inline=false)
+        ContentList
+          Text("\u0022Captain Hastings!\u0022")
+        ContentList
+          Text("\n")
+      Choice(name=null, once=true, invisible=false, depth=2, inline=false)
+        ContentList
+          Text("\u0022Myself!\u0022")
+        ContentList
+          Text("\n")
+    Choice(name=null, once=true, invisible=false, depth=1, inline=false)
+      ContentList
+        Text("\u0022Suicide!\u0022")
+      ContentList
+        Text("\n")
+    Gather(name=null, depth=1)
+    Text("Mrs. Christie lowered her manuscript a moment. The rest of the writing group sat, open-mouthed.")
+    Text("\n")
+    Divert(target="-\u003E END", empty=false, tunnel=false, thread=false)
+    Gather(name=null, depth=1)
+    Divert(target="-\u003E DONE", empty=false, tunnel=false, thread=false)

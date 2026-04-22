@@ -1,0 +1,10 @@
+Story
+  Weave(baseIndent=0)
+    Text("Hello, world!")
+    Text("\n")
+    Text("Hello?")
+    Text("\n")
+    Text("Hello, are you there?")
+    Text("\n")
+    Gather(name=null, depth=1)
+    Divert(target="-\u003E DONE", empty=false, tunnel=false, thread=false)

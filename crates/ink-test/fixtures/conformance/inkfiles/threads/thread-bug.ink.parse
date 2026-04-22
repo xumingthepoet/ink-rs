@@ -1,0 +1,29 @@
+Story
+  Weave(baseIndent=0)
+    Divert(target="-\u003E start", empty=false, tunnel=false, thread=false)
+    Gather(name=null, depth=1)
+    Divert(target="-\u003E DONE", empty=false, tunnel=false, thread=false)
+  Flow(level=Knot, name="start", function=false)
+    Weave(baseIndent=0)
+      Text("Here is some gold. Do you want it?")
+      Text("\n")
+      Gather(name="top", depth=1)
+      Divert(target="-\u003E choices", empty=false, tunnel=false, thread=true)
+      Choice(name=null, once=false, invisible=false, depth=1, inline=false)
+        ContentList
+          Text("Yes")
+        ContentList
+          Text("\n")
+      Text("You win!")
+      Text("\n")
+      Divert(target="-\u003E END", empty=false, tunnel=false, thread=false)
+  Flow(level=Knot, name="choices", function=false)
+    Weave(baseIndent=0)
+      Choice(name=null, once=false, invisible=false, depth=1, inline=false)
+        ContentList
+          Text("No")
+        ContentList
+          Text("\n")
+      Text("Try again!")
+      Text("\n")
+      Divert(target="-\u003E goback", empty=false, tunnel=false, thread=false)

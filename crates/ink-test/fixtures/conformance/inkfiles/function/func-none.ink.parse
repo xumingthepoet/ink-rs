@@ -1,0 +1,20 @@
+Story
+  Weave(baseIndent=0)
+    VariableAssignment(name="x", global=true, temp=false)
+      Number(0)
+    ContentList
+      VariableAssignment(name="x", global=false, temp=false)
+        FunctionCall(f, args=0)
+      Text("\n")
+    Text("The value of x is ")
+    ContentList
+      VariableReference(x)
+    Text(".")
+    Text("\n")
+    Divert(target="-\u003E END", empty=false, tunnel=false, thread=false)
+    Gather(name=null, depth=1)
+    Divert(target="-\u003E DONE", empty=false, tunnel=false, thread=false)
+  Flow(level=Knot, name="f", function=true)
+    Weave(baseIndent=0)
+      Return
+        Number(3.8)

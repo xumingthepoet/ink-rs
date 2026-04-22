@@ -1,0 +1,18 @@
+Story
+  Weave(baseIndent=0)
+    Text("tag ")
+    Tag(start=true, inChoice=false)
+    Text("pic")
+    ContentList
+      Binary(+, Number(5), Number(3))
+    ContentList
+      Sequence(type=Stopping)
+        Weave(baseIndent=0)
+          Text("red")
+        Weave(baseIndent=0)
+          Text("blue")
+    Text(".jpg")
+    Tag(start=false, inChoice=false)
+    Text("\n")
+    Gather(name=null, depth=1)
+    Divert(target="-\u003E DONE", empty=false, tunnel=false, thread=false)

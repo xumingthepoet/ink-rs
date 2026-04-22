@@ -1,0 +1,32 @@
+Story
+  Weave(baseIndent=0)
+    Divert(target="-\u003E start", empty=false, tunnel=false, thread=false)
+    Gather(name=null, depth=1)
+    Divert(target="-\u003E DONE", empty=false, tunnel=false, thread=false)
+  Flow(level=Knot, name="start", function=false)
+    Weave(baseIndent=0)
+      ContentList
+        FunctionCall(beats, args=1)
+      Text("\n")
+      ContentList
+        FunctionCall(beats, args=1)
+      Text("\n")
+      Choice(name=null, once=true, invisible=false, depth=1, inline=true)
+        ContentList
+          Text("Choice")
+        ContentList
+          Text("  ")
+          Divert(target="-\u003E next", empty=false, tunnel=false, thread=false)
+          Text("\n")
+    Flow(level=Stitch, name="next", function=false)
+      Weave(baseIndent=0)
+        ContentList
+          FunctionCall(beats, args=1)
+        Text("\n")
+        Divert(target="-\u003E END", empty=false, tunnel=false, thread=false)
+  Flow(level=Knot, name="beats", function=true)
+    Weave(baseIndent=0)
+      ContentList
+        Return
+          FunctionCall(TURNS_SINCE, args=1)
+        Text("\n")

@@ -1,0 +1,22 @@
+Story
+  Weave(baseIndent=0)
+    VariableAssignment(name="roll", global=true, temp=false)
+      Number(0)
+    ContentList
+      Conditional
+        Binary(==, VariableReference(roll), Number(0))
+        ConditionalBranch(true=true, else=false, inline=false)
+          Weave(baseIndent=0)
+            VariableAssignment(name="roll", global=false, temp=false)
+              Number(2)
+    Text("\n")
+    ContentList
+      Conditional
+        Binary(==, VariableReference(roll), Number(0))
+        ConditionalBranch(true=true, else=false, inline=false)
+          Weave(baseIndent=0)
+            VariableAssignment(name="roll", global=false, temp=false)
+              Number(1)
+    Text("\n")
+    Gather(name=null, depth=1)
+    Divert(target="-\u003E DONE", empty=false, tunnel=false, thread=false)

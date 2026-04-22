@@ -1,0 +1,24 @@
+Story
+  Weave(baseIndent=0)
+    Divert(target="-\u003E test", empty=false, tunnel=false, thread=false)
+    Gather(name=null, depth=1)
+    Divert(target="-\u003E DONE", empty=false, tunnel=false, thread=false)
+  Flow(level=Knot, name="test", function=false)
+    Weave(baseIndent=0)
+      Text("The radio hissed into life. ")
+      ContentList
+        Sequence(type=Cycle)
+          Weave(baseIndent=0)
+            Text("\u0022Three!\u0022")
+          Weave(baseIndent=0)
+            Text("\u0022Two!\u0022")
+          Weave(baseIndent=0)
+            Text("\u0022One!\u0022")
+      Text("\n")
+      Choice(name=null, once=false, invisible=false, depth=1, inline=true)
+        ContentList
+          Text("Again")
+        ContentList
+          Text(" ")
+          Divert(target="-\u003E test", empty=false, tunnel=false, thread=false)
+          Text("\n")

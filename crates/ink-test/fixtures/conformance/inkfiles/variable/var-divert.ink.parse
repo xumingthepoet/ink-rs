@@ -1,0 +1,32 @@
+Story
+  Weave(baseIndent=0)
+    VariableAssignment(name="current_epilogue", global=true, temp=false)
+      DivertTarget(-> everybody_dies)
+    Text("Divert as variable example")
+    Text("\n")
+    Divert(target="-\u003E continue_or_quit", empty=false, tunnel=false, thread=false)
+    Gather(name=null, depth=1)
+    Divert(target="-\u003E DONE", empty=false, tunnel=false, thread=false)
+  Flow(level=Knot, name="continue_or_quit", function=false)
+    Weave(baseIndent=0)
+      Text("Give up now, or keep trying to save your Kingdom?")
+      Text("\n")
+      Choice(name=null, once=true, invisible=false, depth=1, inline=true)
+        ContentList
+          Text("Keep trying!")
+        ContentList
+          Text("   ")
+          Divert(target="-\u003E continue_or_quit", empty=false, tunnel=false, thread=false)
+          Text("\n")
+      Choice(name=null, once=true, invisible=false, depth=1, inline=true)
+        ContentList
+          Text("Give up")
+        ContentList
+          Text("        ")
+          Divert(target="-\u003E current_epilogue", empty=false, tunnel=false, thread=false)
+          Text("\n")
+  Flow(level=Knot, name="everybody_dies", function=false)
+    Weave(baseIndent=0)
+      Text("Everybody dies.")
+      Text("\n")
+      Divert(target="-\u003E END", empty=false, tunnel=false, thread=false)

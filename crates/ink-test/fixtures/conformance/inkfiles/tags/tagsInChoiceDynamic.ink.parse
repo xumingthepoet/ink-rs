@@ -1,0 +1,38 @@
+Story
+  Weave(baseIndent=0)
+    VariableAssignment(name="name", global=true, temp=false)
+      String("Name")
+    Choice(name=null, once=false, invisible=false, depth=1, inline=true)
+      ContentList
+        Text("Choice ")
+        Tag(start=true, inChoice=false)
+        Text("tag ")
+        ContentList
+          VariableReference(name)
+        Tag(start=false, inChoice=false)
+      ContentList
+        Text("\n")
+    Choice(name=null, once=false, invisible=false, depth=1, inline=true)
+      ContentList
+        Text("Choice2 ")
+        Tag(start=true, inChoice=false)
+        Text("tag 1 ")
+        ContentList
+          VariableReference(name)
+        Text(" 2 3 4")
+        Tag(start=false, inChoice=false)
+      ContentList
+        Text("\n")
+    Choice(name=null, once=false, invisible=false, depth=1, inline=true)
+      ContentList
+        Text("Choice ")
+        Tag(start=true, inChoice=false)
+        ContentList
+          VariableReference(name)
+        Text(" tag 1 2 3 4")
+        Tag(start=false, inChoice=false)
+      ContentList
+        Text("\n")
+    Divert(target="-\u003E END", empty=false, tunnel=false, thread=false)
+    Gather(name=null, depth=1)
+    Divert(target="-\u003E DONE", empty=false, tunnel=false, thread=false)

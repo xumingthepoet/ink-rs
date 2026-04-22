@@ -1,0 +1,17 @@
+Story
+  Weave(baseIndent=0)
+    Divert(target="-\u003E A", empty=false, tunnel=true, thread=false)
+    Text("We will never return to here!")
+    Text("\n")
+    Gather(name=null, depth=1)
+    Divert(target="-\u003E DONE", empty=false, tunnel=false, thread=false)
+  Flow(level=Knot, name="A", function=false)
+    Weave(baseIndent=0)
+      Text("This is A")
+      Text("\n")
+      TunnelOnwards
+  Flow(level=Knot, name="B", function=false)
+    Weave(baseIndent=0)
+      Text("Now in B.")
+      Text("\n")
+      Divert(target="-\u003E END", empty=false, tunnel=false, thread=false)

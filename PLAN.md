@@ -453,7 +453,9 @@ cargo test --workspace
 - [x] Normalize and document any intentional JSON mismatches while the suite
   was being brought up, then remove the mismatches once the compiler matched
   the fixture set.
-- [ ] Fix the imported legacy compiler-conformance suite first, in
+- [x] Add tokenizer-level `.ink.parse` snapshots for compiler-conformance
+  fixtures and compare them before JSON.
+- [x] Fix the imported legacy compiler-conformance suite first, in
   dependency-light order.
 - [ ] Then fix the imported legacy csharp-tests suite, reusing the same
   dependency-light approach and compatibility wrappers where needed.
@@ -472,11 +474,10 @@ Primary Rust references:
 
 Current blocker while the imported suites are being stabilized:
 
-- The imported legacy compiler-to-runtime suite is the highest-priority
-  remaining suite, followed by the imported csharp suite. Both stay
-  feature-gated so the default gate stays green until the remaining migration
-  work is complete. The `divert_choice` checkpoint is green; `label_scope`
-  still times out and is the current compiler-conformance blocker.
+- The imported legacy compiler-to-runtime suite is now green, including the
+  new tokenizer-level parse snapshots that compare `A.ink.parse` before
+  `A.ink.json`. The highest-priority remaining suite is the imported csharp
+  suite, which still stays feature-gated while migration continues.
 
 Acceptance:
 
@@ -501,8 +502,9 @@ timeout 30s cargo test --workspace
 
 ## Next Task
 
-Continue fixing the feature-gated legacy compiler-conformance suite first, then
-move to the legacy csharp-tests suite, both in small checkpointed slices.
+Continue fixing the feature-gated legacy csharp-tests suite in small
+checkpointed slices now that the compiler-conformance suite is green and has
+parse-snapshot coverage.
 
 ## Risk Register
 

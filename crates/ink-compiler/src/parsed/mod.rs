@@ -39,7 +39,7 @@ pub use gather::Gather;
 pub use identifier::Identifier;
 pub use knot::Knot;
 pub use list_definition::{ListDefinition, ListElementDefinition};
-pub(crate) use object::ObjectKind;
+pub use object::ObjectKind;
 pub use object::{find_all, find_first, DebugMetadata, Object, ObjectRef};
 pub use path::Path;
 pub use return_stmt::Return;

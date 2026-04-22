@@ -1,0 +1,14 @@
+Story
+  Weave(baseIndent=0)
+    VariableAssignment(name="x", global=true, temp=false)
+      ListDefinition(name="x")
+        ListElementDefinition(name="a", explicit=null, series=1, initial=false)
+        ListElementDefinition(name="b", explicit=null, series=2, initial=false)
+        ListElementDefinition(name="c", explicit=null, series=3, initial=false)
+    VariableAssignment(name="x", global=false, temp=false)
+      List()
+    ContentList
+      FunctionCall(LIST_ALL, args=1)
+    Text("\n")
+    Gather(name=null, depth=1)
+    Divert(target="-\u003E DONE", empty=false, tunnel=false, thread=false)

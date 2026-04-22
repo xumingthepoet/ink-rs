@@ -1,0 +1,30 @@
+Story
+  Weave(baseIndent=0)
+    VariableAssignment(name="x", global=true, temp=false)
+      Number(1)
+    VariableAssignment(name="y", global=true, temp=false)
+      String("Hmm.")
+    Text("How much do you give?")
+    Text("\n")
+    Choice(name=null, once=true, invisible=false, depth=1, inline=true)
+      ContentList
+        Text("I don\u0027t know")
+      ContentList
+        Text(" ")
+        Divert(target="-\u003E give", empty=false, tunnel=false, thread=false)
+        Text("\n")
+    Gather(name=null, depth=1)
+    Divert(target="-\u003E DONE", empty=false, tunnel=false, thread=false)
+  Flow(level=Knot, name="give", function=false)
+    Weave(baseIndent=0)
+      Text("You give ")
+      ContentList
+        VariableReference(a)
+      Text(" or ")
+      ContentList
+        VariableReference(b)
+      Text(" dollars. ")
+      ContentList
+        VariableReference(y)
+      Text("\n")
+      Divert(target="-\u003E END", empty=false, tunnel=false, thread=false)

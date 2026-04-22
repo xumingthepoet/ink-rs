@@ -1,0 +1,14 @@
+Story
+  Weave(baseIndent=0)
+    Text("The value of x is ")
+    ContentList
+      FunctionCall(lerp, args=3)
+    Text(".")
+    Text("\n")
+    Divert(target="-\u003E END", empty=false, tunnel=false, thread=false)
+    Gather(name=null, depth=1)
+    Divert(target="-\u003E DONE", empty=false, tunnel=false, thread=false)
+  Flow(level=Knot, name="lerp", function=true)
+    Weave(baseIndent=0)
+      Return
+        Binary(+, Binary(*, Binary(-, VariableReference(b), VariableReference(a)), VariableReference(k)), VariableReference(a))

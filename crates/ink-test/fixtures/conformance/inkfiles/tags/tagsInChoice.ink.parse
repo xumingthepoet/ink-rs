@@ -1,0 +1,22 @@
+Story
+  Weave(baseIndent=0)
+    Choice(name=null, once=false, invisible=false, depth=1, inline=true)
+      ContentList
+        Text("one ")
+        Tag(start=true, inChoice=false)
+        Text("one ")
+        Tag(start=false, inChoice=false)
+      ContentList
+        Text("two ")
+        Tag(start=true, inChoice=false)
+        Text("two")
+        Tag(start=false, inChoice=false)
+      ContentList
+        Text(" three ")
+        Tag(start=true, inChoice=false)
+        Text("three ")
+        Tag(start=false, inChoice=false)
+        Divert(target="-\u003E END", empty=false, tunnel=false, thread=false)
+        Text("\n")
+    Gather(name=null, depth=1)
+    Divert(target="-\u003E DONE", empty=false, tunnel=false, thread=false)

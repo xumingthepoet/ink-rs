@@ -1,0 +1,16 @@
+Story
+  Weave(baseIndent=0)
+    VariableAssignment(name="x", global=true, temp=false)
+      Number(0)
+    VariableAssignment(name="x", global=false, temp=false)
+      Number(5)
+    Choice(name=null, once=true, invisible=false, depth=1, inline=false)
+      ContentList
+        Text("Sets x = 10")
+      ContentList
+        Text("\n")
+    VariableAssignment(name="x", global=false, temp=false)
+      Number(10)
+    Divert(target="-\u003E END", empty=false, tunnel=false, thread=false)
+    Gather(name=null, depth=1)
+    Divert(target="-\u003E DONE", empty=false, tunnel=false, thread=false)
