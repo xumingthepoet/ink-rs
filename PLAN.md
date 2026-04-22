@@ -21,7 +21,7 @@ Core commands to run after every completed milestone:
 - [x] `cargo check --workspace`
 - [x] `cargo test --workspace`
 
-Current last verified milestone: Milestone 9 glue conformance slice
+Current last verified milestone: Milestone 9 simple-divert fixture slice
 (`2026-04-22`).
 
 ## Rules

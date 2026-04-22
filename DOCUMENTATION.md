@@ -90,6 +90,8 @@ runtime instead of rewriting runtime execution.
   `basictext` fixtures from `blade-ink-rs`.
 - The trusted `blade-ink-rs` glue text fixture `glue/simple-glue.ink` now has
   a parser-level conformance snapshot.
+- The trusted `blade-ink-rs` divert fixture `divert/simple-divert.ink` now has
+  a parser-level conformance snapshot.
 - Official C# include-chain fixtures now have a parser-level conformance
   snapshot covering BOM stripping, recursive include expansion, a variable
   declaration, and a knot with a divert.
@@ -241,6 +243,25 @@ Pass a second argument to write the JSON to a file instead of stdout.
   full official test suite.
 
 ## Audit Log
+
+### 2026-04-22
+
+- Added a parser-level conformance snapshot for `blade-ink-rs` divert fixture
+  `divert/simple-divert.ink`.
+- The snapshot verifies a top-level text line, a simple divert, a blank line,
+  and a trailing knot body.
+
+Validation:
+
+```sh
+cargo fmt --all --check
+cargo test -p ink-compiler ink_parser_golden_cases_for_minimal_snippets
+cargo check --workspace
+cargo test --workspace
+```
+
+Result: all passed. The only remaining warnings are the two existing
+`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
 
 ### 2026-04-22
 

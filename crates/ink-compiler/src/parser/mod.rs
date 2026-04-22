@@ -2604,6 +2604,16 @@ mod tests {
                 "Story\n  ContentList\n    Text(\"Some <>\")\n    Text(\"\\n\")\n  ContentList\n    Text(\"content <>\")\n    Text(\"\\n\")\n  ContentList\n    Text(\"with glue.\")",
             ),
             (
+                "simple_divert_fixture",
+                "\
+We arrived into London at 9.45pm exactly.\n\
+-> hurry_home\n\
+\n\
+=== hurry_home ===\n\
+We hurried home to Savile Row as fast as we could. -> END",
+                "Story\n  ContentList\n    Text(\"We arrived into London at 9.45pm exactly.\")\n    Text(\"\\n\")\n  Divert(target=\"-> hurry_home\", empty=false, tunnel=false, thread=false)\n  ContentList\n    Text(\"\\n\")\n  Flow(level=Knot, name=\"hurry_home\", function=false)\n    ContentList\n      Text(\"We hurried home to Savile Row as fast as we could. -> END\")",
+            ),
+            (
                 "sequence",
                 "once: first | second",
                 "Story\n  Sequence(type=Once)\n    ContentList\n      Text(\"first\")\n    ContentList\n      Text(\"second\")",
