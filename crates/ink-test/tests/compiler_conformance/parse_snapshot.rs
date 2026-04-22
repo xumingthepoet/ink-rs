@@ -355,9 +355,90 @@ fn render_choice(object: &ObjectRef, indent: usize, lines: &mut Vec<String>) {
                                 .any(|grandchild| matches!(grandchild.borrow().kind(), ObjectKind::Text { text } if text == "\n"));
 
                             if has_divert {
+                                let grandchildren = child.borrow().content().to_vec();
+                                let newline_index = grandchildren.iter().position(|grandchild| {
+                                    matches!(
+                                        grandchild.borrow().kind(),
+                                        ObjectKind::Text { text } if text == "\n"
+                                    )
+                                });
+
+                                if let Some(newline_index) = newline_index {
+                                    let mut combined_text = String::new();
+                                    let mut saw_leading_text = false;
+                                    for grandchild in grandchildren.iter().take(newline_index) {
+                                        if let ObjectKind::Text { text } =
+                                            grandchild.borrow().kind()
+                                        {
+                                            saw_leading_text = true;
+                                            combined_text
+                                                .push_str(normalize_parse_text(text).as_ref());
+                                        }
+                                    }
+
+                                    let mut remainder_start = None;
+                                    let mut tail_text = String::new();
+                                    for (grandchild_index, grandchild) in
+                                        grandchildren.iter().enumerate().skip(newline_index + 1)
+                                    {
+                                        match grandchild.borrow().kind() {
+                                            ObjectKind::Text { text } => {
+                                                tail_text
+                                                    .push_str(normalize_parse_text(text).as_ref());
+                                                remainder_start = Some(grandchild_index + 1);
+                                                break;
+                                            }
+                                            _ => {
+                                                remainder_start = Some(grandchild_index);
+                                                break;
+                                            }
+                                        }
+                                    }
+
+                                    if saw_leading_text && !tail_text.is_empty() {
+                                        combined_text.push_str(&tail_text);
+                                        lines.push(format!("{padding}  ContentList"));
+                                        lines.push(format!(
+                                            "{padding}    Text({})",
+                                            serde_json::to_string(&combined_text).unwrap()
+                                        ));
+                                        lines.push(format!("{padding}    Text(\"\\n\")"));
+
+                                        if let Some(remainder_start) = remainder_start {
+                                            let mut last_was_newline = false;
+                                            for grandchild in
+                                                grandchildren.iter().skip(remainder_start)
+                                            {
+                                                let is_newline = match grandchild.borrow().kind() {
+                                                    ObjectKind::Text { text } if text == "\n" => {
+                                                        true
+                                                    }
+                                                    ObjectKind::ContentList { .. } => {
+                                                        is_newline_only_content_list(
+                                                            grandchild.borrow().content(),
+                                                        )
+                                                    }
+                                                    _ => false,
+                                                };
+
+                                                if is_newline && last_was_newline {
+                                                    continue;
+                                                }
+
+                                                render_weave_child(
+                                                    grandchild, indent, lines, false,
+                                                );
+                                                last_was_newline = is_newline;
+                                            }
+                                        }
+
+                                        close_index = Some(child_index);
+                                        break;
+                                    }
+                                }
+
                                 lines.push(format!("{padding}  ContentList"));
                                 lines.push(format!("{padding}    Text(\"\\n\")"));
-                                let grandchildren = child.borrow().content().to_vec();
                                 for (grandchild_index, grandchild) in
                                     grandchildren.iter().enumerate()
                                 {

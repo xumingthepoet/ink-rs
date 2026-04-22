@@ -23,14 +23,15 @@ Core commands to run after every completed milestone:
 - [x] `make gate`
 
 Current last verified milestone: compiler-conformance choice slice advanced to
-`choices/multi-choice` with the imported legacy suites still feature-gated
-(`2026-04-23 02:55`).
+`choices/mixed-choice` with the imported legacy suites still feature-gated
+(`2026-04-23 03:28`).
 
-Current verified checkpoint: `choices/one`, `choices/single-choice`, and
-`choices/multi-choice` are green again; the imported legacy compiler-
-conformance and csharp suites are retained behind the separate legacy
-features so they can keep migrating without blocking the default workspace
-run (`2026-04-23 02:55`).
+Current verified checkpoint: `choices/one`, `choices/single-choice`,
+`choices/multi-choice`, `choices/suppress-choice`, `choices/label-scope`,
+`choices/divert-choice`, and `choices/mixed-choice` are green again; the
+imported legacy compiler-conformance and csharp suites are retained behind
+the separate legacy features so they can keep migrating without blocking the
+default workspace run (`2026-04-23 03:28`).
 
 Workspace warning policy: `.cargo/config.toml` now denies warnings, and
 `make gate` is the unified local entry point for format, check, and a
@@ -481,11 +482,11 @@ Current blocker while the imported suites are being stabilized:
   renderer now matches the official dump for the current choice slice
   (`choices/no-choice-text`, `choices/one`, `choices/single-choice`,
   `choices/multi-choice`, `choices/suppress-choice`, `choices/label-scope`,
-  and `choices/divert-choice`). The checklist queue
+  `choices/divert-choice`, and `choices/mixed-choice`). The checklist queue
   has been reordered to follow the broad syntax progression in
   `WritingWithInk.md`, so the next compiler-conformance work starts from the
   earliest dependency-light syntax slice and now moves on to
-  `choices/mixed-choice`, while `choices/sticky-choice` remains a named-flow
+  `choices/varying-choice`, while `choices/sticky-choice` remains a named-flow
   JSON blocker to recover separately.
 
 Acceptance:

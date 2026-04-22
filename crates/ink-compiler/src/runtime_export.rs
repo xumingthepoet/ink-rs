@@ -569,17 +569,22 @@ fn export_choice_container(
         None
     };
     let flow_prefix = flow_path_prefix(object);
+    let choice_position = object
+        .borrow()
+        .parent()
+        .and_then(|parent| index_in_parent(&parent, object))
+        .map(|index| index + 1)
+        .unwrap_or(choice_index);
     let needs_eval = has_start_content || has_choice_only_content || has_condition;
-    let choice_eval_index = choice_index;
     let choice_eval_prefix = if flow_prefix.is_empty() {
-        format!("0.{choice_eval_index}")
+        format!("0.{choice_position}")
     } else {
-        format!("{flow_prefix}.0.{choice_eval_index}")
+        format!("{flow_prefix}.0.{choice_position}")
     };
     let choice_inner_prefix = if flow_prefix.is_empty() {
-        format!("0.{choice_eval_index}")
+        format!("0.{choice_position}")
     } else {
-        format!(".^.^.{choice_eval_index}")
+        format!(".^.^.{choice_position}")
     };
     let choice_container_prefix = if flow_prefix.is_empty() {
         format!("0.c-{choice_index}")
@@ -690,8 +695,38 @@ fn export_choice_container(
     } else {
         Vec::new()
     };
+    if has_start_content && has_choice_only_content {
+        if matches!(body_tokens.first(), Some(Value::String(value)) if value == "\n") {
+            body_tokens.remove(0);
+            if let Some(Value::String(text)) = body_tokens.get_mut(0) {
+                if let Some(body) = text.strip_prefix('^') {
+                    if !body.starts_with(' ') {
+                        *text = format!("^ {body}");
+                    }
+                }
+            }
+            if body_tokens.len() > 1
+                && !matches!(body_tokens.get(1), Some(Value::String(value)) if value == "\n")
+            {
+                body_tokens.insert(1, Value::String("\n".to_string()));
+            }
+        }
+        if body_tokens.len() > 2 {
+            while matches!(
+                body_tokens.get(body_tokens.len() - 3),
+                Some(Value::String(value)) if value == "\n"
+            ) && matches!(
+                body_tokens.get(body_tokens.len() - 2),
+                Some(Value::String(value)) if value == "\n"
+            ) && matches!(body_tokens.last(), Some(Value::String(value)) if value == "done" || value == "end")
+            {
+                body_tokens.remove(body_tokens.len() - 2);
+            }
+        }
+    }
 
     if has_start_content
+        && !has_choice_only_content
         && !has_inline_inner_content
         && !matches!(body_tokens.first(), Some(Value::String(value)) if value == "\n")
     {
@@ -704,7 +739,8 @@ fn export_choice_container(
         branch_gather_target = None;
     }
     let suppress_synthetic_gather = branch_gather_target.is_none()
-        && (has_start_content || has_parent_only_relative_divert(&inner_tokens));
+        && has_parent_only_relative_divert(&inner_tokens)
+        && !has_start_content;
 
     if branch_gather_target.is_none() && !suppress_synthetic_gather {
         branch_gather_target = Some(ChoiceGatherTarget {
@@ -1545,7 +1581,7 @@ fn export_text_token(text: &str) -> Value {
         json!("\n")
     } else {
         let leading_whitespace = text.chars().take_while(|c| *c == ' ' || *c == '\t').count();
-        let prefix = if leading_whitespace == 1 { " " } else { "" };
+        let prefix = if leading_whitespace > 0 { " " } else { "" };
         json!(format!("^{}{}", prefix, &text[leading_whitespace..]))
     }
 }

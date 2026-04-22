@@ -22,12 +22,13 @@ into `crates/ink-runtime` instead of rewriting runtime execution.
 - Compiler-conformance compares `A.ink.parse` first and `A.ink.json` second;
   parse snapshots are generated locally from the Rust parsed tree.
 - The compiler-conformance queue follows `WritingWithInk.md` order and is at
-  `11/126` after the latest choice slice.
+  `12/126` after the latest choice slice.
 - Green fixtures in the current checkpoint include `basictext/oneline`,
   `basictext/twolines`, `test1`, `choices/no-choice-text`, `choices/one`,
   `choices/single-choice`, `choices/multi-choice`, `choices/suppress-choice`,
-  `choices/label-scope`, `choices/divert-choice`, and `knot/single-line`.
-- The next compiler-conformance fixture is `choices/mixed-choice`; `choices/
+  `choices/label-scope`, `choices/divert-choice`, `choices/mixed-choice`,
+  and `knot/single-line`.
+- The next compiler-conformance fixture is `choices/varying-choice`; `choices/
   sticky-choice` is still under recovery because the exporter is still
   over-inserting a named-flow continuation.
 - `choices/TheIntercept` stays in the last-pass section.
@@ -40,6 +41,12 @@ into `crates/ink-runtime` instead of rewriting runtime execution.
 The audit log is a rolling window of the latest five entries. Timestamps use
 `YYYY-MM-DD HH:MM`; older history is intentionally trimmed so this file stays
 usable as prompt memory.
+
+### 2026-04-23 03:28
+
+- Fixed `choices/mixed-choice` in the legacy compiler-conformance queue.
+- The choice tail now matches the official JSON, so the queue advances to
+  `choices/varying-choice`.
 
 ### 2026-04-23 03:09
 
@@ -62,14 +69,6 @@ usable as prompt memory.
   `single_choice1_test` and `single_choic2_test` now pass.
 - Validated with the focused `single_choice1_test` and `single_choic2_test`
   compiler-conformance runs.
-
-### 2026-04-23 02:49
-
-- Kept the compiler-conformance queue in WritingWithInk order and continued
-  the dependency-light choice slice.
-- `choices/one` and `choices/no-choice-text` are green in the current
-  checkpoint.
-
 ### 2026-04-23 02:49
 
 - Added the rolling five-entry audit-log rule and minute-granularity
