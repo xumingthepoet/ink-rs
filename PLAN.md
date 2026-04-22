@@ -21,8 +21,8 @@ Core commands to run after every completed milestone:
 - [x] `cargo check --workspace`
 - [x] `cargo test --workspace`
 
-Current last verified milestone: Milestone 7 brace multiline conditional and
-sequence parsing slice (`2026-04-22`).
+Current last verified milestone: Milestone 7 feature tests slice
+(`2026-04-22`).
 
 ## Rules
 
@@ -241,8 +241,8 @@ cargo check --workspace
   externals.
 - [x] Port list definitions and list values.
 - [x] Port conditionals, sequences, function calls, returns, and tunnels.
-- [ ] Add feature tests for arithmetic, variables, lists, conditions, functions,
-  and sequences.
+- [x] Add feature tests for arithmetic, variables, lists, conditions,
+  functions, and sequences.
 
 Primary C# references:
 
@@ -265,6 +265,7 @@ cargo fmt --all --check
 cargo test -p ink-compiler expressions
 cargo test -p ink-compiler variables
 cargo test -p ink-compiler lists
+cargo test -p ink-compiler ink_parser_feature_cases_cover_arithmetic_variables_lists_conditions_functions_and_sequences
 cargo test --workspace
 ```
 
@@ -318,8 +319,7 @@ cargo test --workspace
 
 ## Next Task
 
-Add feature tests for arithmetic, variables, lists, conditions, functions, and
-sequences.
+Port include handling and file handler abstraction.
 
 ## Risk Register
 

@@ -2476,4 +2476,54 @@ mod tests {
             assert_eq!(render_story(&story), expected, "case {name}");
         }
     }
+
+    #[test]
+    fn ink_parser_feature_cases_cover_arithmetic_variables_lists_conditions_functions_and_sequences(
+    ) {
+        let cases = [
+            (
+                "arithmetic_and_variables",
+                "VAR result = 1 + 2 * 3\n~ result = result + 4",
+                "Story\n  VariableAssignment(name=\"result\", global=true, temp=false)\n    Binary(+, Number(1), Binary(*, Number(2), Number(3)))\n  VariableAssignment(name=\"result\", global=false, temp=false)\n    Binary(+, VariableReference(result), Number(4))",
+            ),
+            (
+                "lists",
+                "LIST terrain = (forest), hill = 4, (beach)\nVAR chosen = (forest, terrain.hill)",
+                "Story\n  VariableAssignment(name=\"terrain\", global=true, temp=false)\n    ListDefinition(name=\"terrain\")\n      ListElementDefinition(name=\"forest\", explicit=None, series=1, initial=true)\n      ListElementDefinition(name=\"hill\", explicit=Some(4), series=4, initial=false)\n      ListElementDefinition(name=\"beach\", explicit=None, series=5, initial=true)\n  VariableAssignment(name=\"chosen\", global=true, temp=false)\n    List(forest, terrain.hill)",
+            ),
+            (
+                "conditions",
+                "VAR x = 4\n{ x == 4:\n  yes\n- else:\n  no\n}",
+                "Story\n  VariableAssignment(name=\"x\", global=true, temp=false)\n    Number(4)\n  Conditional\n    Binary(==, VariableReference(x), Number(4))\n    ConditionalBranch(true=true, else=false, inline=false)\n      Text(\"yes\")\n      Text(\"\\n\")\n    ConditionalBranch(true=false, else=true, inline=false)\n      Text(\"no\")\n      Text(\"\\n\")",
+            ),
+            (
+                "functions",
+                "=== function greet ===\n~ return 7\n== start ==\n~ greet()",
+                "Story\n  Flow(level=Knot, name=\"greet\", function=true)\n    Return\n      Number(7)\n  Flow(level=Knot, name=\"start\", function=false)\n    FunctionCall(greet, args=0)",
+            ),
+            (
+                "sequences",
+                "{once:\n  - first\n  -\n  - second\n}",
+                "Story\n  Sequence(type=Once)\n    ContentList\n      Text(\"first\")\n    ContentList\n    ContentList\n      Text(\"second\")",
+            ),
+        ];
+
+        for (name, source, expected) in cases {
+            let mut parser = InkParser::new(source, Some("feature.ink"), None);
+            let result = parser.parse();
+
+            assert!(
+                result.diagnostics.is_empty(),
+                "case {name} produced diagnostics: {:?}",
+                result.diagnostics
+            );
+
+            let story = result.parsed_story.expect("expected parsed story");
+            assert_eq!(
+                render_story(&story),
+                expected,
+                "case {name} produced an unexpected feature snapshot"
+            );
+        }
+    }
 }

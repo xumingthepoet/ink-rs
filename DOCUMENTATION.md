@@ -82,10 +82,10 @@ runtime instead of rewriting runtime execution.
 
 Milestone 1 is complete. Milestone 2 is complete. Milestone 3 is complete.
 Milestone 4 is complete. Milestone 5 is complete. Milestone 6 is complete.
-Milestone 7 is in progress, and the expression, variable-statement,
+Milestone 7 task list is complete, and the expression, variable-statement,
 list-definition, return-statement, tunnel-divert, inline-sequence,
-inline-conditional, and brace multiline conditional/sequence slices are
-complete.
+inline-conditional, brace multiline conditional/sequence, and feature-test
+slices are complete.
 
 ## Verification Checklist
 
@@ -148,6 +148,8 @@ The ignored `blade-ink-rs/` directory must be present because the workspace uses
 - `InkParser::parse` now also recognizes brace-based multiline sequence and
   conditional blocks, including switch-style branch expressions, but nested
   brace logic and runtime export behavior remain limited.
+- Parser feature coverage now includes arithmetic, variables, lists,
+  conditions, functions, and sequences in a single stable snapshot test.
 - Expression parsing currently covers a focused foundation subset: numeric and
   boolean literals, string expressions, variable paths, function calls, list
   expressions, divert targets, unary operators, and binary precedence.
@@ -171,6 +173,8 @@ The ignored `blade-ink-rs/` directory must be present because the workspace uses
 - Parsed inline and brace multiline conditional/sequence nodes are parsed, but
   nested brace logic and runtime export behavior are still limited.
 - The ink parser grammar is still pending for the remaining unported features.
+- Feature coverage for arithmetic, variables, lists, conditions, functions, and
+  sequences now exists as a stable parser snapshot test.
 - The C# `Glue` and `LegacyTag` `Wrap<T>` aliases are not yet ported as
   dedicated compiler-side wrappers because the corresponding runtime modules in
   `blade-ink-rs` are private; the generic `Wrap<T>` helper is in place for
@@ -180,6 +184,26 @@ The ignored `blade-ink-rs/` directory must be present because the workspace uses
   compiler crate failures.
 
 ## Audit Log
+
+### 2026-04-22
+
+- Completed the Milestone 7 feature-tests slice.
+- Added a parser feature snapshot test covering arithmetic, variables, lists,
+  conditions, functions, and sequences in one compact fixture set.
+- Confirmed the feature snapshot against the current parser tree rendering.
+
+Validation:
+
+```sh
+cargo fmt --all
+cargo test -p ink-compiler ink_parser_feature_cases_cover_arithmetic_variables_lists_conditions_functions_and_sequences
+cargo test -p ink-compiler parser
+cargo check --workspace
+cargo test --workspace
+```
+
+Result: all passed. `blade-ink-rs/lib` emitted the same two existing warnings
+about unnecessary parentheses around trait object types.
 
 ### 2026-04-22
 
@@ -712,8 +736,7 @@ about unnecessary parentheses around trait object types.
 
 ## Next Task
 
-Add feature tests for arithmetic, variables, lists, conditions, functions, and
-sequences.
+Port include handling and file handler abstraction.
 
 ## Repo Structure
 
