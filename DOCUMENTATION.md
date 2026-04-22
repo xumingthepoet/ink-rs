@@ -91,8 +91,6 @@ runtime instead of rewriting runtime execution.
   the official include examples from `ink-csharp/tests`.
 - The trusted conformance baseline now covers both the one-line and two-line
   `basictext` fixtures from `blade-ink-rs`.
-- The trusted `blade-ink-rs` glue text fixture `glue/simple-glue.ink` now has
-  a parser-level conformance snapshot.
 - The trusted `blade-ink-rs` divert fixture `divert/simple-divert.ink` now has
   a parser-level conformance snapshot.
 - The trusted `blade-ink-rs` glue/divert fixture `glue/glue-with-divert.ink`
@@ -101,6 +99,8 @@ runtime instead of rewriting runtime execution.
   runtime conformance snapshot.
 - The trusted `blade-ink-rs` knot fixture `knot/strip-empty-lines.ink` now
   has a runtime conformance snapshot.
+- The trusted `blade-ink-rs` knot fixture `knot/single-line.ink` now has a
+  runtime conformance snapshot.
 - Official C# include-chain fixtures now have a parser-level conformance
   snapshot covering BOM stripping, recursive include expansion, a variable
   declaration, and a knot with a divert.
@@ -256,6 +256,25 @@ Pass a second argument to write the JSON to a file instead of stdout.
 ### 2026-04-22
 
 - Added a runtime conformance snapshot for `blade-ink-rs` knot fixture
+  `knot/single-line.ink`.
+- The snapshot verifies plain-text runtime output stays stable through
+  `Compiler::compile_json` and `bladeink::story::Story::new`.
+
+Validation:
+
+```sh
+cargo fmt --all --check
+cargo test -p ink-compiler --test conformance_harness
+cargo check --workspace
+cargo test --workspace
+```
+
+Result: all passed. The only remaining warnings are the two existing
+`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
+
+### 2026-04-22
+
+- Added a runtime conformance snapshot for `blade-ink-rs` knot fixture
   `knot/strip-empty-lines.ink`.
 - The snapshot verifies plain-text runtime output stays stable for a source
   file with internal blank lines.
@@ -298,25 +317,6 @@ Result: all passed. The only remaining warnings are the two existing
   `glue/glue-with-divert.ink`.
 - The snapshot verifies a text line with glue markers, a simple divert, two
   knot bodies, and the terminal divert to `END`.
-
-### 2026-04-22
-
-- Added a parser-level conformance snapshot for `blade-ink-rs` glue fixture
-  `glue/simple-glue.ink`.
-- The snapshot keeps glue text visible in the parsed tree so future runtime
-  export work can decide whether to treat it specially.
-
-Validation:
-
-```sh
-cargo fmt --all --check
-cargo test -p ink-compiler ink_parser_golden_cases_for_minimal_snippets
-cargo check --workspace
-cargo test --workspace
-```
-
-Result: all passed. The only remaining warnings are the two existing
-`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
 
 ### 2026-04-22
 
