@@ -91,6 +91,8 @@ runtime instead of rewriting runtime execution.
   the official include examples from `ink-csharp/tests`.
 - The trusted conformance baseline now covers both the one-line and two-line
   `basictext` fixtures from `blade-ink-rs`.
+- The trusted `blade-ink-rs` `basictext/oneline.ink` fixture now also has a
+  parser-level conformance snapshot.
 - The trusted `blade-ink-rs` `basictext/twolines.ink` fixture now also has a
   parser-level conformance snapshot.
 - The trusted `blade-ink-rs` `conditional/iftrue.ink` fixture now also has a
@@ -290,6 +292,25 @@ Validation:
 ```sh
 cargo fmt --all --check
 cargo test -p ink-compiler ink_parser_parses_trusted_conditional_iftrue_fixture
+cargo check --workspace
+cargo test --workspace
+```
+
+Result: all passed. The only remaining warnings are the two existing
+`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
+
+### 2026-04-22
+
+- Added a parser-level conformance snapshot for `blade-ink-rs` basictext
+  fixture `basictext/oneline.ink`.
+- The snapshot verifies the parser keeps a single plain-text line in stable
+  parsed hierarchy form.
+
+Validation:
+
+```sh
+cargo fmt --all --check
+cargo test -p ink-compiler ink_parser_parses_trusted_basictext_oneline_fixture
 cargo check --workspace
 cargo test --workspace
 ```
