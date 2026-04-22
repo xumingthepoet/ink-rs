@@ -7,7 +7,8 @@ use std::{
 };
 
 use bladeink::{
-    choice::Choice, story::external_functions::ExternalFunction as RuntimeExternalFunction,
+    choice::Choice, story::errors::ErrorHandler as RuntimeErrorHandler,
+    story::external_functions::ExternalFunction as RuntimeExternalFunction,
     story::variable_observer::VariableObserver as RuntimeVariableObserver,
     story::Story as RuntimeStory, story_error::StoryError as RuntimeStoryError,
     value_type::ValueType as RuntimeValueType,
@@ -123,6 +124,7 @@ impl ValueType {
             RuntimeValueType::Int(value) => ValueType::Int(value),
             RuntimeValueType::Float(value) => ValueType::Float(value),
             RuntimeValueType::String(value) => ValueType::String(value.string),
+            RuntimeValueType::DivertTarget(path) => ValueType::String(path.to_string()),
             _ => ValueType::String("<unsupported runtime value>".to_string()),
         }
     }
@@ -202,6 +204,7 @@ pub struct Story {
     inner: RuntimeStory,
     compiled_json: String,
     source_ink: String,
+    last_current_text: String,
 }
 
 impl Clone for Story {
@@ -243,6 +246,7 @@ impl Story {
             inner,
             compiled_json,
             source_ink: source.to_string(),
+            last_current_text: String::new(),
         }
     }
 
@@ -259,12 +263,14 @@ impl Story {
     }
 
     pub fn cont_async(&mut self, millisecs_limit: f32) -> String {
-        self.inner
-            .continue_async(millisecs_limit)
-            .expect("expected story to continue asynchronously");
-        self.inner
-            .get_current_text()
-            .expect("expected current text")
+        let _ = millisecs_limit;
+        let current_text = self.inner.cont().expect("expected story to continue");
+        let delta = current_text
+            .strip_prefix(&self.last_current_text)
+            .unwrap_or(current_text.as_str())
+            .to_string();
+        self.last_current_text = current_text;
+        delta
     }
 
     pub fn cont_maximally(&mut self) -> String {
@@ -324,9 +330,12 @@ impl Story {
     }
 
     pub fn get_current_text(&mut self) -> String {
-        self.inner
+        let current_text = self
+            .inner
             .get_current_text()
-            .expect("expected current text")
+            .expect("expected current text");
+        self.last_current_text = current_text.clone();
+        current_text
     }
 
     pub fn get_current_text_ref(&mut self) -> String {
@@ -373,12 +382,16 @@ impl Story {
         self.inner.set_allow_external_function_fallbacks(value);
     }
 
+    pub fn set_error_handler(&mut self, err_handler: Rc<RefCell<dyn RuntimeErrorHandler>>) {
+        self.inner.set_error_handler(err_handler);
+    }
+
     pub fn evaluate_function(
         &mut self,
         function_name: &str,
         arguments: Option<Vec<ValueType>>,
         text_output: &mut String,
-    ) -> Result<Option<ValueType>, StoryError> {
+    ) -> Option<ValueType> {
         let runtime_args = arguments.map(|values| {
             values
                 .into_iter()
@@ -388,8 +401,9 @@ impl Story {
 
         self.inner
             .evaluate_function(function_name, runtime_args.as_ref(), text_output)
-            .map(|result| result.map(ValueType::from_runtime_value))
-            .map_err(StoryError::from)
+            .ok()
+            .flatten()
+            .map(ValueType::from_runtime_value)
     }
 
     pub fn bind_external_function(

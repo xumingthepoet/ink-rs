@@ -7,7 +7,8 @@ use std::{
 };
 
 use bladeink::{
-    choice::Choice, story::external_functions::ExternalFunction as RuntimeExternalFunction,
+    choice::Choice, story::errors::ErrorHandler as RuntimeErrorHandler,
+    story::external_functions::ExternalFunction as RuntimeExternalFunction,
     story::variable_observer::VariableObserver as RuntimeVariableObserver,
     story::Story as RuntimeStory, story_error::StoryError as RuntimeStoryError,
     value_type::ValueType as RuntimeValueType,
@@ -107,6 +108,7 @@ impl ValueType {
             RuntimeValueType::Int(value) => ValueType::Int(value),
             RuntimeValueType::Float(value) => ValueType::Float(value),
             RuntimeValueType::String(value) => ValueType::String(value.string),
+            RuntimeValueType::DivertTarget(path) => ValueType::String(path.to_string()),
             _ => ValueType::String("<unsupported runtime value>".to_string()),
         }
     }
@@ -319,12 +321,16 @@ impl Story {
         self.inner.set_allow_external_function_fallbacks(value);
     }
 
+    pub fn set_error_handler(&mut self, err_handler: Rc<RefCell<dyn RuntimeErrorHandler>>) {
+        self.inner.set_error_handler(err_handler);
+    }
+
     pub fn evaluate_function(
         &mut self,
         function_name: &str,
         arguments: Option<Vec<ValueType>>,
         text_output: &mut String,
-    ) -> Result<Option<ValueType>, StoryError> {
+    ) -> Option<ValueType> {
         let runtime_args = arguments.map(|values| {
             values
                 .into_iter()
@@ -334,8 +340,9 @@ impl Story {
 
         self.inner
             .evaluate_function(function_name, runtime_args.as_ref(), text_output)
-            .map(|result| result.map(ValueType::from_runtime_value))
-            .map_err(StoryError::from)
+            .ok()
+            .flatten()
+            .map(ValueType::from_runtime_value)
     }
 
     pub fn bind_external_function(
@@ -379,6 +386,43 @@ impl Story {
 
     pub fn build_string_of_hierarchy(&self) -> String {
         self.inner.build_string_of_hierarchy()
+    }
+
+    #[allow(non_snake_case)]
+    pub fn BuildStringOfHierarchy(&self) -> String {
+        self.build_string_of_hierarchy()
+    }
+
+    #[allow(non_snake_case)]
+    pub fn ResetState(&mut self) {
+        self.inner.reset_state().expect("expected state to reset")
+    }
+
+    #[allow(non_snake_case)]
+    pub fn UnbindExternalFunction(&mut self, func_name: String) {
+        self.inner
+            .unbind_external_function(&func_name)
+            .expect("expected external function to unbind")
+    }
+
+    #[allow(non_snake_case)]
+    pub fn TagsForContentAtPath(&self, path: String) -> Vec<String> {
+        self.tags_for_content_at_path(&path)
+    }
+
+    #[allow(non_snake_case)]
+    pub fn EvaluateFunction(
+        &mut self,
+        function_name: String,
+        arguments: Vec<ValueType>,
+    ) -> Option<ValueType> {
+        let mut text_output = String::new();
+        self.evaluate_function(&function_name, Some(arguments), &mut text_output)
+    }
+
+    #[allow(non_snake_case)]
+    pub fn get_hasWarning(&self) -> bool {
+        !self.get_current_warnings().is_empty()
     }
 
     pub fn get_can_continue(&self) -> bool {

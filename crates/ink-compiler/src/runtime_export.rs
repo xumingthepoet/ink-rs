@@ -20,7 +20,7 @@ pub fn export_story_json(story: &ParsedStory) -> Result<String, CompilerError> {
         .last()
         .map(|object| object.borrow().kind().clone());
     let mut main_content = Vec::new();
-    export_children(top_level_content, &mut state, &mut main_content, true)?;
+    export_children(top_level_content, &mut state, &mut main_content, true, None)?;
     state.main_content = main_content;
 
     if !top_level_has_weave_points
@@ -67,6 +67,7 @@ struct ExportState {
     named_containers: BTreeMap<String, Value>,
     list_defs: BTreeMap<String, BTreeMap<String, i64>>,
     choice_index: usize,
+    gather_index: usize,
     last_top_level_kind: Option<ObjectKind>,
 }
 
@@ -75,6 +76,7 @@ fn export_object_into(
     state: &mut ExportState,
     tokens: &mut Vec<Value>,
     allow_named_flow: bool,
+    inherited_gather_target: Option<String>,
 ) -> Result<(), CompilerError> {
     let (kind, content) = {
         let borrowed = object.borrow();
@@ -83,7 +85,13 @@ fn export_object_into(
 
     match kind {
         ObjectKind::ContentList { .. } => {
-            export_children(content, state, tokens, allow_named_flow)?;
+            export_children(
+                content,
+                state,
+                tokens,
+                allow_named_flow,
+                inherited_gather_target,
+            )?;
         }
         ObjectKind::Text { text } => tokens.extend(export_text_tokens(&text)),
         ObjectKind::Divert {
@@ -99,13 +107,17 @@ fn export_object_into(
         ObjectKind::Flow { name, .. } => {
             if allow_named_flow {
                 if let Some(name) = name {
-                    let container = export_named_flow_container(&content, state)?;
+                    let container = export_named_flow_container(
+                        &content,
+                        state,
+                        inherited_gather_target.clone(),
+                    )?;
                     state.named_containers.insert(name.clone(), container);
                 } else {
-                    export_children(content, state, tokens, false)?;
+                    export_children(content, state, tokens, false, inherited_gather_target)?;
                 }
             } else {
-                export_children(content, state, tokens, false)?;
+                export_children(content, state, tokens, false, inherited_gather_target)?;
             }
         }
         ObjectKind::Choice {
@@ -127,6 +139,8 @@ fn export_object_into(
                 has_choice_only_content,
                 has_inline_inner_content,
                 tokens.len(),
+                None,
+                inherited_gather_target.clone(),
                 tokens,
             )?;
             tokens.push(Value::Object(
@@ -137,8 +151,17 @@ fn export_object_into(
             let sequence_container = export_sequence_container(&content, sequence_type, state)?;
             tokens.push(sequence_container);
         }
-        ObjectKind::Gather { .. }
-        | ObjectKind::Conditional
+        ObjectKind::Gather { identifier, .. } => {
+            let generated_index = state.gather_index;
+            state.gather_index += 1;
+            let gather_name = identifier
+                .map(|identifier| identifier.name)
+                .unwrap_or_else(|| format!("g-{}", generated_index));
+
+            let container = export_gather_container(&content, state, inherited_gather_target)?;
+            state.named_containers.insert(gather_name, container);
+        }
+        ObjectKind::Conditional
         | ObjectKind::ConditionalSingleBranch { .. }
         | ObjectKind::ConstantDeclaration { .. }
         | ObjectKind::ExternalDeclaration { .. }
@@ -188,9 +211,16 @@ fn export_object_into(
 fn export_named_flow_container(
     flow_content: &[ObjectRef],
     state: &mut ExportState,
+    inherited_gather_target: Option<String>,
 ) -> Result<Value, CompilerError> {
     let mut tokens = Vec::new();
-    export_children(flow_content.to_vec(), state, &mut tokens, false)?;
+    export_children(
+        flow_content.to_vec(),
+        state,
+        &mut tokens,
+        false,
+        inherited_gather_target,
+    )?;
 
     let should_wrap = flow_content.iter().any(|object| {
         matches!(
@@ -209,6 +239,37 @@ fn export_named_flow_container(
         tokens.push(Value::Null);
         Ok(Value::Array(tokens))
     }
+}
+
+fn export_gather_container(
+    gather_content: &[ObjectRef],
+    state: &mut ExportState,
+    inherited_gather_target: Option<String>,
+) -> Result<Value, CompilerError> {
+    let mut tokens = Vec::new();
+    export_children(
+        gather_content.to_vec(),
+        state,
+        &mut tokens,
+        false,
+        inherited_gather_target,
+    )?;
+
+    let had_terminal_end = matches!(tokens.last(), Some(Value::String(value)) if value == "end");
+    if had_terminal_end {
+        tokens.pop();
+    }
+
+    if !matches!(tokens.last(), Some(Value::String(value)) if value == "\n") {
+        tokens.push(Value::String("\n".to_string()));
+    }
+    tokens.push(Value::String("end".to_string()));
+    tokens.push(json!([
+        Value::String("done".to_string()),
+        json!({"#n": format!("g-{}", state.gather_index)})
+    ]));
+    tokens.push(Value::Null);
+    Ok(Value::Array(tokens))
 }
 
 fn export_sequence_container(
@@ -290,7 +351,7 @@ fn export_sequence_container(
 
         let mut branch_tokens = vec![json!("pop")];
         if let Some(branch_content) = sequence_content.get(branch_index) {
-            branch_tokens.extend(export_content_list_tokens(branch_content, state)?);
+            branch_tokens.extend(export_content_list_tokens(branch_content, state, None)?);
         }
         branch_tokens.push(json!({
             "->": format!(".^.^.{post_sequence_no_op_index}"),
@@ -318,6 +379,8 @@ fn export_choice_container(
     has_choice_only_content: bool,
     has_inline_inner_content: bool,
     outer_index: usize,
+    branch_gather_target: Option<String>,
+    inherited_gather_target: Option<String>,
     tokens: &mut Vec<Value>,
 ) -> Result<BTreeMap<String, Value>, CompilerError> {
     let choice_index = state.choice_index;
@@ -366,7 +429,13 @@ fn export_choice_container(
 
     if let Some(choice_only_content) = choice_only_content.as_ref() {
         outer_tokens.push(json!("str"));
-        outer_tokens.extend(export_content_list_tokens(choice_only_content, state)?);
+        outer_tokens.extend(export_content_list_tokens(
+            choice_only_content,
+            state,
+            branch_gather_target
+                .clone()
+                .or(inherited_gather_target.clone()),
+        )?);
         outer_tokens.push(json!("/str"));
     }
 
@@ -406,7 +475,13 @@ fn export_choice_container(
 
     if let Some(start_content) = start_content {
         let mut s_tokens = Vec::new();
-        s_tokens.extend(export_content_list_tokens(&start_content, state)?);
+        s_tokens.extend(export_content_list_tokens(
+            &start_content,
+            state,
+            branch_gather_target
+                .clone()
+                .or(inherited_gather_target.clone()),
+        )?);
         s_tokens.push(json!({"->":"$r", "var":true}));
         s_tokens.push(Value::Null);
         outer_tokens.push(Value::Object(
@@ -431,7 +506,13 @@ fn export_choice_container(
     }
 
     let mut body_tokens = if let Some(inner_content) = inner_content {
-        export_content_list_tokens(&inner_content, state)?
+        export_content_list_tokens(
+            &inner_content,
+            state,
+            branch_gather_target
+                .clone()
+                .or(inherited_gather_target.clone()),
+        )?
     } else {
         Vec::new()
     };
@@ -446,22 +527,40 @@ fn export_choice_container(
     inner_tokens.extend(body_tokens);
 
     if has_start_content {
-        if !matches!(
-            inner_tokens.last(),
-            Some(Value::String(value)) if value == "done" || value == "end"
-        ) {
+        if branch_gather_target.is_some()
+            && !matches!(
+                inner_tokens.last(),
+                Some(Value::String(value)) if value == "\n"
+            )
+        {
+            inner_tokens.push(Value::String("\n".to_string()));
+        }
+        if branch_gather_target.is_none()
+            && !matches!(
+                inner_tokens.last(),
+                Some(Value::String(value)) if value == "done" || value == "end"
+            )
+        {
             inner_tokens.push(Value::String("end".to_string()));
         }
 
-        inner_tokens.push(json!({"->": format!("0.g-{choice_index}")}));
+        let branch_target = branch_gather_target
+            .clone()
+            .unwrap_or_else(|| format!("0.g-{choice_index}"));
+        inner_tokens.push(json!({"->": branch_target}));
         inner_tokens.push(json!({"#f":5}));
 
         choice_named_content.insert(format!("c-{choice_index}"), Value::Array(inner_tokens));
-        choice_named_content.insert(
-            format!("g-{choice_index}"),
-            Value::Array(vec![Value::String("done".to_string()), Value::Null]),
-        );
+        if branch_gather_target.is_none() {
+            choice_named_content.insert(
+                format!("g-{choice_index}"),
+                Value::Array(vec![Value::String("done".to_string()), Value::Null]),
+            );
+        }
     } else {
+        if let Some(branch_gather_target) = branch_gather_target {
+            inner_tokens.push(json!({"->": branch_gather_target}));
+        }
         if !matches!(
             inner_tokens.last(),
             Some(Value::String(value)) if value == "\n"
@@ -482,6 +581,7 @@ fn export_choice_container(
 fn export_content_list_tokens(
     content_list: &ObjectRef,
     state: &mut ExportState,
+    inherited_gather_target: Option<String>,
 ) -> Result<Vec<Value>, CompilerError> {
     let children = {
         let borrowed = content_list.borrow();
@@ -489,9 +589,47 @@ fn export_content_list_tokens(
     };
 
     let mut tokens = Vec::new();
-    export_children(children, state, &mut tokens, false)?;
+    export_children(children, state, &mut tokens, false, inherited_gather_target)?;
+    normalize_text_token_sequences(&mut tokens);
 
     Ok(tokens)
+}
+
+fn normalize_text_token_sequences(tokens: &mut Vec<Value>) {
+    let mut normalized = Vec::with_capacity(tokens.len());
+    let mut index = 0usize;
+
+    while index < tokens.len() {
+        let current = tokens.get(index).cloned();
+        let next = tokens.get(index + 1).cloned();
+        let next_next = tokens.get(index + 2).cloned();
+
+        if let (
+            Some(Value::String(current_text)),
+            Some(Value::String(next_text)),
+            Some(Value::String(next_next_text)),
+        ) = (current.as_ref(), next.as_ref(), next_next.as_ref())
+        {
+            let current_body = current_text.strip_prefix('^').unwrap_or(current_text);
+            let next_body = next_next_text.strip_prefix('^').unwrap_or(next_next_text);
+            if current_body.chars().all(|c| c == ' ' || c == '\t')
+                && next_text == "\n"
+                && !next_body.is_empty()
+            {
+                normalized.push(Value::String(format!("^{}{}", current_body, next_body)));
+                normalized.push(Value::String("\n".to_string()));
+                index += 3;
+                continue;
+            }
+        }
+
+        if let Some(value) = current {
+            normalized.push(value);
+        }
+        index += 1;
+    }
+
+    *tokens = normalized;
 }
 
 fn export_children(
@@ -499,39 +637,60 @@ fn export_children(
     state: &mut ExportState,
     tokens: &mut Vec<Value>,
     allow_named_flow: bool,
+    inherited_gather_target: Option<String>,
 ) -> Result<(), CompilerError> {
     let mut pending_choice_named_contents: Vec<BTreeMap<String, Value>> = Vec::new();
 
-    for child in children {
+    for (index, child) in children.iter().enumerate() {
         let child_kind = child.borrow().kind().clone();
-        if let ObjectKind::Choice {
-            once_only,
-            is_invisible_default,
-            has_condition,
-            has_start_content,
-            has_choice_only_content,
-            has_inline_inner_content,
-            ..
-        } = child_kind
-        {
-            let choice_named_content = export_choice_container(
-                &child,
-                state,
+        match child_kind {
+            ObjectKind::Choice {
                 once_only,
                 is_invisible_default,
                 has_condition,
                 has_start_content,
                 has_choice_only_content,
                 has_inline_inner_content,
-                tokens.len(),
-                tokens,
-            )?;
-            pending_choice_named_contents.push(choice_named_content);
-        } else {
-            if !pending_choice_named_contents.is_empty() {
-                flush_pending_choice_named_contents(&mut pending_choice_named_contents, tokens);
+                ..
+            } => {
+                let choice_named_content = export_choice_container(
+                    &child,
+                    state,
+                    once_only,
+                    is_invisible_default,
+                    has_condition,
+                    has_start_content,
+                    has_choice_only_content,
+                    has_inline_inner_content,
+                    tokens.len(),
+                    gather_target_for_choice(
+                        &children,
+                        index,
+                        state,
+                        inherited_gather_target.clone(),
+                    ),
+                    inherited_gather_target.clone(),
+                    tokens,
+                )?;
+                pending_choice_named_contents.push(choice_named_content);
             }
-            export_object_into(&child, state, tokens, allow_named_flow)?;
+            ObjectKind::Gather { .. } if !pending_choice_named_contents.is_empty() => {
+                let gather_named_content =
+                    export_gather_named_content(child, state, inherited_gather_target.clone())?;
+                pending_choice_named_contents.push(gather_named_content);
+            }
+            _ => {
+                if !pending_choice_named_contents.is_empty() {
+                    flush_pending_choice_named_contents(&mut pending_choice_named_contents, tokens);
+                }
+                export_object_into(
+                    child,
+                    state,
+                    tokens,
+                    allow_named_flow,
+                    inherited_gather_target.clone(),
+                )?;
+            }
         }
     }
 
@@ -540,6 +699,49 @@ fn export_children(
     }
 
     Ok(())
+}
+
+fn gather_target_for_choice(
+    children: &[ObjectRef],
+    current_index: usize,
+    state: &ExportState,
+    inherited_gather_target: Option<String>,
+) -> Option<String> {
+    for child in children.iter().skip(current_index + 1) {
+        match child.borrow().kind() {
+            ObjectKind::Choice { .. } => continue,
+            ObjectKind::Gather { .. } => return Some(format!("0.g-{}", state.gather_index)),
+            _ => return None,
+        }
+    }
+
+    inherited_gather_target
+}
+
+fn export_gather_named_content(
+    object: &ObjectRef,
+    state: &mut ExportState,
+    _inherited_gather_target: Option<String>,
+) -> Result<BTreeMap<String, Value>, CompilerError> {
+    let (identifier, content) = {
+        let borrowed = object.borrow();
+        let identifier = match borrowed.kind() {
+            ObjectKind::Gather { identifier, .. } => identifier.clone(),
+            _ => None,
+        };
+        (identifier, borrowed.content().to_vec())
+    };
+
+    let generated_index = state.gather_index;
+    state.gather_index += 1;
+    let gather_name = identifier
+        .map(|identifier| identifier.name)
+        .unwrap_or_else(|| format!("g-{}", generated_index));
+
+    let container = export_gather_container(&content, state, _inherited_gather_target)?;
+    Ok(vec![(gather_name, container)]
+        .into_iter()
+        .collect::<BTreeMap<_, _>>())
 }
 
 fn flush_pending_choice_named_contents(
@@ -675,7 +877,7 @@ fn export_object_tokens(
     state: &mut ExportState,
 ) -> Result<Vec<Value>, CompilerError> {
     let mut tokens = Vec::new();
-    export_object_into(object, state, &mut tokens, false)?;
+    export_object_into(object, state, &mut tokens, false, None)?;
     Ok(tokens)
 }
 

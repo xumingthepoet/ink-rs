@@ -312,6 +312,66 @@ impl StringParser {
         }
     }
 
+    #[allow(non_snake_case)]
+    pub fn ParseString(&mut self, str: String) -> Option<String> {
+        self.parse_string(&str)
+    }
+
+    #[allow(non_snake_case)]
+    pub fn Interleave<T, F1, F2>(
+        &mut self,
+        mut rule_a: F1,
+        mut rule_b: F2,
+        until_terminator: Option<fn(&mut Self) -> Option<()>>,
+        _flatten: bool,
+    ) -> Option<Vec<T>>
+    where
+        F1: FnMut(&mut Self) -> Option<T>,
+        F2: FnMut(&mut Self) -> Option<T>,
+    {
+        let rule_id = self.begin_rule();
+        let mut results = Vec::new();
+
+        let first_a = self.parse_object(|parser| rule_a(parser));
+        if let Some(value) = first_a {
+            results.push(value);
+        } else {
+            self.fail_rule(rule_id);
+            return None;
+        }
+
+        loop {
+            if let Some(stop_rule) = until_terminator {
+                if self.peek(|parser| stop_rule(parser)).is_some() {
+                    break;
+                }
+            }
+
+            let last_main_result = self.parse_object(|parser| rule_b(parser));
+            let Some(value) = last_main_result else {
+                break;
+            };
+            results.push(value);
+
+            let outer_result = self.parse_object(|parser| rule_a(parser));
+            let Some(value) = outer_result else {
+                break;
+            };
+            results.push(value);
+
+            if self.remaining_length() == 0 {
+                break;
+            }
+        }
+
+        if results.is_empty() {
+            self.fail_rule(rule_id);
+            None
+        } else {
+            Some(self.succeed_rule(rule_id, results))
+        }
+    }
+
     pub fn parse_single_character(&mut self) -> Option<char> {
         if self.remaining_length() == 0 {
             return None;

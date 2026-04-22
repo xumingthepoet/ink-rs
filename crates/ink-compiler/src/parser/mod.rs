@@ -20,9 +20,9 @@ use crate::{
     error::{Diagnostic, DiagnosticSeverity},
     parsed::{
         Choice, Conditional, ConditionalSingleBranch, ConstantDeclaration, ContentList, Divert,
-        ExternalDeclaration, FlowLevel, Identifier, Knot, ListDefinition, ListElementDefinition,
-        MultipleConditionExpression, Object, ObjectKind, ObjectRef, Path, Return, Sequence,
-        SequenceType, Stitch, Story as ParsedStory, Text, VariableAssignment,
+        ExternalDeclaration, FlowLevel, Gather, Identifier, Knot, ListDefinition,
+        ListElementDefinition, MultipleConditionExpression, Object, ObjectKind, ObjectRef, Path,
+        Return, Sequence, SequenceType, Stitch, Story as ParsedStory, Text, VariableAssignment,
     },
     results::{DefaultFileHandler, FileHandler, ParseResult},
 };
@@ -194,6 +194,21 @@ impl<'source> InkParser<'source> {
                     top_level_content.push(choice.0);
                 }
                 line_index += choice.1;
+                continue;
+            }
+
+            if let Some(gather) = Self::parse_gather_line(
+                &segments,
+                line_index,
+                line_index + 1,
+                source_filename.clone(),
+            )? {
+                if let Some(parent) = current_flow.as_ref() {
+                    Object::add_content(parent, gather.0);
+                } else {
+                    top_level_content.push(gather.0);
+                }
+                line_index += gather.1;
                 continue;
             }
 
@@ -555,24 +570,15 @@ impl<'source> InkParser<'source> {
         };
 
         let line_indent = line_text.len().saturating_sub(trimmed_start.len());
-        let remainder = remainder.trim_start();
-
-        if remainder.starts_with('(') {
-            return Err(Diagnostic::new(
-                DiagnosticSeverity::Error,
-                source_filename,
-                line_number,
-                line_indent + 1,
-                "Named choices are not yet supported",
-            ));
-        }
+        let (identifier, remainder) =
+            Self::parse_bracketed_identifier(remainder.trim_start(), source_filename.clone())?;
 
         let (condition, remainder) =
             Self::parse_choice_conditions(remainder, line_number, source_filename.clone())?;
         let (start_text, choice_only_text, inner_tail_text) =
             Self::split_choice_text_fragments(remainder, line_number, source_filename.clone())?;
 
-        let mut choice = Choice::new(None, bullets_consumed);
+        let mut choice = Choice::new(identifier, bullets_consumed);
         choice.set_once_only(once_only);
 
         if !start_text.is_empty() {
@@ -627,15 +633,25 @@ impl<'source> InkParser<'source> {
                 }
             }
 
-            inner_content
-                .inner_content
-                .extend(Self::parse_branch_content_objects(
-                    inner_line_text,
-                    line_number + consumed_lines,
-                    source_filename.clone(),
-                    segment.ends_with('\n'),
-                )?);
-            consumed_lines += 1;
+            if let Some((mut nested_objects, nested_consumed)) = Self::parse_branch_segment_objects(
+                segments,
+                start_index + consumed_lines,
+                line_number + consumed_lines,
+                source_filename.clone(),
+            )? {
+                inner_content.inner_content.append(&mut nested_objects);
+                consumed_lines += nested_consumed;
+            } else {
+                inner_content
+                    .inner_content
+                    .extend(Self::parse_branch_content_objects(
+                        inner_line_text,
+                        line_number + consumed_lines,
+                        source_filename.clone(),
+                        segment.ends_with('\n'),
+                    )?);
+                consumed_lines += 1;
+            }
         }
 
         if has_inline_inner_content && consumed_lines > 1 && !has_simple_inner_divert {
@@ -654,6 +670,84 @@ impl<'source> InkParser<'source> {
         }
 
         Ok(Some((choice.object(), consumed_lines)))
+    }
+
+    fn parse_gather_line(
+        segments: &[&str],
+        start_index: usize,
+        line_number: usize,
+        source_filename: Option<String>,
+    ) -> std::result::Result<Option<(ObjectRef, usize)>, Diagnostic> {
+        let first_segment = segments[start_index];
+        let line_text = first_segment.strip_suffix('\n').unwrap_or(first_segment);
+        let trimmed_start = line_text.trim_start();
+
+        let Some(after_dash) = trimmed_start.strip_prefix('-') else {
+            return Ok(None);
+        };
+        if trimmed_start.starts_with("->") {
+            return Ok(None);
+        }
+
+        let line_indent = line_text.len().saturating_sub(trimmed_start.len());
+        let (identifier, remainder) =
+            Self::parse_bracketed_identifier(after_dash.trim_start(), source_filename.clone())?;
+        let gather = Gather::new(identifier, 1);
+
+        let mut content = Vec::new();
+        let same_line_text = remainder.trim_start();
+        if !same_line_text.is_empty() {
+            content.extend(Self::parse_branch_content_objects(
+                same_line_text,
+                line_number,
+                source_filename.clone(),
+                false,
+            )?);
+        }
+
+        let mut consumed_lines = 1usize;
+        while start_index + consumed_lines < segments.len() {
+            let segment = segments[start_index + consumed_lines];
+            let inner_line_text = segment.strip_suffix('\n').unwrap_or(segment);
+            let trimmed = inner_line_text.trim_start();
+            let indent = inner_line_text.len().saturating_sub(trimmed.len());
+
+            if !trimmed.is_empty() && indent <= line_indent {
+                let is_next_choice = trimmed.starts_with('*') || trimmed.starts_with('+');
+                let is_next_gather = trimmed.starts_with('-') && !trimmed.starts_with("->");
+                let is_next_flow = trimmed.starts_with('=') || trimmed.starts_with("INCLUDE");
+                let is_next_brace_logic = trimmed.starts_with('{') || trimmed == "}";
+
+                if is_next_choice || is_next_gather || is_next_flow || is_next_brace_logic {
+                    break;
+                }
+            }
+
+            if let Some((mut nested_objects, nested_consumed)) = Self::parse_branch_segment_objects(
+                segments,
+                start_index + consumed_lines,
+                line_number + consumed_lines,
+                source_filename.clone(),
+            )? {
+                content.append(&mut nested_objects);
+                consumed_lines += nested_consumed;
+            } else {
+                content.extend(Self::parse_branch_content_objects(
+                    inner_line_text,
+                    line_number + consumed_lines,
+                    source_filename.clone(),
+                    segment.ends_with('\n'),
+                )?);
+                consumed_lines += 1;
+            }
+        }
+
+        if !content.is_empty() {
+            let content_list = Self::build_content_list(content);
+            Object::add_content(&gather.object(), content_list.object());
+        }
+
+        Ok(Some((gather.object(), consumed_lines)))
     }
 
     fn parse_choice_conditions<'input>(
@@ -1323,6 +1417,75 @@ impl<'source> InkParser<'source> {
         list
     }
 
+    fn parse_branch_segment_objects(
+        segments: &[&str],
+        start_index: usize,
+        line_number: usize,
+        source_filename: Option<String>,
+    ) -> std::result::Result<Option<(Vec<ObjectRef>, usize)>, Diagnostic> {
+        let Some(segment) = segments.get(start_index) else {
+            return Ok(None);
+        };
+        let had_newline = segment.ends_with('\n');
+        let line_text = segment.strip_suffix('\n').unwrap_or(segment);
+
+        if let Some(statement) =
+            Self::parse_statement_line(line_text, line_number, source_filename.clone())?
+        {
+            return Ok(Some((vec![statement], 1)));
+        }
+
+        if let Some(choice) =
+            Self::parse_choice_line(segments, start_index, line_number, source_filename.clone())?
+        {
+            return Ok(Some((vec![choice.0], choice.1)));
+        }
+
+        if let Some(gather) =
+            Self::parse_gather_line(segments, start_index, line_number, source_filename.clone())?
+        {
+            return Ok(Some((vec![gather.0], gather.1)));
+        }
+
+        if let Some(divert) =
+            Self::parse_simple_divert_line(line_text, line_number, source_filename.clone())?
+        {
+            return Ok(Some((vec![divert], 1)));
+        }
+
+        if let Some(sequence) =
+            Self::parse_sequence_line(line_text, line_number, source_filename.clone(), had_newline)?
+        {
+            return Ok(Some((vec![sequence], 1)));
+        }
+
+        if let Some(sequence) = Self::parse_inline_sequence_line(
+            line_text,
+            line_number,
+            source_filename.clone(),
+            had_newline,
+        )? {
+            return Ok(Some((vec![sequence], 1)));
+        }
+
+        if let Some(conditional) =
+            Self::parse_conditional_line(line_text, line_number, source_filename.clone())?
+        {
+            return Ok(Some((vec![conditional], 1)));
+        }
+
+        if let Some((logic, consumed)) = Self::parse_brace_logic_block(
+            segments,
+            start_index,
+            line_number,
+            source_filename.clone(),
+        )? {
+            return Ok(Some((vec![logic], consumed)));
+        }
+
+        Ok(None)
+    }
+
     fn parse_branch_content_objects(
         line_text: &str,
         line_number: usize,
@@ -1397,6 +1560,40 @@ impl<'source> InkParser<'source> {
         } else {
             Some(Path::new(components))
         }
+    }
+
+    fn parse_bracketed_identifier(
+        input: &str,
+        source_filename: Option<String>,
+    ) -> std::result::Result<(Option<Identifier>, &str), Diagnostic> {
+        let trimmed = input.trim_start();
+        if !trimmed.starts_with('(') {
+            return Ok((None, input));
+        }
+
+        let Some(close_index) = trimmed.find(')') else {
+            return Err(Diagnostic::new(
+                DiagnosticSeverity::Error,
+                source_filename,
+                0,
+                1,
+                "Expected closing ')' for bracketed name",
+            ));
+        };
+
+        let name = trimmed[1..close_index].trim();
+        if name.is_empty() {
+            return Err(Diagnostic::new(
+                DiagnosticSeverity::Error,
+                source_filename,
+                0,
+                1,
+                "Expected a name inside brackets",
+            ));
+        }
+
+        let remainder = &trimmed[close_index + 1..];
+        Ok((Some(Identifier::new(name.to_string())), remainder))
     }
 
     fn parse_statement_line(
@@ -2066,10 +2263,7 @@ impl<'source> InkParser<'source> {
                 continue;
             }
 
-            for marker in ["-", "#", "{", "}"] {
-                if marker == "-" && trimmed.starts_with("->") {
-                    continue;
-                }
+            for marker in ["#", "{", "}"] {
                 if marker == "{" && trimmed.starts_with('{') && trimmed.ends_with('}') {
                     continue;
                 }

@@ -30,13 +30,14 @@ macOS, use `gtimeout` if GNU `timeout` is not installed.
 Start with 30 seconds; only increase the timeout temporarily when a specific
 fixture needs more wall-clock time.
 
-The legacy compiler-to-runtime conformance suite is available behind the
-`compiler-conformance` Cargo feature and should always be run with a timeout.
-Use `make compiler-gate` for the full suite, and pass a focused filter through
-`COMPILER_TEST` when iterating on a single legacy fixture:
+The legacy compiler-to-runtime conformance suite now runs as part of the
+default workspace test flow and should still always be run with a timeout when
+invoked directly. Use `make compiler-gate` for the full suite, and pass a
+focused filter through `COMPILER_TEST` when iterating on a single legacy
+fixture:
 
 ```sh
-timeout 30s cargo test -p ink-test --features compiler-conformance --test compiler_conformance_legacy
+timeout 30s cargo test -p ink-test --test compiler_conformance_legacy
 make compiler-gate
 make compiler-gate COMPILER_TEST='compiler_conformance::choice_test::conditional_choice_test -- --exact'
 ```

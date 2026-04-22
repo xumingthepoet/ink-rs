@@ -25,8 +25,8 @@ Core commands to run after every completed milestone:
 Current last verified milestone: Milestone 13 compiler-conformance gate
 slice (`2026-04-22`).
 
-Current verified checkpoint: the full feature-gated legacy
-compiler-conformance suite is green (`2026-04-22`).
+Current verified checkpoint: the legacy compiler-conformance suite is green
+and now runs in the default workspace test flow (`2026-04-22`).
 
 Workspace warning policy: `.cargo/config.toml` now denies warnings, and
 `make gate` is the unified local entry point for format, check, and a
@@ -413,8 +413,8 @@ Acceptance:
 - The copied fixture tree under `crates/ink-test/fixtures/conformance/`
   matches the legacy runtime tests.
 - The legacy compiler-to-runtime suite is available from `ink-test` behind the
-  `compiler-conformance` feature gate so it can be enabled explicitly while the
-  compiler port continues to grow.
+  normal workspace test flow so it can be exercised alongside the rest of the
+  compiler port.
 - The workspace still passes `cargo fmt --all --check`,
   `cargo check --workspace`, and `cargo test --workspace`.
 
@@ -423,7 +423,7 @@ Validation:
 ```sh
 cargo fmt --all --check
 cargo test -p ink-test --test conformance_legacy
-cargo test -p ink-test --features compiler-conformance --test compiler_conformance_legacy
+cargo test -p ink-test --test compiler_conformance_legacy
 cargo check --workspace
 cargo test --workspace
 ```
@@ -444,13 +444,13 @@ cargo test --workspace
   - conditionals, sequences, and choice generation
   - runtime behaviors: save/load, externals, observers, visit counts, threads,
     and tunnels
-- [ ] Normalize and document any intentional JSON mismatches while the suite
-  is still being brought up, then remove the mismatches once the compiler
-  matches the fixture set.
-- [ ] Remove the `compiler-conformance` feature gate once the legacy suite is
+- [x] Normalize and document any intentional JSON mismatches while the suite
+  was being brought up, then remove the mismatches once the compiler matched
+  the fixture set.
+- [x] Remove the `compiler-conformance` feature gate once the legacy suite is
   green and include it in the default workspace test run.
-- [ ] Delete any compiler-conformance wrappers that become unnecessary after
-  the suite is promoted to a normal test target.
+- [x] Delete any compiler-conformance wrappers that became unnecessary after
+  the suite was promoted to a normal test target.
 
 Primary Rust references:
 
@@ -459,6 +459,12 @@ Primary Rust references:
 - `crates/ink-test/fixtures/conformance/`
 - `crates/ink-compiler/src/compiler.rs`
 - `crates/ink-compiler/src/runtime_export.rs`
+
+Current blocker while the suite is being stabilized:
+
+- Nested choice/gather fixtures still need `Weave`-level numbering and
+  target-scope handling so that grouped choices line up with the official
+  JSON shape.
 
 Acceptance:
 
@@ -474,8 +480,8 @@ Validation:
 ```sh
 make compiler-gate
 make compiler-gate COMPILER_TEST='compiler_conformance::choice_test::conditional_choice_test -- --exact'
-timeout 30s cargo test -p ink-test --features compiler-conformance --test compiler_conformance_legacy
-timeout 30s cargo test -p ink-test --features compiler-conformance --test compiler_conformance_legacy compiler_conformance::choice_test::conditional_choice_test -- --exact
+timeout 30s cargo test -p ink-test --test compiler_conformance_legacy
+timeout 30s cargo test -p ink-test --test compiler_conformance_legacy compiler_conformance::choice_test::conditional_choice_test -- --exact
 cargo fmt --all --check
 cargo check --workspace
 timeout 30s cargo test --workspace
@@ -483,8 +489,7 @@ timeout 30s cargo test --workspace
 
 ## Next Task
 
-Remove the `compiler-conformance` feature gate once the legacy suite is green
-and include it in the default workspace test run.
+No required Milestone 13 tasks remain.
 
 ## Risk Register
 

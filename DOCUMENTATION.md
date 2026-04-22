@@ -21,21 +21,25 @@ into `crates/ink-runtime` instead of rewriting runtime execution.
 - `ink-test` now hosts the package-level integration tests and copied
   conformance/include fixtures.
 - The legacy compiler-to-runtime conformance suite now lives in
-  `crates/ink-test/tests/compiler_conformance_legacy.rs` and is gated behind
-  the `compiler-conformance` feature while the remaining failures are fixed.
-- The compiler-conformance choice slice now has the basic `no-choice`, `one`,
-  `single-choice`, `suppress-choice`, and `mixed-choice` fixtures green.
-- The compiler-conformance choice/divert/sequence slice now also has
-  `divert-on-choice` and `variable_text::sequence` green.
+  `crates/ink-test/tests/compiler_conformance_legacy.rs` and now runs in the
+  default workspace test flow.
+- The compiler-conformance choice/divert/sequence slice now has the basic
+  `no-choice`, `one`, `single-choice`, `suppress-choice`, `mixed-choice`,
+  `divert-on-choice`, and `variable_text::sequence` fixtures green.
 - The current compiler-conformance slice has made the simple divert and glue
-  fixtures green and updated the trusted parser snapshots to reflect inline
-  divert splitting inside conditional fixtures.
+  fixtures green, updated the trusted parser snapshots to reflect inline
+  divert splitting inside conditional fixtures, and removed the feature gate
+  from the legacy suite.
 - During Milestone 13, compiler-conformance progress is checkpointed in small
   commits after each few passing fixtures so the remaining work stays
   resumable and bounded.
-- The legacy compiler-to-runtime suite is green under the feature gate, so
-  the next step is to remove the gate and fold it into the default workspace
-  test run.
+- Current Milestone 13 blocker: nested choice/gather scoping inside weave
+  sections still needs a `Weave`-level numbering and target-scope model.
+  `gather-basic` remains green, but `gather-chain` and `nested-flow` are still
+  blocked on this structural alignment.
+- The legacy compiler-to-runtime suite is green and now folds into the
+  default workspace test run, so the next step is to delete any leftover
+  wrappers that are no longer needed.
 - The documented test loop now treats every long-running `cargo test` path as
   timeboxed, and `make gate` wraps the workspace test pass with a timeout as
   well.
@@ -136,8 +140,8 @@ into `crates/ink-runtime` instead of rewriting runtime execution.
   `crates/ink-test/fixtures/conformance/`.
 - The legacy runtime conformance import currently covers 124 passing tests.
 - The legacy compiler-to-runtime conformance import is now present in
-  `ink-test` behind a feature gate and reuses the copied conformance fixtures
-  for compiler JSON comparison.
+  `ink-test` and reuses the copied conformance fixtures for compiler JSON
+  comparison.
 - The trusted conformance baseline now covers both the one-line and two-line
   `basictext` fixtures from `blade-ink-rs`.
 - The trusted `blade-ink-rs` `basictext/oneline.ink` fixture now also has a
@@ -389,6 +393,17 @@ Pass a second argument to write the JSON to a file instead of stdout.
 - Validation: documentation update only; no code change validation run.
 - Result: the runbook, plan, and live status now all state that Milestone 13
   should be advanced in small committed batches.
+
+### 2026-04-22
+
+- Confirmed `gather-basic` still passes after the nested choice parser
+  refactor, but `gather-chain` and `nested-flow` remain blocked on weave
+  scope and numbering alignment.
+- Validation: `cargo fmt --all --check`,
+  `timeout 30s cargo test -p ink-test --test compiler_conformance_legacy
+  compiler_conformance::gather_test::gather_basic_test -- --exact`.
+- Result: the minimal gather fixture stayed green; the remaining gather-heavy
+  fixtures require a deeper `Weave`-level export refactor.
 
 ### 2026-04-22
 
