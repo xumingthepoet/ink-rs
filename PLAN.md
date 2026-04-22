@@ -22,7 +22,7 @@ Core commands to run after every completed milestone:
 - [x] `cargo test --workspace`
 - [x] `make gate`
 
-Current last verified milestone: Milestone 12 legacy runtime conformance import
+Current last verified milestone: Milestone 12 legacy conformance import
 slice (`2026-04-22`).
 
 Workspace warning policy: `.cargo/config.toml` now denies warnings, and
@@ -386,7 +386,7 @@ cargo test --workspace
 
 - [x] Import the legacy runtime conformance suite from
   `ink-tests-old/src/conformance` into `crates/ink-test`.
-- [ ] Import the legacy compiler-to-runtime conformance suite into
+- [x] Import the legacy compiler-to-runtime conformance suite into
   `crates/ink-test`.
 - [ ] Import the legacy `csharp_tests` suite into `crates/ink-test`.
 - [ ] Decide whether any remaining `ink-tests-old` fixtures or wrappers should
@@ -395,15 +395,21 @@ cargo test --workspace
 Primary Rust references:
 
 - `crates/ink-test/tests/conformance_legacy.rs`
+- `crates/ink-test/tests/compiler_conformance_legacy.rs`
 - `crates/ink-test/tests/conformance/`
+- `crates/ink-test/tests/compiler_conformance/`
 - `crates/ink-test/fixtures/conformance/`
 - `ink-tests-old/src/conformance/`
+- `ink-tests-old/src/compiler_conformance/`
 
 Acceptance:
 
 - The legacy runtime conformance suite runs from `ink-test`.
 - The copied fixture tree under `crates/ink-test/fixtures/conformance/`
   matches the legacy runtime tests.
+- The legacy compiler-to-runtime suite is available from `ink-test` behind the
+  `compiler-conformance` feature gate so it can be enabled explicitly while the
+  compiler port continues to grow.
 - The workspace still passes `cargo fmt --all --check`,
   `cargo check --workspace`, and `cargo test --workspace`.
 
@@ -412,13 +418,14 @@ Validation:
 ```sh
 cargo fmt --all --check
 cargo test -p ink-test --test conformance_legacy
+cargo test -p ink-test --features compiler-conformance --test compiler_conformance_legacy
 cargo check --workspace
 cargo test --workspace
 ```
 
 ## Next Task
 
-Import the legacy compiler-to-runtime conformance suite into `ink-test`.
+Import the legacy `csharp_tests` suite into `ink-test`.
 
 ## Risk Register
 

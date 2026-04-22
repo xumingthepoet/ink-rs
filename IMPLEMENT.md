@@ -24,6 +24,13 @@ just `继续`.
 For a full local verification pass, `make gate` is the preferred unified entry
 point. It runs format, check, and test with workspace warnings denied.
 
+The legacy compiler-to-runtime conformance suite is available behind the
+`compiler-conformance` Cargo feature:
+
+```sh
+cargo test -p ink-test --features compiler-conformance --test compiler_conformance_legacy
+```
+
 ## Non-Negotiable Continuation Rule
 
 When the user says `继续`, do not stop after planning or after one read-only

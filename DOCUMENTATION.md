@@ -20,6 +20,10 @@ into `crates/ink-runtime` instead of rewriting runtime execution.
   parse/compile result types, and file handler abstractions.
 - `ink-test` now hosts the package-level integration tests and copied
   conformance/include fixtures.
+- The legacy compiler-to-runtime conformance suite now lives in
+  `crates/ink-test/tests/compiler_conformance_legacy.rs` and is gated behind
+  the `compiler-conformance` feature so it can stay available without breaking
+  the default workspace while compiler coverage is still growing.
 - `CharacterSet`, `CharacterRange`, and basic string parser character helpers
   are now ported.
 - `StringParserState` stack behavior is now ported.
@@ -111,6 +115,9 @@ into `crates/ink-runtime` instead of rewriting runtime execution.
   modules under `crates/ink-test/tests/conformance/` and copied fixtures under
   `crates/ink-test/fixtures/conformance/`.
 - The legacy runtime conformance import currently covers 124 passing tests.
+- The legacy compiler-to-runtime conformance import is now present in
+  `ink-test` behind an opt-in feature gate and reuses the copied conformance
+  fixtures for compiler JSON comparison.
 - The trusted conformance baseline now covers both the one-line and two-line
   `basictext` fixtures from `blade-ink-rs`.
 - The trusted `blade-ink-rs` `basictext/oneline.ink` fixture now also has a
@@ -1505,7 +1512,34 @@ Result: all passed.
 
 ## Next Task
 
-Import the legacy compiler-to-runtime conformance suite into `ink-test`.
+Import the legacy `csharp_tests` suite into `ink-test`.
+
+### 2026-04-22
+
+- Imported the legacy compiler-to-runtime conformance suite from
+  `ink-tests-old/src/compiler_conformance` into `ink-test`.
+- Added a compiler-to-runtime compatibility layer in
+  `crates/ink-test/tests/compiler_conformance/api.rs` and
+  `crates/ink-test/tests/compiler_conformance/common.rs` so source `.ink`
+  files are compiled to runtime JSON before the runtime suite runs.
+- Kept the suite opt-in behind the `compiler-conformance` Cargo feature so the
+  default workspace stays green while compiler feature coverage continues to
+  expand.
+- Added the entry point in
+  `crates/ink-test/tests/compiler_conformance_legacy.rs` and copied the legacy
+  fixtures under `crates/ink-test/fixtures/conformance/`.
+
+Validation:
+
+```sh
+cargo fmt --all --check
+cargo test -p ink-test --test compiler_conformance_legacy
+cargo check --workspace
+cargo test --workspace
+```
+
+Result: default workspace validation passed. The compiler conformance suite is
+available behind the `compiler-conformance` feature for explicit runs.
 
 ## Repo Structure
 
