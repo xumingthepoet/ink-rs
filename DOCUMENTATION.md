@@ -69,9 +69,10 @@ into `crates/ink-runtime` instead of rewriting runtime execution.
   list-definition nodes.
 - Ink parser now also recognizes `~ return` logic lines and models them as
   parsed return nodes.
-- The remaining parser trusted snapshots still live in
-  `crates/ink-compiler/src/parser/mod.rs`, but they now read fixture copies
-  from `crates/ink-test/fixtures` instead of the deleted legacy tree.
+- The parser trusted snapshots now live in
+  `crates/ink-test/tests/parser_snapshots.rs`, while `ink-compiler` keeps
+  only internal unit tests and the shared snapshot renderer in
+  `crates/ink-compiler/src/parsed/snapshot.rs`.
 - Runtime story behavior tests now cover choice selection, named knot/stitch
   and gather-like container paths, and explicit diverts against
   `bladeink::story::Story`.
@@ -177,8 +178,9 @@ incompatibility notes, and parser-level trusted snapshots are all documented.
 Milestone 10 is complete: the runtime crate has been relocated into
 `crates/ink-runtime`, the workspace points at it, and the package-level tests
 now live in `crates/ink-test`.
-Milestone 11 has started: the remaining parser trusted snapshots are the next
-relocation slice.
+Milestone 11 is complete: the remaining parser trusted snapshots now live in
+`crates/ink-test/tests/parser_snapshots.rs`, and `ink-compiler` keeps only
+module unit tests plus the shared snapshot renderer.
 
 ## Verification Checklist
 
@@ -259,9 +261,8 @@ Pass a second argument to write the JSON to a file instead of stdout.
   assignments, and variable-reference expressions.
 - `InkParser::parse` now also recognizes `LIST` declarations and models them as
   parsed list-definition nodes.
-- The remaining parser trusted snapshots still live in
-  `crates/ink-compiler/src/parser/mod.rs`; moving them into `crates/ink-test`
-  is the next external-fixture relocation slice.
+- The parser trusted snapshots now live in `crates/ink-test/tests/`; that
+  crate owns the external fixture-driven parser coverage.
 - The runtime JSON reader expects top-level `inkVersion`, `root`, and
   `listDefs` keys; the `root` value is a container array whose trailing entry
   is either named-content metadata or `null`.
@@ -343,12 +344,21 @@ Pass a second argument to write the JSON to a file instead of stdout.
 - Plugin hooks and dynamic plugin discovery remain intentionally deferred.
 - The conformance harness currently covers a small trusted subset of trusted
   runtime and parser snapshots, not the full official test suite.
-- The remaining parser trusted snapshots still live in
-  `crates/ink-compiler/src/parser/mod.rs`; moving them into `crates/ink-test`
-  is the next relocation slice if we want every fixture-driven test under one
-  crate.
+- External fixture-driven parser snapshots now live in `crates/ink-test/tests/`.
 
 ## Audit Log
+
+### 2026-04-22
+
+- Moved the trusted parser snapshot tests out of `crates/ink-compiler` and
+  into `crates/ink-test/tests/parser_snapshots.rs`.
+- Added a shared snapshot-rendering helper in
+  `crates/ink-compiler/src/parsed/snapshot.rs` so the compiler crate keeps the
+  formatting logic while its external fixture tests live in `ink-test`.
+- Validation: `cargo test -p ink-test --test parser_snapshots`,
+  `cargo test -p ink-compiler parser`, `cargo fmt --all --check`,
+  `make gate`.
+- Result: all passed with warnings denied.
 
 ### 2026-04-22
 

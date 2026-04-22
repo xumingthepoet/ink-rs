@@ -15,6 +15,7 @@ mod object;
 mod path;
 mod return_stmt;
 mod sequence;
+pub mod snapshot;
 mod stitch;
 mod story;
 mod variable_assignment;

@@ -22,7 +22,7 @@ Core commands to run after every completed milestone:
 - [x] `cargo test --workspace`
 - [x] `make gate`
 
-Current last verified milestone: Milestone 10 runtime/test relocation slice
+Current last verified milestone: Milestone 11 parser snapshot relocation slice
 (`2026-04-22`).
 
 Workspace warning policy: `.cargo/config.toml` now denies warnings, and
@@ -355,20 +355,20 @@ cargo test --workspace
 
 ## Next Task
 
-Move the remaining parser trusted snapshots out of
-`crates/ink-compiler/src/parser/mod.rs` into `crates/ink-test` so the test
-crate owns all external fixture-based coverage.
+No required milestones remain. Expand trusted conformance coverage further if
+desired.
 
 ## Milestone 11: Parser Snapshot Relocation
 
-- [ ] Move the remaining parser trusted snapshots out of
+- [x] Move the remaining parser trusted snapshots out of
   `crates/ink-compiler/src/parser/mod.rs` and into `crates/ink-test`.
-- [ ] Update docs and status once the parser snapshots live entirely in the
+- [x] Update docs and status once the parser snapshots live entirely in the
   test crate.
 
 Primary Rust references:
 
 - `crates/ink-compiler/src/parser/mod.rs`
+- `crates/ink-compiler/src/parsed/snapshot.rs`
 - `crates/ink-test/tests/`
 - `crates/ink-test/fixtures/`
 
