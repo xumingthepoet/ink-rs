@@ -105,6 +105,8 @@ runtime instead of rewriting runtime execution.
   now also has a parser-level conformance snapshot.
 - The trusted `blade-ink-rs` glue fixture `glue/testbugfix1.ink` now also has
   a parser-level conformance snapshot.
+- The trusted `blade-ink-rs` glue fixture `glue/testbugfix2.ink` now also has
+  a parser-level conformance snapshot.
 - The trusted `blade-ink-rs` function fixture `function/setvar-func.ink` now
   also has a parser-level conformance snapshot.
 - The trusted `blade-ink-rs` function fixture `function/rnd-func.ink` now
@@ -246,6 +248,9 @@ Pass a second argument to write the JSON to a file instead of stdout.
   `lerp(a,` in the parser snapshot.
 - Builtin-style `~ SEED_RANDOM(10)` lines currently render as function calls in
   the parser snapshot for `function/rnd-func.ink`.
+- Inline conditional-like glue text without extra spacing, such as
+  `A {f():B} `, currently remains plain text in the parser snapshot for
+  `glue/testbugfix2.ink`.
 - The parser snapshot for `function/func-inline.ink` shows the inline
   function-call story and trailing return body in stable parsed hierarchy
   form.
@@ -255,6 +260,9 @@ Pass a second argument to write the JSON to a file instead of stdout.
 - The parser snapshot for `glue/testbugfix1.ink` shows the `A` / `C` glue
   story, the inline `{f():X}` conditional, and the function body with the
   current return parsing behavior.
+- The parser snapshot for `glue/testbugfix2.ink` shows the `A {f():B}` glue
+  line, the `X` line, and the function body with the current return parsing
+  behavior.
 - The parser snapshot for `function/setvar-func.ink` shows the top-level
   function call assignment, the trailing text/divert, and the function body
   with the current setvar parsing behavior.
@@ -294,6 +302,25 @@ Pass a second argument to write the JSON to a file instead of stdout.
   runtime and parser snapshots, not the full official test suite.
 
 ## Audit Log
+
+### 2026-04-22
+
+- Added a parser-level conformance snapshot for `blade-ink-rs` glue fixture
+  `glue/testbugfix2.ink`.
+- The snapshot verifies the parser keeps the `A {f():B}` line as plain text,
+  the `X` line, and the function body in stable parsed hierarchy form.
+
+Validation:
+
+```sh
+cargo fmt --all --check
+cargo test -p ink-compiler ink_parser_parses_trusted_glue_testbugfix2_fixture
+cargo check --workspace
+cargo test --workspace
+```
+
+Result: all passed. The only remaining warnings are the two existing
+`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
 
 ### 2026-04-22
 

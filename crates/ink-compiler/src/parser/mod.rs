@@ -2847,6 +2847,26 @@ to Savile Row\n\
     }
 
     #[test]
+    fn ink_parser_parses_trusted_glue_testbugfix2_fixture() {
+        let source =
+            load_workspace_text("blade-ink-rs/conformance-tests/inkfiles/glue/testbugfix2.ink");
+        let mut parser = InkParser::new(&source, Some("testbugfix2.ink"), None);
+        let result = parser.parse();
+
+        assert!(
+            result.diagnostics.is_empty(),
+            "unexpected diagnostics: {:#?}",
+            result.diagnostics
+        );
+
+        let story = result.parsed_story.expect("expected parsed story");
+        assert_eq!(
+            render_story(&story),
+            "Story\n  ContentList\n    Text(\"A {f():B}\")\n    Text(\"\\n\")\n  ContentList\n    Text(\"X\")\n    Text(\"\\n\")\n  ContentList\n    Text(\"\\n\")\n  Flow(level=Knot, name=\"f()\", function=true)\n    Conditional\n      Number(true)\n      ConditionalBranch(true=true, else=false, inline=false)\n        Return\n          Number(false)"
+        );
+    }
+
+    #[test]
     fn ink_parser_parses_trusted_function_setvar_fixture() {
         let source =
             load_workspace_text("blade-ink-rs/conformance-tests/inkfiles/function/setvar-func.ink");
