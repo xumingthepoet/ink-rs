@@ -219,13 +219,11 @@ fn direct_named_child(
                 }
             }
             ObjectKind::Flow { flow_level, .. } => {
-                if minimum_level.is_none() {
+                if level_allows(*flow_level, minimum_level) {
                     if let Some(name) = borrowed_flow_name(&borrowed) {
                         if name == child_name {
                             return Some(child.clone());
                         }
-                    } else {
-                        let _ = flow_level;
                     }
                 }
             }
@@ -279,7 +277,7 @@ mod tests {
     use std::rc::Rc;
 
     use super::{FlowLevel, Identifier, Path};
-    use crate::parsed::{Choice, Knot, Stitch, Story, Weave};
+    use crate::parsed::{Choice, Gather, Knot, Object, Stitch, Story, Text, Weave};
 
     #[test]
     fn parsed_path_joins_components() {
@@ -352,5 +350,36 @@ mod tests {
         let resolved = path.resolve_from_context(&story.root()).expect("choice");
 
         assert!(Rc::ptr_eq(&resolved, &choice.object()));
+    }
+
+    #[test]
+    fn parsed_path_resolves_nested_stitch_from_gather_context() {
+        let gather = Gather::new(Some(Identifier::new("gatherpoint")), 1);
+        Object::add_content(&gather.object(), Text::new("Some content.").object());
+        let stitch_one = Stitch::new(
+            Identifier::new("stitch_one"),
+            vec![gather.object()],
+            Vec::new(),
+            false,
+        )
+        .object();
+        let stitch_two =
+            Stitch::new(Identifier::new("stitch_two"), vec![], Vec::new(), false).object();
+        let knot = Knot::new(
+            Identifier::new("knot"),
+            vec![stitch_one.clone(), stitch_two.clone()],
+            Vec::new(),
+            false,
+        )
+        .object();
+        let story = Story::new(vec![knot.clone()], false);
+
+        let path = Path::new(vec![Identifier::new("knot"), Identifier::new("stitch_two")]);
+        let resolved = path
+            .resolve_from_context(&gather.object())
+            .expect("stitch_two");
+
+        assert!(Rc::ptr_eq(&resolved, &stitch_two));
+        assert!(story.content().len() >= 1);
     }
 }

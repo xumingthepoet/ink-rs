@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, rc::Rc};
 
 use serde_json::{json, Map, Value};
 
@@ -71,6 +71,21 @@ struct ExportState {
     last_top_level_kind: Option<ObjectKind>,
 }
 
+#[derive(Debug, Clone)]
+struct RuntimePath {
+    components: Vec<String>,
+}
+
+impl RuntimePath {
+    fn new(components: Vec<String>) -> Self {
+        Self { components }
+    }
+
+    fn as_string(&self) -> String {
+        self.components.join(".")
+    }
+}
+
 fn export_object_into(
     object: &ObjectRef,
     state: &mut ExportState,
@@ -102,7 +117,7 @@ fn export_object_into(
                     "runtime export currently supports plain text stories, terminal diverts, and list definitions only",
                 ));
             }
-            tokens.push(export_divert_token(target.as_ref(), is_tunnel));
+            tokens.push(export_divert_token(object, target.as_ref(), is_tunnel));
         }
         ObjectKind::Flow { name, .. } => {
             if allow_named_flow {
@@ -790,12 +805,18 @@ fn export_expression_tokens(
         ObjectKind::Expression {
             kind: ExpressionKind::VariableReference { path, .. },
         } => {
-            let path = path
-                .into_iter()
-                .map(|identifier| identifier.name)
-                .collect::<Vec<_>>()
-                .join(".");
-            tokens.push(json!({"VAR?": path}));
+            if let Some(resolved_path) =
+                export_compact_logic_path_string(expression, &Path::new(path.clone()))
+            {
+                tokens.push(json!({"CNT?": resolved_path}));
+            } else {
+                let path = path
+                    .into_iter()
+                    .map(|identifier| identifier.name)
+                    .collect::<Vec<_>>()
+                    .join(".");
+                tokens.push(json!({"VAR?": path}));
+            }
         }
         ObjectKind::Expression {
             kind: ExpressionKind::FunctionCall { function_name, .. },
@@ -813,8 +834,10 @@ fn export_expression_tokens(
                 .and_then(|child| match child.borrow().kind() {
                     ObjectKind::Divert { target, .. } => target.clone(),
                     _ => None,
-                })
-                .and_then(|path| path.dot_separated_components())
+                });
+            let target = target
+                .and_then(|path| path.resolve_from_context(expression))
+                .map(|object| runtime_target_path_string(&object).as_string())
                 .unwrap_or_default();
             tokens.push(json!({"^->": target}));
         }
@@ -913,7 +936,7 @@ fn build_list_defs_json(list_defs: BTreeMap<String, BTreeMap<String, i64>>) -> V
     Value::Object(defs)
 }
 
-fn export_divert_token(target: Option<&Path>, is_tunnel: bool) -> Value {
+fn export_divert_token(context: &ObjectRef, target: Option<&Path>, is_tunnel: bool) -> Value {
     if let Some(target) = target {
         if target.dot_separated_components().as_deref() == Some("END") {
             return json!("end");
@@ -926,9 +949,157 @@ fn export_divert_token(target: Option<&Path>, is_tunnel: bool) -> Value {
 
     let divert_key = if is_tunnel { "->t->" } else { "->" };
     let target = target
-        .and_then(|path| path.dot_separated_components())
+        .and_then(|path| {
+            let resolved = path.resolve_from_context(context)?;
+            if matches!(resolved.borrow().kind(), ObjectKind::Flow { .. })
+                && path.number_of_components() == 1
+            {
+                Some(path.dot_separated_components().unwrap_or_default())
+            } else {
+                export_compact_path_string(context, path)
+            }
+        })
         .unwrap_or_default();
     json!({ divert_key: target })
+}
+
+fn export_compact_path_string(context: &ObjectRef, path: &Path) -> Option<String> {
+    let target = path.resolve_from_context(context)?;
+    let current_path = runtime_context_path_string(context);
+    let target_path = runtime_target_path_string(&target);
+    Some(compact_runtime_path_string(&current_path, &target_path))
+}
+
+fn export_compact_logic_path_string(context: &ObjectRef, path: &Path) -> Option<String> {
+    let target = path.resolve_from_context(context)?;
+    let current_path = runtime_logic_context_path_string(context);
+    let target_path = runtime_target_path_string(&target);
+    Some(compact_runtime_path_string(&current_path, &target_path))
+}
+
+fn runtime_context_path_string(context: &ObjectRef) -> RuntimePath {
+    let mut components = runtime_target_path_components(context);
+    components.push("0".to_string());
+    RuntimePath::new(components)
+}
+
+fn runtime_logic_context_path_string(context: &ObjectRef) -> RuntimePath {
+    RuntimePath::new(runtime_target_path_components(context))
+}
+
+fn runtime_target_path_string(target: &ObjectRef) -> RuntimePath {
+    RuntimePath::new(runtime_target_path_components(target))
+}
+
+fn runtime_target_path_components(target: &ObjectRef) -> Vec<String> {
+    let ancestry = target.borrow().ancestry();
+    let mut components = Vec::new();
+
+    for ancestor in &ancestry {
+        let borrowed = ancestor.borrow();
+        match borrowed.kind() {
+            ObjectKind::Flow {
+                name: Some(name), ..
+            } => {
+                components.push(name.clone());
+            }
+            ObjectKind::Choice { .. } => {
+                components.push(choice_runtime_component(&ancestor));
+            }
+            ObjectKind::Gather { identifier, .. } => {
+                components.push(flow_named_gather_component(&ancestor, identifier.clone()));
+            }
+            _ => {}
+        }
+    }
+
+    let borrowed = target.borrow();
+    match borrowed.kind() {
+        ObjectKind::Flow {
+            name: Some(name), ..
+        } => components.push(name.clone()),
+        ObjectKind::Choice { .. } | ObjectKind::Gather { .. } => match borrowed.kind() {
+            ObjectKind::Choice { .. } => {
+                components.push(choice_runtime_component(target));
+            }
+            ObjectKind::Gather { identifier, .. } => {
+                components.push(flow_named_gather_component(target, identifier.clone()));
+            }
+            _ => {}
+        },
+        _ => {}
+    }
+
+    components
+}
+
+fn choice_runtime_component(choice: &ObjectRef) -> String {
+    let Some(parent) = choice.borrow().parent() else {
+        return "c-0".to_string();
+    };
+    let mut index = 0usize;
+    for sibling in parent.borrow().content().iter() {
+        if Rc::ptr_eq(sibling, choice) {
+            break;
+        }
+        if matches!(sibling.borrow().kind(), ObjectKind::Choice { .. }) {
+            index += 1;
+        }
+    }
+    format!("c-{index}")
+}
+
+fn flow_named_gather_component(
+    gather: &ObjectRef,
+    identifier: Option<crate::parsed::Identifier>,
+) -> String {
+    if let Some(identifier) = identifier {
+        if !identifier.name.is_empty() {
+            return identifier.name;
+        }
+    }
+
+    let Some(parent) = gather.borrow().parent() else {
+        return "g-0".to_string();
+    };
+    let mut index = 0usize;
+    for sibling in parent.borrow().content().iter() {
+        if Rc::ptr_eq(sibling, gather) {
+            break;
+        }
+        if matches!(sibling.borrow().kind(), ObjectKind::Gather { .. }) {
+            index += 1;
+        }
+    }
+    format!("g-{index}")
+}
+
+fn compact_runtime_path_string(current: &RuntimePath, target: &RuntimePath) -> String {
+    let shared_prefix = current
+        .components
+        .iter()
+        .zip(target.components.iter())
+        .take_while(|(left, right)| left == right)
+        .count();
+
+    let mut relative_components = Vec::new();
+    for _ in shared_prefix..current.components.len() {
+        relative_components.push("^".to_string());
+    }
+    relative_components.extend(target.components.iter().skip(shared_prefix).cloned());
+
+    let relative_path = if relative_components.is_empty() {
+        String::new()
+    } else {
+        relative_components.join(".")
+    };
+
+    let global_path = target.as_string();
+    if relative_path.is_empty() || relative_path.len() >= global_path.len() {
+        global_path
+    } else {
+        format!(".{relative_path}")
+    }
 }
 
 fn export_text_token(text: &str) -> Value {
