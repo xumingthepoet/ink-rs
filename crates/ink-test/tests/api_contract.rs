@@ -235,7 +235,7 @@ fn compiler_reports_includes_diagnostics_with_included_source_filename() {
     let mut files = HashMap::new();
     files.insert(
         PathBuf::from("/virtual/broken.ink"),
-        "* (branch) choice".to_string(),
+        "# unsupported".to_string(),
     );
 
     let file_handler = Arc::new(IncludeFileHandler::new(files));
@@ -260,7 +260,7 @@ fn compiler_reports_includes_diagnostics_with_included_source_filename() {
         Some("/virtual/broken.ink")
     );
     assert_eq!(diagnostic.severity, DiagnosticSeverity::Error);
-    assert!(diagnostic.message.contains("Named choices"));
+    assert!(diagnostic.message.contains("unsupported syntax"));
     assert_eq!(file_handler.resolve_calls.load(Ordering::SeqCst), 1);
     assert_eq!(file_handler.load_calls.load(Ordering::SeqCst), 1);
 }

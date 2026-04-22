@@ -14,6 +14,6 @@ test:
 	$(TIMEOUT) 30s cargo test --workspace
 
 compiler-gate:
-	$(COMPILER_TIMEOUT) 30s cargo test -p ink-test --test compiler_conformance_legacy $(COMPILER_TEST)
+	$(COMPILER_TIMEOUT) 30s cargo test -p ink-test --features legacy-imported-tests --test compiler_conformance_legacy $(COMPILER_TEST)
 
 gate: fmt check test

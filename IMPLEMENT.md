@@ -30,14 +30,15 @@ macOS, use `gtimeout` if GNU `timeout` is not installed.
 Start with 30 seconds; only increase the timeout temporarily when a specific
 fixture needs more wall-clock time.
 
-The legacy compiler-to-runtime conformance suite now runs as part of the
-default workspace test flow and should still always be run with a timeout when
-invoked directly. Use `make compiler-gate` for the full suite, and pass a
-focused filter through `COMPILER_TEST` when iterating on a single legacy
-fixture:
+The imported legacy compiler-to-runtime and csharp suites are currently
+feature-gated behind `legacy-imported-tests` so the default workspace gate can
+stay green while migration continues. They should still always be run with a
+timeout when invoked directly. Use `make compiler-gate` for the compiler
+suite, and pass a focused filter through `COMPILER_TEST` when iterating on a
+single legacy fixture:
 
 ```sh
-timeout 30s cargo test -p ink-test --test compiler_conformance_legacy
+timeout 30s cargo test -p ink-test --features legacy-imported-tests --test compiler_conformance_legacy
 make compiler-gate
 make compiler-gate COMPILER_TEST='compiler_conformance::choice_test::conditional_choice_test -- --exact'
 ```

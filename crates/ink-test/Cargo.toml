@@ -4,6 +4,9 @@ version = "0.1.0"
 edition.workspace = true
 publish = false
 
+[features]
+legacy-imported-tests = []
+
 [dependencies]
 bladeink.workspace = true
 ink_compiler = { package = "ink-compiler", path = "../ink-compiler" }

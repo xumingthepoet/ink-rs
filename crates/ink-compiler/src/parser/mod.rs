@@ -2329,7 +2329,7 @@ mod tests {
 
     #[test]
     fn ink_parser_reports_unsupported_structural_syntax() {
-        let mut parser = InkParser::new("* (branch) choice", Some("story.ink"), None);
+        let mut parser = InkParser::new("# unsupported", Some("story.ink"), None);
         let result = parser.parse();
 
         assert!(result.parsed_story.is_none());

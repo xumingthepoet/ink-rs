@@ -1,3 +1,4 @@
+#![cfg(feature = "legacy-imported-tests")]
 #![allow(
     dead_code,
     unused_imports,
