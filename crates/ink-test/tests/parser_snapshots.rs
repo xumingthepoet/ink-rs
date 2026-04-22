@@ -75,7 +75,7 @@ fn ink_parser_parses_trusted_conditional_iftrue_fixture() {
     let source = load_fixture_text("conformance-tests/inkfiles/conditional/iftrue.ink");
     assert_eq!(
         parse_and_render(&source, "iftrue.ink", None),
-        "Story\n  ContentList\n    Text(\"\\n\")\n  VariableAssignment(name=\"x\", global=true, temp=false)\n    Number(2)\n  VariableAssignment(name=\"y\", global=true, temp=false)\n    Number(0)\n  Conditional\n    Binary(>, VariableReference(x), Number(0))\n    ConditionalBranch(true=true, else=false, inline=false)\n      VariableAssignment(name=\"y\", global=false, temp=false)\n        Binary(-, VariableReference(x), Number(1))\n  ContentList\n    Text(\"        The value is {y}. \")\n    Divert(target=\"-> END\", empty=false, tunnel=false, thread=false)\n    Text(\"\\n\")"
+        "Story\n  ContentList\n    Text(\"\\n\")\n  VariableAssignment(name=\"x\", global=true, temp=false)\n    Number(2)\n  VariableAssignment(name=\"y\", global=true, temp=false)\n    Number(0)\n  Conditional\n    Binary(>, VariableReference(x), Number(0))\n    ConditionalBranch(true=true, else=false, inline=false)\n      VariableAssignment(name=\"y\", global=false, temp=false)\n        Binary(-, VariableReference(x), Number(1))\n  ContentList\n    Text(\"        The value is {y}.\")\n    Divert(target=\"-> END\", empty=false, tunnel=false, thread=false)\n    Text(\"\\n\")"
     );
 }
 
@@ -84,7 +84,7 @@ fn ink_parser_parses_trusted_conditional_ifelse_fixture() {
     let source = load_fixture_text("conformance-tests/inkfiles/conditional/ifelse.ink");
     assert_eq!(
         parse_and_render(&source, "ifelse.ink", None),
-        "Story\n  ContentList\n    Text(\"\\n\")\n  VariableAssignment(name=\"x\", global=true, temp=false)\n    Number(0)\n  VariableAssignment(name=\"y\", global=true, temp=false)\n    Number(3)\n  Conditional\n    Binary(>, VariableReference(x), Number(0))\n    ConditionalBranch(true=true, else=false, inline=false)\n      VariableAssignment(name=\"y\", global=false, temp=false)\n        Binary(-, VariableReference(x), Number(1))\n    ConditionalBranch(true=false, else=true, inline=false)\n      VariableAssignment(name=\"y\", global=false, temp=false)\n        Binary(+, VariableReference(x), Number(1))\n  ContentList\n    Text(\"        The value is {y}. \")\n    Divert(target=\"-> END\", empty=false, tunnel=false, thread=false)"
+        "Story\n  ContentList\n    Text(\"\\n\")\n  VariableAssignment(name=\"x\", global=true, temp=false)\n    Number(0)\n  VariableAssignment(name=\"y\", global=true, temp=false)\n    Number(3)\n  Conditional\n    Binary(>, VariableReference(x), Number(0))\n    ConditionalBranch(true=true, else=false, inline=false)\n      VariableAssignment(name=\"y\", global=false, temp=false)\n        Binary(-, VariableReference(x), Number(1))\n    ConditionalBranch(true=false, else=true, inline=false)\n      VariableAssignment(name=\"y\", global=false, temp=false)\n        Binary(+, VariableReference(x), Number(1))\n  ContentList\n    Text(\"        The value is {y}.\")\n    Divert(target=\"-> END\", empty=false, tunnel=false, thread=false)"
     );
 }
 

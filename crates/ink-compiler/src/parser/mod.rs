@@ -21,8 +21,8 @@ use crate::{
     parsed::{
         Choice, Conditional, ConditionalSingleBranch, ConstantDeclaration, ContentList, Divert,
         ExternalDeclaration, FlowLevel, Identifier, Knot, ListDefinition, ListElementDefinition,
-        Object, ObjectKind, ObjectRef, Path, Return, Sequence, SequenceType, Stitch,
-        Story as ParsedStory, Text, VariableAssignment,
+        MultipleConditionExpression, Object, ObjectKind, ObjectRef, Path, Return, Sequence,
+        SequenceType, Stitch, Story as ParsedStory, Text, VariableAssignment,
     },
     results::{DefaultFileHandler, FileHandler, ParseResult},
 };
@@ -539,16 +539,18 @@ impl<'source> InkParser<'source> {
         let line_indent = line_text.len().saturating_sub(trimmed_start.len());
         let remainder = remainder.trim_start();
 
-        if remainder.starts_with('{') || remainder.starts_with('(') {
+        if remainder.starts_with('(') {
             return Err(Diagnostic::new(
                 DiagnosticSeverity::Error,
                 source_filename,
                 line_number,
                 line_indent + 1,
-                "Choice conditions and named choices are not yet supported",
+                "Named choices are not yet supported",
             ));
         }
 
+        let (condition, remainder) =
+            Self::parse_choice_conditions(remainder, line_number, source_filename.clone())?;
         let (start_text, choice_only_text, inner_tail_text) =
             Self::split_choice_text_fragments(remainder, line_number, source_filename.clone())?;
 
@@ -619,7 +621,49 @@ impl<'source> InkParser<'source> {
             Object::add_content(&choice.object(), inner_list.object());
         }
 
+        if let Some(condition) = condition {
+            choice.set_condition(Some(condition));
+        }
+
         Ok(Some((choice.object(), consumed_lines)))
+    }
+
+    fn parse_choice_conditions<'input>(
+        remainder: &'input str,
+        line_number: usize,
+        source_filename: Option<String>,
+    ) -> std::result::Result<(Option<ObjectRef>, &'input str), Diagnostic> {
+        let mut remaining = remainder.trim_start();
+        let mut conditions = Vec::new();
+
+        while remaining.starts_with('{') {
+            let Some(close_index) = remaining.find('}') else {
+                return Err(Diagnostic::new(
+                    DiagnosticSeverity::Error,
+                    source_filename.clone(),
+                    line_number,
+                    1,
+                    "Expected closing '}' for choice condition",
+                ));
+            };
+
+            let condition_text = remaining[1..close_index].trim();
+            let condition = Self::parse_expression_fragment(
+                condition_text,
+                line_number,
+                source_filename.clone(),
+            )?;
+            conditions.push(condition);
+            remaining = remaining[close_index + 1..].trim_start();
+        }
+
+        let condition = match conditions.len() {
+            0 => None,
+            1 => Some(conditions.remove(0)),
+            _ => Some(MultipleConditionExpression::new(conditions).object()),
+        };
+
+        Ok((condition, remaining))
     }
 
     fn parse_choice_bullet_prefix(trimmed_start: &str) -> Option<(bool, usize, &str)> {
@@ -1968,7 +2012,7 @@ mod tests {
 
     #[test]
     fn ink_parser_reports_unsupported_structural_syntax() {
-        let mut parser = InkParser::new("* choice", Some("story.ink"), None);
+        let mut parser = InkParser::new("* (branch) choice", Some("story.ink"), None);
         let result = parser.parse();
 
         assert!(result.parsed_story.is_none());
@@ -2548,7 +2592,7 @@ We arrived into London at 9.45pm exactly.\n\
 \n\
 === hurry_home ===\n\
 We hurried home to Savile Row as fast as we could. -> END",
-                "Story\n  ContentList\n    Text(\"We arrived into London at 9.45pm exactly.\")\n    Text(\"\\n\")\n  Divert(target=\"-> hurry_home\", empty=false, tunnel=false, thread=false)\n  ContentList\n    Text(\"\\n\")\n  Flow(level=Knot, name=\"hurry_home\", function=false)\n    ContentList\n      Text(\"We hurried home to Savile Row as fast as we could. \")\n      Divert(target=\"-> END\", empty=false, tunnel=false, thread=false)",
+                "Story\n  ContentList\n    Text(\"We arrived into London at 9.45pm exactly.\")\n    Text(\"\\n\")\n  Divert(target=\"-> hurry_home\", empty=false, tunnel=false, thread=false)\n  ContentList\n    Text(\"\\n\")\n  Flow(level=Knot, name=\"hurry_home\", function=false)\n    ContentList\n      Text(\"We hurried home to Savile Row as fast as we could.\")\n      Divert(target=\"-> END\", empty=false, tunnel=false, thread=false)",
             ),
             (
                 "glue_with_divert",

@@ -4,16 +4,18 @@ use serde_json::{json, Map, Value};
 
 use crate::{
     error::CompilerError,
-    parsed::{ObjectKind, ObjectRef, Path, Story as ParsedStory},
+    parsed::{ExpressionKind, ObjectKind, ObjectRef, Path, Story as ParsedStory},
 };
 
 pub fn export_story_json(story: &ParsedStory) -> Result<String, CompilerError> {
     let mut state = ExportState::default();
-    for object in story.content() {
-        let top_level_kind = object.borrow().kind().clone();
-        export_object(&object, &mut state)?;
-        state.last_top_level_kind = Some(top_level_kind);
-    }
+    let top_level_content = story.content();
+    state.last_top_level_kind = top_level_content
+        .last()
+        .map(|object| object.borrow().kind().clone());
+    let mut main_content = Vec::new();
+    export_children(top_level_content, &mut state, &mut main_content, true)?;
+    state.main_content = main_content;
 
     if !matches!(
         state.last_top_level_kind,
@@ -62,13 +64,6 @@ struct ExportState {
     last_top_level_kind: Option<ObjectKind>,
 }
 
-fn export_object(object: &ObjectRef, state: &mut ExportState) -> Result<(), CompilerError> {
-    let mut main_content = std::mem::take(&mut state.main_content);
-    let result = export_object_into(object, state, &mut main_content, true);
-    state.main_content = main_content;
-    result
-}
-
 fn export_object_into(
     object: &ObjectRef,
     state: &mut ExportState,
@@ -82,9 +77,7 @@ fn export_object_into(
 
     match kind {
         ObjectKind::ContentList { .. } => {
-            for child in content {
-                export_object_into(&child, state, tokens, allow_named_flow)?;
-            }
+            export_children(content, state, tokens, allow_named_flow)?;
         }
         ObjectKind::Text { text } => tokens.extend(export_text_tokens(&text)),
         ObjectKind::Divert {
@@ -103,35 +96,36 @@ fn export_object_into(
                     let container = export_named_flow_container(&content, state)?;
                     state.named_containers.insert(name.clone(), container);
                 } else {
-                    for child in content {
-                        export_object_into(&child, state, tokens, false)?;
-                    }
+                    export_children(content, state, tokens, false)?;
                 }
             } else {
-                for child in content {
-                    export_object_into(&child, state, tokens, false)?;
-                }
+                export_children(content, state, tokens, false)?;
             }
         }
         ObjectKind::Choice {
             once_only,
             is_invisible_default,
+            has_condition,
             has_start_content,
             has_choice_only_content,
             has_inline_inner_content,
             ..
         } => {
-            export_choice_container(
+            let choice_named_content = export_choice_container(
                 object,
                 state,
                 once_only,
                 is_invisible_default,
+                has_condition,
                 has_start_content,
                 has_choice_only_content,
                 has_inline_inner_content,
                 tokens.len(),
                 tokens,
             )?;
+            tokens.push(Value::Object(
+                choice_named_content.into_iter().collect::<Map<_, _>>(),
+            ));
         }
         ObjectKind::Gather { .. }
         | ObjectKind::Sequence { .. }
@@ -139,13 +133,15 @@ fn export_object_into(
         | ObjectKind::ConditionalSingleBranch { .. }
         | ObjectKind::ConstantDeclaration { .. }
         | ObjectKind::ExternalDeclaration { .. }
-        | ObjectKind::Expression { .. }
         | ObjectKind::ListDefinition { .. }
         | ObjectKind::ListElementDefinition { .. }
         | ObjectKind::Generic => {
             return Err(CompilerError::Unsupported(
                 "runtime export currently supports plain text stories and list definitions only",
             ));
+        }
+        ObjectKind::Expression { .. } => {
+            tokens.extend(export_expression_tokens(object, state)?);
         }
         ObjectKind::VariableAssignment { .. } => {
             let assignment = crate::parsed::VariableAssignment::from_object(object.clone());
@@ -185,9 +181,7 @@ fn export_named_flow_container(
     state: &mut ExportState,
 ) -> Result<Value, CompilerError> {
     let mut tokens = Vec::new();
-    for child in flow_content {
-        export_object_into(child, state, &mut tokens, false)?;
-    }
+    export_children(flow_content.to_vec(), state, &mut tokens, false)?;
 
     if !matches!(tokens.last(), Some(Value::String(value)) if value == "\n") {
         tokens.push(Value::String("\n".to_string()));
@@ -204,17 +198,21 @@ fn export_choice_container(
     state: &mut ExportState,
     once_only: bool,
     is_invisible_default: bool,
+    has_condition: bool,
     has_start_content: bool,
     has_choice_only_content: bool,
     has_inline_inner_content: bool,
     outer_index: usize,
     tokens: &mut Vec<Value>,
-) -> Result<(), CompilerError> {
+) -> Result<BTreeMap<String, Value>, CompilerError> {
     let choice_index = state.choice_index;
     state.choice_index += 1;
 
     let (start_content, choice_only_content, inner_content) = {
-        let children = object.borrow().content().to_vec();
+        let mut children = object.borrow().content().to_vec();
+        if has_condition {
+            children.pop();
+        }
         let mut iter = children.into_iter();
 
         let start_content = if has_start_content { iter.next() } else { None };
@@ -229,9 +227,18 @@ fn export_choice_container(
 
     let mut outer_tokens = Vec::new();
     let mut choice_named_content = BTreeMap::new();
+    let condition = if has_condition {
+        object.borrow().content().last().cloned()
+    } else {
+        None
+    };
+    let needs_eval = has_start_content || has_choice_only_content || has_condition;
+
+    if needs_eval {
+        outer_tokens.push(json!("ev"));
+    }
 
     if let Some(_start_content) = start_content.as_ref() {
-        outer_tokens.push(json!("ev"));
         outer_tokens.push(json!({
             "^->": format!("0.{outer_index}.$r1")
         }));
@@ -243,20 +250,24 @@ fn export_choice_container(
     }
 
     if let Some(choice_only_content) = choice_only_content.as_ref() {
-        if !has_start_content {
-            outer_tokens.push(json!("ev"));
-        }
         outer_tokens.push(json!("str"));
         outer_tokens.extend(export_content_list_tokens(choice_only_content, state)?);
         outer_tokens.push(json!("/str"));
     }
 
-    if has_start_content || has_choice_only_content {
+    if let Some(condition) = condition.as_ref() {
+        outer_tokens.extend(export_expression_tokens(condition, state)?);
+    }
+
+    if needs_eval {
         outer_tokens.push(json!("/ev"));
     }
 
     let flags = {
         let mut flags = 0;
+        if has_condition {
+            flags |= 1;
+        }
         if has_start_content {
             flags |= 2;
         }
@@ -328,15 +339,8 @@ fn export_choice_container(
         format!("g-{choice_index}"),
         Value::Array(vec![Value::String("done".to_string()), Value::Null]),
     );
-    if has_start_content {
-        tokens.push(Value::Array(outer_tokens));
-    } else {
-        tokens.extend(outer_tokens);
-    }
-    tokens.push(Value::Object(
-        choice_named_content.into_iter().collect::<Map<_, _>>(),
-    ));
-    Ok(())
+    tokens.push(Value::Array(outer_tokens));
+    Ok(choice_named_content)
 }
 
 fn export_content_list_tokens(
@@ -349,11 +353,213 @@ fn export_content_list_tokens(
     };
 
     let mut tokens = Vec::new();
+    export_children(children, state, &mut tokens, false)?;
+
+    Ok(tokens)
+}
+
+fn export_children(
+    children: Vec<ObjectRef>,
+    state: &mut ExportState,
+    tokens: &mut Vec<Value>,
+    allow_named_flow: bool,
+) -> Result<(), CompilerError> {
+    let mut pending_choice_named_contents: Vec<BTreeMap<String, Value>> = Vec::new();
+
     for child in children {
-        export_object_into(&child, state, &mut tokens, false)?;
+        let child_kind = child.borrow().kind().clone();
+        if let ObjectKind::Choice {
+            once_only,
+            is_invisible_default,
+            has_condition,
+            has_start_content,
+            has_choice_only_content,
+            has_inline_inner_content,
+            ..
+        } = child_kind
+        {
+            let choice_named_content = export_choice_container(
+                &child,
+                state,
+                once_only,
+                is_invisible_default,
+                has_condition,
+                has_start_content,
+                has_choice_only_content,
+                has_inline_inner_content,
+                tokens.len(),
+                tokens,
+            )?;
+            pending_choice_named_contents.push(choice_named_content);
+        } else {
+            if !pending_choice_named_contents.is_empty() {
+                flush_pending_choice_named_contents(&mut pending_choice_named_contents, tokens);
+            }
+            export_object_into(&child, state, tokens, allow_named_flow)?;
+        }
+    }
+
+    if !pending_choice_named_contents.is_empty() {
+        flush_pending_choice_named_contents(&mut pending_choice_named_contents, tokens);
+    }
+
+    Ok(())
+}
+
+fn flush_pending_choice_named_contents(
+    pending_choice_named_contents: &mut Vec<BTreeMap<String, Value>>,
+    tokens: &mut Vec<Value>,
+) {
+    if pending_choice_named_contents.is_empty() {
+        return;
+    }
+
+    let mut merged = BTreeMap::new();
+    for entry in pending_choice_named_contents.drain(..) {
+        merged.extend(entry);
+    }
+
+    tokens.push(Value::Object(merged.into_iter().collect::<Map<_, _>>()));
+}
+
+fn export_expression_tokens(
+    expression: &ObjectRef,
+    state: &mut ExportState,
+) -> Result<Vec<Value>, CompilerError> {
+    let (kind, content) = {
+        let borrowed = expression.borrow();
+        (borrowed.kind().clone(), borrowed.content().to_vec())
+    };
+
+    let mut tokens = Vec::new();
+    match kind {
+        ObjectKind::Expression {
+            kind: ExpressionKind::Number(value),
+        } => match value {
+            crate::parsed::NumberValue::Int(value) => tokens.push(json!(value)),
+            crate::parsed::NumberValue::Float(value) => tokens.push(json!(value)),
+            crate::parsed::NumberValue::Bool(value) => tokens.push(json!(value)),
+        },
+        ObjectKind::Expression {
+            kind: ExpressionKind::StringExpression,
+        } => {
+            tokens.push(json!("str"));
+            for child in content {
+                tokens.extend(export_object_tokens(&child, state)?);
+            }
+            tokens.push(json!("/str"));
+        }
+        ObjectKind::Expression {
+            kind: ExpressionKind::VariableReference { path, .. },
+        } => {
+            let path = path
+                .into_iter()
+                .map(|identifier| identifier.name)
+                .collect::<Vec<_>>()
+                .join(".");
+            tokens.push(json!({"VAR?": path}));
+        }
+        ObjectKind::Expression {
+            kind: ExpressionKind::FunctionCall { function_name, .. },
+        } => {
+            for argument in content {
+                tokens.extend(export_expression_tokens(&argument, state)?);
+            }
+            tokens.push(json!({"f()": function_name.name}));
+        }
+        ObjectKind::Expression {
+            kind: ExpressionKind::DivertTarget,
+        } => {
+            let target = content
+                .first()
+                .and_then(|child| match child.borrow().kind() {
+                    ObjectKind::Divert { target, .. } => target.clone(),
+                    _ => None,
+                })
+                .and_then(|path| path.dot_separated_components())
+                .unwrap_or_default();
+            tokens.push(json!({"^->": target}));
+        }
+        ObjectKind::Expression {
+            kind: ExpressionKind::Binary { op_name },
+        } => {
+            if let Some(left) = content.first().cloned() {
+                tokens.extend(export_expression_tokens(&left, state)?);
+            }
+            if let Some(right) = content.get(1).cloned() {
+                tokens.extend(export_expression_tokens(&right, state)?);
+            }
+            tokens.push(json!(runtime_operator_name(&op_name)));
+        }
+        ObjectKind::Expression {
+            kind: ExpressionKind::Unary { op },
+        } => {
+            if let Some(inner) = content.first().cloned() {
+                tokens.extend(export_expression_tokens(&inner, state)?);
+            }
+            tokens.push(json!(runtime_unary_operator_name(&op)));
+        }
+        ObjectKind::Expression {
+            kind: ExpressionKind::IncDec { identifier, is_inc },
+        } => {
+            tokens.push(json!({"VAR?": identifier.name}));
+            tokens.push(json!(if is_inc { "++" } else { "--" }));
+        }
+        ObjectKind::Expression {
+            kind: ExpressionKind::MultipleCondition,
+        } => {
+            let mut iter = content.into_iter();
+            if let Some(first) = iter.next() {
+                tokens.extend(export_expression_tokens(&first, state)?);
+            }
+            for child in iter {
+                tokens.extend(export_expression_tokens(&child, state)?);
+                tokens.push(json!("&&"));
+            }
+        }
+        ObjectKind::Expression {
+            kind: ExpressionKind::List { .. },
+        } => {
+            return Err(CompilerError::Unsupported(
+                "runtime export currently supports plain text stories and basic expressions only",
+            ));
+        }
+        _ => {
+            return Err(CompilerError::Unsupported(
+                "runtime export currently supports plain text stories and basic expressions only",
+            ));
+        }
     }
 
     Ok(tokens)
+}
+
+fn export_object_tokens(
+    object: &ObjectRef,
+    state: &mut ExportState,
+) -> Result<Vec<Value>, CompilerError> {
+    let mut tokens = Vec::new();
+    export_object_into(object, state, &mut tokens, false)?;
+    Ok(tokens)
+}
+
+fn runtime_operator_name(op_name: &str) -> &str {
+    match op_name {
+        "and" => "&&",
+        "or" => "||",
+        "mod" => "%",
+        "has" => "?",
+        "hasnt" => "!?",
+        _ => op_name,
+    }
+}
+
+fn runtime_unary_operator_name(op: &str) -> &str {
+    match op {
+        "-" => "_",
+        "not" => "!",
+        _ => op,
+    }
 }
 
 fn build_list_defs_json(list_defs: BTreeMap<String, BTreeMap<String, i64>>) -> Value {
@@ -424,8 +630,8 @@ mod tests {
     use bladeink::story::Story as RuntimeStory;
 
     use crate::parsed::{
-        Choice, ContentList, Divert, Identifier, Knot, ListDefinition, ListElementDefinition, Path,
-        Story, Text, VariableAssignment,
+        ContentList, Divert, Identifier, Knot, ListDefinition, ListElementDefinition, Path,
+        Sequence, SequenceType, Story, Text, VariableAssignment,
     };
 
     use super::export_story_json;
@@ -465,7 +671,14 @@ mod tests {
 
     #[test]
     fn rejects_non_text_nodes() {
-        let story = Story::new(vec![Choice::new(None, 1).object()], false);
+        let story = Story::new(
+            vec![Sequence::new(
+                vec![ContentList::new(), ContentList::new()],
+                SequenceType::Once,
+            )
+            .object()],
+            false,
+        );
 
         assert!(export_story_json(&story).is_err());
     }

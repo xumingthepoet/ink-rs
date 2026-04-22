@@ -6,6 +6,7 @@ use super::{Identifier, NamedContent, Object, ObjectKind, ObjectRef, WeavePoint}
 pub struct Choice {
     object: ObjectRef,
     identifier: Option<Identifier>,
+    condition: Option<ObjectRef>,
     indentation_depth: usize,
     once_only: bool,
     is_invisible_default: bool,
@@ -25,11 +26,13 @@ impl Choice {
             false,
             false,
             false,
+            false,
         );
 
         Self {
             object,
             identifier,
+            condition: None,
             indentation_depth,
             once_only: true,
             is_invisible_default: false,
@@ -55,6 +58,18 @@ impl Choice {
 
     pub fn identifier(&self) -> Option<Identifier> {
         self.identifier.clone()
+    }
+
+    pub fn condition(&self) -> Option<ObjectRef> {
+        self.condition.clone()
+    }
+
+    pub fn set_condition(&mut self, condition: Option<ObjectRef>) {
+        self.condition = condition.clone();
+        self.set_has_condition(condition.is_some());
+        if let Some(condition) = condition {
+            Object::add_content(&self.object, condition);
+        }
     }
 
     pub fn name(&self) -> Option<&str> {
@@ -151,6 +166,26 @@ impl Choice {
         }
     }
 
+    pub fn has_condition(&self) -> bool {
+        matches!(
+            self.object.borrow().kind(),
+            ObjectKind::Choice {
+                has_condition: true,
+                ..
+            }
+        )
+    }
+
+    pub fn set_has_condition(&mut self, has_condition: bool) {
+        if let ObjectKind::Choice {
+            has_condition: current,
+            ..
+        } = self.object.borrow_mut().kind_mut()
+        {
+            *current = has_condition;
+        }
+    }
+
     pub fn set_has_inline_inner_content(&mut self, has_inline_inner_content: bool) {
         if let ObjectKind::Choice {
             has_inline_inner_content: current,
@@ -215,6 +250,7 @@ mod tests {
         assert!(choice.has_weave_style_inline_brackets());
         assert!(!choice.has_start_content());
         assert!(!choice.has_choice_only_content());
+        assert!(!choice.has_condition());
         assert_eq!(choice.content().len(), 1);
         assert_eq!(WeavePoint::name(&choice), Some("branch"));
         assert_eq!(choice.to_string(), "* branch");
