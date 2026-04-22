@@ -1,4 +1,4 @@
-// Issue reported here: https://github.com/bladecoder/blade-ink/issues/15
+// Issue reported here: original upstream issue 15
 // The correct output has to be:
 // This is a test
 // X is set

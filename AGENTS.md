@@ -3,10 +3,10 @@
 ## Purpose
 
 Port the official ink compiler layer from the C# implementation to Rust while
-reusing the existing `blade-ink-rs/lib` runtime.
+reusing the existing `ink-runtime/lib` runtime.
 
 The target result is a Rust compiler crate that can compile `.ink` source into
-runtime JSON compatible with `bladeink::story::Story::new`.
+runtime JSON compatible with `ink_runtime::story::Story::new`.
 
 ## Operating Model
 
@@ -36,7 +36,7 @@ The compiler source of truth is `ink-csharp/compiler`, especially:
 - `InkParser/`
 - `ParsedHierarchy/`
 
-The local `blade-ink-rs/` directory contains an unofficial Rust runtime port.
+The local `ink-runtime/` directory contains an unofficial Rust runtime port.
 It has runtime coverage only. The compiler crate must depend on it by path and
 must not duplicate the runtime.
 
@@ -48,7 +48,7 @@ locally for development and verification.
 - Implement a Rust compiler layer under `crates/ink-compiler`.
 - Preserve official C# compiler behavior wherever practical.
 - Preserve recognizable type and concept names from the C# compiler.
-- Compile ink source to runtime JSON accepted by `bladeink`.
+- Compile ink source to runtime JSON accepted by `ink_runtime`.
 - Add tests incrementally so each language feature has a small verification
   surface.
 - Keep work resumable through `PLAN.md`, `IMPLEMENT.md`, and
@@ -57,7 +57,7 @@ locally for development and verification.
 ## Non-Goals
 
 - Do not reimplement the runtime layer.
-- Do not vendor `ink-csharp/` or `blade-ink-rs/` into this Git repository.
+- Do not vendor `ink-csharp/` or `ink-runtime/` into this Git repository.
 - Do not redesign the ink language.
 - Do not optimize before compatibility is established.
 - Do not port all compiler files in one large unverified patch.
@@ -72,7 +72,7 @@ locally for development and verification.
   - parser and parsed hierarchy modules
 - Parser equivalent for official ink syntax.
 - Parsed hierarchy equivalent for code generation and reference resolution.
-- Runtime export that produces JSON compatible with `bladeink`.
+- Runtime export that produces JSON compatible with `ink_runtime`.
 - Tests for parser behavior, parsed hierarchy behavior, JSON export, and runtime
   smoke execution.
 - Documentation describing architecture, porting rules, testing, status, and
@@ -84,7 +84,7 @@ locally for development and verification.
 - `cargo check --workspace` passes.
 - `cargo test --workspace` passes.
 - A representative conformance subset compiles from `.ink` source to JSON and
-  runs through `bladeink`.
+  runs through `ink_runtime`.
 - Public docs explain how to build, test, and continue development.
 - `PLAN.md` has no unchecked required milestones.
 - `DOCUMENTATION.md` records final status, decisions, and known limitations.
@@ -101,13 +101,13 @@ locally for development and verification.
   AST structure and runtime export behavior.
 - Treat `ink-csharp/compiler/InkParser` and `ink-csharp/compiler/StringParser`
   as the source of truth for parsing behavior.
-- Export runtime JSON compatible with `bladeink::story::Story::new`.
+- Export runtime JSON compatible with `ink_runtime::story::Story::new`.
 
 ## Constraints
 
-- Runtime dependency remains `bladeink = { path = "blade-ink-rs/lib" }`.
-- Do not vendor or track `ink-csharp/` or `blade-ink-rs/` in this repository.
-- Do not duplicate runtime implementation from `blade-ink-rs/lib`.
+- Runtime dependency remains `ink_runtime = { path = "ink-runtime/lib" }`.
+- Do not vendor or track `ink-csharp/` or `ink-runtime/` in this repository.
+- Do not duplicate runtime implementation from `ink-runtime/lib`.
 - Keep initial ports small and testable. Port one compiler concept at a time
   instead of creating large unverified translations.
 - Preserve behavior over idiomatic rewrites when porting from C#; idiomatic Rust
@@ -158,8 +158,8 @@ cargo check --workspace
 cargo test --workspace
 ```
 
-These commands require the ignored local `blade-ink-rs/` directory to be
-present because `crates/ink-compiler` depends on `blade-ink-rs/lib` by path.
+These commands require the ignored local `ink-runtime/` directory to be
+present because `crates/ink-compiler` depends on `ink-runtime/lib` by path.
 
 ## Verification Rule
 

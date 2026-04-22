@@ -13,7 +13,7 @@ into `crates/ink-runtime` instead of rewriting runtime execution.
 
 - Root Git repository exists.
 - `ink-csharp/` remains the local ignored reference tree.
-- The legacy `blade-ink-rs/` tree has been deleted.
+- The legacy `ink-runtime/` tree has been deleted.
 - Rust workspace exists with `crates/ink-compiler`, `crates/ink-runtime`, and
   `crates/ink-test`.
 - `ink-compiler` now exposes a stable API contract with structured diagnostics,
@@ -97,17 +97,17 @@ into `crates/ink-runtime` instead of rewriting runtime execution.
   `crates/ink-compiler/src/parsed/snapshot.rs`.
 - Runtime story behavior tests now cover choice selection, named knot/stitch
   and gather-like container paths, and explicit diverts against
-  `bladeink::story::Story`.
-- Runtime JSON shape for `bladeink::story::Story::new` has been identified
+  `ink_runtime::story::Story`.
+- Runtime JSON shape for `ink_runtime::story::Story::new` has been identified
   with a minimal loading fixture.
 - Compiler-owned runtime export now emits minimal plain-text story JSON plus
   `listDefs` metadata for parsed list declarations and loads successfully
-  through `bladeink::story::Story::new`.
+  through `ink_runtime::story::Story::new`.
 - The runtime crate has been copied into `crates/ink-runtime`, and the
   compiler/test crates now depend on that location directly instead of the
-  legacy `blade-ink-rs/lib` tree.
+  legacy `ink-runtime/lib` tree.
 - The runtime Cargo package is named `ink-runtime`, while the exported Rust
-  library crate remains `bladeink` for compatibility with existing imports.
+  library crate remains `ink_runtime` for compatibility with existing imports.
 - Compiler-owned runtime export normalizes a missing terminal newline for
   plain-text stories so trusted runtime output stays stable across source
   files that do not end with `\n`.
@@ -152,39 +152,39 @@ into `crates/ink-runtime` instead of rewriting runtime execution.
   structure preserved; the remaining work is compatibility and integration,
   not source reconstruction.
 - The trusted conformance baseline now covers both the one-line and two-line
-  `basictext` fixtures from `blade-ink-rs`.
-- The trusted `blade-ink-rs` `basictext/oneline.ink` fixture now also has a
+  `basictext` fixtures from `ink-runtime`.
+- The trusted `ink-runtime` `basictext/oneline.ink` fixture now also has a
   parser-level conformance snapshot.
-- The trusted `blade-ink-rs` `basictext/twolines.ink` fixture now also has a
+- The trusted `ink-runtime` `basictext/twolines.ink` fixture now also has a
   parser-level conformance snapshot.
-- The trusted `blade-ink-rs` `function/func-none.ink` fixture now also has a
+- The trusted `ink-runtime` `function/func-none.ink` fixture now also has a
   parser-level conformance snapshot.
-- The trusted `blade-ink-rs` `function/func-basic.ink` fixture now also has a
+- The trusted `ink-runtime` `function/func-basic.ink` fixture now also has a
   parser-level conformance snapshot.
-- The trusted `blade-ink-rs` `function/func-inline.ink` fixture now also has a
+- The trusted `ink-runtime` `function/func-inline.ink` fixture now also has a
   parser-level conformance snapshot.
-- The trusted `blade-ink-rs` glue fixture `glue/left-right-glue-matching.ink`
+- The trusted `ink-runtime` glue fixture `glue/left-right-glue-matching.ink`
   now also has a parser-level conformance snapshot.
-- The trusted `blade-ink-rs` glue fixture `glue/testbugfix1.ink` now also has
+- The trusted `ink-runtime` glue fixture `glue/testbugfix1.ink` now also has
   a parser-level conformance snapshot.
-- The trusted `blade-ink-rs` glue fixture `glue/testbugfix2.ink` now also has
+- The trusted `ink-runtime` glue fixture `glue/testbugfix2.ink` now also has
   a parser-level conformance snapshot.
-- The trusted `blade-ink-rs` function fixture `function/complex-func1.ink` now
+- The trusted `ink-runtime` function fixture `function/complex-func1.ink` now
   also has a parser-level conformance snapshot.
-- The trusted `blade-ink-rs` function fixture `function/complex-func2.ink` now
+- The trusted `ink-runtime` function fixture `function/complex-func2.ink` now
   also has a parser-level conformance snapshot.
-- The trusted `blade-ink-rs` function fixture
+- The trusted `ink-runtime` function fixture
   `function/evaluating-function-variablestate-bug.ink` now also has a
   parser-level conformance snapshot.
-- The trusted `blade-ink-rs` function fixture `function/setvar-func.ink` now
+- The trusted `ink-runtime` function fixture `function/setvar-func.ink` now
   also has a parser-level conformance snapshot.
-- The trusted `blade-ink-rs` function fixture `function/rnd-func.ink` now
+- The trusted `ink-runtime` function fixture `function/rnd-func.ink` now
   also has a parser-level conformance snapshot.
-- The trusted `blade-ink-rs` `conditional/iftrue.ink` fixture now also has a
+- The trusted `ink-runtime` `conditional/iftrue.ink` fixture now also has a
   parser-level conformance snapshot.
-- The trusted `blade-ink-rs` `conditional/ifelse.ink` fixture now also has a
+- The trusted `ink-runtime` `conditional/ifelse.ink` fixture now also has a
   parser-level conformance snapshot.
-- The trusted `blade-ink-rs` divert fixture `divert/simple-divert.ink` now has
+- The trusted `ink-runtime` divert fixture `divert/simple-divert.ink` now has
   a parser-level conformance snapshot.
 - The simple divert parser now also accepts an optional trailing `->` glue
   marker, which matches the official `function/evaluating-function-
@@ -192,13 +192,13 @@ into `crates/ink-runtime` instead of rewriting runtime execution.
 - Choice output now preserves user-visible spacing in choice text fragments
   and matches the official JSON layout for the green `no-choice`, `one`,
   `single-choice`, `suppress-choice`, and `mixed-choice` fixtures.
-- The trusted `blade-ink-rs` glue/divert fixture `glue/glue-with-divert.ink`
+- The trusted `ink-runtime` glue/divert fixture `glue/glue-with-divert.ink`
   now has a parser-level conformance snapshot.
-- The trusted `blade-ink-rs` knot fixture `knot/multi-line.ink` now has a
+- The trusted `ink-runtime` knot fixture `knot/multi-line.ink` now has a
   runtime conformance snapshot.
-- The trusted `blade-ink-rs` knot fixture `knot/strip-empty-lines.ink` now
+- The trusted `ink-runtime` knot fixture `knot/strip-empty-lines.ink` now
   has a runtime conformance snapshot.
-- The trusted `blade-ink-rs` knot fixture `knot/single-line.ink` now has a
+- The trusted `ink-runtime` knot fixture `knot/single-line.ink` now has a
   runtime conformance snapshot.
 - Official C# include-chain fixtures now have a parser-level conformance
   snapshot covering BOM stripping, recursive include expansion, a variable
@@ -246,7 +246,7 @@ cargo check --workspace
 timeout 30s cargo test --workspace
 ```
 
-The workspace now builds against `crates/ink-runtime`; the old `blade-ink-rs/`
+The workspace now builds against `crates/ink-runtime`; the old `ink-runtime/`
 tree is no longer required.
 
 For manual compilation, run:
@@ -317,7 +317,7 @@ Pass a second argument to write the JSON to a file instead of stdout.
   is either named-content metadata or `null`.
 - `Compiler::compile_json` now exports minimal plain-text story JSON plus
   `listDefs` metadata for parsed list declarations, and `Compiler::compile`
-  can load that JSON through `bladeink`.
+  can load that JSON through `ink_runtime`.
 - `CompilerOptions` now accepts an injectable file handler, and `InkParser`
   now resolves `INCLUDE` lines through that abstraction with recursive include
   tracking and source-file diagnostics.
@@ -368,7 +368,7 @@ Pass a second argument to write the JSON to a file instead of stdout.
   sequences now exists as a stable parser snapshot test.
 - The C# `Glue` and `LegacyTag` `Wrap<T>` aliases are not yet ported as
   dedicated compiler-side wrappers because the corresponding runtime modules in
-  `blade-ink-rs` are private; the generic `Wrap<T>` helper is in place for
+  `ink-runtime` are private; the generic `Wrap<T>` helper is in place for
   future use.
 - The `ink_compile` tool is intentionally minimal and prints JSON to stdout
   or writes it to an optional output path; richer CLI ergonomics remain out of
@@ -383,7 +383,7 @@ Pass a second argument to write the JSON to a file instead of stdout.
 ## Remaining Incompatibilities
 
 - `Compiler::compile_json` still emits only the minimal runtime JSON shape that
-  the current `bladeink::story::Story::new` loader accepts, plus `listDefs`
+  the current `ink_runtime::story::Story::new` loader accepts, plus `listDefs`
   metadata for parsed list declarations.
 - The parser and parsed hierarchy still only cover the ported slices listed in
   the current status above; the rest of the official C# grammar remains
@@ -396,6 +396,14 @@ Pass a second argument to write the JSON to a file instead of stdout.
 - External fixture-driven parser snapshots now live in `crates/ink-test/tests/`.
 
 ## Audit Log
+
+- Renamed the runtime library crate from `bladeink` to `ink_runtime`,
+  removed the workspace-level runtime dependency alias, and updated the
+  compiler/test crates to depend on `crates/ink-runtime` directly.
+- Validation: `cargo fmt --all`, `cargo check --workspace`, and
+  `timeout 30s make gate`.
+- Result: the workspace gate is green and the repository no longer carries
+  the old `blade*` crate naming.
 
 - Restored the default workspace gate by feature-gating the imported legacy
   compiler-conformance and csharp suites behind separate features, and kept
@@ -530,7 +538,7 @@ Pass a second argument to write the JSON to a file instead of stdout.
 - Added the `ink-test` crate and moved the package-level integration tests
   there, along with copied conformance/include fixtures under
   `crates/ink-test/fixtures`.
-- The legacy `blade-ink-rs` tree was deleted after the workspace was verified
+- The legacy `ink-runtime` tree was deleted after the workspace was verified
   against `crates/ink-runtime` and the new test crate.
 - Validation: `cargo fmt --all`, `cargo fmt --all --check`,
   `cargo check --workspace`, `cargo test --workspace`.
@@ -539,7 +547,7 @@ Pass a second argument to write the JSON to a file instead of stdout.
 
 ### 2026-04-22
 
-- Added a new runtime migration step by copying the `blade-ink-rs/lib/src`
+- Added a new runtime migration step by copying the `ink-runtime/lib/src`
   tree into `crates/ink-runtime/src`.
 - The compiler and tests now depend directly on `crates/ink-runtime`, which
   keeps the workspace building against the relocated runtime source.
@@ -550,7 +558,7 @@ Pass a second argument to write the JSON to a file instead of stdout.
 
 ### 2026-04-22
 
-- Added parser-level coverage for `blade-ink-rs` function fixture
+- Added parser-level coverage for `ink-runtime` function fixture
   `function/evaluating-function-variablestate-bug.ink`.
 - The fixture confirmed that `-> tunnel ->` is accepted as a simple divert
   with trailing glue, and that the function bodies render as expected.
@@ -558,9 +566,9 @@ Pass a second argument to write the JSON to a file instead of stdout.
   `cargo test -p ink-compiler ink_parser_parses_trusted_function_evaluating_variablestate_bug_fixture`,
   `cargo fmt --all --check`, `cargo check --workspace`,
   `cargo test --workspace`.
-- Result: all passed; only the existing `blade-ink-rs/lib/src/story_state.rs`
+- Result: all passed; only the existing `ink-runtime/lib/src/story_state.rs`
   parenthesis warnings remained.
-- Added parser-level coverage for `blade-ink-rs` function fixture
+- Added parser-level coverage for `ink-runtime` function fixture
   `function/complex-func2.ink`.
 - The larger conditional block in this fixture is now checked through stable
   key-structure assertions rather than a full exact string snapshot.
@@ -578,7 +586,7 @@ Result: all passed with warnings denied.
 
 ### 2026-04-22
 
-- Added a parser-level conformance snapshot for `blade-ink-rs` function
+- Added a parser-level conformance snapshot for `ink-runtime` function
   fixture `function/complex-func1.ink`.
 - The snapshot verifies the parser keeps the function call, variable
   declarations, conditional branch, and trailing assignment in stable parsed
@@ -595,11 +603,11 @@ cargo test --workspace
 ```
 
 Result: all passed. The only remaining warnings are the two existing
-`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
+`ink-runtime/lib/src/story_state.rs` parentheses warnings.
 
 ### 2026-04-22
 
-- Added a parser-level conformance snapshot for `blade-ink-rs` glue fixture
+- Added a parser-level conformance snapshot for `ink-runtime` glue fixture
   `glue/testbugfix2.ink`.
 - The snapshot verifies the parser keeps the `A {f():B}` line as plain text,
   the `X` line, and the function body in stable parsed hierarchy form.
@@ -614,11 +622,11 @@ cargo test --workspace
 ```
 
 Result: all passed. The only remaining warnings are the two existing
-`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
+`ink-runtime/lib/src/story_state.rs` parentheses warnings.
 
 ### 2026-04-22
 
-- Added a parser-level conformance snapshot for `blade-ink-rs` function
+- Added a parser-level conformance snapshot for `ink-runtime` function
   fixture `function/rnd-func.ink`.
 - The snapshot verifies the parser keeps the builtin `SEED_RANDOM` call and
   the four rolling-dice text lines in stable parsed hierarchy form.
@@ -633,11 +641,11 @@ cargo test --workspace
 ```
 
 Result: all passed. The only remaining warnings are the two existing
-`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
+`ink-runtime/lib/src/story_state.rs` parentheses warnings.
 
 ### 2026-04-22
 
-- Added a parser-level conformance snapshot for `blade-ink-rs` function
+- Added a parser-level conformance snapshot for `ink-runtime` function
   fixture `function/setvar-func.ink`.
 - The snapshot verifies the parser keeps the top-level function call
   assignment, trailing text, trailing divert, and function body in stable
@@ -654,11 +662,11 @@ cargo test --workspace
 ```
 
 Result: all passed. The only remaining warnings are the two existing
-`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
+`ink-runtime/lib/src/story_state.rs` parentheses warnings.
 
 ### 2026-04-22
 
-- Added a parser-level conformance snapshot for `blade-ink-rs` glue fixture
+- Added a parser-level conformance snapshot for `ink-runtime` glue fixture
   `glue/testbugfix1.ink`.
 - The snapshot verifies the parser keeps the leading and trailing plain text,
   the inline conditional, and the function body in stable parsed hierarchy
@@ -674,11 +682,11 @@ cargo test --workspace
 ```
 
 Result: all passed. The only remaining warnings are the two existing
-`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
+`ink-runtime/lib/src/story_state.rs` parentheses warnings.
 
 ### 2026-04-22
 
-- Added a parser-level conformance snapshot for `blade-ink-rs` glue fixture
+- Added a parser-level conformance snapshot for `ink-runtime` glue fixture
   `glue/left-right-glue-matching.ink`.
 - The snapshot verifies the parser keeps the leading text, the inline
   conditional, and the function body in stable parsed hierarchy form. It also
@@ -694,11 +702,11 @@ cargo test --workspace
 ```
 
 Result: all passed. The only remaining warnings are the two existing
-`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
+`ink-runtime/lib/src/story_state.rs` parentheses warnings.
 
 ### 2026-04-22
 
-- Added a parser-level conformance snapshot for `blade-ink-rs` function
+- Added a parser-level conformance snapshot for `ink-runtime` function
   fixture `function/func-inline.ink`.
 - The snapshot verifies the parser keeps the inline function-call line, a
   trailing divert, and the function return body in stable parsed hierarchy
@@ -714,11 +722,11 @@ cargo test --workspace
 ```
 
 Result: all passed. The only remaining warnings are the two existing
-`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
+`ink-runtime/lib/src/story_state.rs` parentheses warnings.
 
 ### 2026-04-22
 
-- Added a parser-level conformance snapshot for `blade-ink-rs` function
+- Added a parser-level conformance snapshot for `ink-runtime` function
   fixture `function/func-basic.ink`.
 - The snapshot verifies the parser keeps a variable declaration, a function
   call assignment, a trailing divert, and a function return body in stable
@@ -735,11 +743,11 @@ cargo test --workspace
 ```
 
 Result: all passed. The only remaining warnings are the two existing
-`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
+`ink-runtime/lib/src/story_state.rs` parentheses warnings.
 
 ### 2026-04-22
 
-- Added a parser-level conformance snapshot for `blade-ink-rs` conditional
+- Added a parser-level conformance snapshot for `ink-runtime` conditional
   fixture `conditional/ifelse.ink`.
 - The snapshot verifies the parser keeps variable declarations, an `else`
   branch, and trailing text in stable parsed hierarchy form.
@@ -754,11 +762,11 @@ cargo test --workspace
 ```
 
 Result: all passed. The only remaining warnings are the two existing
-`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
+`ink-runtime/lib/src/story_state.rs` parentheses warnings.
 
 ### 2026-04-22
 
-- Added a parser-level conformance snapshot for `blade-ink-rs` conditional
+- Added a parser-level conformance snapshot for `ink-runtime` conditional
   fixture `conditional/iftrue.ink`.
 - The snapshot verifies the parser keeps variable declarations, a conditional
   branch, and trailing text in stable parsed hierarchy form.
@@ -773,11 +781,11 @@ cargo test --workspace
 ```
 
 Result: all passed. The only remaining warnings are the two existing
-`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
+`ink-runtime/lib/src/story_state.rs` parentheses warnings.
 
 ### 2026-04-22
 
-- Added a parser-level conformance snapshot for `blade-ink-rs` function
+- Added a parser-level conformance snapshot for `ink-runtime` function
   fixture `function/func-none.ink`.
 - The snapshot verifies the parser keeps a simple function flow, a zero-arg
   function call, and the trailing return body in stable parsed hierarchy form.
@@ -792,11 +800,11 @@ cargo test --workspace
 ```
 
 Result: all passed. The only remaining warnings are the two existing
-`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
+`ink-runtime/lib/src/story_state.rs` parentheses warnings.
 
 ### 2026-04-22
 
-- Added a parser-level conformance snapshot for `blade-ink-rs` basictext
+- Added a parser-level conformance snapshot for `ink-runtime` basictext
   fixture `basictext/oneline.ink`.
 - The snapshot verifies the parser keeps a single plain-text line in stable
   parsed hierarchy form.
@@ -811,11 +819,11 @@ cargo test --workspace
 ```
 
 Result: all passed. The only remaining warnings are the two existing
-`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
+`ink-runtime/lib/src/story_state.rs` parentheses warnings.
 
 ### 2026-04-22
 
-- Added a parser-level conformance snapshot for `blade-ink-rs` basictext
+- Added a parser-level conformance snapshot for `ink-runtime` basictext
   fixture `basictext/twolines.ink`.
 - The snapshot verifies the parser keeps two consecutive plain-text lines in
   stable `ContentList` structure.
@@ -830,14 +838,14 @@ cargo test --workspace
 ```
 
 Result: all passed. The only remaining warnings are the two existing
-`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
+`ink-runtime/lib/src/story_state.rs` parentheses warnings.
 
 ### 2026-04-22
 
-- Added a runtime conformance snapshot for `blade-ink-rs` knot fixture
+- Added a runtime conformance snapshot for `ink-runtime` knot fixture
   `knot/single-line.ink`.
 - The snapshot verifies plain-text runtime output stays stable through
-  `Compiler::compile_json` and `bladeink::story::Story::new`.
+  `Compiler::compile_json` and `ink_runtime::story::Story::new`.
 
 Validation:
 
@@ -849,11 +857,11 @@ cargo test --workspace
 ```
 
 Result: all passed. The only remaining warnings are the two existing
-`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
+`ink-runtime/lib/src/story_state.rs` parentheses warnings.
 
 ### 2026-04-22
 
-- Added a runtime conformance snapshot for `blade-ink-rs` knot fixture
+- Added a runtime conformance snapshot for `ink-runtime` knot fixture
   `knot/strip-empty-lines.ink`.
 - The snapshot verifies plain-text runtime output stays stable for a source
   file with internal blank lines.
@@ -868,14 +876,14 @@ cargo test --workspace
 ```
 
 Result: all passed. The only remaining warnings are the two existing
-`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
+`ink-runtime/lib/src/story_state.rs` parentheses warnings.
 
 ### 2026-04-22
 
-- Added a runtime conformance snapshot for `blade-ink-rs` knot fixture
+- Added a runtime conformance snapshot for `ink-runtime` knot fixture
   `knot/multi-line.ink`.
 - The snapshot verifies plain-text multi-line runtime output remains stable
-  through `Compiler::compile_json` and `bladeink::story::Story::new`.
+  through `Compiler::compile_json` and `ink_runtime::story::Story::new`.
 
 Validation:
 
@@ -888,11 +896,11 @@ cargo test --workspace
 ```
 
 Result: all passed. The only remaining warnings are the two existing
-`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
+`ink-runtime/lib/src/story_state.rs` parentheses warnings.
 
 ### 2026-04-22
 
-- Added a parser-level conformance snapshot for `blade-ink-rs`
+- Added a parser-level conformance snapshot for `ink-runtime`
   `glue/glue-with-divert.ink`.
 - The snapshot verifies a text line with glue markers, a simple divert, two
   knot bodies, and the terminal divert to `END`.
@@ -914,7 +922,7 @@ cargo test --workspace
 ```
 
 Result: all passed. The only remaining warnings are the two existing
-`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
+`ink-runtime/lib/src/story_state.rs` parentheses warnings.
 
 ### 2026-04-22
 
@@ -934,12 +942,12 @@ cargo test --workspace
 ```
 
 Result: all passed. The only remaining warnings are the two existing
-`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
+`ink-runtime/lib/src/story_state.rs` parentheses warnings.
 
 ### 2026-04-22
 
 - Expanded the Milestone 9 conformance harness baseline to cover both
-  `basictext/oneline` and `basictext/twolines` from `blade-ink-rs`.
+  `basictext/oneline` and `basictext/twolines` from `ink-runtime`.
 
 Validation:
 
@@ -951,7 +959,7 @@ cargo test --workspace
 ```
 
 Result: all passed. The only remaining warnings are the two existing
-`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
+`ink-runtime/lib/src/story_state.rs` parentheses warnings.
 
 ### 2026-04-22
 
@@ -968,7 +976,7 @@ cargo test --workspace
 ```
 
 Result: all passed. The only remaining warnings are the two existing
-`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
+`ink-runtime/lib/src/story_state.rs` parentheses warnings.
 
 ### 2026-04-22
 
@@ -986,7 +994,7 @@ cargo test --workspace
 ```
 
 Result: all passed. The only remaining warnings are the two existing
-`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
+`ink-runtime/lib/src/story_state.rs` parentheses warnings.
 
 ### 2026-04-22
 
@@ -1003,13 +1011,13 @@ cargo test --workspace
 ```
 
 Result: all passed. The only remaining warnings are the two existing
-`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
+`ink-runtime/lib/src/story_state.rs` parentheses warnings.
 
 ### 2026-04-22
 
 - Completed the Milestone 9 conformance harness slice.
 - Added a reusable conformance harness that compares compiler output against
-  trusted `blade-ink-rs` fixtures and compiles an official C# include example
+  trusted `ink-runtime` fixtures and compiles an official C# include example
   through the Rust compiler and runtime.
 - Fixed BOM handling in the comment eliminator so included files from the C#
   reference set no longer preserve a leading BOM in text output.
@@ -1024,7 +1032,7 @@ cargo test --workspace
 ```
 
 Result: all passed. The only remaining warnings are the two existing
-`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
+`ink-runtime/lib/src/story_state.rs` parentheses warnings.
 
 ### 2026-04-22
 
@@ -1044,7 +1052,7 @@ cargo check --workspace
 ```
 
 Result: all passed. The only remaining warnings are the two existing
-`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
+`ink-runtime/lib/src/story_state.rs` parentheses warnings.
 
 ### 2026-04-22
 
@@ -1065,7 +1073,7 @@ cargo test --workspace
 ```
 
 Result: all passed. The only remaining warnings are the two existing
-`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
+`ink-runtime/lib/src/story_state.rs` parentheses warnings.
 
 ### 2026-04-22
 
@@ -1082,7 +1090,7 @@ cargo check --workspace
 ```
 
 Result: all passed. The only remaining warnings are the two existing
-`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
+`ink-runtime/lib/src/story_state.rs` parentheses warnings.
 
 ### 2026-04-22
 
@@ -1101,7 +1109,7 @@ cargo check --workspace
 cargo test --workspace
 ```
 
-Result: all passed. `blade-ink-rs/lib` emitted the same two existing warnings
+Result: all passed. `ink-runtime/lib` emitted the same two existing warnings
 about unnecessary parentheses around trait object types.
 
 ### 2026-04-22
@@ -1123,7 +1131,7 @@ cargo check --workspace
 cargo test --workspace
 ```
 
-Result: all passed. `blade-ink-rs/lib` emitted the same two existing warnings
+Result: all passed. `ink-runtime/lib` emitted the same two existing warnings
 about unnecessary parentheses around trait object types.
 
 ### 2026-04-22
@@ -1213,7 +1221,7 @@ about unnecessary parentheses around trait object types.
 - Added golden parser tests that snapshot minimal plain-text, knot, and
   simple-divert parsed trees as stable textual dumps.
 - Added a runtime JSON smoke test that proves the minimal compiled story shape
-  loads through `bladeink::story::Story::new`.
+  loads through `ink_runtime::story::Story::new`.
 - Added a compiler-owned runtime export path that serializes minimal
   plain-text stories to runtime JSON and returns a runtime `Story`.
 - Added compiler and API contract tests covering JSON export success,
@@ -1227,7 +1235,7 @@ cargo check --workspace
 cargo test --workspace
 ```
 
-Result: all passed. `blade-ink-rs/lib` emitted two existing warnings about
+Result: all passed. `ink-runtime/lib` emitted two existing warnings about
 unnecessary parentheses around trait object types.
 
 ### 2026-04-22
@@ -1247,7 +1255,7 @@ cargo test -p ink-compiler string_parser
 cargo check --workspace
 ```
 
-Result: all passed. `blade-ink-rs/lib` emitted the same two existing warnings
+Result: all passed. `ink-runtime/lib` emitted the same two existing warnings
 about unnecessary parentheses around trait object types.
 
 ### 2026-04-22
@@ -1274,7 +1282,7 @@ cargo test -p ink-compiler parsed
 cargo check --workspace
 ```
 
-Result: all passed. `blade-ink-rs/lib` emitted the same two existing warnings
+Result: all passed. `ink-runtime/lib` emitted the same two existing warnings
 about unnecessary parentheses around trait object types.
 
 ### 2026-04-22
@@ -1332,7 +1340,7 @@ cargo check --workspace
 cargo test --workspace
 ```
 
-Result: all passed. `blade-ink-rs/lib` emitted the same two existing warnings
+Result: all passed. `ink-runtime/lib` emitted the same two existing warnings
 about unnecessary parentheses around trait object types.
 
 ### 2026-04-22
@@ -1346,7 +1354,7 @@ about unnecessary parentheses around trait object types.
 ### 2026-04-22
 
 - Started Milestone 5 with runtime JSON shape identification.
-- Confirmed that `bladeink::story::Story::new` accepts a minimal JSON fixture
+- Confirmed that `ink_runtime::story::Story::new` accepts a minimal JSON fixture
   with `inkVersion`, `root`, and `listDefs`.
 - Recorded the top-level JSON contract and container terminator shape in the
   live documentation.
@@ -1356,7 +1364,7 @@ about unnecessary parentheses around trait object types.
 - Completed Milestone 5 with a compiler-owned runtime export skeleton.
 - Added a JSON exporter that turns plain-text parsed stories into runtime JSON
   without copying runtime internals.
-- Verified that exported JSON loads through `bladeink::story::Story::new` and
+- Verified that exported JSON loads through `ink_runtime::story::Story::new` and
   that `compile()` returns a runtime story for a plain-text input.
 
 ### 2026-04-22
@@ -1377,14 +1385,14 @@ cargo check --workspace
 cargo test --workspace
 ```
 
-Result: all passed. `blade-ink-rs/lib` emitted the same two existing warnings
+Result: all passed. `ink-runtime/lib` emitted the same two existing warnings
 about unnecessary parentheses around trait object types.
 
 ### 2026-04-22
 
 - Completed Milestone 6 with runtime tests for choices, gathers, knots,
   stitches, and diverts.
-- Added integration tests against `bladeink::story::Story` covering a choice
+- Added integration tests against `ink_runtime::story::Story` covering a choice
   fixture, nested knot/stitch and gather-like named container paths, and
   explicit diverts.
 
@@ -1397,7 +1405,7 @@ cargo check --workspace
 cargo test --workspace
 ```
 
-Result: all passed. `blade-ink-rs/lib` emitted the same two existing warnings
+Result: all passed. `ink-runtime/lib` emitted the same two existing warnings
 about unnecessary parentheses around trait object types.
 
 ### 2026-04-22
@@ -1420,7 +1428,7 @@ cargo check --workspace
 cargo test --workspace
 ```
 
-Result: all passed. `blade-ink-rs/lib` emitted the same two existing warnings
+Result: all passed. `ink-runtime/lib` emitted the same two existing warnings
 about unnecessary parentheses around trait object types.
 
 ### 2026-04-22
@@ -1443,7 +1451,7 @@ cargo check --workspace
 cargo test --workspace
 ```
 
-Result: all passed. `blade-ink-rs/lib` emitted the same two existing warnings
+Result: all passed. `ink-runtime/lib` emitted the same two existing warnings
 about unnecessary parentheses around trait object types.
 
 ### 2026-04-22
@@ -1465,7 +1473,7 @@ cargo check --workspace
 cargo test --workspace
 ```
 
-Result: all passed. `blade-ink-rs/lib` emitted the same two existing warnings
+Result: all passed. `ink-runtime/lib` emitted the same two existing warnings
 about unnecessary parentheses around trait object types.
 
 ### 2026-04-22
@@ -1485,7 +1493,7 @@ cargo test --workspace
 cargo check --workspace
 ```
 
-Result: all passed. `blade-ink-rs/lib` emitted the same two existing warnings
+Result: all passed. `ink-runtime/lib` emitted the same two existing warnings
 about unnecessary parentheses around trait object types.
 
 ### 2026-04-22
@@ -1505,7 +1513,7 @@ cargo test -p ink-compiler parser
 cargo check --workspace
 ```
 
-Result: all passed. `blade-ink-rs/lib` emitted the same two existing warnings
+Result: all passed. `ink-runtime/lib` emitted the same two existing warnings
 about unnecessary parentheses around trait object types.
 
 ### 2026-04-22
@@ -1528,7 +1536,7 @@ cargo test -p ink-compiler parser
 cargo check --workspace
 ```
 
-Result: all passed. `blade-ink-rs/lib` emitted the same two existing warnings
+Result: all passed. `ink-runtime/lib` emitted the same two existing warnings
 about unnecessary parentheses around trait object types.
 
 ### 2026-04-22
@@ -1549,7 +1557,7 @@ cargo test -p ink-compiler parsed
 cargo check --workspace
 ```
 
-Result: all passed. `blade-ink-rs/lib` emitted the same two existing warnings
+Result: all passed. `ink-runtime/lib` emitted the same two existing warnings
 about unnecessary parentheses around trait object types.
 
 ### 2026-04-22
@@ -1570,7 +1578,7 @@ cargo test -p ink-compiler parsed
 cargo check --workspace
 ```
 
-Result: all passed. `blade-ink-rs/lib` emitted the same two existing warnings
+Result: all passed. `ink-runtime/lib` emitted the same two existing warnings
 about unnecessary parentheses around trait object types.
 
 ### 2026-04-22
@@ -1588,7 +1596,7 @@ cargo test -p ink-compiler string_parser
 cargo check --workspace
 ```
 
-Result: all passed. `blade-ink-rs/lib` emitted the same two existing warnings
+Result: all passed. `ink-runtime/lib` emitted the same two existing warnings
 about unnecessary parentheses around trait object types.
 
 ### 2026-04-22
@@ -1608,7 +1616,7 @@ cargo test -p ink-compiler string_parser
 cargo check --workspace
 ```
 
-Result: all passed. `blade-ink-rs/lib` emitted the same two existing warnings
+Result: all passed. `ink-runtime/lib` emitted the same two existing warnings
 about unnecessary parentheses around trait object types.
 
 ### 2026-04-22
@@ -1630,7 +1638,7 @@ cargo check --workspace
 cargo test --workspace
 ```
 
-Result: all passed. `blade-ink-rs/lib` emitted the same two existing warnings
+Result: all passed. `ink-runtime/lib` emitted the same two existing warnings
 about unnecessary parentheses around trait object types.
 
 ### 2026-04-22
@@ -1639,7 +1647,7 @@ about unnecessary parentheses around trait object types.
   `ink-test`.
 - Added a compatibility layer in `crates/ink-test/tests/conformance/api.rs`
   so the old runtime conformance modules could remain nearly unchanged while
-  calling the new `bladeink` API.
+  calling the new `ink_runtime` API.
 - Copied the runtime conformance fixtures into
   `crates/ink-test/fixtures/conformance/`.
 - Added the legacy runtime suite entry point in
@@ -1709,17 +1717,17 @@ timeout wrapper.
 - `IMPLEMENT.md`: execution runbook for repeated `继续` prompts.
 - `DOCUMENTATION.md`: this live status and audit log.
 - `ink-csharp/`: ignored local official C# reference.
-- `blade-ink-rs/`: ignored local Rust runtime dependency.
+- `ink-runtime/`: ignored local Rust runtime dependency.
 
 ## Troubleshooting
 
-- Missing `bladeink` path dependency:
-  - Ensure ignored directory `blade-ink-rs/` exists at repository root.
+- Missing `ink_runtime` path dependency:
+  - Ensure ignored directory `ink-runtime/` exists at repository root.
 - C# reference unavailable:
   - Ensure ignored directory `ink-csharp/` exists at repository root.
 - Unexpected ignored files:
   - Run `git status --short --ignored` and confirm only reference/build
     directories are ignored.
 - Runtime dependency warnings:
-  - Warnings from `blade-ink-rs/lib` are tracked as local dependency warnings
+  - Warnings from `ink-runtime/lib` are tracked as local dependency warnings
     unless a compiler task requires changing runtime integration.

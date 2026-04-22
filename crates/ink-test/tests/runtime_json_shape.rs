@@ -1,4 +1,4 @@
-use bladeink::story::Story as RuntimeStory;
+use ink_runtime::story::Story as RuntimeStory;
 
 #[test]
 fn minimal_runtime_json_story_loads() {

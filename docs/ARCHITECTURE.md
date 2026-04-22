@@ -5,7 +5,7 @@
 `ink-rs` is split into two conceptual layers:
 
 - Compiler layer: implemented in this repository under `crates/ink-compiler`.
-- Runtime layer: reused from the ignored local `blade-ink-rs/lib` crate.
+- Runtime layer: reused from the ignored local `ink-runtime/lib` crate.
 
 The compiler layer parses `.ink` source, builds a parsed hierarchy, resolves
 references, and exports runtime JSON. The runtime layer loads that JSON and
@@ -17,7 +17,7 @@ executes the story.
   -> parsed hierarchy
   -> reference resolution
   -> runtime JSON export
-  -> bladeink::story::Story
+  -> ink_runtime::story::Story
 ```
 
 ## Compiler Crate Modules
@@ -36,7 +36,7 @@ executes the story.
 | `StringParser/` | `parser::string_parser` | Low-level parser state and rules |
 | `InkParser/` | `parser::ink_parser` | Ink language grammar |
 | `ParsedHierarchy/` | `parsed` | AST-like parsed object model |
-| `ink-engine-runtime/` | `bladeink` dependency | Runtime story execution |
+| `ink-engine-runtime/` | `ink_runtime` dependency | Runtime story execution |
 
 ## Parsed Hierarchy Design
 
@@ -94,7 +94,7 @@ The first parsed-hierarchy slice uses reference-counted tree nodes:
 ## Runtime Export
 
 The compiler owns the JSON export path. It generates JSON compatible with
-`bladeink::story::Story::new`.
+`ink_runtime::story::Story::new`.
 
 The runtime reader's minimal accepted shape is:
 
@@ -167,7 +167,7 @@ history.
 The final architecture should support this minimal demonstration:
 
 1. Compile plain text ink to JSON.
-2. Load it with `bladeink::story::Story::new`.
+2. Load it with `ink_runtime::story::Story::new`.
 3. Continue the runtime story and print expected output.
 4. Repeat with a story containing choices and diverts.
 5. Repeat with variables, expressions, and conditions.

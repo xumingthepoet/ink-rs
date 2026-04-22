@@ -4,7 +4,7 @@ use std::{
     sync::Arc,
 };
 
-use bladeink::story::Story as RuntimeStory;
+use ink_runtime::story::Story as RuntimeStory;
 
 use crate::{error::Diagnostic, parsed};
 

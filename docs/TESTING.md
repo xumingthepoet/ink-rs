@@ -4,7 +4,7 @@
 
 - Verify parser behavior in isolation.
 - Verify parsed hierarchy behavior before runtime export.
-- Verify generated JSON loads in `bladeink`.
+- Verify generated JSON loads in `ink_runtime`.
 - Verify runtime behavior for representative stories.
 - Preserve compatibility with the official C# compiler where practical.
 
@@ -44,7 +44,7 @@ For compiler export, compare generated JSON against either:
 
 ### Runtime Smoke Tests
 
-Load generated JSON with `bladeink::story::Story::new` and execute simple
+Load generated JSON with `ink_runtime::story::Story::new` and execute simple
 stories to verify observable output.
 
 Examples:
@@ -57,7 +57,7 @@ Examples:
 
 Later milestones should reuse local fixtures from:
 
-- `blade-ink-rs/conformance-tests/inkfiles`
+- `ink-runtime/conformance-tests/inkfiles`
 - `ink-csharp/tests`
 
 Start with a narrow subset and expand only after the compiler pipeline is

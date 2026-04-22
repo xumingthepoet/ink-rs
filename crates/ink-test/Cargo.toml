@@ -9,7 +9,7 @@ legacy-compiler-conformance = []
 legacy-csharp-tests = []
 
 [dependencies]
-bladeink = { package = "ink-runtime", path = "../ink-runtime" }
+ink_runtime = { package = "ink-runtime", path = "../ink-runtime" }
 ink_compiler = { package = "ink-compiler", path = "../ink-compiler" }
 rand = "0.9"
 serde_json = "1"

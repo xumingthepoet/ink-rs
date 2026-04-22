@@ -9,7 +9,7 @@ Guiding principles:
 - Compatibility over novelty: follow the official C# compiler behavior.
 - Determinism over convenience: generated JSON and diagnostics should be stable.
 - Small verified slices: each ported concept needs focused tests.
-- Runtime reuse: compiler work should integrate with `bladeink`, not duplicate
+- Runtime reuse: compiler work should integrate with `ink_runtime`, not duplicate
   runtime internals.
 - Durable memory: decisions, status, and validation live in Markdown.
 
@@ -55,7 +55,7 @@ of `examples/`.
 ## Milestone 0: Project Memory and Guardrails
 
 - [x] Initialize root Git repository.
-- [x] Ignore local `ink-csharp/` and `blade-ink-rs/` reference trees.
+- [x] Ignore local `ink-csharp/` and `ink-runtime/` reference trees.
 - [x] Create initial Rust workspace and compiler crate scaffold.
 - [x] Add durable project-memory docs for long-horizon Codex work.
 
@@ -191,23 +191,23 @@ cargo check --workspace
 ## Milestone 5: Runtime Export Skeleton
 
 - [x] Identify required public or internal runtime JSON structures in
-  `blade-ink-rs/lib`.
+  `ink-runtime/lib`.
 - [x] Implement a compiler-owned JSON export path rather than copying runtime
   internals.
 - [x] Export minimal plain text story JSON.
-- [x] Verify exported JSON loads with `bladeink::story::Story::new`.
+- [x] Verify exported JSON loads with `ink_runtime::story::Story::new`.
 
 Primary C# references:
 
 - `ink-csharp/compiler/ParsedHierarchy/Story.cs`
 - `ink-csharp/compiler/ParsedHierarchy/FlowBase.cs`
 - `ink-csharp/compiler/ParsedHierarchy/Object.cs`
-- `blade-ink-rs/lib/src/json/`
+- `ink-runtime/lib/src/json/`
 
 Acceptance:
 
 - `Compiler::compile_json` works for at least one plain text story.
-- `Compiler::compile` returns a `bladeink::story::Story` for that story.
+- `Compiler::compile` returns a `ink_runtime::story::Story` for that story.
 - A runtime smoke test can continue the story and observe expected output.
 
 Validation:
@@ -312,7 +312,7 @@ cargo check --workspace
 
 ## Milestone 9: Conformance and Hardening
 
-- [x] Build a conformance harness using local examples from `blade-ink-rs` and
+- [x] Build a conformance harness using local examples from `ink-runtime` and
   official `ink-csharp/tests`.
 - [x] Compare compiler JSON or runtime behavior against trusted fixtures.
 - [x] Add regression tests for every fixed bug.
@@ -333,23 +333,23 @@ cargo test --workspace
 
 ## Milestone 10: Runtime Crate Relocation
 
-- [x] Scaffold `crates/ink-runtime` with the copied `blade-ink-rs/lib/src`
+- [x] Scaffold `crates/ink-runtime` with the copied `ink-runtime/lib/src`
   runtime tree.
 - [x] Point the workspace runtime dependency at `crates/ink-runtime`.
 - [x] Update docs and tests to treat `crates/ink-runtime` as the canonical
   runtime home, move package-level tests into `crates/ink-test`, and remove
-  the legacy `blade-ink-rs` tree.
+  the legacy `ink-runtime` tree.
 
 Primary Rust references:
 
-- `blade-ink-rs/lib/src/`
+- `ink-runtime/lib/src/`
 - `crates/ink-runtime/src/`
 
 Acceptance:
 
 - The workspace builds and tests against `crates/ink-runtime`.
-- The old `blade-ink-rs/lib` path dependency is no longer used by the
-  workspace, and the legacy `blade-ink-rs` tree is gone.
+- The old `ink-runtime/lib` path dependency is no longer used by the
+  workspace, and the legacy `ink-runtime` tree is gone.
 - Runtime tests continue to pass without conformance regression.
 
 Validation:
@@ -501,8 +501,8 @@ suites in small, checkpointed slices.
 ## Risk Register
 
 1. Runtime JSON compatibility:
-   - Risk: compiler output may not match the JSON shape expected by `bladeink`.
-   - Mitigation: inspect `blade-ink-rs/lib/src/json` before export work, build
+   - Risk: compiler output may not match the JSON shape expected by `ink_runtime`.
+   - Mitigation: inspect `ink-runtime/lib/src/json` before export work, build
      small runtime smoke tests early, and normalize JSON golden tests.
 2. C# inheritance to Rust ownership:
    - Risk: parent pointers, lazy `runtimeObject`, and virtual methods may be
@@ -539,16 +539,16 @@ This is the eventual developer demo for the completed compiler:
 2. Compile a minimal story:
    - Input: plain text `.ink`.
    - Output: runtime JSON.
-   - Load JSON with `bladeink::story::Story::new`.
+   - Load JSON with `ink_runtime::story::Story::new`.
    - Continue the story and show expected text output.
 3. Compile a flow story:
    - Include knots, stitches, diverts, choices, and gathers.
-   - Run through a choice path in `bladeink`.
+   - Run through a choice path in `ink_runtime`.
 4. Compile a logic story:
    - Include variables, expressions, conditions, and functions.
    - Verify runtime output and variable behavior.
 5. Run conformance subset:
-   - Use selected fixtures from `blade-ink-rs/conformance-tests/inkfiles`.
+   - Use selected fixtures from `ink-runtime/conformance-tests/inkfiles`.
    - Document unsupported cases in `DOCUMENTATION.md`.
 
 ## Architecture Overview
@@ -562,7 +562,7 @@ The compiler pipeline is:
   -> parsed hierarchy
   -> reference resolution
   -> runtime JSON export
-  -> bladeink::story::Story
+  -> ink_runtime::story::Story
 ```
 
 Core module boundaries:

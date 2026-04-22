@@ -1,18 +1,18 @@
 //! This is a Rust port of inkle's [Ink](https://github.com/inkle/ink), a scripting language for writing interactive narratives.
-//! `bladeink` is fully compatible with the reference version and supports all
+//! `ink_runtime` is fully compatible with the reference version and supports all
 //! its language features.
 //!
 //! To learn more about the Ink language, you can check [the official documentation](https://github.com/inkle/ink/blob/master/Documentation/WritingWithInk.md).
 //!
 //! Here is a quick example that uses basic features to play an Ink story using
-//! the `bladeink` crate.
+//! the `ink_runtime` crate.
 //!
 //! ```
-//! # use bladeink::{story::Story, story_error::StoryError};
+//! # use ink_runtime::{story::Story, story_error::StoryError};
 //! # fn main() -> Result<(), StoryError> {
 //! # let json_string = r##"{"inkVersion":21, "root":["done",null],"listDefs":{}}"##;
 //! # let read_input = |_:&_| 0;
-//! // story is the entry point of the `bladeink` lib.
+//! // story is the entry point of the `ink_runtime` lib.
 //! // json_string is a string with all the contents of the .ink.json file.
 //! let mut story = Story::new(json_string)?;
 //!
@@ -38,7 +38,7 @@
 //! # }
 //! ```
 //!
-//! The `bladeink` library supports all the **Ink** language features, including
+//! The `ink_runtime` library supports all the **Ink** language features, including
 //! threads, multi-flows, variable set/get from code, variable observing,
 //! external functions, tags on choices, etc. Examples of uses of all these
 //! features will be added to this documentation in the future, but meanwhile,

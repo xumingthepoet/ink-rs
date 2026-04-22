@@ -965,7 +965,7 @@ fn export_text_tokens(text: &str) -> Vec<Value> {
 
 #[cfg(test)]
 mod tests {
-    use bladeink::story::Story as RuntimeStory;
+    use ink_runtime::story::Story as RuntimeStory;
 
     use crate::parsed::{
         ContentList, Divert, Identifier, Knot, ListDefinition, ListElementDefinition, Path,

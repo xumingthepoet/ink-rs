@@ -58,7 +58,7 @@ fn compile_json(
 }
 
 fn run_story(json: &str) -> String {
-    let mut story = bladeink::story::Story::new(json).expect("load runtime story");
+    let mut story = ink_runtime::story::Story::new(json).expect("load runtime story");
     let mut output = String::new();
     while story.can_continue() {
         output.push_str(&story.cont().expect("continue story"));

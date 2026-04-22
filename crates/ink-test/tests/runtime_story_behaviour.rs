@@ -1,4 +1,4 @@
-use bladeink::story::Story as RuntimeStory;
+use ink_runtime::story::Story as RuntimeStory;
 use serde_json::json;
 
 fn load_story(value: serde_json::Value) -> RuntimeStory {

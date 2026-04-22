@@ -2,7 +2,7 @@
 
 `ink-rs` aims to port the official C# ink compiler layer to Rust.
 
-The runtime layer is reused from the local `blade-ink-rs/lib` crate. The local
+The runtime layer is reused from the local `ink-runtime/lib` crate. The local
 `ink-csharp/` tree is the architecture and naming reference for the compiler
 port, especially `ink-csharp/compiler`.
 
@@ -13,7 +13,7 @@ next to this project when building locally.
 
 - `crates/ink-compiler`: Rust compiler layer under development.
 - `ink-csharp/`: local official C# reference implementation, ignored by Git.
-- `blade-ink-rs/`: local Rust runtime implementation, ignored by Git.
+- `ink-runtime/`: local Rust runtime implementation, ignored by Git.
 
 ## Long-Horizon Workflow
 

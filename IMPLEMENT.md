@@ -80,7 +80,7 @@ If any exception applies, document it in `DOCUMENTATION.md` before stopping.
 ## Scope Control
 
 - Do not port multiple compiler subsystems in one patch.
-- Do not rewrite `blade-ink-rs` runtime code unless the selected task explicitly
+- Do not rewrite `ink-runtime` runtime code unless the selected task explicitly
   requires a small integration fix.
 - Do not silently change public API names once tests or docs depend on them.
 - Do not add large dependencies without recording the reason in
@@ -108,7 +108,7 @@ For each feature:
    `ink-csharp/compiler/ParsedHierarchy`.
 3. Read any runtime type used by the generated object in
    `ink-csharp/ink-engine-runtime`.
-4. Read the corresponding Rust runtime type under `blade-ink-rs/lib/src`.
+4. Read the corresponding Rust runtime type under `ink-runtime/lib/src`.
 5. Implement only the smallest Rust slice needed for the selected task.
 
 ## Documentation Update Format

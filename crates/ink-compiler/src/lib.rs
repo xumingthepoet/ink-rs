@@ -1,6 +1,6 @@
 //! Compiler-layer port for ink.
 //!
-//! This crate intentionally depends on `bladeink` for the runtime layer and
+//! This crate intentionally depends on `ink_runtime` for the runtime layer and
 //! focuses on porting the official C# compiler architecture.
 
 pub mod compiler;

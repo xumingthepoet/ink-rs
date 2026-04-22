@@ -11,7 +11,12 @@ use crate::conformance::api::story::Story as RuntimeStory;
 use crate::conformance::api::{
     story::ExternalFunction, story::VariableObserver, value_type::ValueType,
 };
-use bladeink::{
+use ink_compiler::{
+    parsed::Story as ParsedStory,
+    parser::{character_range::CharacterRange, CommentEliminator, StringParser},
+    Compiler, CompilerOptions, Diagnostic, DiagnosticSeverity, FileHandler,
+};
+use ink_runtime::{
     choice::Choice,
     story::{
         errors::{ErrorHandler, ErrorType},
@@ -19,11 +24,6 @@ use bladeink::{
         variable_observer::VariableObserver as RuntimeVariableObserver,
     },
     value_type::ValueType as RuntimeValueType,
-};
-use ink_compiler::{
-    parsed::Story as ParsedStory,
-    parser::{character_range::CharacterRange, CommentEliminator, StringParser},
-    Compiler, CompilerOptions, Diagnostic, DiagnosticSeverity, FileHandler,
 };
 use std::cell::RefCell;
 use std::io;

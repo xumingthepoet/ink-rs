@@ -6,14 +6,14 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use bladeink::{
+use ink_compiler::{Compiler, CompilerOptions};
+use ink_runtime::{
     choice::Choice, story::errors::ErrorHandler as RuntimeErrorHandler,
     story::external_functions::ExternalFunction as RuntimeExternalFunction,
     story::variable_observer::VariableObserver as RuntimeVariableObserver,
     story::Story as RuntimeStory, story_error::StoryError as RuntimeStoryError,
     value_type::ValueType as RuntimeValueType,
 };
-use ink_compiler::{Compiler, CompilerOptions};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StoryError(pub String);

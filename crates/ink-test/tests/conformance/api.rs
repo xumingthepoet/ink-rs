@@ -6,7 +6,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use bladeink::{
+use ink_runtime::{
     choice::Choice, story::errors::ErrorHandler as RuntimeErrorHandler,
     story::external_functions::ExternalFunction as RuntimeExternalFunction,
     story::variable_observer::VariableObserver as RuntimeVariableObserver,

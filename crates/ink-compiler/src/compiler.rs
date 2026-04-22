@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use bladeink::story::Story as RuntimeStory;
+use ink_runtime::story::Story as RuntimeStory;
 
 pub use crate::results::CompilerOptions;
 

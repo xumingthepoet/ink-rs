@@ -43,7 +43,7 @@ fn turns_since_test() -> Result<(), StoryError> {
 }
 
 /**
- * Issue: https://github.com/bladecoder/blade-ink/issues/15
+ * Issue: original upstream issue 15
  */
 #[test]
 fn issue15_test() -> Result<(), StoryError> {
