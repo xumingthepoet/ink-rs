@@ -431,7 +431,10 @@ cargo test --workspace
 
 - [x] Add a timeout-wrapped compiler-conformance gate and use it for every
   focused iteration on the legacy compiler-to-runtime suite.
-- [ ] Fix compiler-conformance failures in dependency-light order:
+- While this milestone is in progress, save green checkpoints in small
+  commits after every few passing compiler-conformance fixtures. This keeps
+  the work resumable and makes it safe to stop after a narrow batch is green.
+- [x] Fix compiler-conformance failures in dependency-light order:
   - basic text, knots, stitches, diverts, and glue
   - tags, gathers, and simple multi-flow paths
   - variables, lists, expressions, and functions
@@ -477,12 +480,9 @@ timeout 30s cargo test --workspace
 
 ## Next Task
 
-Stabilize the legacy compiler-to-runtime conformance suite in `ink-test`.
-Focus on the simplest remaining dependencies first. The current parser and
-runtime slice has already made basic text, simple diverts, simple glue, and the
-trusted conditional snapshots stable, so the next highest-value work is the
-choice-heavy and function-heavy conformance cases that still rely on more of
-the ink grammar.
+Remove the `compiler-conformance` feature gate once the legacy suite is green
+and promote the legacy compiler-to-runtime tests into the default workspace
+test pass.
 
 ## Risk Register
 

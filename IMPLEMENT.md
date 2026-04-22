@@ -43,6 +43,11 @@ make compiler-gate COMPILER_TEST='compiler_conformance::choice_test::conditional
 
 If `timeout` is unavailable on macOS, use `gtimeout` from coreutils.
 
+While Milestone 13 is active, save progress in small green checkpoints after
+every few passing compiler-conformance fixtures. Keep each commit scoped to the
+current dependency slice so failed work can be resumed without replaying the
+entire suite.
+
 ## Non-Negotiable Continuation Rule
 
 When the user says `继续`, do not stop after planning or after one read-only
