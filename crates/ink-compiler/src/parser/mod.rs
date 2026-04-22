@@ -2746,6 +2746,26 @@ to Savile Row\n\
     }
 
     #[test]
+    fn ink_parser_parses_trusted_function_none_fixture() {
+        let source =
+            load_workspace_text("blade-ink-rs/conformance-tests/inkfiles/function/func-none.ink");
+        let mut parser = InkParser::new(&source, Some("func-none.ink"), None);
+        let result = parser.parse();
+
+        assert!(
+            result.diagnostics.is_empty(),
+            "unexpected diagnostics: {:#?}",
+            result.diagnostics
+        );
+
+        let story = result.parsed_story.expect("expected parsed story");
+        assert_eq!(
+            render_story(&story),
+            "Story\n  VariableAssignment(name=\"x\", global=true, temp=false)\n    Number(0)\n  VariableAssignment(name=\"x\", global=false, temp=false)\n    FunctionCall(f, args=0)\n  ContentList\n    Text(\"  The value of x is {x}.\")\n    Text(\"\\n\")\n  Divert(target=\"-> END\", empty=false, tunnel=false, thread=false)\n  ContentList\n    Text(\"\\n\")\n  Flow(level=Knot, name=\"f()\", function=true)\n    Return\n      Number(3.8)"
+        );
+    }
+
+    #[test]
     fn ink_parser_feature_cases_cover_arithmetic_variables_lists_conditions_functions_and_sequences(
     ) {
         let cases = [

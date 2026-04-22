@@ -95,6 +95,8 @@ runtime instead of rewriting runtime execution.
   parser-level conformance snapshot.
 - The trusted `blade-ink-rs` `basictext/twolines.ink` fixture now also has a
   parser-level conformance snapshot.
+- The trusted `blade-ink-rs` `function/func-none.ink` fixture now also has a
+  parser-level conformance snapshot.
 - The trusted `blade-ink-rs` `conditional/iftrue.ink` fixture now also has a
   parser-level conformance snapshot.
 - The trusted `blade-ink-rs` `conditional/ifelse.ink` fixture now also has a
@@ -292,6 +294,25 @@ Validation:
 ```sh
 cargo fmt --all --check
 cargo test -p ink-compiler ink_parser_parses_trusted_conditional_iftrue_fixture
+cargo check --workspace
+cargo test --workspace
+```
+
+Result: all passed. The only remaining warnings are the two existing
+`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
+
+### 2026-04-22
+
+- Added a parser-level conformance snapshot for `blade-ink-rs` function
+  fixture `function/func-none.ink`.
+- The snapshot verifies the parser keeps a simple function flow, a zero-arg
+  function call, and the trailing return body in stable parsed hierarchy form.
+
+Validation:
+
+```sh
+cargo fmt --all --check
+cargo test -p ink-compiler ink_parser_parses_trusted_function_none_fixture
 cargo check --workspace
 cargo test --workspace
 ```
