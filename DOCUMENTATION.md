@@ -76,6 +76,10 @@ runtime instead of rewriting runtime execution.
 - Ink parser grammar is still pending, but Milestone 6 is now complete with
   flow base, knot/stitch behavior, weave-point wrappers, path resolution, and
   runtime behavior coverage.
+- Plugin support is intentionally deferred for this Rust compiler port. The
+  compiler crate does not implement dynamic plugin discovery or PreParse /
+  PostParse / PostExport hooks, and that scope is documented as out of band
+  until there is a concrete compatibility need.
 - Long-horizon project memory docs now exist.
 
 ## Current Milestone
@@ -200,6 +204,23 @@ Validation:
 ```sh
 cargo fmt --all --check
 cargo test -p ink-compiler includes
+cargo check --workspace
+```
+
+Result: all passed. The only remaining warnings are the two existing
+`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
+
+### 2026-04-22
+
+- Completed the Milestone 8 plugin-scope decision slice.
+- Documented the plugin-porting scope as intentionally deferred for now: the
+  Rust compiler crate will not implement dynamic plugin loading or plugin
+  hooks until a concrete compatibility need appears.
+
+Validation:
+
+```sh
+cargo fmt --all --check
 cargo check --workspace
 ```
 

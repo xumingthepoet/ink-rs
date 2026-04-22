@@ -118,6 +118,14 @@ Do not copy the runtime implementation into `ink-compiler`. If runtime internals
 are private, prefer generating serialized JSON directly from compiler-owned
 structures rather than making broad runtime visibility changes.
 
+## Plugins
+
+The official C# compiler supports plugin discovery and PreParse/PostParse/
+PostExport hooks. This Rust port currently defers that feature entirely: the
+compiler crate does not load plugins, expose plugin hook traits, or mutate the
+story through plugin callbacks. Keep plugin support documented as an explicit
+future scope item unless a compatibility requirement appears.
+
 ## Diagnostics
 
 Diagnostics should carry:

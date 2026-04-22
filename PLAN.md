@@ -21,7 +21,7 @@ Core commands to run after every completed milestone:
 - [x] `cargo check --workspace`
 - [x] `cargo test --workspace`
 
-Current last verified milestone: Milestone 8 include handling slice
+Current last verified milestone: Milestone 8 plugin scope decision slice
 (`2026-04-22`).
 
 ## Rules
@@ -272,7 +272,7 @@ cargo test --workspace
 ## Milestone 8: Includes, File Handling, Plugins, and CLI Readiness
 
 - [x] Port include handling and file handler abstraction.
-- [ ] Decide plugin support scope and document any deliberate deferral.
+- [x] Decide plugin support scope and document any deliberate deferral.
 - [ ] Add a small CLI or example if needed for manual compilation.
 - [ ] Add tests for includes and source filename diagnostics.
 
@@ -319,7 +319,7 @@ cargo test --workspace
 
 ## Next Task
 
-Decide plugin support scope and document any deliberate deferral.
+Add a small CLI or example if needed for manual compilation.
 
 ## Risk Register
 
