@@ -97,6 +97,8 @@ runtime instead of rewriting runtime execution.
   parser-level conformance snapshot.
 - The trusted `blade-ink-rs` `function/func-none.ink` fixture now also has a
   parser-level conformance snapshot.
+- The trusted `blade-ink-rs` `function/func-basic.ink` fixture now also has a
+  parser-level conformance snapshot.
 - The trusted `blade-ink-rs` `conditional/iftrue.ink` fixture now also has a
   parser-level conformance snapshot.
 - The trusted `blade-ink-rs` `conditional/ifelse.ink` fixture now also has a
@@ -229,6 +231,9 @@ Pass a second argument to write the JSON to a file instead of stdout.
   function-return semantics is still pending.
 - Parsed inline and brace multiline conditional/sequence nodes are parsed, but
   nested brace logic and runtime export behavior are still limited.
+- Function definitions with parameter lists still render their flow names
+  using the current partial header split, so `func-basic.ink` currently shows
+  `lerp(a,` in the parser snapshot.
 - The ink parser grammar is still pending for the remaining unported features.
 - Feature coverage for arithmetic, variables, lists, conditions, functions, and
   sequences now exists as a stable parser snapshot test.
@@ -262,6 +267,27 @@ Pass a second argument to write the JSON to a file instead of stdout.
   runtime and parser snapshots, not the full official test suite.
 
 ## Audit Log
+
+### 2026-04-22
+
+- Added a parser-level conformance snapshot for `blade-ink-rs` function
+  fixture `function/func-basic.ink`.
+- The snapshot verifies the parser keeps a variable declaration, a function
+  call assignment, a trailing divert, and a function return body in stable
+  parsed hierarchy form. It also records the current partial function header
+  split for parameterized functions.
+
+Validation:
+
+```sh
+cargo fmt --all --check
+cargo test -p ink-compiler ink_parser_parses_trusted_function_basic_fixture
+cargo check --workspace
+cargo test --workspace
+```
+
+Result: all passed. The only remaining warnings are the two existing
+`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
 
 ### 2026-04-22
 
