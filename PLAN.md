@@ -27,7 +27,7 @@ imported legacy suites feature-gated (`2026-04-22`).
 
 Current verified checkpoint: `make gate` is green again; the imported legacy
 compiler-conformance and csharp suites are retained behind the
-`legacy-imported-tests` feature so they can keep migrating without blocking
+separate legacy features so they can keep migrating without blocking
 the default workspace run (`2026-04-22`).
 
 Workspace warning policy: `.cargo/config.toml` now denies warnings, and
@@ -400,7 +400,7 @@ cargo test --workspace
   be retained after the migration completes.
 
   Decision: keep the imported legacy compiler-conformance and csharp suites
-  behind a `legacy-imported-tests` feature so the default gate stays green
+  behind separate legacy features so the default gate stays green
   while migration continues.
 
 Primary Rust references:
@@ -453,8 +453,8 @@ cargo test --workspace
 - [x] Normalize and document any intentional JSON mismatches while the suite
   was being brought up, then remove the mismatches once the compiler matched
   the fixture set.
-- [ ] Remove the `legacy-imported-tests` feature gate once the legacy suites
-  are ready to return to the default workspace test run.
+- [ ] Remove the legacy feature gates once the imported suites are ready to
+  return to the default workspace test run.
 - [ ] Delete any compiler-conformance or csharp-test wrappers that become
   unnecessary after the suites are promoted to normal test targets.
 
@@ -486,8 +486,8 @@ Validation:
 ```sh
 make compiler-gate
 make compiler-gate COMPILER_TEST='compiler_conformance::choice_test::conditional_choice_test -- --exact'
-timeout 30s cargo test -p ink-test --features legacy-imported-tests --test compiler_conformance_legacy
-timeout 30s cargo test -p ink-test --features legacy-imported-tests --test compiler_conformance_legacy compiler_conformance::choice_test::conditional_choice_test -- --exact
+timeout 30s cargo test -p ink-test --features legacy-compiler-conformance --test compiler_conformance_legacy
+timeout 30s cargo test -p ink-test --features legacy-compiler-conformance --test compiler_conformance_legacy compiler_conformance::choice_test::conditional_choice_test -- --exact
 cargo fmt --all --check
 cargo check --workspace
 timeout 30s cargo test --workspace

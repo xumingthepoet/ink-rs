@@ -1,3 +1,3 @@
-#![cfg(feature = "legacy-imported-tests")]
+#![cfg(feature = "legacy-compiler-conformance")]
 
 mod compiler_conformance;

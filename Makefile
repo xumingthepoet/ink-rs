@@ -1,4 +1,4 @@
-.PHONY: fmt check test gate compiler-gate
+.PHONY: fmt check test gate compiler-gate csharp-gate
 
 TIMEOUT ?= timeout
 COMPILER_TIMEOUT ?= $(TIMEOUT)
@@ -14,6 +14,9 @@ test:
 	$(TIMEOUT) 30s cargo test --workspace
 
 compiler-gate:
-	$(COMPILER_TIMEOUT) 30s cargo test -p ink-test --features legacy-imported-tests --test compiler_conformance_legacy $(COMPILER_TEST)
+	$(COMPILER_TIMEOUT) 30s cargo test -p ink-test --features legacy-compiler-conformance --test compiler_conformance_legacy $(COMPILER_TEST)
+
+csharp-gate:
+	$(COMPILER_TIMEOUT) 30s cargo test -p ink-test --features legacy-csharp-tests --test csharp_tests_legacy $(COMPILER_TEST)
 
 gate: fmt check test

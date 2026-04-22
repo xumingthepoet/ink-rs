@@ -1,5 +1,5 @@
 [package]
-name = "bladeink"
+name = "ink-runtime"
 version = "1.2.1"
 authors = ["Rafael Garcia <bladecoder@gmail.com>"]
 description = """

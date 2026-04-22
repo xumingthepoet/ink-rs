@@ -22,8 +22,8 @@ into `crates/ink-runtime` instead of rewriting runtime execution.
   conformance/include fixtures.
 - The legacy compiler-to-runtime conformance suite now lives in
   `crates/ink-test/tests/compiler_conformance_legacy.rs` and is retained
-  behind the `legacy-imported-tests` feature so the default workspace gate
-  can stay green while migration continues.
+  behind the `legacy-compiler-conformance` feature so the default workspace
+  gate can stay green while migration continues.
 - The compiler-conformance choice/divert/sequence slice now has the basic
   `no-choice`, `one`, `single-choice`, `suppress-choice`, `mixed-choice`,
   `divert-on-choice`, and `variable_text::sequence` fixtures green.
@@ -36,8 +36,9 @@ into `crates/ink-runtime` instead of rewriting runtime execution.
   resumable and bounded.
 - Current Milestone 13 blocker: the imported legacy compiler-conformance and
   csharp suites are intentionally feature-gated behind
-  `legacy-imported-tests`. Default-gate promotion will resume once the
-  remaining migration work is ready to be re-enabled.
+  `legacy-compiler-conformance` and `legacy-csharp-tests`. Default-gate
+  promotion will resume once the remaining migration work is ready to be
+  re-enabled.
 - The documented test loop now treats every long-running `cargo test` path as
   timeboxed, and `make gate` wraps the workspace test pass with a timeout as
   well.
@@ -105,6 +106,8 @@ into `crates/ink-runtime` instead of rewriting runtime execution.
 - The runtime crate has been copied into `crates/ink-runtime`, and the
   workspace dependency now points at that location instead of the legacy
   `blade-ink-rs/lib` tree.
+- The runtime Cargo package is named `ink-runtime`, while the exported Rust
+  library crate remains `bladeink` for compatibility with existing imports.
 - Compiler-owned runtime export normalizes a missing terminal newline for
   plain-text stories so trusted runtime output stays stable across source
   files that do not end with `\n`.
@@ -129,7 +132,7 @@ into `crates/ink-runtime` instead of rewriting runtime execution.
 - `make compiler-gate` now wraps the legacy compiler-to-runtime conformance
   suite with the default timeout and accepts a `COMPILER_TEST` filter for
   focused iteration. The suite itself is currently behind
-  `legacy-imported-tests`.
+  `legacy-compiler-conformance`.
 - The conformance harness now compares compiler output against copied trusted
   fixtures under `crates/ink-test/fixtures` and compiler behavior against the
   copied official include examples there as well.
@@ -395,11 +398,13 @@ Pass a second argument to write the JSON to a file instead of stdout.
 ## Audit Log
 
 - Restored the default workspace gate by feature-gating the imported legacy
-  compiler-conformance and csharp suites behind `legacy-imported-tests`,
-  and kept `make compiler-gate` pointed at the same feature for focused
-  iterations.
-- Validation: `cargo fmt --all --check`, `timeout 30s make gate`, and
-  `timeout 30s make compiler-gate COMPILER_TEST='compiler_conformance::basic_text_test::oneline_test -- --exact'`.
+  compiler-conformance and csharp suites behind separate features, and kept
+  `make compiler-gate` and `make csharp-gate` pointed at the matching
+  feature for focused iterations.
+- Validation: `cargo fmt --all --check`, `timeout 30s make gate`, `timeout 30s
+  make compiler-gate COMPILER_TEST='compiler_conformance::basic_text_test::oneline_test -- --exact'`,
+  and `timeout 30s cargo test -p ink-test --features legacy-csharp-tests --test
+  csharp_tests_legacy csharp_tests::tests::TestHelloWorld -- --exact`.
 - Result: the default workspace gate is green again, and the imported legacy
   suites remain available behind a dedicated feature instead of blocking the
   main test flow.
@@ -1676,20 +1681,20 @@ Stabilize the legacy compiler-to-runtime conformance suite in `ink-test`.
 - Added a feature-aware runbook entry and a timeboxed gate so future compiler
   conformance work can be iterated safely without burning CPU on a stuck test.
 - Restored the default workspace gate by feature-gating the imported legacy
-  compiler-conformance and csharp suites behind `legacy-imported-tests`.
+  compiler-conformance and csharp suites behind separate features.
 
 Validation:
 
 ```sh
 cargo fmt --all --check
-cargo test -p ink-test --features legacy-imported-tests --test compiler_conformance_legacy
+cargo test -p ink-test --features legacy-compiler-conformance --test compiler_conformance_legacy
 cargo check --workspace
 cargo test --workspace
 ```
 
 Result: default workspace validation passed again, and the imported legacy
 compiler-conformance suite remains feature-gated behind
-`legacy-imported-tests` so it can keep migrating without blocking the
+`legacy-compiler-conformance` so it can keep migrating without blocking the
 default gate. Compiler-conformance iterations should still be run with a
 timeout wrapper.
 

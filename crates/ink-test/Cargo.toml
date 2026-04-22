@@ -5,7 +5,8 @@ edition.workspace = true
 publish = false
 
 [features]
-legacy-imported-tests = []
+legacy-compiler-conformance = []
+legacy-csharp-tests = []
 
 [dependencies]
 bladeink.workspace = true

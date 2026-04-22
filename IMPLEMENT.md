@@ -31,16 +31,18 @@ Start with 30 seconds; only increase the timeout temporarily when a specific
 fixture needs more wall-clock time.
 
 The imported legacy compiler-to-runtime and csharp suites are currently
-feature-gated behind `legacy-imported-tests` so the default workspace gate can
-stay green while migration continues. They should still always be run with a
-timeout when invoked directly. Use `make compiler-gate` for the compiler
-suite, and pass a focused filter through `COMPILER_TEST` when iterating on a
-single legacy fixture:
+feature-gated behind separate features so the default workspace gate can stay
+green while migration continues. They should still always be run with a
+timeout when invoked directly. Use `make compiler-gate` or `make csharp-gate`
+for the respective suites, and pass a focused filter through `COMPILER_TEST`
+when iterating on a single legacy fixture:
 
 ```sh
-timeout 30s cargo test -p ink-test --features legacy-imported-tests --test compiler_conformance_legacy
+timeout 30s cargo test -p ink-test --features legacy-compiler-conformance --test compiler_conformance_legacy
 make compiler-gate
 make compiler-gate COMPILER_TEST='compiler_conformance::choice_test::conditional_choice_test -- --exact'
+make csharp-gate
+make csharp-gate COMPILER_TEST='csharp_tests::tests::TestHelloWorld -- --exact'
 ```
 
 If `timeout` is unavailable on macOS, use `gtimeout` from coreutils.

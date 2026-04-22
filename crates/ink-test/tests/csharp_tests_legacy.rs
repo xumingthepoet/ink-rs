@@ -1,4 +1,4 @@
-#![cfg(feature = "legacy-imported-tests")]
+#![cfg(feature = "legacy-csharp-tests")]
 #![allow(
     dead_code,
     unused_imports,
