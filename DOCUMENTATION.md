@@ -99,8 +99,8 @@ into `crates/ink-runtime` instead of rewriting runtime execution.
   the expected location.
 - A new `ink-test` crate now hosts the package-level integration tests and
   copied fixture data used by the conformance harness and runtime smoke tests.
-- The `ink-tools` crate now hosts the manual compile entry point that used to
-  live under `examples/`.
+- The `ink-tools` crate now lives under `crates/ink-tools` and hosts the
+  manual compile entry point that used to live under `examples/`.
 - The workspace now treats warnings as errors via `.cargo/config.toml`, and
   `make gate` is the unified local wrapper for format, check, and test.
 - The conformance harness now compares compiler output against copied trusted
@@ -204,7 +204,7 @@ tree is no longer required.
 For manual compilation, run:
 
 ```sh
-cargo run --manifest-path tools/Cargo.toml --bin ink_compile -- path/to/story.ink
+cargo run -p ink-tools --bin ink_compile -- path/to/story.ink
 ```
 
 Pass a second argument to write the JSON to a file instead of stdout.
@@ -347,6 +347,15 @@ Pass a second argument to write the JSON to a file instead of stdout.
 - External fixture-driven parser snapshots now live in `crates/ink-test/tests/`.
 
 ## Audit Log
+
+### 2026-04-22
+
+- Moved the manual compile entry point from the top-level `tools/` crate into
+  `crates/ink-tools`, and updated the workspace member and CLI smoke test to
+  use the new package location.
+- Validation: `cargo test -p ink-test --test cli_manual`,
+  `cargo fmt --all --check`, `make gate`.
+- Result: all passed with warnings denied.
 
 ### 2026-04-22
 
@@ -886,8 +895,9 @@ Result: all passed. The only remaining warnings are the two existing
 - Completed the manual compile entry-point relocation slice.
 - Added a minimal `ink_compile` tool and a smoke test that compiles a story
   with a relative include through the CLI path.
-- Moved the manual compile entry point from `examples/` to `tools/` so the
-  name matches its actual role better.
+- Moved the manual compile entry point from `examples/` to `tools/`, then
+  relocated it again into `crates/ink-tools/` so it lives alongside the other
+  crates.
 
 Validation:
 

@@ -30,8 +30,8 @@ fn cli_compiles_a_story_with_relative_includes() {
         .args([
             "run",
             "--quiet",
-            "--manifest-path",
-            "tools/Cargo.toml",
+            "-p",
+            "ink-tools",
             "--bin",
             "ink_compile",
             "--",

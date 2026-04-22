@@ -5,7 +5,7 @@ edition.workspace = true
 publish = false
 
 [dependencies]
-ink-compiler = { path = "../crates/ink-compiler" }
+ink-compiler = { path = "../ink-compiler" }
 
 [[bin]]
 name = "ink_compile"

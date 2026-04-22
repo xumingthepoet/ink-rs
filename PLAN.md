@@ -28,8 +28,8 @@ Current last verified milestone: Milestone 11 parser snapshot relocation slice
 Workspace warning policy: `.cargo/config.toml` now denies warnings, and
 `make gate` is the unified local entry point for format, check, and test.
 
-The manual compiler entry point now lives under `tools/` instead of
-`examples/`.
+The manual compiler entry point now lives under `crates/ink-tools/` instead
+of `examples/`.
 
 ## Rules
 
