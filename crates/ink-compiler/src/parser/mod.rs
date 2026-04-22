@@ -2928,6 +2928,32 @@ to Savile Row\n\
     }
 
     #[test]
+    fn ink_parser_parses_trusted_function_complex_func2_fixture() {
+        let source = load_workspace_text(
+            "blade-ink-rs/conformance-tests/inkfiles/function/complex-func2.ink",
+        );
+        let mut parser = InkParser::new(&source, Some("complex-func2.ink"), None);
+        let result = parser.parse();
+
+        assert!(
+            result.diagnostics.is_empty(),
+            "unexpected diagnostics: {:#?}",
+            result.diagnostics
+        );
+
+        let story = result.parsed_story.expect("expected parsed story");
+        let render = render_story(&story);
+        assert!(render.contains("FunctionCall(derp, args=2)"));
+        assert!(render.contains("Text(\"    The values are {x} and {y} and {z}.\")"));
+        assert!(render.contains("Divert(target=\"-> END\", empty=false, tunnel=false, thread=false)"));
+        assert!(render.contains("Flow(level=Knot, name=\"derp(a,\", function=true)"));
+        assert!(render.contains("Conditional"));
+        assert!(render.contains("Binary(==, VariableReference(x), Number(0))"));
+        assert!(render.contains("Binary(>, VariableReference(x), Number(0))"));
+        assert!(render.contains("VariableAssignment(name=\"z\", global=true, temp=false)"));
+    }
+
+    #[test]
     fn ink_parser_feature_cases_cover_arithmetic_variables_lists_conditions_functions_and_sequences(
     ) {
         let cases = [

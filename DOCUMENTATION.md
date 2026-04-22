@@ -109,6 +109,8 @@ runtime instead of rewriting runtime execution.
   a parser-level conformance snapshot.
 - The trusted `blade-ink-rs` function fixture `function/complex-func1.ink` now
   also has a parser-level conformance snapshot.
+- The trusted `blade-ink-rs` function fixture `function/complex-func2.ink` now
+  also has a parser-level conformance snapshot.
 - The trusted `blade-ink-rs` function fixture `function/setvar-func.ink` now
   also has a parser-level conformance snapshot.
 - The trusted `blade-ink-rs` function fixture `function/rnd-func.ink` now
@@ -250,6 +252,9 @@ Pass a second argument to write the JSON to a file instead of stdout.
   `lerp(a,` in the parser snapshot.
 - `function/complex-func1.ink` currently shows the same partial header split
   on `derp(a,` in the parser snapshot.
+- `function/complex-func2.ink` is covered by key-structure assertions rather
+  than a full exact string snapshot because the larger conditional block is
+  noisier to stabilize.
 - Builtin-style `~ SEED_RANDOM(10)` lines currently render as function calls in
   the parser snapshot for `function/rnd-func.ink`.
 - Inline conditional-like glue text without extra spacing, such as
@@ -270,6 +275,8 @@ Pass a second argument to write the JSON to a file instead of stdout.
 - The parser snapshot for `function/complex-func1.ink` shows the `derp(2, 3,
   4)` call, the values text, and the function body with the current variable
   and conditional parsing behavior.
+- The parser coverage for `function/complex-func2.ink` now uses key-structure
+  assertions for the larger conditional block and trailing assignments.
 - The parser snapshot for `function/setvar-func.ink` shows the top-level
   function call assignment, the trailing text/divert, and the function body
   with the current setvar parsing behavior.
@@ -309,6 +316,25 @@ Pass a second argument to write the JSON to a file instead of stdout.
   runtime and parser snapshots, not the full official test suite.
 
 ## Audit Log
+
+### 2026-04-22
+
+- Added parser-level coverage for `blade-ink-rs` function fixture
+  `function/complex-func2.ink`.
+- The larger conditional block in this fixture is now checked through stable
+  key-structure assertions rather than a full exact string snapshot.
+
+Validation:
+
+```sh
+cargo fmt --all --check
+cargo test -p ink-compiler ink_parser_parses_trusted_function_complex_func2_fixture
+cargo check --workspace
+cargo test --workspace
+```
+
+Result: all passed. The only remaining warnings are the two existing
+`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
 
 ### 2026-04-22
 
