@@ -316,51 +316,100 @@ fn render_choice(object: &ObjectRef, indent: usize, lines: &mut Vec<String>) {
             if let Some(first_child) = children.first() {
                 render_object(first_child, indent + 1, lines);
             }
-            if !choice_has_name {
-                lines.push(format!("{padding}  ContentList"));
-                lines.push(format!("{padding}    Text(\"\\n\")"));
-            }
 
-            for child in children.iter().skip(1) {
-                match child.borrow().kind() {
-                    ObjectKind::ContentList { .. } => {
-                        if is_newline_only_content_list(child.borrow().content()) {
+            if choice_has_name {
+                for child in children.iter().skip(1) {
+                    match child.borrow().kind() {
+                        ObjectKind::ContentList { .. } => {
+                            if is_newline_only_content_list(child.borrow().content()) {
+                                render_inline_choice_tail(child, indent + 1, lines);
+                            } else {
+                                render_object(child, indent + 1, lines);
+                            }
+                        }
+                        ObjectKind::Text { text } if text == "\n" => {
                             render_inline_choice_tail(child, indent + 1, lines);
-                        } else if choice_has_name {
+                        }
+                        ObjectKind::Text { .. } => {
                             render_inline_choice_tail(child, indent + 1, lines);
-                        } else {
+                        }
+                        ObjectKind::Divert { .. } => {
+                            render_inline_choice_tail(child, indent, lines);
+                        }
+                        _ => render_object(child, indent + 1, lines),
+                    }
+                }
+            } else {
+                let mut close_index = None;
+                for (offset, child) in children.iter().skip(1).enumerate() {
+                    let child_index = offset + 1;
+                    match child.borrow().kind() {
+                        ObjectKind::ContentList { .. } => {
                             let has_divert = child.borrow().content().iter().any(|grandchild| {
                                 matches!(grandchild.borrow().kind(), ObjectKind::Divert { .. })
                             });
-                            for grandchild in child.borrow().content() {
-                                match grandchild.borrow().kind() {
-                                    ObjectKind::Text { text } => {
-                                        let text = normalize_parse_text(text);
-                                        let text = if text == "\n" {
-                                            text.to_string()
-                                        } else if has_divert && !text.ends_with(' ') {
-                                            format!("{text} ")
-                                        } else {
-                                            text.to_string()
-                                        };
-                                        lines.push(format!(
-                                            "{}Text({})",
-                                            "  ".repeat(indent),
-                                            serde_json::to_string(&text).unwrap()
-                                        ));
+                            let has_newline = child
+                                .borrow()
+                                .content()
+                                .iter()
+                                .any(|grandchild| matches!(grandchild.borrow().kind(), ObjectKind::Text { text } if text == "\n"));
+
+                            if has_divert {
+                                lines.push(format!("{padding}  ContentList"));
+                                lines.push(format!("{padding}    Text(\"\\n\")"));
+                                let grandchildren = child.borrow().content().to_vec();
+                                for (grandchild_index, grandchild) in
+                                    grandchildren.iter().enumerate()
+                                {
+                                    match grandchild.borrow().kind() {
+                                        ObjectKind::Text { text } if text == "\n" => {
+                                            lines.push(format!(
+                                                "{}Text(\"\\n\")",
+                                                "  ".repeat(indent)
+                                            ));
+                                        }
+                                        ObjectKind::Text { text } => {
+                                            let mut text = normalize_parse_text(text).to_string();
+                                            let next_is_divert = grandchildren
+                                                .get(grandchild_index + 1)
+                                                .is_some_and(|next| {
+                                                    matches!(
+                                                        next.borrow().kind(),
+                                                        ObjectKind::Divert { .. }
+                                                    )
+                                                });
+                                            if next_is_divert && !text.ends_with(' ') {
+                                                text.push(' ');
+                                            }
+                                            lines.push(format!(
+                                                "{}Text({})",
+                                                "  ".repeat(indent),
+                                                serde_json::to_string(&text).unwrap()
+                                            ));
+                                        }
+                                        ObjectKind::Divert { .. } => {
+                                            render_object(grandchild, indent, lines);
+                                        }
+                                        _ => render_object(grandchild, indent, lines),
                                     }
-                                    _ => render_object(grandchild, indent, lines),
                                 }
+                                close_index = Some(child_index);
+                                break;
+                            }
+
+                            render_object(child, indent + 1, lines);
+                            if has_newline {
+                                close_index = Some(child_index);
+                                break;
                             }
                         }
-                    }
-                    ObjectKind::Text { text } if text == "\n" => {
-                        render_inline_choice_tail(child, indent + 1, lines);
-                    }
-                    ObjectKind::Text { .. } => {
-                        if choice_has_name {
-                            render_inline_choice_tail(child, indent + 1, lines);
-                        } else {
+                        ObjectKind::Text { text } if text == "\n" => {
+                            lines.push(format!("{padding}  ContentList"));
+                            lines.push(format!("{padding}    Text(\"\\n\")"));
+                            close_index = Some(child_index);
+                            break;
+                        }
+                        ObjectKind::Text { .. } => {
                             if let ObjectKind::Text { text } = child.borrow().kind() {
                                 let text = normalize_parse_text(text).to_string();
                                 lines.push(format!(
@@ -370,11 +419,19 @@ fn render_choice(object: &ObjectRef, indent: usize, lines: &mut Vec<String>) {
                                 ));
                             }
                         }
+                        ObjectKind::Divert { .. } => {
+                            render_object(child, indent, lines);
+                            close_index = Some(child_index);
+                            break;
+                        }
+                        _ => render_object(child, indent + 1, lines),
                     }
-                    ObjectKind::Divert { .. } => {
-                        render_inline_choice_tail(child, indent, lines);
+                }
+
+                if let Some(close_index) = close_index {
+                    for sibling in children.iter().skip(close_index + 1) {
+                        render_weave_child(sibling, indent, lines, false);
                     }
-                    _ => render_object(child, indent + 1, lines),
                 }
             }
             return;

@@ -1,6 +1,6 @@
 # compiler_conformance_legacy Checklist
 
-Progress: **9/126** completed.
+Progress: **11/126** completed.
 
 This is the working queue for the imported legacy compiler-conformance suite.
 The order now follows the broad progression in `ink-csharp/Documentation/
@@ -23,8 +23,8 @@ Legend:
 
 - [x] `choices/one`
 - [x] `choices/single-choice`
-- [ ] `choices/multi-choice`
-- [ ] `choices/suppress-choice`
+- [x] `choices/multi-choice`
+- [x] `choices/suppress-choice`
 - [ ] `choices/mixed-choice`
 - [ ] `choices/varying-choice`
 - [x] `choices/no-choice-text`
@@ -36,10 +36,10 @@ Legend:
 - [ ] `choices/conditional-choice`
 - [ ] `choices/label-flow`
 - [ ] `choices/label-flow2`
-- [ ] `choices/label-scope`
+- [x] `choices/label-scope`
 - [ ] `choices/label-scope-error`
 - [x] `choices/divert-choice`
-- [x] `choices/sticky-choice`
+- [ ] `choices/sticky-choice`
 
 ## 4. Knots and stitches
 

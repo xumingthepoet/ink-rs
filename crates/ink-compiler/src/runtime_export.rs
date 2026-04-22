@@ -378,6 +378,12 @@ fn export_gather_container(
             tokens.push(json!({"#f":5}));
         } else {
             tokens.push(Value::String("end".to_string()));
+            if had_terminal_end {
+                tokens.push(Value::Array(vec![
+                    Value::String("done".to_string()),
+                    json!({"#n": format!("g-{}", state.gather_index)}),
+                ]));
+            }
             tokens.push(Value::Null);
         }
     } else {
@@ -530,6 +536,13 @@ fn export_choice_container(
 ) -> Result<BTreeMap<String, Value>, CompilerError> {
     let choice_index = state.choice_index;
     state.choice_index += 1;
+    let mut branch_gather_target = branch_gather_target;
+    let inside_named_flow = choice_inside_named_flow(object);
+    let effective_inherited_gather_target = if inside_named_flow {
+        None
+    } else {
+        inherited_gather_target.clone()
+    };
 
     let (start_content, choice_only_content, inner_content) = {
         let mut children = object.borrow().content().to_vec();
@@ -557,15 +570,16 @@ fn export_choice_container(
     };
     let flow_prefix = flow_path_prefix(object);
     let needs_eval = has_start_content || has_choice_only_content || has_condition;
-    let choice_eval_index = if has_start_content {
-        choice_index + 2
-    } else {
-        choice_index
-    };
+    let choice_eval_index = choice_index;
     let choice_eval_prefix = if flow_prefix.is_empty() {
         format!("0.{choice_eval_index}")
     } else {
         format!("{flow_prefix}.0.{choice_eval_index}")
+    };
+    let choice_inner_prefix = if flow_prefix.is_empty() {
+        format!("0.{choice_eval_index}")
+    } else {
+        format!(".^.^.{choice_eval_index}")
     };
     let choice_container_prefix = if flow_prefix.is_empty() {
         format!("0.c-{choice_index}")
@@ -595,7 +609,7 @@ fn export_choice_container(
             branch_gather_target
                 .as_ref()
                 .map(|target| target.target.clone())
-                .or(inherited_gather_target.clone()),
+                .or(effective_inherited_gather_target.clone()),
         )?);
         outer_tokens.push(json!("/str"));
     }
@@ -641,7 +655,7 @@ fn export_choice_container(
             branch_gather_target
                 .as_ref()
                 .map(|target| target.target.clone())
-                .or(inherited_gather_target.clone()),
+                .or(effective_inherited_gather_target.clone()),
         )?);
         s_tokens.push(json!({"->":"$r", "var":true}));
         s_tokens.push(Value::Null);
@@ -660,7 +674,7 @@ fn export_choice_container(
         }));
         inner_tokens.push(json!("/ev"));
         inner_tokens.push(json!({"temp=":"$r"}));
-        inner_tokens.push(json!({"->": format!("{choice_eval_prefix}.s")}));
+        inner_tokens.push(json!({"->": format!("{choice_inner_prefix}.s")}));
         inner_tokens.push(Value::Array(vec![json!({"#n":"$r2"})]));
     }
 
@@ -671,7 +685,7 @@ fn export_choice_container(
             branch_gather_target
                 .as_ref()
                 .map(|target| target.target.clone())
-                .or(inherited_gather_target.clone()),
+                .or(effective_inherited_gather_target.clone()),
         )?
     } else {
         Vec::new()
@@ -686,6 +700,18 @@ fn export_choice_container(
 
     let body_has_divert = body_tokens.iter().any(is_runtime_divert_token);
     inner_tokens.extend(body_tokens);
+    if has_parent_only_relative_divert(&inner_tokens) {
+        branch_gather_target = None;
+    }
+    let suppress_synthetic_gather = branch_gather_target.is_none()
+        && (has_start_content || has_parent_only_relative_divert(&inner_tokens));
+
+    if branch_gather_target.is_none() && !suppress_synthetic_gather {
+        branch_gather_target = Some(ChoiceGatherTarget {
+            target: format!("0.g-{}", state.gather_index),
+            synthetic: true,
+        });
+    }
 
     if has_start_content {
         if branch_gather_target
@@ -900,6 +926,8 @@ fn export_children(
                         &children,
                         index,
                         state,
+                        choice_inside_named_flow(&child),
+                        has_start_content,
                         inherited_gather_target.clone(),
                     ),
                     inherited_gather_target.clone(),
@@ -938,6 +966,8 @@ fn gather_target_for_choice(
     children: &[ObjectRef],
     current_index: usize,
     state: &ExportState,
+    inside_named_flow: bool,
+    has_start_content: bool,
     inherited_gather_target: Option<String>,
 ) -> Option<ChoiceGatherTarget> {
     for child in children.iter().skip(current_index + 1) {
@@ -967,13 +997,18 @@ fn gather_target_for_choice(
             | ObjectKind::ListElementDefinition { .. }
             | ObjectKind::Generic => continue,
             ObjectKind::Gather { identifier, .. } => {
-                let gather_name = identifier
-                    .as_ref()
-                    .filter(|identifier| !identifier.name.is_empty())
-                    .map(|identifier| identifier.name.clone())
-                    .unwrap_or_else(|| flow_named_gather_component(child));
+                let target = if state.named_flow_depth == 0 {
+                    runtime_target_path_string(child).as_string()
+                } else {
+                    let gather_name = identifier
+                        .as_ref()
+                        .filter(|identifier| !identifier.name.is_empty())
+                        .map(|identifier| identifier.name.clone())
+                        .unwrap_or_else(|| flow_named_gather_component(child));
+                    format!(".^.^.{gather_name}")
+                };
                 return Some(ChoiceGatherTarget {
-                    target: format!(".^.^.{gather_name}"),
+                    target,
                     synthetic: false,
                 });
             }
@@ -981,28 +1016,61 @@ fn gather_target_for_choice(
         }
     }
 
-    let gather_fallback = Some(ChoiceGatherTarget {
-        target: format!("0.g-{}", state.gather_index),
-        synthetic: true,
-    });
-
-    next_gather_sibling_target(&children[current_index])
-        .map(|target| ChoiceGatherTarget {
-            target,
-            synthetic: false,
+    next_gather_sibling_target(&children[current_index], state.named_flow_depth)
+        .and_then(|target| {
+            if inside_named_flow && target.starts_with("0.g-") {
+                None
+            } else {
+                Some(ChoiceGatherTarget {
+                    target,
+                    synthetic: false,
+                })
+            }
         })
-        .or(gather_fallback)
-        .or(inherited_gather_target.map(|target| ChoiceGatherTarget {
-            target,
-            synthetic: false,
-        }))
+        .or_else(|| {
+            if has_start_content || inside_named_flow {
+                None
+            } else {
+                Some(ChoiceGatherTarget {
+                    target: format!("0.g-{}", state.gather_index),
+                    synthetic: true,
+                })
+            }
+        })
+        .or_else(|| {
+            if !inside_named_flow {
+                inherited_gather_target.map(|target| ChoiceGatherTarget {
+                    target,
+                    synthetic: false,
+                })
+            } else {
+                None
+            }
+        })
 }
 
-fn next_gather_sibling_target(object: &ObjectRef) -> Option<String> {
+fn choice_inside_named_flow(choice: &ObjectRef) -> bool {
+    choice
+        .borrow()
+        .ancestry()
+        .iter()
+        .any(|node| matches!(node.borrow().kind(), ObjectKind::Flow { name: Some(_), .. }))
+}
+
+fn next_gather_sibling_target(object: &ObjectRef, named_flow_depth: usize) -> Option<String> {
     let mut current = Some(object.clone());
 
     while let Some(node) = current {
-        let parent = node.borrow().parent()?;
+        let (parent, is_named_flow_boundary) = {
+            let borrowed = node.borrow();
+            let parent = borrowed.parent()?;
+            let is_named_flow_boundary = named_flow_depth > 0
+                && matches!(borrowed.kind(), ObjectKind::Flow { name: Some(_), .. });
+            (parent, is_named_flow_boundary)
+        };
+        if is_named_flow_boundary {
+            return None;
+        }
         let siblings = parent.borrow().content().to_vec();
         let mut found_self = false;
 
@@ -1015,12 +1083,17 @@ fn next_gather_sibling_target(object: &ObjectRef) -> Option<String> {
                 continue;
             }
             if let ObjectKind::Gather { identifier, .. } = sibling.borrow().kind() {
-                let gather_name = identifier
-                    .as_ref()
-                    .filter(|identifier| !identifier.name.is_empty())
-                    .map(|identifier| identifier.name.clone())
-                    .unwrap_or_else(|| flow_named_gather_component(&sibling));
-                return Some(format!(".^.^.{gather_name}"));
+                let target = if named_flow_depth == 0 {
+                    runtime_target_path_string(&sibling).as_string()
+                } else {
+                    let gather_name = identifier
+                        .as_ref()
+                        .filter(|identifier| !identifier.name.is_empty())
+                        .map(|identifier| identifier.name.clone())
+                        .unwrap_or_else(|| flow_named_gather_component(&sibling));
+                    format!(".^.^.{gather_name}")
+                };
+                return Some(target);
             }
         }
 
@@ -1445,15 +1518,7 @@ fn flow_path_prefix(object: &ObjectRef) -> String {
     names.join(".")
 }
 
-fn choice_path_prefix(object: &ObjectRef, has_start_content: bool) -> String {
-    if has_start_content {
-        let flow_prefix = flow_path_prefix(object);
-        if flow_prefix.is_empty() {
-            return "0.".to_string();
-        }
-        return format!("{flow_prefix}.0.");
-    }
-
+fn choice_path_prefix(object: &ObjectRef, _has_start_content: bool) -> String {
     let mut current = object.borrow().parent();
 
     while let Some(node) = current {

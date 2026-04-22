@@ -22,13 +22,15 @@ into `crates/ink-runtime` instead of rewriting runtime execution.
 - Compiler-conformance compares `A.ink.parse` first and `A.ink.json` second;
   parse snapshots are generated locally from the Rust parsed tree.
 - The compiler-conformance queue follows `WritingWithInk.md` order and is at
-  `9/126` after the latest choice slice.
+  `11/126` after the latest choice slice.
 - Green fixtures in the current checkpoint include `basictext/oneline`,
   `basictext/twolines`, `test1`, `choices/no-choice-text`, `choices/one`,
-  `choices/single-choice`, `choices/divert-choice`, `choices/sticky-choice`,
-  and `knot/single-line`.
-- The next compiler-conformance fixture is `choices/multi-choice`; `choices/
-  TheIntercept` stays in the last-pass section.
+  `choices/single-choice`, `choices/multi-choice`, `choices/suppress-choice`,
+  `choices/label-scope`, `choices/divert-choice`, and `knot/single-line`.
+- The next compiler-conformance fixture is `choices/mixed-choice`; `choices/
+  sticky-choice` is still under recovery because the exporter is still
+  over-inserting a named-flow continuation.
+- `choices/TheIntercept` stays in the last-pass section.
 - When fixing any failing legacy fixture, read the source `.ink` and the
   matching assertions first.
 - The audit log is a rolling five-entry window with minute timestamps.
@@ -38,6 +40,21 @@ into `crates/ink-runtime` instead of rewriting runtime execution.
 The audit log is a rolling window of the latest five entries. Timestamps use
 `YYYY-MM-DD HH:MM`; older history is intentionally trimmed so this file stays
 usable as prompt memory.
+
+### 2026-04-23 03:09
+
+- Fixed the `choices/suppress-choice` compiler-conformance fixture and the
+  `choices/label-scope` runtime JSON pathing so both pass again.
+- `choices/sticky-choice` still has an extra named-flow continuation, and
+  `choices/mixed-choice` still needs parse-snapshot alignment.
+- Validated with focused `suppress_choice_test` and `label_scope_test` runs.
+
+### 2026-04-23 02:55
+
+- Fixed the `choices/multi-choice` compiler-conformance fixture by correcting
+  the gather tail JSON shape and keeping the explicit gather target global.
+- Validated with the focused `multi_choice_test` and a `no_choice_test`
+  regression check.
 
 ### 2026-04-23 02:49
 
@@ -58,48 +75,13 @@ usable as prompt memory.
 - Added the rolling five-entry audit-log rule and minute-granularity
   timestamps to the project-memory docs.
 
-### 2026-04-23 02:49
-
-- Documented the fixture-first workflow: read the source `.ink` and the
-  corresponding assertions before changing any failing legacy fixture.
-
-### 2026-04-23 02:49
-
-- Restored the default workspace gate, feature-gated the imported legacy
-  suites, and kept `make gate` green while migration continues.
-
 ## Next Task
 
 Keep shrinking the remaining `compiler_conformance_legacy` parse-snapshot
 in dependency-light order. The next unchecked fixture after the current green
-choice slice is `choices/multi-choice`. Once compiler-conformance is green
-again, move to the imported `csharp_tests_legacy` suite. Both suites remain
+choice slice is `choices/mixed-choice`, while `choices/sticky-choice` remains
+the current named-flow JSON blocker. Once compiler-conformance is green again,
+move to the imported `csharp_tests_legacy` suite. Both suites remain
 feature-gated until they are ready for the default workspace gate.
 
 Stabilize the legacy compiler-to-runtime conformance suite in `ink-test`.
-
-## Repo Structure
-
-- `crates/ink-compiler`: compiler crate under development.
-- `docs/ARCHITECTURE.md`: module boundaries and pipeline architecture.
-- `docs/PORTING_GUIDE.md`: C# to Rust porting rules.
-- `docs/TESTING.md`: test layers and validation strategy.
-- `AGENTS.md`: stable project spec and agent rules.
-- `PLAN.md`: milestone plan, validation checklist, risks, and notes.
-- `IMPLEMENT.md`: execution runbook for repeated `继续` prompts.
-- `DOCUMENTATION.md`: this live status and audit log.
-- `ink-csharp/`: ignored local official C# reference.
-- `ink-runtime/`: ignored local Rust runtime dependency.
-
-## Troubleshooting
-
-- Missing `ink_runtime` path dependency:
-  - Ensure ignored directory `ink-runtime/` exists at repository root.
-- C# reference unavailable:
-  - Ensure ignored directory `ink-csharp/` exists at repository root.
-- Unexpected ignored files:
-  - Run `git status --short --ignored` and confirm only reference/build
-    directories are ignored.
-- Runtime dependency warnings:
-  - Warnings from `ink-runtime/lib` are tracked as local dependency warnings
-    unless a compiler task requires changing runtime integration.
