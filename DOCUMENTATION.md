@@ -112,6 +112,9 @@ into `crates/ink-runtime` instead of rewriting runtime execution.
   `make gate` is the unified local wrapper for format, check, and test.
 - The default test timeout is 30 seconds; longer timeouts should only be used
   temporarily for specific fixtures that genuinely need them.
+- `make compiler-gate` now wraps the legacy compiler-to-runtime conformance
+  suite with the default timeout and accepts a `COMPILER_TEST` filter for
+  focused iteration.
 - The conformance harness now compares compiler output against copied trusted
   fixtures under `crates/ink-test/fixtures` and compiler behavior against the
   copied official include examples there as well.
@@ -364,6 +367,18 @@ Pass a second argument to write the JSON to a file instead of stdout.
 - External fixture-driven parser snapshots now live in `crates/ink-test/tests/`.
 
 ## Audit Log
+
+### 2026-04-22
+
+- Added `make compiler-gate` as the timeout-wrapped entry point for focused
+  compiler-conformance iterations, with `COMPILER_TEST` support for exact
+  legacy fixture filters.
+- Validation: `git diff --check`,
+  `make compiler-gate COMPILER_TEST='compiler_conformance::choice_test::conditional_choice_test -- --exact'`,
+  `make gate`.
+- Result: the compiler gate ran under timeout and produced the expected
+  bounded compiler failure for the still-unported conditional choice fixture,
+  while the default workspace gate stayed green.
 
 ### 2026-04-22
 

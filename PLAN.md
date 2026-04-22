@@ -22,7 +22,7 @@ Core commands to run after every completed milestone:
 - [x] `timeout 30s cargo test --workspace`
 - [x] `make gate`
 
-Current last verified milestone: Milestone 12 legacy conformance import
+Current last verified milestone: Milestone 13 compiler-conformance gate
 slice (`2026-04-22`).
 
 Workspace warning policy: `.cargo/config.toml` now denies warnings, and
@@ -429,7 +429,7 @@ cargo test --workspace
 
 ## Milestone 13: Compiler Conformance Stabilization
 
-- [ ] Add a timeout-wrapped compiler-conformance gate and use it for every
+- [x] Add a timeout-wrapped compiler-conformance gate and use it for every
   focused iteration on the legacy compiler-to-runtime suite.
 - [ ] Fix compiler-conformance failures in dependency-light order:
   - basic text, knots, stitches, diverts, and glue
@@ -466,6 +466,8 @@ Acceptance:
 Validation:
 
 ```sh
+make compiler-gate
+make compiler-gate COMPILER_TEST='compiler_conformance::choice_test::conditional_choice_test -- --exact'
 timeout 30s cargo test -p ink-test --features compiler-conformance --test compiler_conformance_legacy
 timeout 30s cargo test -p ink-test --features compiler-conformance --test compiler_conformance_legacy compiler_conformance::choice_test::conditional_choice_test -- --exact
 cargo fmt --all --check
