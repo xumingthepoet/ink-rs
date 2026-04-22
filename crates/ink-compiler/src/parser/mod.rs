@@ -2907,6 +2907,27 @@ to Savile Row\n\
     }
 
     #[test]
+    fn ink_parser_parses_trusted_function_complex_func1_fixture() {
+        let source = load_workspace_text(
+            "blade-ink-rs/conformance-tests/inkfiles/function/complex-func1.ink",
+        );
+        let mut parser = InkParser::new(&source, Some("complex-func1.ink"), None);
+        let result = parser.parse();
+
+        assert!(
+            result.diagnostics.is_empty(),
+            "unexpected diagnostics: {:#?}",
+            result.diagnostics
+        );
+
+        let story = result.parsed_story.expect("expected parsed story");
+        assert_eq!(
+            render_story(&story),
+            "Story\n  FunctionCall(derp, args=3)\n  ContentList\n    Text(\"   The values are {x} and {y}.\")\n    Text(\"\\n\")\n  Divert(target=\"-> END\", empty=false, tunnel=false, thread=false)\n  ContentList\n    Text(\"\\n\")\n  Flow(level=Knot, name=\"derp(a,\", function=true)\n    VariableAssignment(name=\"x\", global=true, temp=false)\n      Number(0)\n    VariableAssignment(name=\"x\", global=false, temp=false)\n      Binary(+, VariableReference(a), VariableReference(b))\n    VariableAssignment(name=\"y\", global=true, temp=false)\n      Number(3)\n    Conditional\n      Binary(==, VariableReference(x), Number(5))\n      ConditionalBranch(true=true, else=false, inline=false)\n        VariableAssignment(name=\"x\", global=false, temp=false)\n          Number(6)\n    VariableAssignment(name=\"y\", global=false, temp=false)\n      Binary(+, VariableReference(x), VariableReference(c))"
+        );
+    }
+
+    #[test]
     fn ink_parser_feature_cases_cover_arithmetic_variables_lists_conditions_functions_and_sequences(
     ) {
         let cases = [

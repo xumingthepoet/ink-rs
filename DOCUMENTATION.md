@@ -107,6 +107,8 @@ runtime instead of rewriting runtime execution.
   a parser-level conformance snapshot.
 - The trusted `blade-ink-rs` glue fixture `glue/testbugfix2.ink` now also has
   a parser-level conformance snapshot.
+- The trusted `blade-ink-rs` function fixture `function/complex-func1.ink` now
+  also has a parser-level conformance snapshot.
 - The trusted `blade-ink-rs` function fixture `function/setvar-func.ink` now
   also has a parser-level conformance snapshot.
 - The trusted `blade-ink-rs` function fixture `function/rnd-func.ink` now
@@ -246,6 +248,8 @@ Pass a second argument to write the JSON to a file instead of stdout.
 - Function definitions with parameter lists still render their flow names
   using the current partial header split, so `func-basic.ink` currently shows
   `lerp(a,` in the parser snapshot.
+- `function/complex-func1.ink` currently shows the same partial header split
+  on `derp(a,` in the parser snapshot.
 - Builtin-style `~ SEED_RANDOM(10)` lines currently render as function calls in
   the parser snapshot for `function/rnd-func.ink`.
 - Inline conditional-like glue text without extra spacing, such as
@@ -263,6 +267,9 @@ Pass a second argument to write the JSON to a file instead of stdout.
 - The parser snapshot for `glue/testbugfix2.ink` shows the `A {f():B}` glue
   line, the `X` line, and the function body with the current return parsing
   behavior.
+- The parser snapshot for `function/complex-func1.ink` shows the `derp(2, 3,
+  4)` call, the values text, and the function body with the current variable
+  and conditional parsing behavior.
 - The parser snapshot for `function/setvar-func.ink` shows the top-level
   function call assignment, the trailing text/divert, and the function body
   with the current setvar parsing behavior.
@@ -302,6 +309,27 @@ Pass a second argument to write the JSON to a file instead of stdout.
   runtime and parser snapshots, not the full official test suite.
 
 ## Audit Log
+
+### 2026-04-22
+
+- Added a parser-level conformance snapshot for `blade-ink-rs` function
+  fixture `function/complex-func1.ink`.
+- The snapshot verifies the parser keeps the function call, variable
+  declarations, conditional branch, and trailing assignment in stable parsed
+  hierarchy form. It also records the current partial function-header split
+  for parameterized function names.
+
+Validation:
+
+```sh
+cargo fmt --all --check
+cargo test -p ink-compiler ink_parser_parses_trusted_function_complex_func1_fixture
+cargo check --workspace
+cargo test --workspace
+```
+
+Result: all passed. The only remaining warnings are the two existing
+`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
 
 ### 2026-04-22
 
