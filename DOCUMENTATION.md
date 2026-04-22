@@ -34,27 +34,20 @@ into `crates/ink-runtime` instead of rewriting runtime execution.
   earlier version of the compare helper only printed parse/json diffs and
   returned `bool`, which made "green" assessments unreliable. The helper now
   asserts on mismatch so failures actually fail the test.
-- The compiler-conformance choice/divert/sequence slice now has the basic
-  `no-choice`, `one`, `single-choice`, `suppress-choice`, `mixed-choice`,
-  `divert-on-choice`, and `variable_text::sequence` fixtures green, and the
-  `divert_choice` checkpoint is now green as well.
-- The current compiler-conformance slice has made the simple divert and glue
-  fixtures green, updated the trusted parser snapshots to reflect inline
-  divert splitting inside conditional fixtures, and was later feature-gated
-  again so the default gate could stay green while migration continues.
-- `compiler_conformance::choice_test::sticky_choice_test` and
-  `compiler_conformance::choice_test::divert_choice_test` are now green after
-  the parser started splitting inline diverts inside branch content and the
-  exporter adjusted choice token spacing/path handling, but the
-  path-resolution-heavy `label_scope` fixture still times out.
+- The new compiler-conformance parse-snapshot layer currently exposes real
+  mismatches against the official C# parse dump. The remaining work is now
+  concentrated on a smaller set of choice-heavy fixtures such as
+  `choices/sticky-choice`; the basic text and `choices/label-scope` fixtures
+  are aligned again.
 - During Milestone 13, compiler-conformance progress is checkpointed in small
   commits after each few passing fixtures so the remaining work stays
   resumable and bounded.
-- Current Milestone 13 priority: the imported legacy compiler-conformance
-  suite is now green, so the remaining highest-priority suite is the imported
-  csharp suite. Both remain feature-gated behind `legacy-compiler-conformance`
-  and `legacy-csharp-tests` until the remaining migration work is ready to be
-  re-enabled or promoted.
+- Current Milestone 13 priority: fix the imported legacy compiler-conformance
+  suite first, especially the remaining choice-heavy parse-snapshot
+  alignment now that the harness fails early on mismatches. After that, move
+  to the imported csharp suite. Both remain feature-gated behind
+  `legacy-compiler-conformance` and `legacy-csharp-tests` until the remaining
+  migration work is ready to be re-enabled or promoted.
 - The documented test loop now treats every long-running `cargo test` path as
   timeboxed, and `make gate` wraps the workspace test pass with a timeout as
   well.
@@ -1694,6 +1687,10 @@ Result: all passed.
 - Recorded the earlier false-green cause: the compare helper previously
   returned `bool` and only logged diffs, which made status assessment
   unreliable until it was changed to assert.
+- Marked `basictext/oneline`, `basictext/twolines`, and
+  `choices/label-scope` as aligned again, and shifted the next compiler-
+  conformance work toward `choices/sticky-choice` and other remaining
+  choice-heavy fixtures.
 
 Validation:
 
@@ -1708,12 +1705,12 @@ Result: all passed.
 
 ## Next Task
 
-Keep shrinking the remaining `compiler_conformance_legacy` failures in
-dependency-light order. The next useful work is still the remaining
-choice-heavy fixtures, especially conditional/named choices, before moving
-deeper into gather-heavy and runtime-heavy cases. Once that suite is green,
-move to the imported `csharp_tests_legacy` suite. Both suites remain
-feature-gated until they are ready for the default workspace gate.
+Keep shrinking the remaining `compiler_conformance_legacy` parse-snapshot
+in dependency-light order. The next useful work is to align the Rust parse
+renderer and runtime export for the remaining choice-heavy fixtures such as
+`choices/sticky-choice`. Once compiler-conformance is green again, move to
+the imported `csharp_tests_legacy` suite. Both suites remain feature-gated
+until they are ready for the default workspace gate.
 
 Stabilize the legacy compiler-to-runtime conformance suite in `ink-test`.
 

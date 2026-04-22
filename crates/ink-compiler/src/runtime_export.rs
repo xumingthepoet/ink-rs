@@ -4,6 +4,7 @@ use serde_json::{json, Map, Value};
 
 use crate::{
     error::CompilerError,
+    parsed::FlowLevel,
     parsed::{ExpressionKind, ObjectKind, ObjectRef, Path, SequenceType, Story as ParsedStory},
 };
 
@@ -35,21 +36,29 @@ pub fn export_story_json(story: &ParsedStory) -> Result<String, CompilerError> {
                 json!({"#n":"g-0"})
             ]));
         }
-    } else if !top_level_has_weave_points
-        && !matches!(
-            state.last_top_level_kind,
-            Some(ObjectKind::Choice { .. } | ObjectKind::Gather { .. })
-        )
-        && !matches!(state.main_content.last(), Some(Value::String(value)) if value == "\n")
-    {
-        state.main_content.push(Value::String("\n".to_string()));
+    } else {
+        if !top_level_has_weave_points
+            && !matches!(
+                state.last_top_level_kind,
+                Some(ObjectKind::Choice { .. } | ObjectKind::Gather { .. })
+            )
+            && !matches!(state.main_content.last(), Some(Value::String(value)) if value == "\n")
+        {
+            state.main_content.push(Value::String("\n".to_string()));
+        }
+        if !matches!(state.main_content.last(), Some(Value::Array(value)) if matches!(value.as_slice(), [Value::String(marker), Value::Object(_)] if marker == "done"))
+        {
+            state.main_content.push(json!([
+                Value::String("done".to_string()),
+                json!({"#n":"g-0"})
+            ]));
+        }
     }
 
     let mut inner_container = state.main_content;
     if has_named_containers {
         inner_container.push(Value::Null);
-    } else if !top_level_has_weave_points {
-        inner_container.push(Value::String("end".to_string()));
+    } else {
         inner_container.push(Value::Null);
     }
 
@@ -66,13 +75,10 @@ pub fn export_story_json(story: &ParsedStory) -> Result<String, CompilerError> {
 
     let root = json!([Value::Array(inner_container), "done", named_containers]);
     let list_defs = build_list_defs_json(state.list_defs);
-    let story_json = json!({
-        "inkVersion": 21,
-        "root": root,
-        "listDefs": list_defs,
-    });
-
-    Ok(story_json.to_string())
+    Ok(format!(
+        r#"{{"inkVersion":21,"root":{},"listDefs":{}}}"#,
+        root, list_defs
+    ))
 }
 
 #[derive(Default)]
@@ -312,7 +318,7 @@ fn export_named_flow_container(
     };
     content_array.push(named_children_value);
 
-    Ok(Value::Array(vec![Value::Array(content_array), Value::Null]))
+    Ok(Value::Array(content_array))
 }
 
 fn value_contains_weave_point_token(value: &Value) -> bool {
@@ -587,7 +593,7 @@ fn export_choice_container(
         }
         flags
     };
-    let choice_path = format!(".^.c-{choice_index}");
+    let choice_path = format!("{}c-{choice_index}", choice_path_prefix(object));
     outer_tokens.push(json!({"*": choice_path, "flg": flags}));
 
     if let Some(start_content) = start_content {
@@ -1303,6 +1309,28 @@ fn flow_path_prefix(object: &ObjectRef) -> String {
 
     names.reverse();
     names.join(".")
+}
+
+fn choice_path_prefix(object: &ObjectRef) -> &'static str {
+    let mut current = object.borrow().parent();
+
+    while let Some(node) = current {
+        let (kind, parent) = {
+            let borrowed = node.borrow();
+            (borrowed.kind().clone(), borrowed.parent())
+        };
+
+        if let ObjectKind::Flow { flow_level, .. } = kind {
+            return match flow_level {
+                FlowLevel::Stitch => ".^.^.",
+                _ => ".^.",
+            };
+        }
+
+        current = parent;
+    }
+
+    ".^."
 }
 
 fn export_text_token(text: &str) -> Value {
