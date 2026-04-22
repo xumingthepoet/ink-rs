@@ -6,6 +6,7 @@
 # in this repository.
 /ink-csharp/
 /blade-ink-rs/
+/ink-tests-old/
 
 # C#/.NET build outputs from local reference trees if copied elsewhere.
 bin/
