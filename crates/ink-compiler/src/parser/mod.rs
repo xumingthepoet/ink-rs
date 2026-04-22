@@ -2715,4 +2715,42 @@ mod tests {
             "Story\n  VariableAssignment(name=\"t2\", global=true, temp=false)\n    Number(5)\n  ContentList\n    Text(\"\\n\")\n  ContentList\n    Text(\"The value of a variable in test file 2 is { t2 }.\")\n    Text(\"\\n\")\n  ContentList\n    Text(\"\\n\")\n  Text(\"\\n\")\n  Flow(level=Knot, name=\"knot_in_2\", function=false)\n    ContentList\n      Text(\" The value when accessed from knot_in_2 is { t2 }.\")\n      Text(\"\\n\")\n    Divert(target=\"-> END\", empty=false, tunnel=false, thread=false)"
         );
     }
+
+    #[test]
+    fn ink_parser_parses_official_include_text_chain() {
+        let source = "\
+INCLUDE test_included_file.ink\n\
+  INCLUDE test_included_file2.ink\n\
+\n\
+This is the main file.\n";
+        let mut files = HashMap::new();
+        files.insert(
+            workspace_root().join("ink-csharp/tests/test_included_file.ink"),
+            load_workspace_text("ink-csharp/tests/test_included_file.ink"),
+        );
+        files.insert(
+            workspace_root().join("ink-csharp/tests/test_included_file2.ink"),
+            load_workspace_text("ink-csharp/tests/test_included_file2.ink"),
+        );
+        let file_handler: Arc<dyn FileHandler> = Arc::new(IncludeFileHandler::new(files));
+
+        let mut parser = InkParser::new(
+            source,
+            Some("ink-csharp/tests/include-chain.ink"),
+            Some(file_handler),
+        );
+        let result = parser.parse();
+
+        assert!(
+            result.diagnostics.is_empty(),
+            "unexpected diagnostics: {:#?}",
+            result.diagnostics
+        );
+
+        let story = result.parsed_story.expect("expected parsed story");
+        assert_eq!(
+            render_story(&story),
+            "Story\n  ContentList\n    Text(\"This is include 1.\")\n  Text(\"\\n\")\n  ContentList\n    Text(\"This is include 2.\")\n  Text(\"\\n\")\n  ContentList\n    Text(\"\\n\")\n  ContentList\n    Text(\"This is the main file.\")\n    Text(\"\\n\")"
+        );
+    }
 }

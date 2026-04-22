@@ -91,6 +91,8 @@ runtime instead of rewriting runtime execution.
 - Official C# include-chain fixtures now have a parser-level conformance
   snapshot covering BOM stripping, recursive include expansion, a variable
   declaration, and a knot with a divert.
+- The simpler official C# include chain with two text files is also covered by
+  a parser-level conformance snapshot.
 - `CommentEliminator` now strips a leading UTF-8 BOM, and compiler-level
   regression tests cover both direct-source and include-file BOM handling.
 - Remaining compiler/runtime incompatibilities are now documented in the
@@ -237,6 +239,25 @@ Pass a second argument to write the JSON to a file instead of stdout.
   full official test suite.
 
 ## Audit Log
+
+### 2026-04-22
+
+- Added a parser-level conformance snapshot for the official C# include chain
+  using `test_included_file.ink` and `test_included_file2.ink`.
+- The snapshot verifies BOM stripping, recursive include expansion, blank-line
+  preservation, and the main-file text tail.
+
+Validation:
+
+```sh
+cargo fmt --all --check
+cargo test -p ink-compiler ink_parser_parses_official_include_text_chain
+cargo check --workspace
+cargo test --workspace
+```
+
+Result: all passed. The only remaining warnings are the two existing
+`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
 
 ### 2026-04-22
 
