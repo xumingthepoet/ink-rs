@@ -80,14 +80,29 @@ fn run_story(json: &str) -> String {
 
 #[test]
 fn blade_basictext_oneline_matches_trusted_runtime_output() {
-    let source =
-        load_workspace_text("blade-ink-rs/conformance-tests/inkfiles/basictext/oneline.ink");
-    let expected =
-        load_workspace_text("blade-ink-rs/conformance-tests/inkfiles/basictext/oneline.ink.json");
+    let cases = [
+        (
+            "blade-ink-rs/conformance-tests/inkfiles/basictext/oneline.ink",
+            "blade-ink-rs/conformance-tests/inkfiles/basictext/oneline.ink.json",
+            "/virtual/oneline.ink",
+            "Line.\n",
+        ),
+        (
+            "blade-ink-rs/conformance-tests/inkfiles/basictext/twolines.ink",
+            "blade-ink-rs/conformance-tests/inkfiles/basictext/twolines.ink.json",
+            "/virtual/twolines.ink",
+            "Line.\nOther line.\n",
+        ),
+    ];
 
-    let actual = compile_json(source, "/virtual/oneline.ink", None);
-    assert_eq!(run_story(&expected), run_story(&actual));
-    assert_eq!("Line.\n", run_story(&actual));
+    for (source_path, expected_path, virtual_path, expected_output) in cases {
+        let source = load_workspace_text(source_path);
+        let expected = load_workspace_text(expected_path);
+
+        let actual = compile_json(source, virtual_path, None);
+        assert_eq!(run_story(&expected), run_story(&actual));
+        assert_eq!(expected_output, run_story(&actual));
+    }
 }
 
 #[test]

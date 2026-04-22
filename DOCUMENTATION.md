@@ -86,6 +86,8 @@ runtime instead of rewriting runtime execution.
 - A conformance harness now compares compiler output against trusted local
   fixtures from `blade-ink-rs/conformance-tests` and compiler behavior against
   the official include examples from `ink-csharp/tests`.
+- The trusted conformance baseline now covers both the one-line and two-line
+  `basictext` fixtures from `blade-ink-rs`.
 - `CommentEliminator` now strips a leading UTF-8 BOM, and compiler-level
   regression tests cover both direct-source and include-file BOM handling.
 - Remaining compiler/runtime incompatibilities are now documented in the
@@ -232,6 +234,23 @@ Pass a second argument to write the JSON to a file instead of stdout.
   full official test suite.
 
 ## Audit Log
+
+### 2026-04-22
+
+- Expanded the Milestone 9 conformance harness baseline to cover both
+  `basictext/oneline` and `basictext/twolines` from `blade-ink-rs`.
+
+Validation:
+
+```sh
+cargo fmt --all --check
+cargo test -p ink-compiler --test conformance_harness
+cargo check --workspace
+cargo test --workspace
+```
+
+Result: all passed. The only remaining warnings are the two existing
+`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
 
 ### 2026-04-22
 
@@ -896,7 +915,7 @@ about unnecessary parentheses around trait object types.
 
 ## Next Task
 
-Document remaining incompatibilities.
+Expand trusted conformance coverage further.
 
 ## Repo Structure
 
