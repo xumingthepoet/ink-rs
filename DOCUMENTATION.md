@@ -83,6 +83,11 @@ runtime instead of rewriting runtime execution.
 - A minimal `ink_compile` example now provides a manual compile path for `.ink`
   files, rooted to the source file directory so relative includes resolve in
   the expected location.
+- A conformance harness now compares compiler output against trusted local
+  fixtures from `blade-ink-rs/conformance-tests` and compiler behavior against
+  the official include examples from `ink-csharp/tests`.
+- `CommentEliminator` now strips a leading UTF-8 BOM, fixing include-file text
+  handling for the C# reference examples.
 - Long-horizon project memory docs now exist.
 
 ## Current Milestone
@@ -95,6 +100,8 @@ inline-conditional, brace multiline conditional/sequence, and feature-test
 slices are complete.
 Milestone 8 is complete, including include handling, plugin-scope
 documentation, and the minimal manual compilation example.
+Milestone 9 has started with the conformance harness slice and trusted
+fixture comparisons.
 
 ## Verification Checklist
 
@@ -200,11 +207,36 @@ Pass a second argument to write the JSON to a file instead of stdout.
 - The `ink_compile` example is intentionally minimal and prints JSON to stdout
   or writes it to an optional output path; richer CLI ergonomics remain out of
   scope.
+- The conformance harness currently covers a minimal plain-text baseline and a
+  C# include story; broader conformance coverage is still pending.
+- The leading UTF-8 BOM stripping fix is now covered by a parser regression
+  test.
 - `cargo check --workspace` reports warnings from ignored dependency
   `blade-ink-rs/lib`; these are upstream/local reference warnings, not current
   compiler crate failures.
 
 ## Audit Log
+
+### 2026-04-22
+
+- Completed the Milestone 9 conformance harness slice.
+- Added a reusable conformance harness that compares compiler output against
+  trusted `blade-ink-rs` fixtures and compiles an official C# include example
+  through the Rust compiler and runtime.
+- Fixed BOM handling in the comment eliminator so included files from the C#
+  reference set no longer preserve a leading BOM in text output.
+
+Validation:
+
+```sh
+cargo fmt --all --check
+cargo test -p ink-compiler --test conformance_harness
+cargo check --workspace
+cargo test --workspace
+```
+
+Result: all passed. The only remaining warnings are the two existing
+`blade-ink-rs/lib/src/story_state.rs` parentheses warnings.
 
 ### 2026-04-22
 

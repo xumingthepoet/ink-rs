@@ -21,6 +21,11 @@ impl CommentEliminator {
         let mut output = String::new();
 
         while let Some(character) = self.current_character() {
+            if self.index == 0 && character == '\u{feff}' {
+                self.index += 1;
+                continue;
+            }
+
             if self.starts_with("//") {
                 self.index += 2;
                 if let Some(newline) = self.consume_comment_to_line_end() {
@@ -149,5 +154,13 @@ mod tests {
     fn comment_eliminator_returns_none_for_comment_only_input() {
         assert_eq!(CommentEliminator::process("// only comment"), None);
         assert_eq!(CommentEliminator::process("/* only comment */"), None);
+    }
+
+    #[test]
+    fn comment_eliminator_strips_utf8_bom() {
+        let processed =
+            CommentEliminator::process("\u{feff}hello").expect("expected retained content");
+
+        assert_eq!(processed, "hello");
     }
 }

@@ -1,0 +1,118 @@
+use std::{
+    collections::HashMap,
+    fs, io,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
+
+use ink_compiler::{Compiler, CompilerOptions, FileHandler};
+
+#[derive(Debug)]
+struct HarnessFileHandler {
+    files: HashMap<PathBuf, String>,
+}
+
+impl HarnessFileHandler {
+    fn new(files: HashMap<PathBuf, String>) -> Self {
+        Self { files }
+    }
+}
+
+impl FileHandler for HarnessFileHandler {
+    fn resolve_ink_filename(&self, include_name: &str) -> PathBuf {
+        PathBuf::from("/virtual").join(include_name)
+    }
+
+    fn load_ink_file_contents(&self, full_filename: &Path) -> io::Result<String> {
+        self.files.get(full_filename).cloned().ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::NotFound,
+                format!("missing include: {}", full_filename.display()),
+            )
+        })
+    }
+}
+
+fn workspace_root() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(Path::parent)
+        .expect("workspace root")
+        .to_path_buf()
+}
+
+fn load_workspace_text(relative_path: &str) -> String {
+    fs::read_to_string(workspace_root().join(relative_path))
+        .unwrap_or_else(|error| panic!("failed to read {relative_path}: {error}"))
+}
+
+fn compile_json(
+    source_text: String,
+    source_filename: &str,
+    file_handler: Option<Arc<dyn FileHandler>>,
+) -> String {
+    let mut compiler = Compiler::new(
+        source_text,
+        Some(CompilerOptions {
+            source_filename: Some(source_filename.to_string()),
+            count_all_visits: false,
+            file_handler,
+        }),
+    );
+
+    let result = compiler.compile_json();
+    assert!(
+        result.diagnostics.is_empty(),
+        "unexpected diagnostics: {:#?}",
+        result.diagnostics
+    );
+    result.json.expect("expected compiled JSON")
+}
+
+fn run_story(json: &str) -> String {
+    let mut story = bladeink::story::Story::new(json).expect("load runtime story");
+    let mut output = String::new();
+    while story.can_continue() {
+        output.push_str(&story.cont().expect("continue story"));
+    }
+    output
+}
+
+#[test]
+fn blade_basictext_oneline_matches_trusted_runtime_output() {
+    let source =
+        load_workspace_text("blade-ink-rs/conformance-tests/inkfiles/basictext/oneline.ink");
+    let expected =
+        load_workspace_text("blade-ink-rs/conformance-tests/inkfiles/basictext/oneline.ink.json");
+
+    let actual = compile_json(source, "/virtual/oneline.ink", None);
+    assert_eq!(run_story(&expected), run_story(&actual));
+    assert_eq!("Line.\n", run_story(&actual));
+}
+
+#[test]
+fn csharp_include_story_matches_expected_runtime_output() {
+    let source = "\
+INCLUDE test_included_file.ink\n\
+  INCLUDE test_included_file2.ink\n\
+\n\
+This is the main file.\n";
+
+    let mut files = HashMap::new();
+    files.insert(
+        PathBuf::from("/virtual/test_included_file.ink"),
+        load_workspace_text("ink-csharp/tests/test_included_file.ink"),
+    );
+    files.insert(
+        PathBuf::from("/virtual/test_included_file2.ink"),
+        load_workspace_text("ink-csharp/tests/test_included_file2.ink"),
+    );
+
+    let file_handler: Arc<dyn FileHandler> = Arc::new(HarnessFileHandler::new(files));
+    let actual = compile_json(source.to_string(), "/virtual/main.ink", Some(file_handler));
+
+    assert_eq!(
+        "This is include 1.\nThis is include 2.\nThis is the main file.\n",
+        run_story(&actual)
+    );
+}
