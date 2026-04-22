@@ -480,9 +480,11 @@ timeout 30s cargo test --workspace
 
 ## Next Task
 
-Remove the `compiler-conformance` feature gate once the legacy suite is green
-and promote the legacy compiler-to-runtime tests into the default workspace
-test pass.
+Fix the remaining compiler-conformance blockers in the choice/gather area
+before attempting any promotion work. The current suite still fails on
+unsupported `*` / `+` choice syntax, `-` gather syntax, and the related
+`variable_text` step-limit cases, so those are the next dependency-light
+parser/runtime slices to port.
 
 ## Risk Register
 

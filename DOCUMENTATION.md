@@ -29,8 +29,9 @@ into `crates/ink-runtime` instead of rewriting runtime execution.
 - During Milestone 13, compiler-conformance progress is checkpointed in small
   commits after each few passing fixtures so the remaining work stays
   resumable and bounded.
-- The legacy compiler-to-runtime suite is green under the feature gate, but
-  it is not yet part of the default workspace test pass.
+- The legacy compiler-to-runtime suite is still not green under the feature
+  gate; the current blocker is unsupported choice/gather syntax and the
+  resulting step-limit failures in the `variable_text` fixtures.
 - The documented test loop now treats every long-running `cargo test` path as
   timeboxed, and `make gate` wraps the workspace test pass with a timeout as
   well.
@@ -375,24 +376,23 @@ Pass a second argument to write the JSON to a file instead of stdout.
 
 ## Audit Log
 
-### 2026-04-22
-
-- Recorded the fact that `compiler_conformance_legacy` is now fully green
-  under the feature gate and updated the milestone plan to move toward
-  promoting the suite into the default workspace test pass.
-- Validation: `timeout 30s make gate` (completed successfully on the current
-  tree), plus the earlier focused compiler-conformance and parser snapshot
-  checks from this batch.
-- Result: Milestone 13's dependency-light compiler-conformance slice is now
-  marked complete, and the next task is feature-gate removal and promotion.
-
-### 2026-04-22
-
 - Documented the Milestone 13 checkpointing rule so compiler-conformance work
   can be saved in small green commits after every few passing fixtures.
 - Validation: documentation update only; no code change validation run.
 - Result: the runbook, plan, and live status now all state that Milestone 13
   should be advanced in small committed batches.
+
+### 2026-04-22
+
+- Re-ran the feature-gated compiler-conformance suite and confirmed the real
+  current blocker is unsupported `*` / `+` choice syntax, `-` gather syntax,
+  and a resulting step-limit failure in `variable_text::sequence_test`.
+- Validation: `timeout 30s make compiler-gate` and
+  `timeout 30s cargo test -p ink-test --features compiler-conformance --test
+  compiler_conformance_legacy`; both failed with the current parser/runtime
+  limitations.
+- Result: the documentation now reflects the actual remaining compiler
+  conformance blockers instead of assuming the suite is fully green.
 
 ### 2026-04-22
 
