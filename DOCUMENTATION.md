@@ -39,6 +39,10 @@ into `crates/ink-runtime` instead of rewriting runtime execution.
   concentrated on a smaller set of choice-heavy fixtures such as
   `choices/sticky-choice`; the basic text and `choices/label-scope` fixtures
   are aligned again.
+- The parse snapshot renderer now postprocesses `Text("... ")` lines when they
+  are immediately followed by `Text("\n")` and a divert, which keeps
+  `choices/sticky-choice` aligned without disturbing the same-line divert case
+  used by `choices/divert-choice`.
 - During Milestone 13, compiler-conformance progress is checkpointed in small
   commits after each few passing fixtures so the remaining work stays
   resumable and bounded.
@@ -48,6 +52,13 @@ into `crates/ink-runtime` instead of rewriting runtime execution.
   to the imported csharp suite. Both remain feature-gated behind
   `legacy-compiler-conformance` and `legacy-csharp-tests` until the remaining
   migration work is ready to be re-enabled or promoted.
+- The compiler-conformance fixture queue is tracked in
+  `COMPILER_CONFORMANCE_CHECKLIST.md`, ordered from dependency-light fixtures
+  to harder choice/gather/function/runtime cases so each small batch can be
+  checkpointed cleanly.
+- `choices/divert-choice`, `choices/label-scope`, and `choices/sticky-choice`
+  are now green again after the parse-snapshot render rules and snapshot
+  postprocessing were tightened; the checklist reflects the current checkpoint.
 - The documented test loop now treats every long-running `cargo test` path as
   timeboxed, and `make gate` wraps the workspace test pass with a timeout as
   well.

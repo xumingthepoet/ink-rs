@@ -629,6 +629,10 @@ impl<'source> InkParser<'source> {
                 )?);
         }
 
+        if !choice_only_text.is_empty() || !inner_tail_text.is_empty() {
+            choice.set_has_weave_style_inline_brackets(true);
+        }
+
         let mut consumed_lines = 1usize;
         while start_index + consumed_lines < segments.len() {
             let segment = segments[start_index + consumed_lines];

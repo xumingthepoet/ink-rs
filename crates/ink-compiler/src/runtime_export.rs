@@ -399,6 +399,22 @@ fn is_runtime_divert_token(value: &Value) -> bool {
     map.contains_key("->") || map.contains_key("->t->")
 }
 
+fn has_parent_only_relative_divert(tokens: &[Value]) -> bool {
+    let Some(Value::Object(map)) = tokens
+        .iter()
+        .rev()
+        .find(|value| is_runtime_divert_token(value))
+    else {
+        return false;
+    };
+
+    let Some(Value::String(target)) = map.get("->") else {
+        return false;
+    };
+
+    target == ".^.^.^"
+}
+
 fn export_sequence_container(
     sequence_content: &[ObjectRef],
     sequence_type: SequenceType,
@@ -645,6 +661,7 @@ fn export_choice_container(
         body_tokens.insert(0, Value::String("\n".to_string()));
     }
 
+    let body_has_divert = body_tokens.iter().any(is_runtime_divert_token);
     inner_tokens.extend(body_tokens);
 
     if has_start_content {
@@ -668,7 +685,11 @@ fn export_choice_container(
         if let Some(branch_target) = branch_gather_target.clone() {
             inner_tokens.push(json!({"->": branch_target}));
         }
-        inner_tokens.push(json!({"#f":5}));
+        if has_parent_only_relative_divert(&inner_tokens) {
+            inner_tokens.push(Value::Null);
+        } else {
+            inner_tokens.push(json!({"#f":5}));
+        }
 
         choice_named_content.insert(format!("c-{choice_index}"), Value::Array(inner_tokens));
     } else {
@@ -688,8 +709,13 @@ fn export_choice_container(
         if let Some(branch_gather_target) = branch_gather_target {
             inner_tokens.push(json!({"->": branch_gather_target}));
         }
-        inner_tokens.push(json!({"#f":5}));
+        if has_parent_only_relative_divert(&inner_tokens) {
+            inner_tokens.push(Value::Null);
+        } else {
+            inner_tokens.push(json!({"#f":5}));
+        }
         if !has_inline_inner_content
+            && body_has_divert
             && matches!(inner_tokens.first(), Some(Value::String(value)) if value == "\n")
         {
             if let Some(Value::String(text)) = inner_tokens.get_mut(1) {
@@ -1142,13 +1168,7 @@ fn export_divert_token(context: &ObjectRef, target: Option<&Path>, is_tunnel: bo
             if matches!(resolved.borrow().kind(), ObjectKind::Choice { .. }) {
                 return Some(format!(".^.^.{}", choice_named_component(&resolved)));
             }
-            if matches!(resolved.borrow().kind(), ObjectKind::Flow { .. })
-                && path.number_of_components() == 1
-            {
-                Some(path.dot_separated_components().unwrap_or_default())
-            } else {
-                export_compact_path_string(context, path)
-            }
+            export_compact_path_string(context, path)
         })
         .unwrap_or_default();
     json!({ divert_key: target })
