@@ -21,7 +21,7 @@ Core commands to run after every completed milestone:
 - [x] `cargo check --workspace`
 - [x] `cargo test --workspace`
 
-Current last verified milestone: Milestone 10 runtime crate relocation scaffold
+Current last verified milestone: Milestone 10 runtime/test relocation slice
 (`2026-04-22`).
 
 ## Rules
@@ -322,8 +322,9 @@ cargo test --workspace
 - [x] Scaffold `crates/ink-runtime` with the copied `blade-ink-rs/lib/src`
   runtime tree.
 - [x] Point the workspace runtime dependency at `crates/ink-runtime`.
-- [ ] Update docs and tests to treat `crates/ink-runtime` as the canonical
-  runtime home, then remove the legacy `blade-ink-rs/lib` path dependency.
+- [x] Update docs and tests to treat `crates/ink-runtime` as the canonical
+  runtime home, move package-level tests into `crates/ink-test`, and remove
+  the legacy `blade-ink-rs` tree.
 
 Primary Rust references:
 
@@ -334,7 +335,7 @@ Acceptance:
 
 - The workspace builds and tests against `crates/ink-runtime`.
 - The old `blade-ink-rs/lib` path dependency is no longer used by the
-  workspace.
+  workspace, and the legacy `blade-ink-rs` tree is gone.
 - Runtime tests continue to pass without conformance regression.
 
 Validation:
@@ -347,8 +348,37 @@ cargo test --workspace
 
 ## Next Task
 
-Update docs and tests to treat `crates/ink-runtime` as the canonical runtime
-home, then remove the legacy `blade-ink-rs/lib` path dependency.
+Move the remaining parser trusted snapshots out of
+`crates/ink-compiler/src/parser/mod.rs` into `crates/ink-test` so the test
+crate owns all external fixture-based coverage.
+
+## Milestone 11: Parser Snapshot Relocation
+
+- [ ] Move the remaining parser trusted snapshots out of
+  `crates/ink-compiler/src/parser/mod.rs` and into `crates/ink-test`.
+- [ ] Update docs and status once the parser snapshots live entirely in the
+  test crate.
+
+Primary Rust references:
+
+- `crates/ink-compiler/src/parser/mod.rs`
+- `crates/ink-test/tests/`
+- `crates/ink-test/fixtures/`
+
+Acceptance:
+
+- External fixture-driven parser snapshots live in `crates/ink-test`.
+- `ink-compiler` keeps only internal unit tests.
+- The workspace still passes `cargo fmt --all --check`,
+  `cargo check --workspace`, and `cargo test --workspace`.
+
+Validation:
+
+```sh
+cargo fmt --all --check
+cargo check --workspace
+cargo test --workspace
+```
 
 ## Risk Register
 

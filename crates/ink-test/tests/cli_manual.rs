@@ -1,9 +1,11 @@
 use std::{
     env, fs,
-    path::{Path, PathBuf},
+    path::PathBuf,
     process::Command,
     time::{SystemTime, UNIX_EPOCH},
 };
+
+use ink_test::workspace_root;
 
 fn unique_temp_dir() -> PathBuf {
     let millis = SystemTime::now()
@@ -23,13 +25,8 @@ fn cli_compiles_a_story_with_relative_includes() {
     fs::write(&include_path, "Included line.\n").expect("write include file");
     fs::write(&story_path, "Prelude.\nINCLUDE chapter.ink\nPostlude.\n").expect("write story file");
 
-    let workspace_root = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .and_then(Path::parent)
-        .expect("workspace root");
-
     let output = Command::new("cargo")
-        .current_dir(workspace_root)
+        .current_dir(workspace_root())
         .args([
             "run",
             "--quiet",

@@ -1,0 +1,10 @@
+[package]
+name = "ink-test"
+version = "0.1.0"
+edition.workspace = true
+publish = false
+
+[dependencies]
+bladeink.workspace = true
+ink_compiler = { package = "ink-compiler", path = "../ink-compiler" }
+serde_json = "1"

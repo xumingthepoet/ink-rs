@@ -1737,8 +1737,12 @@ mod tests {
             .to_path_buf()
     }
 
+    fn fixture_root() -> std::path::PathBuf {
+        workspace_root().join("crates/ink-test/fixtures")
+    }
+
     fn load_workspace_text(relative_path: &str) -> String {
-        fs::read_to_string(workspace_root().join(relative_path))
+        fs::read_to_string(fixture_root().join(relative_path))
             .unwrap_or_else(|error| panic!("failed to read {relative_path}: {error}"))
     }
 
@@ -2669,8 +2673,7 @@ to Savile Row\n\
 
     #[test]
     fn ink_parser_parses_trusted_basictext_twolines_fixture() {
-        let source =
-            load_workspace_text("blade-ink-rs/conformance-tests/inkfiles/basictext/twolines.ink");
+        let source = load_workspace_text("conformance-tests/inkfiles/basictext/twolines.ink");
         let mut parser = InkParser::new(&source, Some("twolines.ink"), None);
         let result = parser.parse();
 
@@ -2689,8 +2692,7 @@ to Savile Row\n\
 
     #[test]
     fn ink_parser_parses_trusted_basictext_oneline_fixture() {
-        let source =
-            load_workspace_text("blade-ink-rs/conformance-tests/inkfiles/basictext/oneline.ink");
+        let source = load_workspace_text("conformance-tests/inkfiles/basictext/oneline.ink");
         let mut parser = InkParser::new(&source, Some("oneline.ink"), None);
         let result = parser.parse();
 
@@ -2709,8 +2711,7 @@ to Savile Row\n\
 
     #[test]
     fn ink_parser_parses_trusted_conditional_iftrue_fixture() {
-        let source =
-            load_workspace_text("blade-ink-rs/conformance-tests/inkfiles/conditional/iftrue.ink");
+        let source = load_workspace_text("conformance-tests/inkfiles/conditional/iftrue.ink");
         let mut parser = InkParser::new(&source, Some("iftrue.ink"), None);
         let result = parser.parse();
 
@@ -2729,8 +2730,7 @@ to Savile Row\n\
 
     #[test]
     fn ink_parser_parses_trusted_conditional_ifelse_fixture() {
-        let source =
-            load_workspace_text("blade-ink-rs/conformance-tests/inkfiles/conditional/ifelse.ink");
+        let source = load_workspace_text("conformance-tests/inkfiles/conditional/ifelse.ink");
         let mut parser = InkParser::new(&source, Some("ifelse.ink"), None);
         let result = parser.parse();
 
@@ -2749,8 +2749,7 @@ to Savile Row\n\
 
     #[test]
     fn ink_parser_parses_trusted_function_none_fixture() {
-        let source =
-            load_workspace_text("blade-ink-rs/conformance-tests/inkfiles/function/func-none.ink");
+        let source = load_workspace_text("conformance-tests/inkfiles/function/func-none.ink");
         let mut parser = InkParser::new(&source, Some("func-none.ink"), None);
         let result = parser.parse();
 
@@ -2769,8 +2768,7 @@ to Savile Row\n\
 
     #[test]
     fn ink_parser_parses_trusted_function_basic_fixture() {
-        let source =
-            load_workspace_text("blade-ink-rs/conformance-tests/inkfiles/function/func-basic.ink");
+        let source = load_workspace_text("conformance-tests/inkfiles/function/func-basic.ink");
         let mut parser = InkParser::new(&source, Some("func-basic.ink"), None);
         let result = parser.parse();
 
@@ -2789,8 +2787,7 @@ to Savile Row\n\
 
     #[test]
     fn ink_parser_parses_trusted_function_inline_fixture() {
-        let source =
-            load_workspace_text("blade-ink-rs/conformance-tests/inkfiles/function/func-inline.ink");
+        let source = load_workspace_text("conformance-tests/inkfiles/function/func-inline.ink");
         let mut parser = InkParser::new(&source, Some("func-inline.ink"), None);
         let result = parser.parse();
 
@@ -2809,9 +2806,8 @@ to Savile Row\n\
 
     #[test]
     fn ink_parser_parses_trusted_glue_left_right_matching_fixture() {
-        let source = load_workspace_text(
-            "blade-ink-rs/conformance-tests/inkfiles/glue/left-right-glue-matching.ink",
-        );
+        let source =
+            load_workspace_text("conformance-tests/inkfiles/glue/left-right-glue-matching.ink");
         let mut parser = InkParser::new(&source, Some("left-right-glue-matching.ink"), None);
         let result = parser.parse();
 
@@ -2830,8 +2826,7 @@ to Savile Row\n\
 
     #[test]
     fn ink_parser_parses_trusted_glue_testbugfix1_fixture() {
-        let source =
-            load_workspace_text("blade-ink-rs/conformance-tests/inkfiles/glue/testbugfix1.ink");
+        let source = load_workspace_text("conformance-tests/inkfiles/glue/testbugfix1.ink");
         let mut parser = InkParser::new(&source, Some("testbugfix1.ink"), None);
         let result = parser.parse();
 
@@ -2850,8 +2845,7 @@ to Savile Row\n\
 
     #[test]
     fn ink_parser_parses_trusted_glue_testbugfix2_fixture() {
-        let source =
-            load_workspace_text("blade-ink-rs/conformance-tests/inkfiles/glue/testbugfix2.ink");
+        let source = load_workspace_text("conformance-tests/inkfiles/glue/testbugfix2.ink");
         let mut parser = InkParser::new(&source, Some("testbugfix2.ink"), None);
         let result = parser.parse();
 
@@ -2870,8 +2864,7 @@ to Savile Row\n\
 
     #[test]
     fn ink_parser_parses_trusted_function_setvar_fixture() {
-        let source =
-            load_workspace_text("blade-ink-rs/conformance-tests/inkfiles/function/setvar-func.ink");
+        let source = load_workspace_text("conformance-tests/inkfiles/function/setvar-func.ink");
         let mut parser = InkParser::new(&source, Some("setvar-func.ink"), None);
         let result = parser.parse();
 
@@ -2890,8 +2883,7 @@ to Savile Row\n\
 
     #[test]
     fn ink_parser_parses_trusted_function_rnd_fixture() {
-        let source =
-            load_workspace_text("blade-ink-rs/conformance-tests/inkfiles/function/rnd-func.ink");
+        let source = load_workspace_text("conformance-tests/inkfiles/function/rnd-func.ink");
         let mut parser = InkParser::new(&source, Some("rnd-func.ink"), None);
         let result = parser.parse();
 
@@ -2910,9 +2902,7 @@ to Savile Row\n\
 
     #[test]
     fn ink_parser_parses_trusted_function_complex_func1_fixture() {
-        let source = load_workspace_text(
-            "blade-ink-rs/conformance-tests/inkfiles/function/complex-func1.ink",
-        );
+        let source = load_workspace_text("conformance-tests/inkfiles/function/complex-func1.ink");
         let mut parser = InkParser::new(&source, Some("complex-func1.ink"), None);
         let result = parser.parse();
 
@@ -2931,9 +2921,7 @@ to Savile Row\n\
 
     #[test]
     fn ink_parser_parses_trusted_function_complex_func2_fixture() {
-        let source = load_workspace_text(
-            "blade-ink-rs/conformance-tests/inkfiles/function/complex-func2.ink",
-        );
+        let source = load_workspace_text("conformance-tests/inkfiles/function/complex-func2.ink");
         let mut parser = InkParser::new(&source, Some("complex-func2.ink"), None);
         let result = parser.parse();
 
@@ -2960,7 +2948,7 @@ to Savile Row\n\
     #[test]
     fn ink_parser_parses_trusted_function_evaluating_variablestate_bug_fixture() {
         let source = load_workspace_text(
-            "blade-ink-rs/conformance-tests/inkfiles/function/evaluating-function-variablestate-bug.ink",
+            "conformance-tests/inkfiles/function/evaluating-function-variablestate-bug.ink",
         );
         let mut parser = InkParser::new(
             &source,

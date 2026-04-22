@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/ink-compiler", "crates/ink-runtime"]
+members = ["crates/ink-compiler", "crates/ink-runtime", "crates/ink-test"]
 resolver = "2"
 
 [workspace.package]

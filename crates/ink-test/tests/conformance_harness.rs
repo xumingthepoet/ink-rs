@@ -1,11 +1,12 @@
 use std::{
     collections::HashMap,
-    fs, io,
+    io,
     path::{Path, PathBuf},
     sync::Arc,
 };
 
 use ink_compiler::{Compiler, CompilerOptions, FileHandler};
+use ink_test::load_fixture_text;
 
 #[derive(Debug)]
 struct HarnessFileHandler {
@@ -31,19 +32,6 @@ impl FileHandler for HarnessFileHandler {
             )
         })
     }
-}
-
-fn workspace_root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .and_then(Path::parent)
-        .expect("workspace root")
-        .to_path_buf()
-}
-
-fn load_workspace_text(relative_path: &str) -> String {
-    fs::read_to_string(workspace_root().join(relative_path))
-        .unwrap_or_else(|error| panic!("failed to read {relative_path}: {error}"))
 }
 
 fn compile_json(
@@ -82,40 +70,40 @@ fn run_story(json: &str) -> String {
 fn blade_basictext_oneline_matches_trusted_runtime_output() {
     let cases = [
         (
-            "blade-ink-rs/conformance-tests/inkfiles/basictext/oneline.ink",
-            "blade-ink-rs/conformance-tests/inkfiles/basictext/oneline.ink.json",
+            "conformance-tests/inkfiles/basictext/oneline.ink",
+            "conformance-tests/inkfiles/basictext/oneline.ink.json",
             "/virtual/oneline.ink",
             "Line.\n",
         ),
         (
-            "blade-ink-rs/conformance-tests/inkfiles/basictext/twolines.ink",
-            "blade-ink-rs/conformance-tests/inkfiles/basictext/twolines.ink.json",
+            "conformance-tests/inkfiles/basictext/twolines.ink",
+            "conformance-tests/inkfiles/basictext/twolines.ink.json",
             "/virtual/twolines.ink",
             "Line.\nOther line.\n",
         ),
         (
-            "blade-ink-rs/conformance-tests/inkfiles/knot/multi-line.ink",
-            "blade-ink-rs/conformance-tests/inkfiles/knot/multi-line.ink.json",
+            "conformance-tests/inkfiles/knot/multi-line.ink",
+            "conformance-tests/inkfiles/knot/multi-line.ink.json",
             "/virtual/multi-line.ink",
             "Hello, world!\nHello?\nHello, are you there?\n",
         ),
         (
-            "blade-ink-rs/conformance-tests/inkfiles/knot/strip-empty-lines.ink",
-            "blade-ink-rs/conformance-tests/inkfiles/knot/strip-empty-lines.ink.json",
+            "conformance-tests/inkfiles/knot/strip-empty-lines.ink",
+            "conformance-tests/inkfiles/knot/strip-empty-lines.ink.json",
             "/virtual/strip-empty-lines.ink",
             "Hello, world!\nHello?\nHello, are you there?\n",
         ),
         (
-            "blade-ink-rs/conformance-tests/inkfiles/knot/single-line.ink",
-            "blade-ink-rs/conformance-tests/inkfiles/knot/single-line.ink.json",
+            "conformance-tests/inkfiles/knot/single-line.ink",
+            "conformance-tests/inkfiles/knot/single-line.ink.json",
             "/virtual/single-line.ink",
             "Hello, world!\n",
         ),
     ];
 
     for (source_path, expected_path, virtual_path, expected_output) in cases {
-        let source = load_workspace_text(source_path);
-        let expected = load_workspace_text(expected_path);
+        let source = load_fixture_text(source_path);
+        let expected = load_fixture_text(expected_path);
 
         let actual = compile_json(source, virtual_path, None);
         assert_eq!(run_story(&expected), run_story(&actual));
@@ -134,11 +122,11 @@ This is the main file.\n";
     let mut files = HashMap::new();
     files.insert(
         PathBuf::from("/virtual/test_included_file.ink"),
-        load_workspace_text("ink-csharp/tests/test_included_file.ink"),
+        load_fixture_text("ink-csharp/tests/test_included_file.ink"),
     );
     files.insert(
         PathBuf::from("/virtual/test_included_file2.ink"),
-        load_workspace_text("ink-csharp/tests/test_included_file2.ink"),
+        load_fixture_text("ink-csharp/tests/test_included_file2.ink"),
     );
 
     let file_handler: Arc<dyn FileHandler> = Arc::new(HarnessFileHandler::new(files));

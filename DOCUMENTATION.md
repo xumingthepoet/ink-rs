@@ -6,16 +6,20 @@ implementation milestone.
 ## What ink-rs Is
 
 `ink-rs` is a Rust compiler-layer port for ink. It uses the official C# compiler
-implementation as the behavior reference and reuses the existing `blade-ink-rs`
-runtime instead of rewriting runtime execution.
+implementation as the behavior reference and reuses the runtime port now copied
+into `crates/ink-runtime` instead of rewriting runtime execution.
 
 ## Current Status
 
 - Root Git repository exists.
-- `ink-csharp/` and `blade-ink-rs/` are local ignored reference trees.
-- Rust workspace exists with `crates/ink-compiler`.
+- `ink-csharp/` remains the local ignored reference tree.
+- The legacy `blade-ink-rs/` tree has been deleted.
+- Rust workspace exists with `crates/ink-compiler`, `crates/ink-runtime`, and
+  `crates/ink-test`.
 - `ink-compiler` now exposes a stable API contract with structured diagnostics,
   parse/compile result types, and file handler abstractions.
+- `ink-test` now hosts the package-level integration tests and copied
+  conformance/include fixtures.
 - `CharacterSet`, `CharacterRange`, and basic string parser character helpers
   are now ported.
 - `StringParserState` stack behavior is now ported.
@@ -65,6 +69,9 @@ runtime instead of rewriting runtime execution.
   list-definition nodes.
 - Ink parser now also recognizes `~ return` logic lines and models them as
   parsed return nodes.
+- The remaining parser trusted snapshots still live in
+  `crates/ink-compiler/src/parser/mod.rs`, but they now read fixture copies
+  from `crates/ink-test/fixtures` instead of the deleted legacy tree.
 - Runtime story behavior tests now cover choice selection, named knot/stitch
   and gather-like container paths, and explicit diverts against
   `bladeink::story::Story`.
@@ -74,8 +81,8 @@ runtime instead of rewriting runtime execution.
   `listDefs` metadata for parsed list declarations and loads successfully
   through `bladeink::story::Story::new`.
 - The runtime crate has been copied into `crates/ink-runtime`, and the
-  workspace dependency now points at that location instead of
-  `blade-ink-rs/lib`.
+  workspace dependency now points at that location instead of the legacy
+  `blade-ink-rs/lib` tree.
 - Compiler-owned runtime export normalizes a missing terminal newline for
   plain-text stories so trusted runtime output stays stable across source
   files that do not end with `\n`.
@@ -89,9 +96,11 @@ runtime instead of rewriting runtime execution.
 - A minimal `ink_compile` example now provides a manual compile path for `.ink`
   files, rooted to the source file directory so relative includes resolve in
   the expected location.
-- A conformance harness now compares compiler output against trusted local
-  fixtures from `blade-ink-rs/conformance-tests` and compiler behavior against
-  the official include examples from `ink-csharp/tests`.
+- A new `ink-test` crate now hosts the package-level integration tests and
+  copied fixture data used by the conformance harness and runtime smoke tests.
+- The conformance harness now compares compiler output against copied trusted
+  fixtures under `crates/ink-test/fixtures` and compiler behavior against the
+  copied official include examples there as well.
 - The trusted conformance baseline now covers both the one-line and two-line
   `basictext` fixtures from `blade-ink-rs`.
 - The trusted `blade-ink-rs` `basictext/oneline.ink` fixture now also has a
@@ -161,8 +170,11 @@ Milestone 8 is complete, including include handling, plugin-scope
 documentation, and the minimal manual compilation example.
 Milestone 9 is complete: the conformance harness, regression tests, remaining
 incompatibility notes, and parser-level trusted snapshots are all documented.
-Milestone 10 has started: the runtime crate has been relocated into
-`crates/ink-runtime` and the workspace now points at it.
+Milestone 10 is complete: the runtime crate has been relocated into
+`crates/ink-runtime`, the workspace points at it, and the package-level tests
+now live in `crates/ink-test`.
+Milestone 11 has started: the remaining parser trusted snapshots are the next
+relocation slice.
 
 ## Verification Checklist
 
@@ -180,8 +192,8 @@ cargo check --workspace
 cargo test --workspace
 ```
 
-The ignored `blade-ink-rs/` directory must be present because the workspace uses
-`blade-ink-rs/lib` as a path dependency.
+The workspace now builds against `crates/ink-runtime`; the old `blade-ink-rs/`
+tree is no longer required.
 
 For manual compilation, run:
 
@@ -193,7 +205,7 @@ Pass a second argument to write the JSON to a file instead of stdout.
 
 ## Decisions
 
-- The runtime is reused from `blade-ink-rs/lib` by path dependency.
+- The runtime is reused from `crates/ink-runtime`.
 - The compiler crate is named `ink-compiler` and lives at
   `crates/ink-compiler`.
 - `ink-csharp/compiler` is the source of truth for compiler architecture,
@@ -208,8 +220,6 @@ Pass a second argument to write the JSON to a file instead of stdout.
 
 - `Compiler::compile_json` now exports minimal plain-text story JSON, but the
   full compiler output path is still limited to plain-text stories.
-- `blade-ink-rs/lib` remains in the repository as a reference tree during the
-  runtime relocation, but the workspace now builds against `crates/ink-runtime`.
 - The parsed hierarchy currently has the object tree, path primitives, and a
   root-story wrapper with content-node leaf wrappers.
 - Parsed `Weave`, `Choice`, and `Gather` wrappers now exist with indentation
@@ -245,6 +255,9 @@ Pass a second argument to write the JSON to a file instead of stdout.
   assignments, and variable-reference expressions.
 - `InkParser::parse` now also recognizes `LIST` declarations and models them as
   parsed list-definition nodes.
+- The remaining parser trusted snapshots still live in
+  `crates/ink-compiler/src/parser/mod.rs`; moving them into `crates/ink-test`
+  is the next external-fixture relocation slice.
 - The runtime JSON reader expects top-level `inkVersion`, `root`, and
   `listDefs` keys; the `root` value is a container array whose trailing entry
   is either named-content metadata or `null`.
@@ -327,10 +340,24 @@ Pass a second argument to write the JSON to a file instead of stdout.
 - Plugin hooks and dynamic plugin discovery remain intentionally deferred.
 - The conformance harness currently covers a small trusted subset of trusted
   runtime and parser snapshots, not the full official test suite.
-- The runtime relocation is not complete until the legacy `blade-ink-rs/lib`
-  path dependency and its local reference tree can be removed.
+- The remaining parser trusted snapshots still live in
+  `crates/ink-compiler/src/parser/mod.rs`; moving them into `crates/ink-test`
+  is the next relocation slice if we want every fixture-driven test under one
+  crate.
 
 ## Audit Log
+
+### 2026-04-22
+
+- Added the `ink-test` crate and moved the package-level integration tests
+  there, along with copied conformance/include fixtures under
+  `crates/ink-test/fixtures`.
+- The legacy `blade-ink-rs` tree was deleted after the workspace was verified
+  against `crates/ink-runtime` and the new test crate.
+- Validation: `cargo fmt --all`, `cargo fmt --all --check`,
+  `cargo check --workspace`, `cargo test --workspace`.
+- Result: all passed; only the existing `crates/ink-runtime/src/story_state.rs`
+  parenthesis warnings remain.
 
 ### 2026-04-22
 
