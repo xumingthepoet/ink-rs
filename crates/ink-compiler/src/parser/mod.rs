@@ -2599,6 +2599,11 @@ mod tests {
                 "Story\n  Divert(target=\"-> ending\", empty=false, tunnel=true, thread=false)",
             ),
             (
+                "simple_glue",
+                "Some <>\ncontent <>\nwith glue.",
+                "Story\n  ContentList\n    Text(\"Some <>\")\n    Text(\"\\n\")\n  ContentList\n    Text(\"content <>\")\n    Text(\"\\n\")\n  ContentList\n    Text(\"with glue.\")",
+            ),
+            (
                 "sequence",
                 "once: first | second",
                 "Story\n  Sequence(type=Once)\n    ContentList\n      Text(\"first\")\n    ContentList\n      Text(\"second\")",
