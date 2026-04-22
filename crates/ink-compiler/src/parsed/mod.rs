@@ -1,4 +1,5 @@
 mod choice;
+mod conditional;
 mod constant_declaration;
 mod content;
 mod divert;
@@ -21,6 +22,7 @@ mod weave;
 mod weave_point;
 
 pub use choice::Choice;
+pub use conditional::{Conditional, ConditionalSingleBranch};
 pub use constant_declaration::ConstantDeclaration;
 pub use content::{AuthorWarning, ContentList, Tag, Text, Wrap};
 pub use divert::Divert;

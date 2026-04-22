@@ -18,9 +18,10 @@ use std::sync::Arc;
 use crate::{
     error::{Diagnostic, DiagnosticSeverity},
     parsed::{
-        ConstantDeclaration, ContentList, Divert, ExternalDeclaration, FlowLevel, Identifier, Knot,
-        ListDefinition, ListElementDefinition, Object, ObjectRef, Path, Return, Sequence,
-        SequenceType, Stitch, Story as ParsedStory, Text, VariableAssignment,
+        Conditional, ConditionalSingleBranch, ConstantDeclaration, ContentList, Divert,
+        ExternalDeclaration, FlowLevel, Identifier, Knot, ListDefinition, ListElementDefinition,
+        Object, ObjectRef, Path, Return, Sequence, SequenceType, Stitch, Story as ParsedStory,
+        Text, VariableAssignment,
     },
     results::{FileHandler, ParseResult},
 };
@@ -135,6 +136,17 @@ impl<'source> InkParser<'source> {
                     Object::add_content(parent, sequence);
                 } else {
                     top_level_content.push(sequence);
+                }
+                continue;
+            }
+
+            if let Some(conditional) =
+                Self::parse_conditional_line(line_text, line_index + 1, source_filename.clone())?
+            {
+                if let Some(parent) = current_flow.as_ref() {
+                    Object::add_content(parent, conditional);
+                } else {
+                    top_level_content.push(conditional);
                 }
                 continue;
             }
@@ -348,6 +360,60 @@ impl<'source> InkParser<'source> {
         }
 
         Ok(Some(Sequence::new(branches, sequence_type).object()))
+    }
+
+    fn parse_conditional_line(
+        line_text: &str,
+        line_number: usize,
+        source_filename: Option<String>,
+    ) -> std::result::Result<Option<ObjectRef>, Diagnostic> {
+        let trimmed_start = line_text.trim_start();
+        if !trimmed_start.starts_with('{') || !trimmed_start.ends_with('}') {
+            return Ok(None);
+        }
+
+        let inner = trimmed_start[1..trimmed_start.len() - 1].trim();
+        let Some((condition_text, branches_text)) = inner.split_once(':') else {
+            return Err(Diagnostic::new(
+                DiagnosticSeverity::Error,
+                source_filename,
+                line_number,
+                line_text.len().saturating_sub(trimmed_start.len()) + 1,
+                "Expected ':' in inline conditional",
+            ));
+        };
+
+        let condition = Self::parse_expression_fragment(
+            condition_text.trim(),
+            line_number,
+            source_filename.clone(),
+        )?;
+
+        let mut branches = Vec::new();
+        let branch_texts = branches_text.split('|').map(str::trim).collect::<Vec<_>>();
+        if branch_texts.is_empty() || branch_texts.len() > 2 {
+            return Err(Diagnostic::new(
+                DiagnosticSeverity::Error,
+                source_filename,
+                line_number,
+                line_text.len().saturating_sub(trimmed_start.len()) + 1,
+                "Inline conditionals must have one or two branches separated by '|'",
+            ));
+        }
+
+        for (branch_index, branch_text) in branch_texts.into_iter().enumerate() {
+            let branch_content = ContentList::new();
+            if !branch_text.is_empty() {
+                branch_content.add_content(Text::new(branch_text).object());
+            }
+            let mut branch = ConditionalSingleBranch::new(vec![branch_content.object()]);
+            branch.set_is_true_branch(branch_index == 0);
+            branch.set_is_else(branch_index == 1);
+            branch.set_is_inline(true);
+            branches.push(branch);
+        }
+
+        Ok(Some(Conditional::new(Some(condition), branches).object()))
     }
 
     fn parse_simple_divert_target(target_text: &str) -> Option<Path> {
@@ -1033,6 +1099,9 @@ impl<'source> InkParser<'source> {
                 if marker == "-" && trimmed.starts_with("->") {
                     continue;
                 }
+                if marker == "{" && trimmed.starts_with('{') && trimmed.ends_with('}') {
+                    continue;
+                }
                 if trimmed.starts_with(marker) {
                     return Some((line_index + 1, column, marker));
                 }
@@ -1046,7 +1115,9 @@ impl<'source> InkParser<'source> {
 #[cfg(test)]
 mod tests {
     use super::{CommentEliminator, InkParser};
-    use crate::parsed::{ObjectKind, ObjectRef, SequenceType, Story as ParsedStory};
+    use crate::parsed::{
+        ExpressionKind, ObjectKind, ObjectRef, SequenceType, Story as ParsedStory,
+    };
 
     fn render_story(story: &ParsedStory) -> String {
         let mut lines = vec!["Story".to_string()];
@@ -1173,7 +1244,124 @@ mod tests {
                     render_object(child, indent + 1, lines);
                 }
             }
+            ObjectKind::Conditional => {
+                lines.push(format!("{padding}Conditional"));
+                for child in borrowed.content() {
+                    render_object(child, indent + 1, lines);
+                }
+            }
+            ObjectKind::ConditionalSingleBranch {
+                is_true_branch,
+                is_else,
+                is_inline,
+            } => {
+                lines.push(format!(
+                    "{padding}ConditionalBranch(true={is_true_branch}, else={is_else}, inline={is_inline})"
+                ));
+                for child in borrowed.content() {
+                    render_object(child, indent + 1, lines);
+                }
+            }
+            ObjectKind::Expression { .. } => {
+                lines.push(format!("{padding}{}", render_expression(object)));
+            }
             other => lines.push(format!("{padding}{other:?}")),
+        }
+    }
+
+    fn render_expression(object: &ObjectRef) -> String {
+        let borrowed = object.borrow();
+        match borrowed.kind() {
+            ObjectKind::Expression {
+                kind: ExpressionKind::Number(value),
+            } => format!("Number({value})"),
+            ObjectKind::Expression {
+                kind: ExpressionKind::StringExpression,
+            } => format!("String({:?})", borrowed.content()),
+            ObjectKind::Expression {
+                kind: ExpressionKind::VariableReference { path, .. },
+            } => format!(
+                "VariableReference({})",
+                path.iter()
+                    .map(|identifier| identifier.name.clone())
+                    .collect::<Vec<_>>()
+                    .join(".")
+            ),
+            ObjectKind::Expression {
+                kind: ExpressionKind::FunctionCall { function_name, .. },
+            } => format!(
+                "FunctionCall({}, args={})",
+                function_name.name,
+                borrowed.content().len()
+            ),
+            ObjectKind::Expression {
+                kind: ExpressionKind::DivertTarget,
+            } => {
+                let target = borrowed
+                    .content()
+                    .first()
+                    .and_then(|child| match child.borrow().kind() {
+                        crate::parsed::ObjectKind::Divert { target, .. } => Some(
+                            target
+                                .as_ref()
+                                .map(ToString::to_string)
+                                .unwrap_or_else(|| "->".to_string()),
+                        ),
+                        _ => None,
+                    })
+                    .unwrap_or_else(|| "<missing>".to_string());
+                format!("DivertTarget({target})")
+            }
+            ObjectKind::Expression {
+                kind: ExpressionKind::List { item_identifiers },
+            } => format!(
+                "List({})",
+                item_identifiers
+                    .iter()
+                    .map(|identifier| identifier.name.clone())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+            ObjectKind::Expression {
+                kind: ExpressionKind::Binary { op_name },
+            } => format!(
+                "Binary({op_name}, {}, {})",
+                borrowed
+                    .content()
+                    .first()
+                    .map(render_expression)
+                    .unwrap_or_else(|| "<missing>".to_string()),
+                borrowed
+                    .content()
+                    .get(1)
+                    .map(render_expression)
+                    .unwrap_or_else(|| "<missing>".to_string())
+            ),
+            ObjectKind::Expression {
+                kind: ExpressionKind::Unary { op },
+            } => format!(
+                "Unary({op}, {})",
+                borrowed
+                    .content()
+                    .first()
+                    .map(render_expression)
+                    .unwrap_or_else(|| "<missing>".to_string())
+            ),
+            ObjectKind::Expression {
+                kind: ExpressionKind::IncDec { identifier, is_inc },
+            } => format!("IncDec({}, inc={is_inc})", identifier.name),
+            ObjectKind::Expression {
+                kind: ExpressionKind::MultipleCondition,
+            } => format!(
+                "MultipleCondition({})",
+                borrowed
+                    .content()
+                    .iter()
+                    .map(render_expression)
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+            _ => "<Expression>".to_string(),
         }
     }
 
@@ -1580,6 +1768,45 @@ mod tests {
     }
 
     #[test]
+    fn ink_parser_parses_inline_conditionals() {
+        let mut parser = InkParser::new("{ x > 3: yes | no }", Some("story.ink"), None);
+        let result = parser.parse();
+
+        assert!(result.diagnostics.is_empty());
+        let story = result.parsed_story.expect("expected parsed story");
+        let content = story.content();
+
+        assert_eq!(content.len(), 1);
+        assert!(matches!(
+            content[0].borrow().kind(),
+            ObjectKind::Conditional
+        ));
+
+        let conditional_content = content[0].borrow().content().to_vec();
+        assert_eq!(conditional_content.len(), 3);
+        assert!(matches!(
+            conditional_content[0].borrow().kind(),
+            ObjectKind::Expression { .. }
+        ));
+        assert!(matches!(
+            conditional_content[1].borrow().kind(),
+            ObjectKind::ConditionalSingleBranch {
+                is_true_branch: true,
+                is_else: false,
+                is_inline: true,
+            }
+        ));
+        assert!(matches!(
+            conditional_content[2].borrow().kind(),
+            ObjectKind::ConditionalSingleBranch {
+                is_true_branch: false,
+                is_else: true,
+                is_inline: true,
+            }
+        ));
+    }
+
+    #[test]
     fn ink_parser_golden_cases_for_minimal_snippets() {
         let cases = [
             (
@@ -1606,6 +1833,11 @@ mod tests {
                 "sequence",
                 "once: first | second",
                 "Story\n  Sequence(type=Once)\n    ContentList\n      Text(\"first\")\n    ContentList\n      Text(\"second\")",
+            ),
+            (
+                "inline_conditional",
+                "{ x > 3: yes | no }",
+                "Story\n  Conditional\n    Binary(>, VariableReference(x), Number(3))\n    ConditionalBranch(true=true, else=false, inline=true)\n      ContentList\n        Text(\"yes\")\n    ConditionalBranch(true=false, else=true, inline=true)\n      ContentList\n        Text(\"no\")",
             ),
         ];
 

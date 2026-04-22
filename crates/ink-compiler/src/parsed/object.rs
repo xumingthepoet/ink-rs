@@ -55,6 +55,12 @@ pub(crate) enum ObjectKind {
     Sequence {
         sequence_type: SequenceType,
     },
+    Conditional,
+    ConditionalSingleBranch {
+        is_true_branch: bool,
+        is_else: bool,
+        is_inline: bool,
+    },
     VariableAssignment {
         identifier: Identifier,
         is_global_declaration: bool,
@@ -198,6 +204,23 @@ impl Object {
 
     pub(crate) fn set_sequence_kind(&mut self, sequence_type: SequenceType) {
         self.kind = ObjectKind::Sequence { sequence_type };
+    }
+
+    pub(crate) fn set_conditional_kind(&mut self) {
+        self.kind = ObjectKind::Conditional;
+    }
+
+    pub(crate) fn set_conditional_branch_kind(
+        &mut self,
+        is_true_branch: bool,
+        is_else: bool,
+        is_inline: bool,
+    ) {
+        self.kind = ObjectKind::ConditionalSingleBranch {
+            is_true_branch,
+            is_else,
+            is_inline,
+        };
     }
 
     pub(crate) fn set_variable_assignment_kind(

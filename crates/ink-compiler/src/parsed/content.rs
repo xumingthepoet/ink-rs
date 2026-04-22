@@ -185,6 +185,16 @@ impl fmt::Display for ContentList {
                     ObjectKind::Sequence { sequence_type } => {
                         format!("Sequence(type={sequence_type})")
                     }
+                    ObjectKind::Conditional => "Conditional".to_string(),
+                    ObjectKind::ConditionalSingleBranch {
+                        is_true_branch,
+                        is_else,
+                        is_inline,
+                    } => {
+                        format!(
+                            "ConditionalBranch(true={is_true_branch}, else={is_else}, inline={is_inline})"
+                        )
+                    }
                     _ => "<Object>".to_string(),
                 }
             })

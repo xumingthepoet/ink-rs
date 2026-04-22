@@ -73,6 +73,8 @@ fn export_object(object: &ObjectRef, state: &mut ExportState) -> Result<(), Comp
         | ObjectKind::Choice { .. }
         | ObjectKind::Gather { .. }
         | ObjectKind::Sequence { .. }
+        | ObjectKind::Conditional
+        | ObjectKind::ConditionalSingleBranch { .. }
         | ObjectKind::ConstantDeclaration { .. }
         | ObjectKind::ExternalDeclaration { .. }
         | ObjectKind::Expression { .. }

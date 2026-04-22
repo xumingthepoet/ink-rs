@@ -49,6 +49,8 @@ runtime instead of rewriting runtime execution.
   as parsed tunnel diverts.
 - Ink parser now also recognizes simple inline sequence lines such as
   `once: a | b` and models them as parsed sequence nodes.
+- Ink parser now also recognizes simple inline conditional lines such as
+  `{ x > 3: yes | no }` and models them as parsed conditional nodes.
 - Ink parser now has golden parser tests for minimal plain-text, knot, and
   divert snippets, including tunnel diverts.
 - Expression parser foundation is now ported with Pratt-style precedence
@@ -79,8 +81,8 @@ runtime instead of rewriting runtime execution.
 Milestone 1 is complete. Milestone 2 is complete. Milestone 3 is complete.
 Milestone 4 is complete. Milestone 5 is complete. Milestone 6 is complete.
 Milestone 7 is in progress, and the expression, variable-statement, and
-list-definition, return-statement, tunnel-divert, and inline-sequence slices
-are complete.
+list-definition, return-statement, tunnel-divert, inline-sequence, and
+inline-conditional slices are complete.
 
 ## Verification Checklist
 
@@ -137,11 +139,14 @@ The ignored `blade-ink-rs/` directory must be present because the workspace uses
 - `InkParser::parse` now also recognizes simple inline sequence lines, but the
   broader multiline sequence grammar and runtime export behavior remain
   limited.
+- `InkParser::parse` now also recognizes simple inline conditional lines, but
+  the broader multiline conditional grammar and runtime export behavior remain
+  limited.
 - Expression parsing currently covers a focused foundation subset: numeric and
   boolean literals, string expressions, variable paths, function calls, list
   expressions, divert targets, unary operators, and binary precedence. The
-  list-definition, conditionals, and broader sequence grammar slices are still
-  pending beyond the variable-statement helpers.
+  list-definition, multiline conditionals, and broader sequence grammar slices
+  are still pending beyond the variable-statement helpers.
 - `InkParser::parse` now also recognizes `VAR`, `CONST`, `EXTERNAL`, and `~`
   logic lines for variable declarations, constants, externals, temporary
   assignments, and variable-reference expressions.
@@ -159,6 +164,8 @@ The ignored `blade-ink-rs/` directory must be present because the workspace uses
   runtime semantics are still limited.
 - Parsed return nodes are parsed, but compiler-side runtime export for
   function-return semantics is still pending.
+- Parsed inline conditional nodes are parsed, but multiline conditional
+  grammar and runtime export behavior are still limited.
 - The ink parser grammar is still pending.
 - The C# `Glue` and `LegacyTag` `Wrap<T>` aliases are not yet ported as
   dedicated compiler-side wrappers because the corresponding runtime modules in
@@ -249,6 +256,11 @@ The ignored `blade-ink-rs/` directory must be present because the workspace uses
   style lines and models them as parsed `Sequence` nodes.
 - Added parser and parsed-hierarchy tests covering inline sequence parsing and
   rendering.
+- Added an inline conditional parser slice that recognizes simple brace-based
+  conditionals such as `{ x > 3: yes | no }` and models them as parsed
+  `Conditional` nodes.
+- Added parser and parsed-hierarchy tests covering inline conditional parsing
+  and rendering.
 - Added golden parser tests that snapshot minimal plain-text, knot, and
   simple-divert parsed trees as stable textual dumps.
 - Added a runtime JSON smoke test that proves the minimal compiled story shape
@@ -347,6 +359,15 @@ about unnecessary parentheses around trait object types.
 - Added parser support for simple inline sequence lines such as `once: a | b`.
 - Added parser and parsed-hierarchy tests covering inline sequence parsing.
 
+### 2026-04-22
+
+- Continued Milestone 7 with the inline conditional parsing slice.
+- Added parsed hierarchy `Conditional` and `ConditionalSingleBranch`
+  wrappers.
+- Added parser support for simple inline brace conditionals such as
+  `{ x > 3: yes | no }`.
+- Added parser and parsed-hierarchy tests covering inline conditional parsing.
+
 Validation:
 
 ```sh
@@ -356,6 +377,8 @@ cargo test -p ink-compiler ink_parser_parses_tunnel_diverts
 cargo test -p ink-compiler ink_parser_golden_cases_for_minimal_snippets
 cargo test -p ink-compiler sequence
 cargo test -p ink-compiler ink_parser_parses_sequences
+cargo test -p ink-compiler conditional
+cargo test -p ink-compiler ink_parser_parses_inline_conditionals
 cargo check --workspace
 cargo test --workspace
 ```
