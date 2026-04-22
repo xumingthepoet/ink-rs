@@ -1527,8 +1527,14 @@ impl<'source> InkParser<'source> {
 
         let mut result = Vec::new();
         let content_text = line_text.trim_start();
-        if !content_text.is_empty() {
-            result.push(Text::new(content_text).object());
+        if let Some((text, divert_target)) = Self::split_inline_divert(content_text) {
+            let text = text.trim_end_matches([' ', '\t']);
+            if !text.is_empty() {
+                result.push(Text::new(text).object());
+            }
+            result.push(Divert::new(Some(divert_target)).object());
+        } else if !content_text.is_empty() {
+            result.push(Text::new(content_text.trim_end_matches([' ', '\t'])).object());
         }
         if had_newline {
             result.push(Text::new("\n").object());

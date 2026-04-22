@@ -436,7 +436,7 @@ cargo test --workspace
 
 ## Next Task
 
-## Milestone 13: Compiler Conformance Stabilization
+## Milestone 13: Legacy Suite Stabilization
 
 - [x] Add a timeout-wrapped compiler-conformance gate and use it for every
   focused iteration on the legacy compiler-to-runtime suite.
@@ -453,7 +453,11 @@ cargo test --workspace
 - [x] Normalize and document any intentional JSON mismatches while the suite
   was being brought up, then remove the mismatches once the compiler matched
   the fixture set.
-- [ ] Remove the legacy feature gates once the imported suites are ready to
+- [ ] Fix the imported legacy compiler-conformance suite first, in
+  dependency-light order.
+- [ ] Then fix the imported legacy csharp-tests suite, reusing the same
+  dependency-light approach and compatibility wrappers where needed.
+- [ ] Remove the legacy feature gates once both imported suites are ready to
   return to the default workspace test run.
 - [ ] Delete any compiler-conformance or csharp-test wrappers that become
   unnecessary after the suites are promoted to normal test targets.
@@ -466,11 +470,12 @@ Primary Rust references:
 - `crates/ink-compiler/src/compiler.rs`
 - `crates/ink-compiler/src/runtime_export.rs`
 
-Current blocker while the suite is being stabilized:
+Current blocker while the imported suites are being stabilized:
 
-- The imported legacy compiler-to-runtime and csharp suites are currently
-  feature-gated so the default gate stays green. Promotion to the default
-  workspace test flow still awaits the remaining migration work.
+- The imported legacy compiler-to-runtime suite is the highest-priority
+  remaining suite, followed by the imported csharp suite. Both stay
+  feature-gated so the default gate stays green until the remaining migration
+  work is complete.
 
 Acceptance:
 
@@ -478,8 +483,8 @@ Acceptance:
   produces either a green run or a bounded failure report.
 - The suite is reduced to dependency-light, isolated examples first so the
   least coupled bugs can be fixed before multi-flow and runtime-heavy cases.
-- Once green, the suite no longer needs the `compiler-conformance` feature gate
-  and can run as part of the normal workspace test pass.
+- Once green, the suite no longer needs the `legacy-compiler-conformance`
+  feature gate and can run as part of the normal workspace test pass.
 
 Validation:
 
@@ -495,8 +500,8 @@ timeout 30s cargo test --workspace
 
 ## Next Task
 
-Continue migrating the feature-gated legacy compiler-conformance and csharp
-suites in small, checkpointed slices.
+Continue fixing the feature-gated legacy compiler-conformance suite first, then
+move to the legacy csharp-tests suite, both in small checkpointed slices.
 
 ## Risk Register
 

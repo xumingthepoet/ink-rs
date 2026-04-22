@@ -24,6 +24,9 @@ into `crates/ink-runtime` instead of rewriting runtime execution.
   `crates/ink-test/tests/compiler_conformance_legacy.rs` and is retained
   behind the `legacy-compiler-conformance` feature so the default workspace
   gate can stay green while migration continues.
+- The legacy csharp suite now lives in `crates/ink-test/tests/csharp_tests_legacy.rs`
+  and is retained behind the `legacy-csharp-tests` feature while migration
+  continues.
 - The compiler-conformance choice/divert/sequence slice now has the basic
   `no-choice`, `one`, `single-choice`, `suppress-choice`, `mixed-choice`,
   `divert-on-choice`, and `variable_text::sequence` fixtures green.
@@ -31,14 +34,17 @@ into `crates/ink-runtime` instead of rewriting runtime execution.
   fixtures green, updated the trusted parser snapshots to reflect inline
   divert splitting inside conditional fixtures, and was later feature-gated
   again so the default gate could stay green while migration continues.
+- `compiler_conformance::choice_test::sticky_choice_test` is now green after
+  the parser started splitting inline diverts inside branch content, but
+  path-resolution-heavy choice fixtures such as `divert_choice` and
+  `label_scope` still need follow-up work.
 - During Milestone 13, compiler-conformance progress is checkpointed in small
   commits after each few passing fixtures so the remaining work stays
   resumable and bounded.
-- Current Milestone 13 blocker: the imported legacy compiler-conformance and
-  csharp suites are intentionally feature-gated behind
-  `legacy-compiler-conformance` and `legacy-csharp-tests`. Default-gate
-  promotion will resume once the remaining migration work is ready to be
-  re-enabled.
+- Current Milestone 13 priority: fix the imported legacy compiler-conformance
+  suite first, then fix the imported csharp suite. Both remain feature-gated
+  behind `legacy-compiler-conformance` and `legacy-csharp-tests` until the
+  remaining migration work is ready to be re-enabled.
 - The documented test loop now treats every long-running `cargo test` path as
   timeboxed, and `make gate` wraps the workspace test pass with a timeout as
   well.
@@ -1667,8 +1673,9 @@ Result: all passed.
 Keep shrinking the remaining `compiler_conformance_legacy` failures in
 dependency-light order. The next useful work is still the remaining
 choice-heavy fixtures, especially conditional/named choices, before moving
-deeper into gather-heavy and runtime-heavy cases. The suite remains
-feature-gated until those are green.
+deeper into gather-heavy and runtime-heavy cases. Once that suite is green,
+move to the imported `csharp_tests_legacy` suite. Both suites remain
+feature-gated until they are ready for the default workspace gate.
 
 Stabilize the legacy compiler-to-runtime conformance suite in `ink-test`.
 

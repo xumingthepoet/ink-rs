@@ -32,10 +32,15 @@ fixture needs more wall-clock time.
 
 The imported legacy compiler-to-runtime and csharp suites are currently
 feature-gated behind separate features so the default workspace gate can stay
-green while migration continues. They should still always be run with a
-timeout when invoked directly. Use `make compiler-gate` or `make csharp-gate`
-for the respective suites, and pass a focused filter through `COMPILER_TEST`
-when iterating on a single legacy fixture:
+green while migration continues. The work priority is:
+
+1. fix `compiler_conformance_legacy` first
+2. then fix `csharp_tests_legacy`
+
+They should still always be run with a timeout when invoked directly. Use
+`make compiler-gate` or `make csharp-gate` for the respective suites, and pass
+a focused filter through `COMPILER_TEST` when iterating on a single legacy
+fixture:
 
 ```sh
 timeout 30s cargo test -p ink-test --features legacy-compiler-conformance --test compiler_conformance_legacy
@@ -50,7 +55,8 @@ If `timeout` is unavailable on macOS, use `gtimeout` from coreutils.
 While Milestone 13 is active, save progress in small green checkpoints after
 every few passing compiler-conformance fixtures. Keep each commit scoped to the
 current dependency slice so failed work can be resumed without replaying the
-entire suite.
+entire suite. After the compiler suite is stable, switch the same checkpointing
+discipline to the csharp tests.
 
 ## Non-Negotiable Continuation Rule
 
