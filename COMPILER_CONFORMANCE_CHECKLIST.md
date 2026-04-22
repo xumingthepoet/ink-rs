@@ -1,6 +1,6 @@
 # compiler_conformance_legacy Checklist
 
-Progress: **7/126** completed.
+Progress: **111/126** completed.
 
 This is the working queue for the imported legacy compiler-conformance suite.
 The order now follows the broad progression in `ink-csharp/Documentation/

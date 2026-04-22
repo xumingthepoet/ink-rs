@@ -55,7 +55,7 @@ into `crates/ink-runtime` instead of rewriting runtime execution.
 - The compiler-conformance fixture queue is tracked in
   `COMPILER_CONFORMANCE_CHECKLIST.md`, and it is now ordered to match the
   broad syntax progression in `WritingWithInk.md` rather than the old folder
-  order. The file header now shows an explicit progress count (`7/126`) so
+  order. The file header now shows an explicit progress count (`111/126`) so
   batch progress is visible at a glance.
 - `TheIntercept` is intentionally deferred to the new last-pass fixture
   section because it combines several syntax features and is too broad for the
