@@ -393,7 +393,7 @@ cargo test --workspace
   `ink-tests-old/src/conformance` into `crates/ink-test`.
 - [x] Import the legacy compiler-to-runtime conformance suite into
   `crates/ink-test`.
-- [ ] Import the legacy `csharp_tests` suite into `crates/ink-test`.
+- [x] Import the legacy `csharp_tests` suite into `crates/ink-test`.
 - [ ] Decide whether any remaining `ink-tests-old` fixtures or wrappers should
   be retained after the migration completes.
 

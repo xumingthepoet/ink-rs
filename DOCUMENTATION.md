@@ -142,6 +142,10 @@ into `crates/ink-runtime` instead of rewriting runtime execution.
 - The legacy compiler-to-runtime conformance import is now present in
   `ink-test` and reuses the copied conformance fixtures for compiler JSON
   comparison.
+- The legacy `csharp_tests` source has now been copied into
+  `crates/ink-test/tests/csharp_tests/mod.rs` with its original comments and
+  structure preserved; the remaining work is compatibility and integration,
+  not source reconstruction.
 - The trusted conformance baseline now covers both the one-line and two-line
   `basictext` fixtures from `blade-ink-rs`.
 - The trusted `blade-ink-rs` `basictext/oneline.ink` fixture now also has a
@@ -393,6 +397,16 @@ Pass a second argument to write the JSON to a file instead of stdout.
 - Validation: documentation update only; no code change validation run.
 - Result: the runbook, plan, and live status now all state that Milestone 13
   should be advanced in small committed batches.
+
+### 2026-04-22
+
+- Copied the legacy `ink-tests-old/src/csharp_tests/mod.rs` file into
+  `crates/ink-test/tests/csharp_tests/mod.rs` verbatim so the original test
+  corpus and comments now live inside the new workspace crate.
+- Validation: `git diff --check`.
+- Result: the raw `csharp_tests` source import is now in place; follow-up work
+  can focus on compatibility layers and integration rather than source
+  reconstruction.
 
 ### 2026-04-22
 

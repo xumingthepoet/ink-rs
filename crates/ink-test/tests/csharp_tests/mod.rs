@@ -10,101 +10,39 @@
 use crate::conformance::api::{
     story::ExternalFunction, story::VariableObserver, value_type::ValueType,
 };
-use bladeink::{
-    choice::Choice,
-    story::{
-        errors::{ErrorHandler, ErrorType},
-        external_functions::ExternalFunction as RuntimeExternalFunction,
-        variable_observer::VariableObserver as RuntimeVariableObserver,
-    },
-    value_type::ValueType as RuntimeValueType,
-};
-use ink_compiler::{
-    parsed::Story as ParsedStory,
-    parser::{character_range::CharacterRange, CommentEliminator, StringParser},
-    Compiler, CompilerOptions, Diagnostic, DiagnosticSeverity, FileHandler,
-};
-use crate::conformance::api::story::Story as RuntimeStory;
+use ink_compiler::CharacterRange::CharacterRange;
+use ink_compiler::FileHandler::IFileHandler;
+use ink_compiler::InkParser::CommentEliminator::CommentEliminator;
+use ink_compiler::InkParser::InkParser::InkParser as InkParserType;
+use ink_compiler::InkParser::InkParser_CharacterRanges::InkParser as CharacterRangeParser;
+use ink_compiler::ParsedHierarchy::Story::Story as ParsedStory;
+use ink_compiler::StringParser::StringParser::StringParser;
+use ink_runtime::Choice::Choice;
+use ink_runtime::Error::{ErrorHandler, ErrorType};
+use ink_runtime::Story::Story as RuntimeStory;
+use ink_runtime::Value::{Value, ValueInput};
 use std::cell::RefCell;
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
-mod character_ranges {
-    use ink_compiler::parser::{character_range::CharacterRange, character_set::CharacterSet};
-
-    pub struct CharacterRangeParser;
-
-    #[allow(non_snake_case)]
-    impl CharacterRangeParser {
-        pub fn ListAllCharacterRanges() -> Vec<CharacterRange> {
-            vec![
-                CharacterRange::define(
-                    '\u{0041}',
-                    '\u{007A}',
-                    Some(CharacterSet::from_range('\u{005B}', '\u{0060}')),
-                ),
-                CharacterRange::define('\u{0100}', '\u{017F}', None),
-                CharacterRange::define('\u{0180}', '\u{024F}', None),
-                CharacterRange::define('\u{0600}', '\u{06FF}', Some(CharacterSet::new())),
-                CharacterRange::define(
-                    '\u{0530}',
-                    '\u{058F}',
-                    Some(
-                        CharacterSet::from_characters(
-                            "\u{0530}\u{0557}\u{0558}\u{0559}\u{055A}\u{055B}\u{055C}\u{055D}\u{055E}\u{055F}\u{0560}\u{0588}\u{058E}"
-                                .chars(),
-                        ),
-                    ),
-                ),
-                CharacterRange::define(
-                    '\u{0400}',
-                    '\u{04FF}',
-                    Some(CharacterSet::from_range('\u{0482}', '\u{0489}')),
-                ),
-                CharacterRange::define(
-                    '\u{0370}',
-                    '\u{03FF}',
-                    Some({
-                        let mut excludes = CharacterSet::from_range('\u{0378}', '\u{0385}');
-                        excludes.union_with(&CharacterSet::from_characters(
-                            "\u{0374}\u{0375}\u{0378}\u{0387}\u{038B}\u{038D}\u{03A2}"
-                                .chars(),
-                        ));
-                        excludes
-                    }),
-                ),
-                CharacterRange::define('\u{0590}', '\u{05FF}', Some(CharacterSet::new())),
-                CharacterRange::define('\u{AC00}', '\u{D7AF}', Some(CharacterSet::new())),
-                CharacterRange::define('\u{0080}', '\u{00FF}', Some(CharacterSet::new())),
-                CharacterRange::define('\u{4E00}', '\u{9FFF}', Some(CharacterSet::new())),
-                CharacterRange::define('\u{3041}', '\u{3096}', None),
-                CharacterRange::define('\u{30A0}', '\u{30FC}', None),
-            ]
-        }
+fn value_type_into_runtime_value(value: ValueType) -> ValueInput {
+    match value {
+        ValueType::Bool(value) => ValueInput::Bool(value),
+        ValueType::Int(value) => ValueInput::Int(value),
+        ValueType::Float(value) => ValueInput::Float(value),
+        ValueType::String(value) => ValueInput::String(value),
     }
 }
 
-use character_ranges::CharacterRangeParser;
-
-fn value_type_into_runtime_value(value: ValueType) -> RuntimeValueType {
+fn value_from_runtime_value(value: Value) -> ValueType {
     match value {
-        ValueType::Bool(value) => RuntimeValueType::Bool(value),
-        ValueType::Int(value) => RuntimeValueType::Int(value),
-        ValueType::Float(value) => RuntimeValueType::Float(value),
-        ValueType::String(value) => RuntimeValueType::from(value.as_str()),
-    }
-}
-
-fn value_from_runtime_value(value: RuntimeValueType) -> ValueType {
-    match value {
-        RuntimeValueType::Bool(value) => ValueType::Bool(value),
-        RuntimeValueType::Int(value) => ValueType::Int(value),
-        RuntimeValueType::Float(value) => ValueType::Float(value),
-        RuntimeValueType::String(value) => ValueType::String(value.string),
-        RuntimeValueType::DivertTarget(path) => ValueType::String(path.to_string()),
-        _ => ValueType::String("<unsupported runtime value>".to_string()),
+        Value::Bool(value) => ValueType::Bool(value.value),
+        Value::Int(value) => ValueType::Int(value.value),
+        Value::Float(value) => ValueType::Float(value.value),
+        Value::String(value) => ValueType::String(value.value),
+        other => ValueType::String(other.to_string()),
     }
 }
 
@@ -125,78 +63,27 @@ pub struct CSharpHarness {
     mode: TestMode,
     testing_errors: bool,
     buckets: Arc<Mutex<MessageBuckets>>,
-    file_handler: Arc<dyn FileHandler>,
+    file_handler: Arc<dyn IFileHandler + Send + Sync>,
 }
 
 #[derive(Clone, Debug, Default)]
 struct CSharpTestsFileHandler;
 
-impl FileHandler for CSharpTestsFileHandler {
-    fn resolve_ink_filename(&self, include_name: &str) -> PathBuf {
+impl IFileHandler for CSharpTestsFileHandler {
+    fn ResolveInkFilename(&self, includeName: &str) -> io::Result<String> {
         let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let tests_dir = manifest_dir.join("fixtures/csharp_tests/includes");
-        let candidate = tests_dir.join(include_name);
+        let candidate = tests_dir.join(includeName);
         if candidate.exists() {
-            return candidate;
+            return Ok(candidate.to_string_lossy().into_owned());
         }
 
-        std::env::current_dir()
-            .unwrap_or_else(|_| PathBuf::from("."))
-            .join(include_name)
+        let current_dir = std::env::current_dir()?;
+        Ok(current_dir.join(includeName).to_string_lossy().into_owned())
     }
 
-    fn load_ink_file_contents(&self, full_filename: &Path) -> io::Result<String> {
-        std::fs::read_to_string(full_filename)
-    }
-}
-
-struct ExternalFunctionAdapter {
-    function: Arc<Mutex<dyn ExternalFunction>>,
-}
-
-impl RuntimeExternalFunction for ExternalFunctionAdapter {
-    fn call(&mut self, func_name: &str, args: Vec<RuntimeValueType>) -> Option<RuntimeValueType> {
-        let args = args
-            .into_iter()
-            .map(value_from_runtime_value)
-            .collect::<Vec<_>>();
-        let mut function = self.function.lock().unwrap();
-        function
-            .call(func_name, args)
-            .map(value_type_into_runtime_value)
-    }
-}
-
-struct VariableObserverAdapter {
-    observer: Arc<Mutex<dyn VariableObserver>>,
-}
-
-impl RuntimeVariableObserver for VariableObserverAdapter {
-    fn changed(&mut self, variable_name: &str, value: &RuntimeValueType) {
-        let converted = value_from_runtime_value(value.clone());
-        self.observer
-            .lock()
-            .unwrap()
-            .changed(variable_name, &converted);
-    }
-}
-
-struct RuntimeErrorHandler {
-    buckets: Arc<Mutex<MessageBuckets>>,
-    testing_errors: bool,
-}
-
-impl ErrorHandler for RuntimeErrorHandler {
-    fn error(&mut self, message: &str, error_type: ErrorType) {
-        if !self.testing_errors {
-            panic!("{}", message);
-        }
-
-        let mut buckets = self.buckets.lock().unwrap();
-        match error_type {
-            ErrorType::Error => buckets.errors.push(message.to_string()),
-            ErrorType::Warning => buckets.warnings.push(message.to_string()),
-        }
+    fn LoadInkFileContents(&self, fullFilename: &str) -> io::Result<String> {
+        std::fs::read_to_string(fullFilename)
     }
 }
 
@@ -212,8 +99,8 @@ trait RuntimeStoryExt {
         reset_callstack: bool,
         arguments: Option<Vec<ValueType>>,
     );
-    fn get_current_choices(&mut self) -> Vec<Rc<Choice>>;
-    fn current_choices(&mut self) -> Vec<Rc<Choice>>;
+    fn get_current_choices(&mut self) -> Vec<Choice>;
+    fn current_choices(&mut self) -> Vec<Choice>;
     fn get_current_choices_len(&mut self) -> usize;
     fn current_choices_len(&mut self) -> usize;
     fn get_current_tags(&mut self) -> Vec<String>;
@@ -235,6 +122,8 @@ trait RuntimeStoryExt {
     fn to_json(&mut self) -> String;
     fn switch_flow(&mut self, flow_name: &str);
     fn remove_flow(&mut self, flow_name: &str);
+    fn get_state(&mut self) -> ink_runtime::StoryState::StoryState;
+    fn set_state(&mut self, state: ink_runtime::StoryState::StoryState);
     fn get_variable(&mut self, name: &str) -> Option<ValueType>;
     fn set_variable(&mut self, name: &str, value: &ValueType) -> Result<(), String>;
     fn bind_external_function(
@@ -268,6 +157,7 @@ impl CSharpHarness {
         match error_type {
             ErrorType::Error => buckets.errors.push(message.to_string()),
             ErrorType::Warning => buckets.warnings.push(message.to_string()),
+            ErrorType::Author => buckets.authors.push(message.to_string()),
         }
     }
 
@@ -282,26 +172,6 @@ impl CSharpHarness {
         }
     }
 
-    fn record_diagnostics(&self, diagnostics: &[Diagnostic]) {
-        let mut buckets = self.buckets.lock().unwrap();
-        for diagnostic in diagnostics {
-            let prefix = match diagnostic.severity {
-                DiagnosticSeverity::Error => "ERROR",
-                DiagnosticSeverity::Warning => "WARNING",
-            };
-            let full_message = format!(
-                "{}: line {}: {}",
-                prefix,
-                diagnostic.line,
-                diagnostic.message
-            );
-            match diagnostic.severity {
-                DiagnosticSeverity::Error => buckets.errors.push(full_message),
-                DiagnosticSeverity::Warning => buckets.warnings.push(full_message),
-            }
-        }
-    }
-
     pub fn compile_string(
         &mut self,
         source: &str,
@@ -311,43 +181,46 @@ impl CSharpHarness {
         self.testing_errors = testing_errors;
         self.clear();
 
-        let options = CompilerOptions {
-            source_filename: None,
-            count_all_visits,
-            file_handler: Some(Arc::clone(&self.file_handler)),
+        let parse_handler = {
+            let this = self.clone_shared();
+            Arc::new(
+                move |message: String, line: i32, character: i32, is_warning: bool| {
+                    if !this.testing_errors {
+                        let prefix = if is_warning { "WARNING" } else { "ERROR" };
+                        panic!("{}: line {}: {}", prefix, line + 1, message);
+                    }
+                    this.push_parse_message(message, line, character, is_warning);
+                },
+            )
         };
 
-        let mut compiler = Compiler::new(source.to_string(), Some(options));
-        let compile_result = compiler.compile_json();
+        let mut parser = InkParserType::new(
+            source.to_string(),
+            None,
+            Some(parse_handler),
+            Some(Arc::clone(&self.file_handler)),
+        );
+        let mut parsed_story = parser.Parse();
+        parsed_story.countAllVisits = count_all_visits;
 
-        if !compile_result.diagnostics.is_empty() {
-            if !self.testing_errors {
-                let diagnostic = &compile_result.diagnostics[0];
-                panic!(
-                    "{}: line {}: {}",
-                    match diagnostic.severity {
-                        DiagnosticSeverity::Error => "ERROR",
-                        DiagnosticSeverity::Warning => "WARNING",
-                    },
-                    diagnostic.line,
-                    diagnostic.message
-                );
-            }
-            self.record_diagnostics(&compile_result.diagnostics);
-        }
+        let runtime_handler = {
+            let this = self.clone_shared();
+            Rc::new(RefCell::new(
+                Box::new(move |message: &str, error_type: ErrorType| {
+                    if !this.testing_errors {
+                        panic!("{}", message);
+                    }
+                    this.push_runtime_message(message, error_type);
+                }) as ErrorHandler,
+            ))
+        };
 
-        let json = compile_result.json?;
-        let mut story = RuntimeStory::new(&json);
-        let runtime_handler: Rc<RefCell<dyn ErrorHandler>> = Rc::new(RefCell::new(
-            RuntimeErrorHandler {
-                buckets: Arc::clone(&self.buckets),
-                testing_errors: self.testing_errors,
-            },
-        ));
-        story.set_error_handler(runtime_handler);
+        let runtime_story = parsed_story.ExportRuntime(Some(runtime_handler))?;
+        let mut story = runtime_story;
 
         if self.mode == TestMode::JsonRoundTrip {
-            story = RuntimeStory::new(&json);
+            let json = story.to_json();
+            story = RuntimeStory::new_overload_2(json);
         }
 
         Some(story)
@@ -361,51 +234,47 @@ impl CSharpHarness {
         self.testing_errors = testing_errors;
         self.clear();
 
-        let options = CompilerOptions {
-            source_filename: None,
-            count_all_visits: false,
-            file_handler: Some(Arc::clone(&self.file_handler)),
+        let parse_handler = {
+            let this = self.clone_shared();
+            Arc::new(
+                move |message: String, line: i32, character: i32, is_warning: bool| {
+                    if !this.testing_errors {
+                        let prefix = if is_warning { "WARNING" } else { "ERROR" };
+                        panic!("{}: line {}: {}", prefix, line + 1, message);
+                    }
+                    this.push_parse_message(message, line, character, is_warning);
+                },
+            )
         };
 
-        let mut compiler = Compiler::new(source.to_string(), Some(options));
-        let parse_result = compiler.parse();
+        let mut parser = InkParserType::new(
+            source.to_string(),
+            None,
+            Some(parse_handler),
+            Some(Arc::clone(&self.file_handler)),
+        );
+        let mut parsed_story = parser.Parse();
 
-        if !parse_result.diagnostics.is_empty() {
-            if !self.testing_errors {
-                let diagnostic = &parse_result.diagnostics[0];
-                panic!(
-                    "{}: line {}: {}",
-                    match diagnostic.severity {
-                        DiagnosticSeverity::Error => "ERROR",
-                        DiagnosticSeverity::Warning => "WARNING",
-                    },
-                    diagnostic.line,
-                    diagnostic.message
-                );
-            }
-            self.record_diagnostics(&parse_result.diagnostics);
+        if !testing_errors {
+            // Keep parity with the C# helper: parse must succeed in normal mode.
         }
 
-        if parse_result.parsed_story.is_some() {
-            let export_result = compiler.compile_json();
-            if !export_result.diagnostics.is_empty() {
-                if !self.testing_errors {
-                    let diagnostic = &export_result.diagnostics[0];
-                    panic!(
-                        "{}: line {}: {}",
-                        match diagnostic.severity {
-                            DiagnosticSeverity::Error => "ERROR",
-                            DiagnosticSeverity::Warning => "WARNING",
-                        },
-                        diagnostic.line,
-                        diagnostic.message
-                    );
-                }
-                self.record_diagnostics(&export_result.diagnostics);
-            }
+        if self.error_messages().is_empty() {
+            let runtime_handler = {
+                let this = self.clone_shared();
+                Rc::new(RefCell::new(
+                    Box::new(move |message: &str, error_type: ErrorType| {
+                        if !this.testing_errors {
+                            panic!("{}", message);
+                        }
+                        this.push_runtime_message(message, error_type);
+                    }) as ErrorHandler,
+                ))
+            };
+            let _ = parsed_story.ExportRuntime(Some(runtime_handler));
         }
 
-        parse_result.parsed_story
+        Some(parsed_story)
     }
 
     fn clone_shared(&self) -> Self {
@@ -447,11 +316,11 @@ impl CSharpHarness {
 
 impl RuntimeStoryExt for RuntimeStory {
     fn cont(&mut self) -> String {
-        self.cont()
+        self.Continue()
     }
 
     fn cont_maximally(&mut self) -> String {
-        self.cont_maximally()
+        self.ContinueMaximally()
     }
 
     fn continue_maximally(&mut self) -> String {
@@ -459,11 +328,11 @@ impl RuntimeStoryExt for RuntimeStory {
     }
 
     fn choose_choice_index(&mut self, idx: usize) {
-        self.choose_choice_index(idx);
+        self.ChooseChoiceIndex(idx as i32);
     }
 
     fn choose_path_string_simple(&mut self, path: &str) {
-        self.choose_path_string(path, false, None);
+        self.ChoosePathString(path.to_string(), false, Vec::new());
     }
 
     fn choose_path_string_with_args(
@@ -472,19 +341,24 @@ impl RuntimeStoryExt for RuntimeStory {
         reset_callstack: bool,
         arguments: Option<Vec<ValueType>>,
     ) {
-        self.choose_path_string(path, reset_callstack, arguments);
+        let args = arguments
+            .unwrap_or_default()
+            .into_iter()
+            .map(value_type_into_runtime_value)
+            .collect::<Vec<_>>();
+        self.ChoosePathString(path.to_string(), reset_callstack, args);
     }
 
-    fn get_current_choices(&mut self) -> Vec<Rc<Choice>> {
-        RuntimeStory::get_current_choices(self)
+    fn get_current_choices(&mut self) -> Vec<Choice> {
+        self.get_currentChoices()
     }
 
-    fn current_choices(&mut self) -> Vec<Rc<Choice>> {
-        RuntimeStory::get_current_choices(self)
+    fn current_choices(&mut self) -> Vec<Choice> {
+        self.get_current_choices()
     }
 
     fn get_current_choices_len(&mut self) -> usize {
-        RuntimeStory::get_current_choices(self).len()
+        self.get_currentChoices().len()
     }
 
     fn current_choices_len(&mut self) -> usize {
@@ -492,7 +366,7 @@ impl RuntimeStoryExt for RuntimeStory {
     }
 
     fn get_current_tags(&mut self) -> Vec<String> {
-        RuntimeStory::get_current_tags(self)
+        self.get_currentTags()
     }
 
     fn current_tags(&mut self) -> Vec<String> {
@@ -500,7 +374,7 @@ impl RuntimeStoryExt for RuntimeStory {
     }
 
     fn get_current_text(&mut self) -> String {
-        RuntimeStory::get_current_text(self)
+        self.get_currentText()
     }
 
     fn current_text(&mut self) -> String {
@@ -508,7 +382,7 @@ impl RuntimeStoryExt for RuntimeStory {
     }
 
     fn get_global_tags(&mut self) -> Vec<String> {
-        RuntimeStory::get_global_tags(self)
+        self.get_globalTags()
     }
 
     fn global_tags(&mut self) -> Vec<String> {
@@ -516,11 +390,11 @@ impl RuntimeStoryExt for RuntimeStory {
     }
 
     fn can_continue(&mut self) -> bool {
-        RuntimeStory::can_continue(self)
+        self.get_canContinue()
     }
 
     fn set_allow_external_function_fallbacks(&mut self, value: bool) {
-        RuntimeStory::set_allow_external_function_fallbacks(self, value);
+        self.set_allowExternalFunctionFallbacks(value);
     }
 
     fn evaluate_function(
@@ -529,35 +403,56 @@ impl RuntimeStoryExt for RuntimeStory {
         arguments: Option<Vec<ValueType>>,
         text_output: &mut String,
     ) -> Option<ValueType> {
-        RuntimeStory::evaluate_function(self, function_name, arguments, text_output)
+        let args = arguments
+            .unwrap_or_default()
+            .into_iter()
+            .map(value_type_into_runtime_value)
+            .collect::<Vec<_>>();
+        self.EvaluateFunction_overload_2(function_name.to_string(), text_output, args)
+            .map(value_from_runtime_value)
     }
 
     fn save_state(&mut self) -> String {
-        RuntimeStory::save_state(self)
+        self.get_state().ToJson()
     }
 
     fn load_state(&mut self, json: &str) {
-        RuntimeStory::load_state(self, json);
+        let mut state = self.get_state();
+        state.LoadJson(json.to_string());
+        self.set_state(state);
     }
 
     fn to_json(&mut self) -> String {
-        RuntimeStory::save_state(self)
+        self.ToJson()
     }
 
     fn switch_flow(&mut self, flow_name: &str) {
-        RuntimeStory::switch_flow(self, flow_name);
+        self.SwitchFlow(flow_name.to_string());
     }
 
     fn remove_flow(&mut self, flow_name: &str) {
-        RuntimeStory::remove_flow(self, flow_name);
+        self.RemoveFlow(flow_name.to_string());
+    }
+
+    fn get_state(&mut self) -> ink_runtime::StoryState::StoryState {
+        self.get_state()
+    }
+
+    fn set_state(&mut self, state: ink_runtime::StoryState::StoryState) {
+        self.set_state(state);
     }
 
     fn get_variable(&mut self, name: &str) -> Option<ValueType> {
-        RuntimeStory::get_variable(self, name)
+        self.get_variablesState()
+            .GetVariableWithName(name.to_string())
+            .map(value_from_runtime_value)
     }
 
     fn set_variable(&mut self, name: &str, value: &ValueType) -> Result<(), String> {
-        RuntimeStory::set_variable(self, name, value).map_err(|err| err.to_string())?;
+        self.get_variablesState_mut().SetIndexedValue(
+            name.to_string(),
+            Some(value_type_into_runtime_value(value.clone())),
+        );
         Ok(())
     }
 
@@ -567,7 +462,29 @@ impl RuntimeStoryExt for RuntimeStory {
         func: Arc<Mutex<dyn ExternalFunction>>,
         lookahead_safe: bool,
     ) {
-        RuntimeStory::bind_external_function(self, func_name, func, lookahead_safe);
+        let func_name = func_name.to_string();
+        let func_name_for_callback = func_name.clone();
+        let callback = {
+            let func = func.clone();
+            Arc::new(move |args: &[ValueInput]| {
+                let args = args
+                    .iter()
+                    .cloned()
+                    .filter_map(Value::Create)
+                    .map(value_from_runtime_value)
+                    .collect::<Vec<_>>();
+                let mut func = func.lock().unwrap();
+                func.call(&func_name_for_callback, args)
+                    .map(|value| match value {
+                        ValueType::Bool(v) => Value::new_bool(v),
+                        ValueType::Int(v) => Value::new_int(v),
+                        ValueType::Float(v) => Value::new_float(v),
+                        ValueType::String(v) => Value::new_string(v),
+                    })
+            })
+        };
+
+        self.BindExternalFunctionGeneral(func_name, callback, lookahead_safe);
     }
 
     fn observe_variable(
@@ -575,7 +492,16 @@ impl RuntimeStoryExt for RuntimeStory {
         variable_name: &str,
         observer: Arc<Mutex<dyn VariableObserver>>,
     ) {
-        RuntimeStory::observe_variable(self, variable_name, observer);
+        let variable_name = variable_name.to_string();
+        let callback = {
+            let observer = observer.clone();
+            Arc::new(move |name: String, value: Value| {
+                let converted = value_from_runtime_value(value);
+                observer.lock().unwrap().changed(&name, &converted);
+            })
+        };
+
+        self.ObserveVariable(variable_name, callback);
     }
 }
 
@@ -642,8 +568,8 @@ mod tests {
             }
         }
 
-        let charset = range.to_character_set();
-        let mut characters: Vec<_> = charset.iter().copied().collect();
+        let charset = range.ToCharacterSet();
+        let mut characters: Vec<_> = charset.characters.iter().copied().collect();
         characters.sort_unstable();
         for c in characters {
             identifier.push(c);
@@ -741,11 +667,12 @@ mod tests {
             );
             let first = story.cont();
             eprintln!(
-                "arith first='{}' after choices={} can_continue={} text='{}'",
+                "arith first='{}' after choices={} can_continue={} text='{}' out={:?}",
                 first,
                 story.current_choices_len(),
                 story.can_continue(),
-                story.current_text()
+                story.current_text(),
+                story.get_state().get_outputStream()
             );
             assert_eq!(
                 "36\n2\n3\n2\n2.3333333\n8\n8\n",
@@ -883,7 +810,7 @@ mod tests {
                 )
                 .expect("compile should succeed");
             story.cont();
-            assert!(!story.can_continue());
+            assert_eq!(0, story.get_state().get_evaluationStack().len());
         });
     }
 
@@ -3233,17 +3160,26 @@ Knot.
     //         }
     #[test]
     fn TestEmptyChoice() {
-        let mut parser = ink_compiler::parser::InkParser::new("*", None, None);
-        let result = parser.parse();
-        let warning_count = result
-            .diagnostics
-            .iter()
-            .filter(|diagnostic| {
-                diagnostic.severity == DiagnosticSeverity::Warning
-                    && diagnostic.message.contains("completely empty")
-            })
-            .count();
-        assert_eq!(1, warning_count);
+        let warning_count = Arc::new(Mutex::new(0usize));
+        let warning_count_for_handler = warning_count.clone();
+        let mut parser = InkParserType::new(
+            "*".to_string(),
+            None,
+            Some(Arc::new(
+                move |message: String, _line: i32, _character: i32, is_warning: bool| {
+                    if is_warning {
+                        *warning_count_for_handler.lock().unwrap() += 1;
+                        assert!(message.contains("completely empty"));
+                    } else {
+                        panic!("Shouldn't have had any errors");
+                    }
+                },
+            )),
+            None,
+        );
+
+        parser.Parse();
+        assert_eq!(1, *warning_count.lock().unwrap());
     }
 
     // C#:         [Test()]
@@ -3268,7 +3204,8 @@ Knot.
     #[test]
     fn TestCommentEliminator() {
         let test_content = "A// C\nA /* C */ A\n\nA * A * /* * C *// A/*\nC C C\n\n*/";
-        let processed = CommentEliminator::process(test_content.to_string())
+        let processed = CommentEliminator::new(test_content.to_string())
+            .Process()
             .unwrap();
         let expected = "A\nA  A\n\nA * A * / A\n\n\n";
         assert_eq!(expected.replace("\r", ""), processed.replace("\r", ""));
@@ -3292,7 +3229,8 @@ Knot.
     fn TestCommentEliminatorMixedNewlines() {
         let test_content =
             "A B\nC D // comment\nA B\r\nC D // comment\r\n/* block comment\r\nsecond line\r\n */ ";
-        let processed = CommentEliminator::process(test_content.to_string())
+        let processed = CommentEliminator::new(test_content.to_string())
+            .Process()
             .unwrap();
         let expected = "A B\nC D \nA B\nC D \n\n\n ";
         assert_eq!(expected, processed);
@@ -3613,32 +3551,10 @@ world
     //         }
     #[test]
     fn TestPaths() {
-        let path1 = ink_compiler::parsed::Path::new(vec![
-            ink_compiler::parsed::Identifier::new("hello"),
-            ink_compiler::parsed::Identifier::new("1"),
-            ink_compiler::parsed::Identifier::new("world"),
-        ]);
-        let path2 = ink_compiler::parsed::Path::new(vec![
-            ink_compiler::parsed::Identifier::new("hello"),
-            ink_compiler::parsed::Identifier::new("1"),
-            ink_compiler::parsed::Identifier::new("world"),
-        ]);
-        let path3 = ink_compiler::parsed::Path::with_base_target_level(
-            Some(ink_compiler::parsed::FlowLevel::WeavePoint),
-            vec![
-                ink_compiler::parsed::Identifier::new("hello"),
-                ink_compiler::parsed::Identifier::new("1"),
-                ink_compiler::parsed::Identifier::new("world"),
-            ],
-        );
-        let path4 = ink_compiler::parsed::Path::with_base_target_level(
-            Some(ink_compiler::parsed::FlowLevel::WeavePoint),
-            vec![
-                ink_compiler::parsed::Identifier::new("hello"),
-                ink_compiler::parsed::Identifier::new("1"),
-                ink_compiler::parsed::Identifier::new("world"),
-            ],
-        );
+        let path1 = ink_runtime::Path::Path::new_overload_4("hello.1.world".to_string());
+        let path2 = ink_runtime::Path::Path::new_overload_4("hello.1.world".to_string());
+        let path3 = ink_runtime::Path::Path::new_overload_4(".hello.1.world".to_string());
+        let path4 = ink_runtime::Path::Path::new_overload_4(".hello.1.world".to_string());
 
         assert_eq!(path1, path2);
         assert_eq!(path3, path4);
@@ -4010,14 +3926,22 @@ hi
     //         }
     #[test]
     fn TestReturnTextWarning() {
-        let mut parser = ink_compiler::parser::InkParser::new("== test ==\n return something", None, None);
-        let result = parser.parse();
-        assert!(
-            result
-                .diagnostics
-                .iter()
-                .any(|diagnostic| diagnostic.severity == DiagnosticSeverity::Warning)
-        );
+        let warning = std::panic::catch_unwind(|| {
+            let mut parser = InkParserType::new(
+                "== test ==\n return something".to_string(),
+                None,
+                Some(Arc::new(
+                    |message: String, _line: i32, _character: i32, is_warning: bool| {
+                        if is_warning {
+                            panic!("{}", message);
+                        }
+                    },
+                )),
+                None,
+            );
+            let _ = parser.Parse();
+        });
+        assert!(warning.is_err());
     }
 
     // C#:         [Test()]
@@ -6011,10 +5935,14 @@ Top level content
                 .expect("compile should succeed");
             story.cont();
             let result = story.EvaluateFunction("test".to_string(), Vec::new());
-            assert_eq!(
-                Some(ValueType::String("somewhere.here".to_string())),
-                result
-            );
+            let path_str = match result {
+                Some(Value::DivertTarget(dt)) => dt
+                    .value
+                    .as_ref()
+                    .map_or(String::new(), |p| format!("{}", p)),
+                other => format!("{:?}", other),
+            };
+            assert_eq!("somewhere.here", path_str);
         });
     }
 
@@ -6170,10 +6098,10 @@ x = {x}, y = {y}
 "#,
                     false,
                     false,
-            )
+                )
                 .expect("compile should succeed");
             assert_eq!("else\nelse\nhi\n", story.cont_maximally());
-            assert!(!story.can_continue());
+            assert!(story.get_state().get_evaluationStack().is_empty());
         });
     }
 
@@ -9122,47 +9050,67 @@ this is the end
                 .expect("compile should succeed");
             assert_eq!(
                 0,
-                story.get_visit_count_at_path_string("TestKnot").expect("expected visit count")
+                story
+                    .get_state()
+                    .VisitCountAtPathString("TestKnot".to_string())
             );
             assert_eq!(
                 0,
-                story.get_visit_count_at_path_string("TestKnot2").expect("expected visit count")
+                story
+                    .get_state()
+                    .VisitCountAtPathString("TestKnot2".to_string())
             );
             story.choose_path_string_simple("TestKnot");
             assert_eq!(
                 1,
-                story.get_visit_count_at_path_string("TestKnot").expect("expected visit count")
+                story
+                    .get_state()
+                    .VisitCountAtPathString("TestKnot".to_string())
             );
             assert_eq!(
                 0,
-                story.get_visit_count_at_path_string("TestKnot2").expect("expected visit count")
+                story
+                    .get_state()
+                    .VisitCountAtPathString("TestKnot2".to_string())
             );
             story.cont();
             assert_eq!(
                 1,
-                story.get_visit_count_at_path_string("TestKnot").expect("expected visit count")
+                story
+                    .get_state()
+                    .VisitCountAtPathString("TestKnot".to_string())
             );
             assert_eq!(
                 0,
-                story.get_visit_count_at_path_string("TestKnot2").expect("expected visit count")
+                story
+                    .get_state()
+                    .VisitCountAtPathString("TestKnot2".to_string())
             );
             story.choose_choice_index(0);
             assert_eq!(
                 1,
-                story.get_visit_count_at_path_string("TestKnot").expect("expected visit count")
+                story
+                    .get_state()
+                    .VisitCountAtPathString("TestKnot".to_string())
             );
             assert_eq!(
                 0,
-                story.get_visit_count_at_path_string("TestKnot2").expect("expected visit count")
+                story
+                    .get_state()
+                    .VisitCountAtPathString("TestKnot2".to_string())
             );
             story.cont();
             assert_eq!(
                 1,
-                story.get_visit_count_at_path_string("TestKnot").expect("expected visit count")
+                story
+                    .get_state()
+                    .VisitCountAtPathString("TestKnot".to_string())
             );
             assert_eq!(
                 1,
-                story.get_visit_count_at_path_string("TestKnot2").expect("expected visit count")
+                story
+                    .get_state()
+                    .VisitCountAtPathString("TestKnot2".to_string())
             );
         });
     }
