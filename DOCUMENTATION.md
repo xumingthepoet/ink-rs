@@ -22,17 +22,15 @@ into `crates/ink-runtime` instead of rewriting runtime execution.
   conformance/include fixtures.
 - The legacy compiler-to-runtime conformance suite now lives in
   `crates/ink-test/tests/compiler_conformance_legacy.rs` and is gated behind
-  the `compiler-conformance` feature so it can stay available without breaking
-  the default workspace while compiler coverage is still growing.
+  the `compiler-conformance` feature while the remaining failures are fixed.
 - The current compiler-conformance slice has made the simple divert and glue
   fixtures green and updated the trusted parser snapshots to reflect inline
   divert splitting inside conditional fixtures.
 - During Milestone 13, compiler-conformance progress is checkpointed in small
   commits after each few passing fixtures so the remaining work stays
   resumable and bounded.
-- The legacy compiler-to-runtime suite is now green under the
-  `compiler-conformance` feature gate, and the next step is to promote it into
-  the default workspace test pass.
+- The legacy compiler-to-runtime suite is green under the feature gate, but
+  it is not yet part of the default workspace test pass.
 - The documented test loop now treats every long-running `cargo test` path as
   timeboxed, and `make gate` wraps the workspace test pass with a timeout as
   well.
@@ -133,8 +131,8 @@ into `crates/ink-runtime` instead of rewriting runtime execution.
   `crates/ink-test/fixtures/conformance/`.
 - The legacy runtime conformance import currently covers 124 passing tests.
 - The legacy compiler-to-runtime conformance import is now present in
-  `ink-test` behind an opt-in feature gate and reuses the copied conformance
-  fixtures for compiler JSON comparison.
+  `ink-test` behind a feature gate and reuses the copied conformance fixtures
+  for compiler JSON comparison.
 - The trusted conformance baseline now covers both the one-line and two-line
   `basictext` fixtures from `blade-ink-rs`.
 - The trusted `blade-ink-rs` `basictext/oneline.ink` fixture now also has a
@@ -1585,6 +1583,11 @@ Result: all passed.
 
 ## Next Task
 
+Keep shrinking the remaining `compiler_conformance_legacy` failures in
+dependency-light order. The next useful work is still the choice-heavy and
+function-heavy fixtures, but the suite remains feature-gated until those are
+green.
+
 Stabilize the legacy compiler-to-runtime conformance suite in `ink-test`.
 
 ### 2026-04-22
@@ -1595,9 +1598,9 @@ Stabilize the legacy compiler-to-runtime conformance suite in `ink-test`.
   `crates/ink-test/tests/compiler_conformance/api.rs` and
   `crates/ink-test/tests/compiler_conformance/common.rs` so source `.ink`
   files are compiled to runtime JSON before the runtime suite runs.
-- Kept the suite opt-in behind the `compiler-conformance` Cargo feature so the
-  default workspace stays green while compiler feature coverage continues to
-  expand.
+- Attempted to promote the legacy compiler-to-runtime suite into the default
+  workspace test pass, but the gate removal exposed many remaining failures, so
+  the feature gate was restored and the promotion remains blocked.
 - Added the entry point in
   `crates/ink-test/tests/compiler_conformance_legacy.rs` and copied the legacy
   fixtures under `crates/ink-test/fixtures/conformance/`.
@@ -1613,9 +1616,10 @@ cargo check --workspace
 cargo test --workspace
 ```
 
-Result: default workspace validation passed. The compiler conformance suite is
-available behind the `compiler-conformance` feature for explicit runs, and
-compiler-conformance iterations should be run with a timeout wrapper.
+Result: default workspace validation passed, but the compiler conformance suite
+remains feature-gated because removing the gate exposed many remaining
+failures. Compiler-conformance iterations should still be run with a timeout
+wrapper.
 
 ## Repo Structure
 
