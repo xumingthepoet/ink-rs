@@ -1,6 +1,7 @@
 mod choice;
 mod content_list;
 mod divert;
+mod expression;
 mod flow;
 mod gather;
 mod glue;
@@ -12,6 +13,7 @@ mod weave;
 pub use choice::Choice;
 pub use content_list::ContentList;
 pub use divert::{Divert, DivertTarget};
+pub use expression::{BinaryOperator, Expression};
 pub use flow::{Flow, FlowArgument, FlowLevel};
 pub use gather::Gather;
 pub use glue::Glue;

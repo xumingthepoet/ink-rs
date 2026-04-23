@@ -1,4 +1,4 @@
-use crate::parsed::{Choice, ContentList};
+use crate::parsed::{BinaryOperator, Choice, ContentList, Expression};
 
 use super::{rule::RuleParser, text};
 
@@ -31,6 +31,8 @@ pub(super) fn parse_choice(parser: &mut RuleParser<'_>) -> Option<Choice> {
         |parser| parser.skip_to_end(),
     )?;
 
+    let (condition, choice_body) = parse_choice_conditions(&choice_body)?;
+
     // Handle fallback choices like "* -> " which have no text content
     // and the -> is a divert to empty (fall through to gather)
     let trimmed_body = choice_body.trim();
@@ -44,6 +46,7 @@ pub(super) fn parse_choice(parser: &mut RuleParser<'_>) -> Option<Choice> {
         );
         choice.set_once_only(once_only);
         choice.set_is_invisible_default(true);
+        choice.set_condition(condition);
         return Some(choice);
     }
 
@@ -66,6 +69,7 @@ pub(super) fn parse_choice(parser: &mut RuleParser<'_>) -> Option<Choice> {
         segments.has_inline_brackets,
     );
     choice.set_once_only(once_only);
+    choice.set_condition(condition);
 
     // Check if this is an invisible default (empty content)
     let is_invisible_default = !choice.has_start_content()
@@ -74,6 +78,46 @@ pub(super) fn parse_choice(parser: &mut RuleParser<'_>) -> Option<Choice> {
     choice.set_is_invisible_default(is_invisible_default);
 
     Some(choice)
+}
+
+fn parse_choice_conditions(choice_body: &str) -> Option<(Option<Expression>, String)> {
+    let mut remaining = choice_body.trim_start();
+    let mut conditions = Vec::new();
+
+    while let Some(after_open) = remaining.strip_prefix('{') {
+        let close_index = after_open.find('}')?;
+        let condition = parse_condition_expression(&after_open[..close_index])?;
+        conditions.push(condition);
+        remaining = after_open[close_index + 1..].trim_start();
+    }
+
+    Some((
+        Expression::multiple_condition(conditions),
+        remaining.to_string(),
+    ))
+}
+
+fn parse_condition_expression(source: &str) -> Option<Expression> {
+    let terms = source
+        .split(" and ")
+        .map(|term| parse_bool_literal(term.trim()))
+        .collect::<Option<Vec<_>>>()?;
+
+    let mut terms = terms.into_iter();
+    let first = terms.next()?;
+    Some(terms.fold(first, |left, right| Expression::Binary {
+        operator: BinaryOperator::And,
+        left: Box::new(left),
+        right: Box::new(right),
+    }))
+}
+
+fn parse_bool_literal(source: &str) -> Option<Expression> {
+    match source {
+        "true" => Some(Expression::NumberBool(true)),
+        "false" => Some(Expression::NumberBool(false)),
+        _ => None,
+    }
 }
 
 struct ChoiceSegments {

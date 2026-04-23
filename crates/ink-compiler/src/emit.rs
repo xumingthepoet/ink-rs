@@ -105,6 +105,8 @@ fn runtime_object_to_value(object: &RuntimeObject) -> Value {
         RuntimeObject::Tag { is_start } => {
             Value::String(if *is_start { "#" } else { "/#" }.to_string())
         }
+        RuntimeObject::Bool(value) => Value::Bool(*value),
+        RuntimeObject::NativeFunction(name) => Value::String(name.clone()),
         RuntimeObject::Divert { target, variable } => {
             let mut obj = Map::new();
             obj.insert("->".to_string(), Value::String(target.clone()));

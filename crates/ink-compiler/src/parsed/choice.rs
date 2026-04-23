@@ -1,6 +1,6 @@
 use crate::source::SourceSpan;
 
-use super::{push_indent, ContentList};
+use super::{push_indent, ContentList, Expression};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Choice {
@@ -13,6 +13,7 @@ pub struct Choice {
     is_invisible_default: bool,
     indentation_depth: usize,
     has_weave_style_inline_brackets: bool,
+    condition: Option<Expression>,
 }
 
 impl Choice {
@@ -49,6 +50,7 @@ impl Choice {
             is_invisible_default: false,
             indentation_depth: 1,
             has_weave_style_inline_brackets,
+            condition: None,
         }
     }
 
@@ -104,8 +106,19 @@ impl Choice {
         self.has_weave_style_inline_brackets
     }
 
+    pub fn condition(&self) -> Option<&Expression> {
+        self.condition.as_ref()
+    }
+
+    pub fn set_condition(&mut self, condition: Option<Expression>) {
+        self.condition = condition;
+    }
+
     pub fn choice_flags(&self) -> i32 {
         let mut flags = 0;
+        if self.condition.is_some() {
+            flags |= 1;
+        }
         if self.has_start_content() {
             flags |= 2;
         }
@@ -169,5 +182,10 @@ impl Choice {
         push_indent(out, indent + 2);
         out.push_str("ContentList");
         self.inner_content.write_parse_snapshot(out, indent + 4);
+
+        if let Some(condition) = &self.condition {
+            out.push('\n');
+            condition.write_parse_snapshot(out, indent + 2);
+        }
     }
 }

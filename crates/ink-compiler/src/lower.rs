@@ -1,7 +1,7 @@
 use crate::{
     analysis::CheckedStory,
     compiler::StageOutput,
-    parsed::{Choice, ContentList, DivertTarget, Flow, Object, Weave},
+    parsed::{BinaryOperator, Choice, ContentList, DivertTarget, Expression, Flow, Object, Weave},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -28,6 +28,8 @@ pub enum RuntimeObject {
     ChoicePoint { target: String, flags: i32 },
     Glue,
     Tag { is_start: bool },
+    Bool(bool),
+    NativeFunction(String),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -326,7 +328,9 @@ fn choice_outer(
     path_mode: &ChoicePathMode,
 ) -> ChoiceOuter {
     let mut outer_content = Vec::new();
-    let has_eval_content = choice.has_start_content() || choice.has_choice_only_content();
+    let has_eval_content = choice.has_start_content()
+        || choice.has_choice_only_content()
+        || choice.condition().is_some();
 
     if has_eval_content {
         outer_content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
@@ -358,6 +362,10 @@ fn choice_outer(
             path_mode,
         ));
         outer_content.push(RuntimeObject::ControlCommand(ControlCommand::EndString));
+    }
+
+    if let Some(condition) = choice.condition() {
+        lower_expression_into(&mut outer_content, condition);
     }
 
     if has_eval_content {
@@ -429,6 +437,35 @@ fn lower_content_list_with_context(
         lower_object_into_with_context(&mut content, object, path_mode);
     }
     content
+}
+
+fn lower_expression_into(content: &mut Vec<RuntimeObject>, expression: &Expression) {
+    match expression {
+        Expression::NumberBool(value) => content.push(RuntimeObject::Bool(*value)),
+        Expression::Binary {
+            operator,
+            left,
+            right,
+        } => {
+            lower_expression_into(content, left);
+            lower_expression_into(content, right);
+            content.push(RuntimeObject::NativeFunction(
+                operator_runtime_name(*operator).to_string(),
+            ));
+        }
+        Expression::MultipleCondition(expressions) => {
+            for (index, expression) in expressions.iter().enumerate() {
+                lower_expression_into(content, expression);
+                if index > 0 {
+                    content.push(RuntimeObject::NativeFunction("&&".to_string()));
+                }
+            }
+        }
+    }
+}
+
+fn operator_runtime_name(operator: BinaryOperator) -> &'static str {
+    operator.runtime_name()
 }
 
 fn lower_object_into(content: &mut Vec<RuntimeObject>, object: &Object) {
