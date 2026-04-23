@@ -1,2 +1,4 @@
 pub mod common;
-mod json_conformance;
+mod json_conformance {
+    include!("generated.rs");
+}
