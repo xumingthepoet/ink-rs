@@ -243,9 +243,10 @@ fn group_nested_weaves(objects: Vec<Object>, base_depth: usize) -> Vec<Object> {
     while index < objects.len() {
         if object_depth(&objects[index]).is_some_and(|depth| depth > base_depth) {
             let mut nested = Vec::new();
-            while index < objects.len()
-                && object_depth(&objects[index]).is_some_and(|depth| depth > base_depth)
-            {
+            while index < objects.len() {
+                if object_depth(&objects[index]).is_some_and(|depth| depth <= base_depth) {
+                    break;
+                }
                 nested.push(objects[index].clone());
                 index += 1;
             }
@@ -278,20 +279,24 @@ fn gather_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
     parser.skip_horizontal_whitespace();
     let span = parser.current_span();
 
-    // Match '-' but not '->'
-    if parser.match_string("-").is_none() {
+    let mut indentation_depth = 0;
+    loop {
+        // Match one or more '-' gather dashes, but never consume a divert arrow.
+        if parser.line_remainder().starts_with("->") || parser.match_string("-").is_none() {
+            break;
+        }
+        indentation_depth += 1;
+        parser.skip_horizontal_whitespace();
+    }
+
+    if indentation_depth == 0 {
         return None;
     }
 
-    // Make sure we didn't match '->' by checking if next char is '>'
-    let remainder = parser.line_remainder();
-    if remainder.starts_with('>') {
-        return None;
-    }
-
-    parser.skip_horizontal_whitespace();
-
-    let mut objects = vec![Object::Gather(crate::parsed::Gather::new(span.clone(), 1))];
+    let mut objects = vec![Object::Gather(crate::parsed::Gather::new(
+        span.clone(),
+        indentation_depth,
+    ))];
 
     // Parse any remaining content on the line
     let remaining = parser.line_remainder().trim();

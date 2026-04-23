@@ -148,6 +148,22 @@ impl ChoicePathMode {
             ChoicePathMode::Flow { .. } => self.with_self_target_relative(true),
         }
     }
+
+    fn for_gather(&self, gather_name: &str) -> Self {
+        match self {
+            ChoicePathMode::Root => ChoicePathMode::RootGather {
+                gather_name: gather_name.to_string(),
+            },
+            ChoicePathMode::NestedRoot {
+                container_path,
+                gather_target,
+            } => ChoicePathMode::NestedRoot {
+                container_path: format!("{container_path}.{gather_name}"),
+                gather_target: gather_target.clone(),
+            },
+            other => other.clone(),
+        }
+    }
 }
 
 pub(crate) fn lower(story: &CheckedStory) -> StageOutput<RuntimeProgram> {
@@ -328,12 +344,7 @@ fn lower_choice_weave(weave: &Weave, path_mode: ChoicePathMode) -> Vec<RuntimeOb
                 let mut gather_named_content = Vec::new();
                 index += 1;
 
-                let gather_path_mode = match &path_mode {
-                    ChoicePathMode::Root => ChoicePathMode::RootGather {
-                        gather_name: gather_name.clone(),
-                    },
-                    other => other.clone(),
-                };
+                let gather_path_mode = path_mode.for_gather(&gather_name);
                 lower_weave_section(
                     objects,
                     &mut index,
@@ -450,6 +461,9 @@ fn lower_choice_in_section(
     };
 
     let choice_index = *choice_count;
+    let has_following_gather = objects[*index + 1..]
+        .iter()
+        .any(|object| matches!(object, Object::Gather(_)));
     *choice_count += 1;
     let choice_container_name = format!("c-{choice_index}");
     let gather_container_name = format!("g-{gather_count}");
@@ -505,7 +519,7 @@ fn lower_choice_in_section(
     };
     if include_gather {
         choice_content.push(RuntimeObject::Divert {
-            target: gather_target(path_mode, &gather_container_name),
+            target: gather_target(path_mode, &gather_container_name, has_following_gather),
             variable: false,
         });
         *needs_terminal_gather = true;
@@ -965,10 +979,17 @@ fn start_content_target(path_mode: &ChoicePathMode, choice_point_index: usize) -
     }
 }
 
-fn gather_target(path_mode: &ChoicePathMode, gather_container_name: &str) -> String {
+fn gather_target(
+    path_mode: &ChoicePathMode,
+    gather_container_name: &str,
+    has_following_gather: bool,
+) -> String {
     match path_mode {
         ChoicePathMode::Root => format!("0.{gather_container_name}"),
         ChoicePathMode::RootGather { .. } => format!("0.{gather_container_name}"),
+        ChoicePathMode::NestedRoot { .. } if has_following_gather => {
+            format!(".^.^.{gather_container_name}")
+        }
         ChoicePathMode::NestedRoot { gather_target, .. } => gather_target.clone(),
         ChoicePathMode::Flow { .. } => format!(".^.^.{gather_container_name}"),
     }

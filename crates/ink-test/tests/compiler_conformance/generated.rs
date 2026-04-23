@@ -59,3 +59,4 @@ fixture!(gather_gather_basic, "inkfiles/gather/gather-basic.ink");
 fixture!(test1, "inkfiles/test1.ink");
 fixture!(gather_gather_chain, "inkfiles/gather/gather-chain.ink");
 fixture!(gather_nested_flow, "inkfiles/gather/nested-flow.ink");
+fixture!(gather_nested_gather, "inkfiles/gather/nested-gather.ink");
