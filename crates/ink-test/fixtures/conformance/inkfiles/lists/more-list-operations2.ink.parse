@@ -93,4 +93,4 @@ Story
       Binary(+, List(a1), Number(1))
     Text("\n")
     Gather(name=null, depth=1)
-    Divert(target="-\u003E DONE", empty=false, tunnel=false, thread=false)
+    Divert(target="-> DONE", empty=false, tunnel=false, thread=false)

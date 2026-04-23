@@ -10,19 +10,19 @@ Story
       ContentList
         Text("\n")
     IncDec(gameState, inc=true)
-    Divert(target="-\u003E init", empty=false, tunnel=false, thread=false)
+    Divert(target="-> init", empty=false, tunnel=false, thread=false)
     Choice(name=null, once=false, invisible=false, depth=1, inline=false)
       ContentList
         Text("OK")
       ContentList
         Text("\n")
       Binary(?, VariableReference(gameState), VariableReference(KNOW_ALIEN_REPORT))
-    Divert(target="-\u003E init", empty=false, tunnel=false, thread=false)
+    Divert(target="-> init", empty=false, tunnel=false, thread=false)
     Choice(name=null, once=false, invisible=false, depth=1, inline=false)
       ContentList
         Text("FAIL")
       ContentList
         Text("\n")
-    Divert(target="-\u003E END", empty=false, tunnel=false, thread=false)
+    Divert(target="-> END", empty=false, tunnel=false, thread=false)
     Gather(name=null, depth=1)
-    Divert(target="-\u003E DONE", empty=false, tunnel=false, thread=false)
+    Divert(target="-> DONE", empty=false, tunnel=false, thread=false)

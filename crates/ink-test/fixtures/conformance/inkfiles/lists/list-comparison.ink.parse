@@ -10,9 +10,9 @@ Story
         ListElementDefinition(name="C", explicit=null, series=4, initial=false)
     VariableAssignment(name="s", global=true, temp=false)
       DivertTarget(-> set_actor)
-    Divert(target="-\u003E start", empty=false, tunnel=false, thread=false)
+    Divert(target="-> start", empty=false, tunnel=false, thread=false)
     Gather(name=null, depth=1)
-    Divert(target="-\u003E DONE", empty=false, tunnel=false, thread=false)
+    Divert(target="-> DONE", empty=false, tunnel=false, thread=false)
   Flow(level=Knot, name="set_actor", function=true)
     Weave(baseIndent=0)
       ContentList
@@ -56,4 +56,4 @@ Story
         VariableReference(currentActor)
       Text(", to get some more for you?")
       Text("\n")
-      Divert(target="-\u003E END", empty=false, tunnel=false, thread=false)
+      Divert(target="-> END", empty=false, tunnel=false, thread=false)

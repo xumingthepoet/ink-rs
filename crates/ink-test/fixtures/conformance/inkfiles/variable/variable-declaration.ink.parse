@@ -4,13 +4,13 @@ Story
       String("Jackie")
     VariableAssignment(name="age", global=true, temp=false)
       Number(23)
-    Text("\u0022My name is Jean Passepartout, but my friend\u0027s call me ")
+    Text("\"My name is Jean Passepartout, but my friend's call me ")
     ContentList
       VariableReference(friendly_name_of_player)
-    Text(". I\u0027m ")
+    Text(". I'm ")
     ContentList
       VariableReference(age)
-    Text(" years old.\u0022")
+    Text(" years old.\"")
     Text("\n")
     Gather(name=null, depth=1)
-    Divert(target="-\u003E DONE", empty=false, tunnel=false, thread=false)
+    Divert(target="-> DONE", empty=false, tunnel=false, thread=false)

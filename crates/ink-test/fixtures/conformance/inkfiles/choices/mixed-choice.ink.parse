@@ -12,6 +12,6 @@ Story
         Text("\n")
     Text("Nice to hear from you.")
     Text("\n")
-    Divert(target="-\u003E DONE", empty=false, tunnel=false, thread=false)
+    Divert(target="-> DONE", empty=false, tunnel=false, thread=false)
     Gather(name=null, depth=1)
-    Divert(target="-\u003E DONE", empty=false, tunnel=false, thread=false)
+    Divert(target="-> DONE", empty=false, tunnel=false, thread=false)

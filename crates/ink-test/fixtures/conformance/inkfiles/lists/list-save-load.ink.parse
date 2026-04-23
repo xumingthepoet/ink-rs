@@ -18,7 +18,7 @@ Story
       VariableReference(t)
     Text("\n")
     Gather(name=null, depth=1)
-    Divert(target="-\u003E DONE", empty=false, tunnel=false, thread=false)
+    Divert(target="-> DONE", empty=false, tunnel=false, thread=false)
   Flow(level=Knot, name="elsewhere", function=false)
     Weave(baseIndent=0)
       VariableAssignment(name="t", global=false, temp=false)
@@ -26,4 +26,4 @@ Story
       ContentList
         VariableReference(t)
       Text("\n")
-      Divert(target="-\u003E END", empty=false, tunnel=false, thread=false)
+      Divert(target="-> END", empty=false, tunnel=false, thread=false)

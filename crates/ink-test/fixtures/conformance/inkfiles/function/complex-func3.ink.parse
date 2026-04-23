@@ -3,17 +3,17 @@ Story
     ContentList
       FunctionCall(merchant_init, args=0)
       Text("\n")
-    Text("\u0022I will pay you ")
+    Text("\"I will pay you ")
     ContentList
       VariableReference(fee)
     Text(" reales if you get the goods to their destination. The goods will take up ")
     ContentList
       VariableReference(weight)
-    Text(" cargo spaces.\u0022")
+    Text(" cargo spaces.\"")
     Text("\n")
-    Divert(target="-\u003E END", empty=false, tunnel=false, thread=false)
+    Divert(target="-> END", empty=false, tunnel=false, thread=false)
     Gather(name=null, depth=1)
-    Divert(target="-\u003E DONE", empty=false, tunnel=false, thread=false)
+    Divert(target="-> DONE", empty=false, tunnel=false, thread=false)
   Flow(level=Knot, name="merchant_init", function=true)
     Weave(baseIndent=0)
       VariableAssignment(name="weight", global=true, temp=false)

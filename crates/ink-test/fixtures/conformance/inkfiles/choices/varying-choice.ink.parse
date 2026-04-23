@@ -1,8 +1,8 @@
 Story
   Weave(baseIndent=0)
-    Divert(target="-\u003E find_help", empty=false, tunnel=false, thread=false)
+    Divert(target="-> find_help", empty=false, tunnel=false, thread=false)
     Gather(name=null, depth=1)
-    Divert(target="-\u003E DONE", empty=false, tunnel=false, thread=false)
+    Divert(target="-> DONE", empty=false, tunnel=false, thread=false)
   Flow(level=Knot, name="find_help", function=false)
     Weave(baseIndent=0)
       Text("You search desperately for a friendly face in the crowd.")
@@ -14,7 +14,7 @@ Story
           Text("?")
         ContentList
           Text(" pushes you roughly aside. ")
-          Divert(target="-\u003E find_help", empty=false, tunnel=false, thread=false)
+          Divert(target="-> find_help", empty=false, tunnel=false, thread=false)
           Text("\n")
       Choice(name=null, once=true, invisible=false, depth=1, inline=true)
         ContentList
@@ -23,6 +23,6 @@ Story
           Text("?")
         ContentList
           Text(" looks disgusted as you stumble past him. ")
-          Divert(target="-\u003E find_help", empty=false, tunnel=false, thread=false)
+          Divert(target="-> find_help", empty=false, tunnel=false, thread=false)
           Text("\n")
-      Divert(target="-\u003E DONE", empty=false, tunnel=false, thread=false)
+      Divert(target="-> DONE", empty=false, tunnel=false, thread=false)

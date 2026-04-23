@@ -1,10 +1,9 @@
 use std::{
-    fmt, io,
+    fmt,
+    io,
     path::{Path, PathBuf},
     sync::Arc,
 };
-
-use ink_runtime::story::Story as RuntimeStory;
 
 use crate::{error::Diagnostic, parsed};
 
@@ -81,43 +80,6 @@ impl CompileJsonResult {
         self.diagnostics
             .iter()
             .any(|diagnostic| diagnostic.severity == crate::error::DiagnosticSeverity::Error)
-    }
-}
-
-#[derive(Default)]
-pub struct CompileResult {
-    pub story: Option<RuntimeStory>,
-    pub diagnostics: Vec<Diagnostic>,
-}
-
-impl CompileResult {
-    pub fn success(story: RuntimeStory) -> Self {
-        Self {
-            story: Some(story),
-            diagnostics: Vec::new(),
-        }
-    }
-
-    pub fn failure(diagnostic: Diagnostic) -> Self {
-        Self {
-            story: None,
-            diagnostics: vec![diagnostic],
-        }
-    }
-
-    pub fn has_errors(&self) -> bool {
-        self.diagnostics
-            .iter()
-            .any(|diagnostic| diagnostic.severity == crate::error::DiagnosticSeverity::Error)
-    }
-}
-
-impl fmt::Debug for CompileResult {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("CompileResult")
-            .field("story", &self.story.as_ref().map(|_| "<runtime story>"))
-            .field("diagnostics", &self.diagnostics)
-            .finish()
     }
 }
 

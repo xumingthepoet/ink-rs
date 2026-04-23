@@ -7,14 +7,14 @@ Story
         Text("... and I could contain myself no longer.")
       ContentList
         Text("\n")
-    Text("\u0027What is the purpose of our journey, Monsieur?\u0027")
+    Text("'What is the purpose of our journey, Monsieur?'")
     Text("\n")
-    Text("\u0027A wager,\u0027 he replied.")
+    Text("'A wager,' he replied.")
     Text("\n")
     Weave(baseIndent=1)
       Choice(name=null, once=true, invisible=false, depth=2, inline=true)
         ContentList
-          Text("\u0027A wager!\u0027")
+          Text("'A wager!'")
         ContentList
           Text(" I returned.")
           Text("\n")
@@ -23,12 +23,12 @@ Story
       Weave(baseIndent=2)
         Choice(name=null, once=true, invisible=false, depth=3, inline=false)
           ContentList
-            Text("\u0027But surely that is foolishness!\u0027")
+            Text("'But surely that is foolishness!'")
           ContentList
             Text("\n")
         Choice(name=null, once=true, invisible=false, depth=3, inline=false)
           ContentList
-            Text("\u0027A most serious matter then!\u0027")
+            Text("'A most serious matter then!'")
           ContentList
             Text("\n")
         Gather(name=null, depth=3)
@@ -36,17 +36,17 @@ Story
         Text("\n")
         Choice(name=null, once=true, invisible=false, depth=3, inline=false)
           ContentList
-            Text("\u0027But can we win?\u0027")
+            Text("'But can we win?'")
           ContentList
             Text("\n")
-        Text("\u0027That is what we will endeavour to find out,\u0027 he answered.")
+        Text("'That is what we will endeavour to find out,' he answered.")
         Text("\n")
         Choice(name=null, once=true, invisible=false, depth=3, inline=false)
           ContentList
-            Text("\u0027A modest wager, I trust?\u0027")
+            Text("'A modest wager, I trust?'")
           ContentList
             Text("\n")
-        Text("\u0027Twenty thousand pounds,\u0027 he replied, quite flatly.")
+        Text("'Twenty thousand pounds,' he replied, quite flatly.")
         Text("\n")
         Choice(name=null, once=true, invisible=false, depth=3, inline=true)
           ContentList
@@ -59,11 +59,11 @@ Story
             Text("\n")
       Choice(name=null, once=true, invisible=false, depth=2, inline=true)
         ContentList
-          Text("\u0027Ah")
+          Text("'Ah")
         ContentList
-          Text(".\u0027")
+          Text(".'")
         ContentList
-          Text(",\u0027 I replied, uncertain what I thought.")
+          Text(",' I replied, uncertain what I thought.")
           Text("\n")
       Gather(name=null, depth=2)
       Text("After that, ")
@@ -80,6 +80,6 @@ Story
     Text("we passed the day in silence.")
     Text("\n")
     Gather(name=null, depth=1)
-    Divert(target="-\u003E END", empty=false, tunnel=false, thread=false)
+    Divert(target="-> END", empty=false, tunnel=false, thread=false)
     Gather(name=null, depth=1)
-    Divert(target="-\u003E DONE", empty=false, tunnel=false, thread=false)
+    Divert(target="-> DONE", empty=false, tunnel=false, thread=false)

@@ -2,17 +2,18 @@
 
 //! Compiler-layer port for ink.
 //!
-//! This crate intentionally depends on `ink_runtime` for the runtime layer and
-//! focuses on porting the official C# compiler architecture.
+//! This crate focuses on the compiler-facing JSON export pipeline and the
+//! parsed hierarchy used to build it.
 
 pub mod compiler;
 pub mod error;
 pub mod parsed;
 pub mod parser;
+mod runtime_export;
 pub mod results;
 
 pub use compiler::Compiler;
 pub use error::{CompilerError, Diagnostic, DiagnosticSeverity, Result};
 pub use results::{
-    CompileJsonResult, CompileResult, CompilerOptions, DefaultFileHandler, FileHandler, ParseResult,
+    CompileJsonResult, CompilerOptions, DefaultFileHandler, FileHandler, ParseResult,
 };

@@ -6,9 +6,9 @@ Story
       FunctionCall(externalFunction, args=0)
     Text(".")
     Text("\n")
-    Divert(target="-\u003E END", empty=false, tunnel=false, thread=false)
+    Divert(target="-> END", empty=false, tunnel=false, thread=false)
     Gather(name=null, depth=1)
-    Divert(target="-\u003E DONE", empty=false, tunnel=false, thread=false)
+    Divert(target="-> DONE", empty=false, tunnel=false, thread=false)
   Flow(level=Knot, name="externalFunction", function=true)
     Weave(baseIndent=0)
       Return

@@ -3,10 +3,8 @@ use std::sync::Arc;
 pub use crate::results::CompilerOptions;
 
 use crate::{
-    error::{CompilerError, Diagnostic},
-    results::{
-        CompileJsonResult, CompileResult, DefaultFileHandler, ParseResult,
-    },
+    parser::InkParser,
+    results::{CompileJsonResult, DefaultFileHandler, ParseResult},
 };
 
 #[derive(Debug)]
@@ -35,26 +33,36 @@ impl Compiler {
     }
 
     pub fn parse(&mut self) -> ParseResult {
-        let _ = &self.input_string;
-        let _ = &self.options;
-        self.parsed_story = None;
-        ParseResult::failure(CompilerError::Unsupported(
-            "ink-compiler implementation is temporarily removed",
-        )
-        .into_diagnostic())
+        let source_filename = self.options.source_filename.as_deref();
+        let file_handler = self.options.file_handler.clone();
+        let mut parser = InkParser::new(&self.input_string, source_filename, file_handler);
+        let parse_result = parser.parse();
+        self.parsed_story = parse_result.parsed_story.clone();
+        parse_result
     }
 
     pub fn compile_json(&mut self) -> CompileJsonResult {
-        let _ = self.parse();
-        CompileJsonResult::failure(Diagnostic::error(
-            "ink-compiler implementation is temporarily removed",
-        ))
-    }
+        let parse_result = self.parse();
+        let Some(parsed_story) = self.parsed_story.as_ref() else {
+            return CompileJsonResult {
+                json: None,
+                diagnostics: parse_result.diagnostics,
+            };
+        };
 
-    pub fn compile(&mut self) -> CompileResult {
-        let _ = self.compile_json();
-        CompileResult::failure(Diagnostic::error(
-            "ink-compiler implementation is temporarily removed",
-        ))
+        let mut diagnostics = parse_result.diagnostics;
+        match crate::runtime_export::export_story_json(parsed_story) {
+            Ok(json) => CompileJsonResult {
+                json: Some(json),
+                diagnostics,
+            },
+            Err(error) => {
+                diagnostics.push(error.into_diagnostic());
+                CompileJsonResult {
+                    json: None,
+                    diagnostics,
+                }
+            }
+        }
     }
 }

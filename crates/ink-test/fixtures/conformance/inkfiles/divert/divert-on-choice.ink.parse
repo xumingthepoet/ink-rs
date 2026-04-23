@@ -1,8 +1,8 @@
 Story
   Weave(baseIndent=0)
-    Divert(target="-\u003E paragraph_1", empty=false, tunnel=false, thread=false)
+    Divert(target="-> paragraph_1", empty=false, tunnel=false, thread=false)
     Gather(name=null, depth=1)
-    Divert(target="-\u003E DONE", empty=false, tunnel=false, thread=false)
+    Divert(target="-> DONE", empty=false, tunnel=false, thread=false)
   Flow(level=Knot, name="paragraph_1", function=false)
     Weave(baseIndent=0)
       Text("You stand by the wall of Analand, sword in hand.")
@@ -12,10 +12,10 @@ Story
           Text("Open the gate")
         ContentList
           Text(" ")
-          Divert(target="-\u003E paragraph_2", empty=false, tunnel=false, thread=false)
+          Divert(target="-> paragraph_2", empty=false, tunnel=false, thread=false)
           Text("\n")
   Flow(level=Knot, name="paragraph_2", function=false)
     Weave(baseIndent=0)
       Text("You open the gate, and step out onto the path. ")
-      Divert(target="-\u003E END", empty=false, tunnel=false, thread=false)
+      Divert(target="-> END", empty=false, tunnel=false, thread=false)
       Text("\n")

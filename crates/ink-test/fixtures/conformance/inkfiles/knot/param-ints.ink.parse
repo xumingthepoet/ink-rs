@@ -7,24 +7,24 @@ Story
         Text("$1")
       ContentList
         Text(" ")
-        Divert(target="-\u003E give", empty=false, tunnel=false, thread=false)
+        Divert(target="-> give", empty=false, tunnel=false, thread=false)
         Text("\n")
     Choice(name=null, once=true, invisible=false, depth=1, inline=true)
       ContentList
         Text("$2")
       ContentList
         Text(" ")
-        Divert(target="-\u003E give", empty=false, tunnel=false, thread=false)
+        Divert(target="-> give", empty=false, tunnel=false, thread=false)
         Text("\n")
     Choice(name=null, once=true, invisible=false, depth=1, inline=true)
       ContentList
         Text("Nothing")
       ContentList
         Text(" ")
-        Divert(target="-\u003E give", empty=false, tunnel=false, thread=false)
+        Divert(target="-> give", empty=false, tunnel=false, thread=false)
         Text("\n")
     Gather(name=null, depth=1)
-    Divert(target="-\u003E DONE", empty=false, tunnel=false, thread=false)
+    Divert(target="-> DONE", empty=false, tunnel=false, thread=false)
   Flow(level=Knot, name="give", function=false)
     Weave(baseIndent=0)
       Text("You give ")
@@ -32,4 +32,4 @@ Story
         VariableReference(amount)
       Text(" dollars.")
       Text("\n")
-      Divert(target="-\u003E END", empty=false, tunnel=false, thread=false)
+      Divert(target="-> END", empty=false, tunnel=false, thread=false)

@@ -1,8 +1,8 @@
 Story
   Weave(baseIndent=0)
-    Divert(target="-\u003E knot", empty=false, tunnel=false, thread=false)
+    Divert(target="-> knot", empty=false, tunnel=false, thread=false)
     Gather(name=null, depth=1)
-    Divert(target="-\u003E DONE", empty=false, tunnel=false, thread=false)
+    Divert(target="-> DONE", empty=false, tunnel=false, thread=false)
   Flow(level=Knot, name="knot", function=false)
     Weave(baseIndent=0)
       Text("You see a soldier.")
@@ -13,7 +13,7 @@ Story
         ContentList
           Text("\n")
       Text("You pull a face, and the soldier comes at you! ")
-      Divert(target="-\u003E shove", empty=false, tunnel=false, thread=false)
+      Divert(target="-> shove", empty=false, tunnel=false, thread=false)
       Text("\n")
       Choice(name="shove", once=true, invisible=false, depth=1, inline=true)
         ContentList
@@ -28,5 +28,5 @@ Story
           Text("\n")
         VariableReference(shove)
       Gather(name=null, depth=1)
-      Divert(target="-\u003E knot", empty=false, tunnel=false, thread=false)
-      Divert(target="-\u003E END", empty=false, tunnel=false, thread=false)
+      Divert(target="-> knot", empty=false, tunnel=false, thread=false)
+      Divert(target="-> END", empty=false, tunnel=false, thread=false)

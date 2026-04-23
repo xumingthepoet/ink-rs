@@ -5,5 +5,4 @@ edition.workspace = true
 publish = false
 
 [dependencies]
-ink_runtime = { package = "ink-runtime", path = "../ink-runtime" }
 serde_json = "1"

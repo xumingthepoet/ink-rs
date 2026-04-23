@@ -1,9 +1,9 @@
 Story
   Weave(baseIndent=0)
-    Divert(target="-\u003E knot", empty=false, tunnel=true, thread=false)
-    Divert(target="-\u003E knot", empty=false, tunnel=true, thread=false)
+    Divert(target="-> knot", empty=false, tunnel=true, thread=false)
+    Divert(target="-> knot", empty=false, tunnel=true, thread=false)
     Gather(name=null, depth=1)
-    Divert(target="-\u003E DONE", empty=false, tunnel=false, thread=false)
+    Divert(target="-> DONE", empty=false, tunnel=false, thread=false)
   Flow(level=Knot, name="knot", function=false)
     Weave(baseIndent=0)
       Text("A ")

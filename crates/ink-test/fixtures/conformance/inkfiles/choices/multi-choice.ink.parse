@@ -17,6 +17,6 @@ Story
     Text("See you later")
     Text("\n")
     Gather(name=null, depth=1)
-    Divert(target="-\u003E END", empty=false, tunnel=false, thread=false)
+    Divert(target="-> END", empty=false, tunnel=false, thread=false)
     Gather(name=null, depth=1)
-    Divert(target="-\u003E DONE", empty=false, tunnel=false, thread=false)
+    Divert(target="-> DONE", empty=false, tunnel=false, thread=false)

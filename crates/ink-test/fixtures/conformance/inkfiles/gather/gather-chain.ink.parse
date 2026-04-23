@@ -23,7 +23,7 @@ Story
       ContentList
         Text("\n")
     Gather(name=null, depth=1)
-    Text("The road could not be much further! Mackie would have the engine running, and then I\u0027d be safe.")
+    Text("The road could not be much further! Mackie would have the engine running, and then I'd be safe.")
     Text("\n")
     Choice(name=null, once=true, invisible=false, depth=1, inline=true)
       ContentList
@@ -35,11 +35,11 @@ Story
       ContentList
         Text("I should interrupt to say Mackie is normally very reliable")
       ContentList
-        Text(". He\u0027s never once let me down. Or rather, never once, previously to that night.")
+        Text(". He's never once let me down. Or rather, never once, previously to that night.")
         Text("\n")
     Gather(name=null, depth=1)
     Text("The road was empty. Mackie was nowhere to be seen.")
     Text("\n")
-    Divert(target="-\u003E END", empty=false, tunnel=false, thread=false)
+    Divert(target="-> END", empty=false, tunnel=false, thread=false)
     Gather(name=null, depth=1)
-    Divert(target="-\u003E DONE", empty=false, tunnel=false, thread=false)
+    Divert(target="-> DONE", empty=false, tunnel=false, thread=false)

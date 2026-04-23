@@ -1,44 +1,44 @@
 Story
   Weave(baseIndent=0)
-    Text("Tell us a tale, Captain!\u0022")
+    Text("Tell us a tale, Captain!\"")
     Text("\n")
     Choice(name=null, once=true, invisible=false, depth=1, inline=false)
       ContentList
-        Text("\u0022Very well, you sea-dogs. Here\u0027s a tale...\u0022")
+        Text("\"Very well, you sea-dogs. Here's a tale...\"")
       ContentList
         Text("\n")
     Weave(baseIndent=1)
       Choice(name=null, once=true, invisible=false, depth=2, inline=false)
         ContentList
-          Text("\u0022It was a dark and stormy night...\u0022")
+          Text("\"It was a dark and stormy night...\"")
         ContentList
           Text("\n")
       Weave(baseIndent=2)
         Choice(name=null, once=true, invisible=false, depth=3, inline=false)
           ContentList
-            Text("\u0022...and the crew were restless...\u0022")
+            Text("\"...and the crew were restless...\"")
           ContentList
             Text("\n")
         Weave(baseIndent=3)
           Choice(name=null, once=true, invisible=false, depth=4, inline=false)
             ContentList
-              Text("\u0022... and they said to their Captain...\u0022")
+              Text("\"... and they said to their Captain...\"")
             ContentList
               Text("\n")
           Weave(baseIndent=4)
             Choice(name=null, once=true, invisible=false, depth=5, inline=false)
               ContentList
-                Text("\u0022...Tell us a tale Captain!\u0022")
+                Text("\"...Tell us a tale Captain!\"")
               ContentList
                 Text("\n")
     Choice(name=null, once=true, invisible=false, depth=1, inline=false)
       ContentList
-        Text("\u0022No, it\u0027s past your bed-time.\u0022")
+        Text("\"No, it's past your bed-time.\"")
       ContentList
         Text("\n")
     Gather(name=null, depth=1)
     Text("To a man, the crew began to yawn.")
     Text("\n")
-    Divert(target="-\u003E END", empty=false, tunnel=false, thread=false)
+    Divert(target="-> END", empty=false, tunnel=false, thread=false)
     Gather(name=null, depth=1)
-    Divert(target="-\u003E DONE", empty=false, tunnel=false, thread=false)
+    Divert(target="-> DONE", empty=false, tunnel=false, thread=false)
