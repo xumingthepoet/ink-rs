@@ -9,7 +9,7 @@ mod text;
 use crate::{
     compiler::StageOutput,
     diagnostic::Diagnostic,
-    parsed::{Flow, Object, Story},
+    parsed::{Flow, Object, Story, Weave},
     source::{SourceFile, SourceInput, SourceLine},
 };
 
@@ -68,7 +68,7 @@ impl Parser {
             index += 1;
         }
 
-        Story::new(objects, flows)
+        Story::new(group_nested_weaves(objects, 1), flows)
     }
 
     fn parse_statement(&mut self, line: &SourceLine) -> Vec<Object> {
@@ -183,7 +183,7 @@ impl Parser {
         Some(Flow::new(
             declaration.level,
             declaration.name,
-            content,
+            group_nested_weaves(content, 1),
             child_flows,
             declaration.arguments,
             declaration.is_function,
@@ -228,11 +228,45 @@ impl Parser {
         Some(Flow::new(
             declaration.level,
             declaration.name,
-            content,
+            group_nested_weaves(content, 1),
             Vec::new(),
             declaration.arguments,
             declaration.is_function,
         ))
+    }
+}
+
+fn group_nested_weaves(objects: Vec<Object>, base_depth: usize) -> Vec<Object> {
+    let mut grouped = Vec::new();
+    let mut index = 0;
+
+    while index < objects.len() {
+        if object_depth(&objects[index]).is_some_and(|depth| depth > base_depth) {
+            let mut nested = Vec::new();
+            while index < objects.len()
+                && object_depth(&objects[index]).is_some_and(|depth| depth > base_depth)
+            {
+                nested.push(objects[index].clone());
+                index += 1;
+            }
+            grouped.push(Object::Weave(Weave::new(
+                group_nested_weaves(nested, base_depth + 1),
+                base_depth,
+            )));
+        } else {
+            grouped.push(objects[index].clone());
+            index += 1;
+        }
+    }
+
+    grouped
+}
+
+fn object_depth(object: &Object) -> Option<usize> {
+    match object {
+        Object::Choice(choice) => Some(choice.indentation_depth()),
+        Object::Gather(gather) => Some(gather.indentation_depth()),
+        _ => None,
     }
 }
 

@@ -102,6 +102,10 @@ impl Choice {
         self.indentation_depth
     }
 
+    pub fn set_indentation_depth(&mut self, indentation_depth: usize) {
+        self.indentation_depth = indentation_depth;
+    }
+
     pub fn has_weave_style_inline_brackets(&self) -> bool {
         self.has_weave_style_inline_brackets
     }

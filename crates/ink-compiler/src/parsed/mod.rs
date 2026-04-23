@@ -34,6 +34,7 @@ pub enum Object {
     Gather(Gather),
     Tag(Tag),
     Sequence(Sequence),
+    Weave(Weave),
 }
 
 impl Object {
@@ -52,6 +53,7 @@ impl Object {
             Object::Gather(gather) => gather.write_parse_snapshot(out, indent),
             Object::Tag(tag) => tag.write_parse_snapshot(out, indent),
             Object::Sequence(sequence) => sequence.write_parse_snapshot(out, indent),
+            Object::Weave(weave) => weave.write_parse_snapshot(out, indent),
         }
     }
 }

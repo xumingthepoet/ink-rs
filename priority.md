@@ -1,6 +1,6 @@
 # Ink Fixture Priority
 
-通过统计: 37/118
+通过统计: 38/118
 
 Sorted by the latest `WritingWithInk.md` syntax point used by each file.
 
@@ -41,7 +41,7 @@ Sorted by the latest `WritingWithInk.md` syntax point used by each file.
 - [x] `gather/gather-basic.ink`
 - [x] `test1.ink`
 - [x] `gather/gather-chain.ink`
-- [ ] `gather/nested-flow.ink`
+- [x] `gather/nested-flow.ink`
 - [ ] `gather/nested-gather.ink`
 - [ ] `gather/complex-flow.ink`
 - [ ] `gather/deep-nesting.ink`

@@ -6,14 +6,28 @@ pub(super) fn parse_choice(parser: &mut RuleParser<'_>) -> Option<Choice> {
     parser.skip_horizontal_whitespace();
     let span = parser.current_span();
 
-    // Match either '*' (once-only) or '+' (sticky)
-    let once_only = if parser.match_string("*").is_some() {
-        true
+    // Match one or more '*' (once-only) or '+' (sticky) bullets.
+    let (bullet, once_only) = if parser.match_string("*").is_some() {
+        ('*', true)
     } else if parser.match_string("+").is_some() {
-        false
+        ('+', false)
     } else {
         return None;
     };
+
+    let mut indentation_depth = 1;
+    loop {
+        parser.skip_horizontal_whitespace();
+        let matched = match bullet {
+            '*' => parser.match_string("*").is_some(),
+            '+' => parser.match_string("+").is_some(),
+            _ => false,
+        };
+        if !matched {
+            break;
+        }
+        indentation_depth += 1;
+    }
 
     parser.skip_horizontal_whitespace();
 
@@ -47,6 +61,7 @@ pub(super) fn parse_choice(parser: &mut RuleParser<'_>) -> Option<Choice> {
         choice.set_once_only(once_only);
         choice.set_is_invisible_default(true);
         choice.set_condition(condition);
+        choice.set_indentation_depth(indentation_depth);
         return Some(choice);
     }
 
@@ -70,6 +85,7 @@ pub(super) fn parse_choice(parser: &mut RuleParser<'_>) -> Option<Choice> {
     );
     choice.set_once_only(once_only);
     choice.set_condition(condition);
+    choice.set_indentation_depth(indentation_depth);
 
     // Check if this is an invisible default (empty content)
     let is_invisible_default = !choice.has_start_content()

@@ -44,7 +44,8 @@ fn container_to_value_with_name(container: &Container, include_name: bool) -> Va
         .content
         .last()
         .is_some_and(|object| matches!(object, RuntimeObject::NamedContent(_)));
-    let value_content = if named_content_tail {
+    let merge_named_content_tail = named_content_tail && container.merge_tail_metadata;
+    let value_content = if merge_named_content_tail {
         &container.content[..container.content.len() - 1]
     } else {
         &container.content
@@ -54,7 +55,7 @@ fn container_to_value_with_name(container: &Container, include_name: bool) -> Va
         .map(runtime_object_to_value)
         .collect::<Vec<_>>();
 
-    if named_content_tail {
+    if merge_named_content_tail {
         if let Some(RuntimeObject::NamedContent(containers)) = container.content.last() {
             values.push(named_content_to_value_with_metadata(
                 containers,
@@ -176,6 +177,7 @@ mod tests {
             content: vec![RuntimeObject::String("Line.".to_string())],
             name: None,
             flags: None,
+            merge_tail_metadata: true,
         };
         assert_eq!(container_to_value(&container), json!(["^Line.", null]));
     }

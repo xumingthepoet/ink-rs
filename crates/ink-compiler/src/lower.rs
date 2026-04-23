@@ -17,6 +17,7 @@ pub struct Container {
     pub content: Vec<RuntimeObject>,
     pub name: Option<String>,
     pub flags: Option<i32>,
+    pub merge_tail_metadata: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -62,6 +63,10 @@ enum ChoicePathMode {
     RootGather {
         gather_name: String,
     },
+    NestedRoot {
+        container_path: String,
+        gather_target: String,
+    },
     Flow {
         flow_name: String,
         parent_flow_name: Option<String>,
@@ -77,6 +82,13 @@ impl ChoicePathMode {
             ChoicePathMode::RootGather { gather_name } => ChoicePathMode::RootGather {
                 gather_name: gather_name.clone(),
             },
+            ChoicePathMode::NestedRoot {
+                container_path,
+                gather_target,
+            } => ChoicePathMode::NestedRoot {
+                container_path: container_path.clone(),
+                gather_target: gather_target.clone(),
+            },
             ChoicePathMode::Flow {
                 flow_name,
                 parent_flow_name,
@@ -90,6 +102,52 @@ impl ChoicePathMode {
             },
         }
     }
+
+    fn for_choice_nested_content(
+        &self,
+        choice_container_name: &str,
+        gather_container_name: &str,
+    ) -> Self {
+        match self {
+            ChoicePathMode::Root => ChoicePathMode::NestedRoot {
+                container_path: format!("0.{choice_container_name}"),
+                gather_target: format!("0.{gather_container_name}"),
+            },
+            ChoicePathMode::RootGather { gather_name } => ChoicePathMode::NestedRoot {
+                container_path: format!("0.{gather_name}.{choice_container_name}"),
+                gather_target: format!("0.{gather_container_name}"),
+            },
+            ChoicePathMode::NestedRoot {
+                container_path,
+                gather_target,
+            } => ChoicePathMode::NestedRoot {
+                container_path: format!("{container_path}.{choice_container_name}"),
+                gather_target: gather_target.clone(),
+            },
+            ChoicePathMode::Flow { .. } => self.with_self_target_relative(true),
+        }
+    }
+
+    fn for_nested_weave(&self, container_index: usize) -> Self {
+        match self {
+            ChoicePathMode::NestedRoot {
+                container_path,
+                gather_target,
+            } => ChoicePathMode::NestedRoot {
+                container_path: format!("{container_path}.{container_index}"),
+                gather_target: gather_target.clone(),
+            },
+            ChoicePathMode::Root => ChoicePathMode::NestedRoot {
+                container_path: format!("0.{container_index}"),
+                gather_target: "0.g-0".to_string(),
+            },
+            ChoicePathMode::RootGather { gather_name } => ChoicePathMode::NestedRoot {
+                container_path: format!("0.{gather_name}.{container_index}"),
+                gather_target: "0.g-0".to_string(),
+            },
+            ChoicePathMode::Flow { .. } => self.with_self_target_relative(true),
+        }
+    }
 }
 
 pub(crate) fn lower(story: &CheckedStory) -> StageOutput<RuntimeProgram> {
@@ -100,6 +158,7 @@ pub(crate) fn lower(story: &CheckedStory) -> StageOutput<RuntimeProgram> {
         content: main_content,
         name: None,
         flags: None,
+        merge_tail_metadata: true,
     });
 
     let mut root_content = vec![
@@ -121,6 +180,7 @@ pub(crate) fn lower(story: &CheckedStory) -> StageOutput<RuntimeProgram> {
         content: root_content,
         name: None,
         flags: None,
+        merge_tail_metadata: true,
     };
 
     StageOutput {
@@ -169,6 +229,7 @@ fn lower_flow_with_context(
             content: lower_choice_weave(flow.weave(), path_mode),
             name: None,
             flags: None,
+            merge_tail_metadata: true,
         }));
     } else if !flow.weave().content().is_empty() {
         content.extend(lower_linear_weave(flow.weave()));
@@ -207,6 +268,7 @@ fn lower_flow_with_context(
         content,
         name: Some(flow.name().to_string()),
         flags: None,
+        merge_tail_metadata: true,
     }
 }
 
@@ -245,7 +307,8 @@ fn lower_choice_weave(weave: &Weave, path_mode: ChoicePathMode) -> Vec<RuntimeOb
             | Object::Glue(_)
             | Object::Divert(_)
             | Object::Tag(_)
-            | Object::Sequence(_) => lower_weave_section(
+            | Object::Sequence(_)
+            | Object::Weave(_) => lower_weave_section(
                 objects,
                 &mut index,
                 &mut main_content,
@@ -290,6 +353,7 @@ fn lower_choice_weave(weave: &Weave, path_mode: ChoicePathMode) -> Vec<RuntimeOb
                     content: gather_content,
                     name: Some(gather_name),
                     flags: None,
+                    merge_tail_metadata: true,
                 });
                 last_gather_container_index = Some(named_content.len() - 1);
             }
@@ -315,7 +379,10 @@ fn lower_choice_weave(weave: &Weave, path_mode: ChoicePathMode) -> Vec<RuntimeOb
                     "g-{gather_count}"
                 ))));
         }
-    } else if !has_explicit_gather && needs_terminal_gather {
+    } else if !matches!(path_mode, ChoicePathMode::NestedRoot { .. })
+        && !has_explicit_gather
+        && needs_terminal_gather
+    {
         // Add a terminal gather for choices that divert to it.
         named_content.push(done_container(&format!("g-{gather_count}")));
     }
@@ -345,7 +412,8 @@ fn lower_weave_section(
             | Object::Glue(_)
             | Object::Divert(_)
             | Object::Tag(_)
-            | Object::Sequence(_) => {
+            | Object::Sequence(_)
+            | Object::Weave(_) => {
                 lower_object_into_with_context(content, &objects[*index], path_mode);
                 *index += 1;
             }
@@ -403,12 +471,17 @@ fn lower_choice_in_section(
         choice.inner_content(),
         &choice_content_path_mode,
     ));
-    let nested_choice_content_path_mode = path_mode.with_self_target_relative(true);
+    let nested_choice_content_path_mode =
+        path_mode.for_choice_nested_content(&choice_container_name, &gather_container_name);
+    let mut has_nested_weave_content = false;
 
     *index += 1;
     while *index < objects.len() {
         if matches!(objects[*index], Object::Choice(_) | Object::Gather(_)) {
             break;
+        }
+        if matches!(objects[*index], Object::Weave(_)) {
+            has_nested_weave_content = true;
         }
         lower_object_into_with_context(
             &mut choice_content,
@@ -418,11 +491,15 @@ fn lower_choice_in_section(
         *index += 1;
     }
 
-    let include_gather = if has_explicit_gather {
+    let include_gather = if has_nested_weave_content {
+        false
+    } else if has_explicit_gather {
         true
     } else {
         match path_mode {
-            ChoicePathMode::Root | ChoicePathMode::RootGather { .. } => true,
+            ChoicePathMode::Root
+            | ChoicePathMode::RootGather { .. }
+            | ChoicePathMode::NestedRoot { .. } => true,
             ChoicePathMode::Flow { .. } => !ends_with_flow_terminator(&choice_content),
         }
     };
@@ -439,6 +516,7 @@ fn lower_choice_in_section(
         name: Some(choice_container_name),
         // Only set visitsShouldBeCounted flag (5) for once-only choices.
         flags: if choice.once_only() { Some(5) } else { None },
+        merge_tail_metadata: true,
     });
 }
 
@@ -472,6 +550,7 @@ fn choice_outer(
             content: Vec::new(),
             name: Some("$r1".to_string()),
             flags: None,
+            merge_tail_metadata: true,
         }));
         outer_content.push(RuntimeObject::ControlCommand(ControlCommand::EndString));
     }
@@ -514,12 +593,14 @@ fn choice_outer(
         content: start_content,
         name: Some("s".to_string()),
         flags: None,
+        merge_tail_metadata: true,
     }]));
 
     ChoiceOuter::Nested(Container {
         content: outer_content,
         name: None,
         flags: None,
+        merge_tail_metadata: true,
     })
 }
 
@@ -545,6 +626,7 @@ fn choice_container_prefix(
             content: Vec::new(),
             name: Some(format!("$r{return_index}")),
             flags: None,
+            merge_tail_metadata: true,
         }),
     ]
 }
@@ -657,6 +739,7 @@ fn lower_sequence(sequence: &Sequence) -> Container {
                 content: branch_content,
                 name: Some(format!("s{index}")),
                 flags: None,
+                merge_tail_metadata: true,
             }
         })
         .collect::<Vec<_>>();
@@ -666,6 +749,7 @@ fn lower_sequence(sequence: &Sequence) -> Container {
         content,
         name: None,
         flags: Some(5),
+        merge_tail_metadata: true,
     }
 }
 
@@ -688,6 +772,12 @@ fn lower_object_into(content: &mut Vec<RuntimeObject>, object: &Object) {
         Object::Sequence(sequence) => {
             content.push(RuntimeObject::Container(lower_sequence(sequence)))
         }
+        Object::Weave(weave) => content.push(RuntimeObject::Container(Container {
+            content: lower_choice_weave(weave, ChoicePathMode::Root),
+            name: None,
+            flags: None,
+            merge_tail_metadata: true,
+        })),
     }
 }
 
@@ -710,6 +800,15 @@ fn lower_object_into_with_context(
         }),
         Object::Sequence(sequence) => {
             content.push(RuntimeObject::Container(lower_sequence(sequence)))
+        }
+        Object::Weave(weave) => {
+            let nested_path_mode = path_mode.for_nested_weave(content.len());
+            content.push(RuntimeObject::Container(Container {
+                content: lower_choice_weave(weave, nested_path_mode),
+                name: None,
+                flags: None,
+                merge_tail_metadata: true,
+            }));
         }
     }
 }
@@ -740,7 +839,9 @@ fn push_divert_with_context(
 /// when the target is a sibling stitch or child stitch inside a choice container.
 fn resolve_divert_target(target: &str, path_mode: &ChoicePathMode) -> String {
     match path_mode {
-        ChoicePathMode::Root | ChoicePathMode::RootGather { .. } => target.to_string(),
+        ChoicePathMode::Root
+        | ChoicePathMode::RootGather { .. }
+        | ChoicePathMode::NestedRoot { .. } => target.to_string(),
         ChoicePathMode::Flow {
             parent_flow_name,
             flow_name,
@@ -770,7 +871,9 @@ fn resolve_divert_target(target: &str, path_mode: &ChoicePathMode) -> String {
 /// Resolve a single stitch name to a relative path if applicable.
 fn resolve_single_stitch_target(target: &str, path_mode: &ChoicePathMode) -> String {
     match path_mode {
-        ChoicePathMode::Root | ChoicePathMode::RootGather { .. } => target.to_string(),
+        ChoicePathMode::Root
+        | ChoicePathMode::RootGather { .. }
+        | ChoicePathMode::NestedRoot { .. } => target.to_string(),
         ChoicePathMode::Flow {
             sibling_stitch_names,
             parent_flow_name,
@@ -820,6 +923,8 @@ fn choice_point_target(
         ChoicePathMode::Root => format!("0.c-{choice_index}"),
         ChoicePathMode::RootGather { .. } if has_start_content => format!(".^.^.c-{choice_index}"),
         ChoicePathMode::RootGather { .. } => format!(".^.c-{choice_index}"),
+        ChoicePathMode::NestedRoot { .. } if has_start_content => format!(".^.^.c-{choice_index}"),
+        ChoicePathMode::NestedRoot { .. } => format!(".^.c-{choice_index}"),
         ChoicePathMode::Flow { .. } if has_start_content => format!(".^.^.c-{choice_index}"),
         ChoicePathMode::Flow { .. } => format!(".^.c-{choice_index}"),
     }
@@ -831,6 +936,9 @@ fn outer_return_target(path_mode: &ChoicePathMode, choice_point_index: usize) ->
         ChoicePathMode::RootGather { gather_name } => {
             format!("0.{gather_name}.{choice_point_index}")
         }
+        ChoicePathMode::NestedRoot { container_path, .. } => {
+            format!("{container_path}.{choice_point_index}")
+        }
         ChoicePathMode::Flow { flow_name, .. } => format!("{flow_name}.0.{choice_point_index}"),
     }
 }
@@ -841,6 +949,9 @@ fn choice_content_return_target(path_mode: &ChoicePathMode, choice_container_nam
         ChoicePathMode::RootGather { gather_name } => {
             format!("0.{gather_name}.{choice_container_name}")
         }
+        ChoicePathMode::NestedRoot { container_path, .. } => {
+            format!("{container_path}.{choice_container_name}")
+        }
         ChoicePathMode::Flow { flow_name, .. } => format!("{flow_name}.0.{choice_container_name}"),
     }
 }
@@ -849,6 +960,7 @@ fn start_content_target(path_mode: &ChoicePathMode, choice_point_index: usize) -
     match path_mode {
         ChoicePathMode::Root => format!("0.{choice_point_index}.s"),
         ChoicePathMode::RootGather { .. } => format!(".^.^.{choice_point_index}.s"),
+        ChoicePathMode::NestedRoot { .. } => format!(".^.^.{choice_point_index}.s"),
         ChoicePathMode::Flow { .. } => format!(".^.^.{choice_point_index}.s"),
     }
 }
@@ -857,6 +969,7 @@ fn gather_target(path_mode: &ChoicePathMode, gather_container_name: &str) -> Str
     match path_mode {
         ChoicePathMode::Root => format!("0.{gather_container_name}"),
         ChoicePathMode::RootGather { .. } => format!("0.{gather_container_name}"),
+        ChoicePathMode::NestedRoot { gather_target, .. } => gather_target.clone(),
         ChoicePathMode::Flow { .. } => format!(".^.^.{gather_container_name}"),
     }
 }
@@ -895,5 +1008,6 @@ fn done_container(name: &str) -> Container {
         content: vec![RuntimeObject::ControlCommand(ControlCommand::Done)],
         name: Some(name.to_string()),
         flags: None,
+        merge_tail_metadata: true,
     }
 }
