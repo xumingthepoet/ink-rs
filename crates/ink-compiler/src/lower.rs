@@ -1,7 +1,7 @@
 use crate::{
     analysis::CheckedStory,
     compiler::StageOutput,
-    parsed::{Choice, ContentList, DivertTarget, Object, Weave},
+    parsed::{Choice, ContentList, DivertTarget, Flow, Object, Weave},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -45,22 +45,7 @@ enum ChoiceOuter {
 
 pub(crate) fn lower(story: &CheckedStory) -> StageOutput<RuntimeProgram> {
     let root_weave = story.parsed.root_weave();
-    let main_content = if root_weave
-        .content()
-        .iter()
-        .any(|object| matches!(object, Object::Choice(_)))
-    {
-        lower_choice_weave(root_weave)
-    } else {
-        let mut content = Vec::new();
-
-        for object in root_weave.content() {
-            lower_object_into(&mut content, object);
-        }
-
-        content.push(RuntimeObject::Container(done_container("g-0")));
-        content
-    };
+    let main_content = lower_root_weave(root_weave);
 
     let main_container = RuntimeObject::Container(Container {
         content: main_content,
@@ -68,11 +53,23 @@ pub(crate) fn lower(story: &CheckedStory) -> StageOutput<RuntimeProgram> {
         flags: None,
     });
 
+    let mut root_content = vec![
+        main_container,
+        RuntimeObject::ControlCommand(ControlCommand::Done),
+    ];
+
+    let flow_containers = story
+        .parsed
+        .flows()
+        .iter()
+        .map(lower_flow)
+        .collect::<Vec<_>>();
+    if !flow_containers.is_empty() {
+        root_content.push(RuntimeObject::NamedContent(flow_containers));
+    }
+
     let root = Container {
-        content: vec![
-            main_container,
-            RuntimeObject::ControlCommand(ControlCommand::Done),
-        ],
+        content: root_content,
         name: None,
         flags: None,
     };
@@ -81,6 +78,36 @@ pub(crate) fn lower(story: &CheckedStory) -> StageOutput<RuntimeProgram> {
         artifact: Some(RuntimeProgram { root }),
         diagnostics: Vec::new(),
     }
+}
+
+fn lower_root_weave(weave: &Weave) -> Vec<RuntimeObject> {
+    if weave
+        .content()
+        .iter()
+        .any(|object| matches!(object, Object::Choice(_)))
+    {
+        lower_choice_weave(weave)
+    } else {
+        let mut content = lower_linear_weave(weave);
+        content.push(RuntimeObject::Container(done_container("g-0")));
+        content
+    }
+}
+
+fn lower_flow(flow: &Flow) -> Container {
+    Container {
+        content: lower_linear_weave(flow.weave()),
+        name: Some(flow.name().to_string()),
+        flags: None,
+    }
+}
+
+fn lower_linear_weave(weave: &Weave) -> Vec<RuntimeObject> {
+    let mut content = Vec::new();
+    for object in weave.content() {
+        lower_object_into(&mut content, object);
+    }
+    content
 }
 
 fn lower_choice_weave(weave: &Weave) -> Vec<RuntimeObject> {

@@ -101,6 +101,33 @@ impl<'source> RuleParser<'source> {
         }
     }
 
+    pub(super) fn take_while(&mut self, predicate: impl Fn(char) -> bool) -> Option<String> {
+        let remainder = self.line_remainder();
+        let mut end = 0;
+        let mut char_count = 0;
+
+        for (index, ch) in remainder.char_indices() {
+            if !predicate(ch) {
+                break;
+            }
+
+            end = index + ch.len_utf8();
+            char_count += 1;
+        }
+
+        if char_count == 0 {
+            return None;
+        }
+
+        let matched = remainder[..end].to_string();
+        self.state.set_position(
+            self.state.byte_index() + end,
+            self.state.character_in_line() + char_count,
+        );
+        Some(matched)
+    }
+
+    #[cfg(test)]
     pub(super) fn take_to_end_trimmed(&mut self) -> Option<String> {
         let text = self.line_remainder().trim().to_string();
         self.skip_to_end();
@@ -210,5 +237,13 @@ mod tests {
             Some("->".to_string())
         );
         assert_eq!(parser.line_remainder(), "-> DONE");
+    }
+
+    #[test]
+    fn take_while_advances_cursor() {
+        let mut parser = parser_for("=== knot");
+
+        assert_eq!(parser.take_while(|ch| ch == '='), Some("===".to_string()));
+        assert_eq!(parser.line_remainder(), " knot");
     }
 }

@@ -1,6 +1,7 @@
 mod choice;
 mod content_list;
 mod divert;
+mod flow;
 mod story;
 mod text;
 mod weave;
@@ -8,6 +9,7 @@ mod weave;
 pub use choice::Choice;
 pub use content_list::ContentList;
 pub use divert::{Divert, DivertTarget};
+pub use flow::{Flow, FlowArgument, FlowLevel};
 pub use story::Story;
 pub use text::Text;
 pub use weave::Weave;

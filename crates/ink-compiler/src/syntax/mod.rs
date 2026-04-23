@@ -1,6 +1,7 @@
 mod choice;
 mod divert;
 mod error;
+mod knot;
 mod rule;
 mod state;
 mod text;
@@ -8,7 +9,7 @@ mod text;
 use crate::{
     compiler::StageOutput,
     diagnostic::Diagnostic,
-    parsed::{Object, Story},
+    parsed::{Flow, Object, Story},
     source::{SourceFile, SourceInput, SourceLine},
 };
 
@@ -41,13 +42,33 @@ impl Parser {
     }
 
     fn parse_story(&mut self) -> Story {
+        let lines = self.source.lines.clone();
         let mut objects = Vec::new();
+        let mut flows = Vec::new();
+        let mut index = 0;
 
-        for line in self.source.lines.clone() {
-            objects.extend(self.parse_statement(&line));
+        while index < lines.len() {
+            let line = &lines[index];
+
+            if line.text.trim().is_empty() {
+                index += 1;
+                continue;
+            }
+
+            if knot::is_knot_declaration_line(&line.text) {
+                if let Some(flow) = self.parse_flow(&lines, &mut index) {
+                    flows.push(flow);
+                } else {
+                    index += 1;
+                }
+                continue;
+            }
+
+            objects.extend(self.parse_statement(line));
+            index += 1;
         }
 
-        Story::new(objects)
+        Story::new(objects, flows)
     }
 
     fn parse_statement(&mut self, line: &SourceLine) -> Vec<Object> {
@@ -115,6 +136,48 @@ impl Parser {
 
         feature.map(|feature| Diagnostic::unsupported(line.span.clone(), feature))
     }
+
+    fn parse_flow(&mut self, lines: &[SourceLine], index: &mut usize) -> Option<Flow> {
+        let line = &lines[*index];
+        let mut line_parser = RuleParser::new(line);
+        let declaration = line_parser.parse_rule(knot::parse_knot_declaration);
+        let had_error = line_parser.had_error();
+        self.diagnostics.extend(line_parser.finish());
+
+        let Some(declaration) = declaration else {
+            return None;
+        };
+
+        if had_error {
+            return None;
+        }
+
+        *index += 1;
+        let mut content = Vec::new();
+
+        while *index < lines.len() {
+            let next_line = &lines[*index];
+            if next_line.text.trim().is_empty() {
+                *index += 1;
+                continue;
+            }
+
+            if knot::is_knot_declaration_line(&next_line.text) {
+                break;
+            }
+
+            content.extend(self.parse_statement(next_line));
+            *index += 1;
+        }
+
+        Some(Flow::new(
+            declaration.level,
+            declaration.name,
+            content,
+            declaration.arguments,
+            declaration.is_function,
+        ))
+    }
 }
 
 fn choice_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
@@ -126,7 +189,7 @@ fn divert_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
 }
 
 fn text_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
-    text::parse_text_line(parser).map(|text| text.into_iter().map(Object::Text).collect())
+    text::parse_text_line(parser)
 }
 
 #[cfg(test)]
@@ -139,6 +202,7 @@ mod tests {
         assert!(output.diagnostics.is_empty());
         let story = output.artifact.unwrap();
         assert_eq!(story.root_weave().content().len(), 4);
+        assert!(story.flows().is_empty());
     }
 
     #[test]
@@ -176,6 +240,29 @@ mod tests {
         assert!(!choice.has_start_content());
         assert!(choice.has_choice_only_content());
         assert_eq!(choice.inner_content().objects().len(), 1);
+    }
+
+    #[test]
+    fn parses_inline_divert_in_text() {
+        let output = parse(SourceInput::new("A line. -> END"));
+        assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
+        let story = output.artifact.unwrap();
+
+        assert_eq!(story.root_weave().content().len(), 3);
+        assert!(matches!(story.root_weave().content()[1], Object::Divert(_)));
+    }
+
+    #[test]
+    fn parses_knot_definition() {
+        let output = parse(SourceInput::new(
+            "Top line.\n-> knot_name\n\n=== knot_name ===\nInside knot. -> END",
+        ));
+        assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
+        let story = output.artifact.unwrap();
+
+        assert_eq!(story.flows().len(), 1);
+        assert_eq!(story.flows()[0].name(), "knot_name");
+        assert_eq!(story.flows()[0].weave().content().len(), 3);
     }
 
     #[test]
