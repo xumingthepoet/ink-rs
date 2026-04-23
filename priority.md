@@ -1,6 +1,6 @@
 # Ink Fixture Priority
 
-通过统计: 13/118
+通过统计: 14/118
 
 Sorted by the latest `WritingWithInk.md` syntax point used by each file.
 
@@ -17,7 +17,7 @@ Sorted by the latest `WritingWithInk.md` syntax point used by each file.
 - [x] `divert/simple-divert.ink`
 - [x] `runtime/jump-knot.ink`
 - [x] `runtime/multiflow-basics.ink`
-- [ ] `divert/invisible-divert.ink`
+- [x] `divert/invisible-divert.ink`
 - [ ] `glue/glue-with-divert.ink`
 - [ ] `glue/simple-glue.ink`
 - [ ] `runtime/saving-loading.ink`
