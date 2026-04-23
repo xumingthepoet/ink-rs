@@ -44,6 +44,12 @@ enum ChoiceOuter {
     Nested(Container),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum ChoicePathMode {
+    Root,
+    Flow { flow_name: String },
+}
+
 pub(crate) fn lower(story: &CheckedStory) -> StageOutput<RuntimeProgram> {
     let root_weave = story.parsed.root_weave();
     let main_content = lower_root_weave(root_weave);
@@ -82,12 +88,8 @@ pub(crate) fn lower(story: &CheckedStory) -> StageOutput<RuntimeProgram> {
 }
 
 fn lower_root_weave(weave: &Weave) -> Vec<RuntimeObject> {
-    if weave
-        .content()
-        .iter()
-        .any(|object| matches!(object, Object::Choice(_)))
-    {
-        lower_choice_weave(weave)
+    if weave_has_choice(weave) {
+        lower_choice_weave(weave, ChoicePathMode::Root)
     } else {
         let mut content = lower_linear_weave(weave);
         content.push(RuntimeObject::Container(done_container("g-0")));
@@ -97,10 +99,30 @@ fn lower_root_weave(weave: &Weave) -> Vec<RuntimeObject> {
 
 fn lower_flow(flow: &Flow) -> Container {
     Container {
-        content: lower_linear_weave(flow.weave()),
+        content: if weave_has_choice(flow.weave()) {
+            vec![RuntimeObject::Container(Container {
+                content: lower_choice_weave(
+                    flow.weave(),
+                    ChoicePathMode::Flow {
+                        flow_name: flow.name().to_string(),
+                    },
+                ),
+                name: None,
+                flags: None,
+            })]
+        } else {
+            lower_linear_weave(flow.weave())
+        },
         name: Some(flow.name().to_string()),
         flags: None,
     }
+}
+
+fn weave_has_choice(weave: &Weave) -> bool {
+    weave
+        .content()
+        .iter()
+        .any(|object| matches!(object, Object::Choice(_)))
 }
 
 fn lower_linear_weave(weave: &Weave) -> Vec<RuntimeObject> {
@@ -111,7 +133,7 @@ fn lower_linear_weave(weave: &Weave) -> Vec<RuntimeObject> {
     content
 }
 
-fn lower_choice_weave(weave: &Weave) -> Vec<RuntimeObject> {
+fn lower_choice_weave(weave: &Weave, path_mode: ChoicePathMode) -> Vec<RuntimeObject> {
     let mut main_content = Vec::new();
     let mut iter = weave.content().iter().peekable();
 
@@ -123,10 +145,16 @@ fn lower_choice_weave(weave: &Weave) -> Vec<RuntimeObject> {
             Object::Choice(choice) => {
                 let choice_index = 0;
                 let choice_container_name = format!("c-{choice_index}");
-                let choice_container_path = format!("0.{choice_container_name}");
                 let gather_container_name = "g-0";
+                let choice_container_path =
+                    choice_point_target(&path_mode, choice.has_start_content(), choice_index);
 
-                match choice_outer(choice, &choice_container_path, main_content.len()) {
+                match choice_outer(
+                    choice,
+                    &choice_container_path,
+                    main_content.len(),
+                    &path_mode,
+                ) {
                     ChoiceOuter::Inline(objects) => main_content.extend(objects),
                     ChoiceOuter::Nested(container) => {
                         main_content.push(RuntimeObject::Container(container))
@@ -135,9 +163,12 @@ fn lower_choice_weave(weave: &Weave) -> Vec<RuntimeObject> {
 
                 let mut choice_content = Vec::new();
                 if choice.has_start_content() {
-                    let choice_point_path = format!("0.{}", main_content.len() - 1);
-                    choice_content =
-                        choice_container_prefix(&choice_container_path, &choice_point_path, 2);
+                    choice_content = choice_container_prefix(
+                        &path_mode,
+                        &choice_container_name,
+                        main_content.len() - 1,
+                        2,
+                    );
                 }
                 choice_content.extend(lower_content_list(choice.inner_content()));
 
@@ -145,19 +176,27 @@ fn lower_choice_weave(weave: &Weave) -> Vec<RuntimeObject> {
                     lower_object_into(&mut choice_content, remaining);
                 }
 
-                choice_content.push(RuntimeObject::Divert {
-                    target: format!("0.{gather_container_name}"),
-                    variable: false,
-                });
+                let include_gather = match path_mode {
+                    ChoicePathMode::Root => true,
+                    ChoicePathMode::Flow { .. } => !ends_with_divert(&choice_content),
+                };
+                if include_gather {
+                    choice_content.push(RuntimeObject::Divert {
+                        target: gather_target(&path_mode, gather_container_name),
+                        variable: false,
+                    });
+                }
 
-                main_content.push(RuntimeObject::NamedContent(vec![
-                    Container {
-                        content: choice_content,
-                        name: Some(choice_container_name),
-                        flags: Some(5),
-                    },
-                    done_container(gather_container_name),
-                ]));
+                let mut named_content = vec![Container {
+                    content: choice_content,
+                    name: Some(choice_container_name),
+                    flags: Some(5),
+                }];
+                if include_gather {
+                    named_content.push(done_container(gather_container_name));
+                }
+
+                main_content.push(RuntimeObject::NamedContent(named_content));
                 break;
             }
         }
@@ -170,6 +209,7 @@ fn choice_outer(
     choice: &Choice,
     choice_container_path: &str,
     choice_point_index: usize,
+    path_mode: &ChoicePathMode,
 ) -> ChoiceOuter {
     let mut outer_content = Vec::new();
     let has_eval_content = choice.has_start_content() || choice.has_choice_only_content();
@@ -179,9 +219,9 @@ fn choice_outer(
     }
 
     if choice.has_start_content() {
-        let choice_point_path = format!("0.{choice_point_index}");
         outer_content.push(RuntimeObject::DivertTarget(format!(
-            "{choice_point_path}.$r1"
+            "{}.$r1",
+            outer_return_target(path_mode, choice_point_index)
         )));
         outer_content.push(RuntimeObject::VariableAssignment("$r".to_string()));
         outer_content.push(RuntimeObject::ControlCommand(ControlCommand::BeginString));
@@ -238,17 +278,21 @@ fn choice_outer(
 }
 
 fn choice_container_prefix(
-    choice_container_path: &str,
-    choice_point_path: &str,
+    path_mode: &ChoicePathMode,
+    choice_container_name: &str,
+    choice_point_index: usize,
     return_index: usize,
 ) -> Vec<RuntimeObject> {
     vec![
         RuntimeObject::ControlCommand(ControlCommand::EvalStart),
-        RuntimeObject::DivertTarget(format!("{choice_container_path}.$r{return_index}")),
+        RuntimeObject::DivertTarget(format!(
+            "{}.$r{return_index}",
+            choice_content_return_target(path_mode, choice_container_name)
+        )),
         RuntimeObject::ControlCommand(ControlCommand::EvalEnd),
         RuntimeObject::VariableAssignment("$r".to_string()),
         RuntimeObject::Divert {
-            target: format!("{choice_point_path}.s"),
+            target: start_content_target(path_mode, choice_point_index),
             variable: false,
         },
         RuntimeObject::Container(Container {
@@ -274,6 +318,54 @@ fn lower_object_into(content: &mut Vec<RuntimeObject>, object: &Object) {
         Object::Divert(divert) => push_divert(content, divert.target()),
         Object::Choice(_) => {}
     }
+}
+
+fn choice_point_target(
+    path_mode: &ChoicePathMode,
+    has_start_content: bool,
+    choice_index: usize,
+) -> String {
+    match path_mode {
+        ChoicePathMode::Root => format!("0.c-{choice_index}"),
+        ChoicePathMode::Flow { .. } if has_start_content => format!(".^.^.c-{choice_index}"),
+        ChoicePathMode::Flow { .. } => format!(".^.c-{choice_index}"),
+    }
+}
+
+fn outer_return_target(path_mode: &ChoicePathMode, choice_point_index: usize) -> String {
+    match path_mode {
+        ChoicePathMode::Root => format!("0.{choice_point_index}"),
+        ChoicePathMode::Flow { flow_name } => format!("{flow_name}.0.{choice_point_index}"),
+    }
+}
+
+fn choice_content_return_target(path_mode: &ChoicePathMode, choice_container_name: &str) -> String {
+    match path_mode {
+        ChoicePathMode::Root => format!("0.{choice_container_name}"),
+        ChoicePathMode::Flow { flow_name } => format!("{flow_name}.0.{choice_container_name}"),
+    }
+}
+
+fn start_content_target(path_mode: &ChoicePathMode, choice_point_index: usize) -> String {
+    match path_mode {
+        ChoicePathMode::Root => format!("0.{choice_point_index}.s"),
+        ChoicePathMode::Flow { .. } => format!(".^.^.{choice_point_index}.s"),
+    }
+}
+
+fn gather_target(path_mode: &ChoicePathMode, gather_container_name: &str) -> String {
+    match path_mode {
+        ChoicePathMode::Root => format!("0.{gather_container_name}"),
+        ChoicePathMode::Flow { .. } => format!(".^.^.{gather_container_name}"),
+    }
+}
+
+fn ends_with_divert(content: &[RuntimeObject]) -> bool {
+    content
+        .iter()
+        .rev()
+        .find(|object| !matches!(object, RuntimeObject::String(text) if text == "\n"))
+        .is_some_and(|object| matches!(object, RuntimeObject::Divert { .. }))
 }
 
 fn push_divert(content: &mut Vec<RuntimeObject>, target: &DivertTarget) {

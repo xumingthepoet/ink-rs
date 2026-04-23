@@ -1,6 +1,6 @@
-use crate::parsed::{Choice, ContentList, Object, Text};
+use crate::parsed::{Choice, ContentList};
 
-use super::rule::RuleParser;
+use super::{rule::RuleParser, text};
 
 pub(super) fn parse_choice(parser: &mut RuleParser<'_>) -> Option<Choice> {
     parser.skip_horizontal_whitespace();
@@ -96,14 +96,13 @@ fn content_list_from_segment(
         return None;
     }
 
-    let mut content = ContentList::empty();
-    if !segment.is_empty() {
-        content.push(Object::Text(Text::new(segment, span)));
-    }
-    Some(content)
+    let objects = text::parse_inline_content(&segment, &span).unwrap_or_default();
+    Some(ContentList::new(objects))
 }
 
 fn append_newline(mut content: ContentList, span: crate::source::SourceSpan) -> ContentList {
-    content.push(Object::Text(Text::new("\n", span)));
+    content.push(crate::parsed::Object::Text(crate::parsed::Text::new(
+        "\n", span,
+    )));
     content
 }

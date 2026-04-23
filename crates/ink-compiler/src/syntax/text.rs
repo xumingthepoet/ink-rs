@@ -1,4 +1,7 @@
-use crate::parsed::{Divert, DivertTarget, Glue, Object, Text};
+use crate::{
+    parsed::{Divert, DivertTarget, Glue, Object, Text},
+    source::SourceSpan,
+};
 
 use super::rule::RuleParser;
 
@@ -38,7 +41,7 @@ fn has_unsupported_text_syntax(text: &str) -> bool {
         || text.contains('#')
 }
 
-fn parse_inline_content(text: &str, span: &crate::source::SourceSpan) -> Option<Vec<Object>> {
+pub(super) fn parse_inline_content(text: &str, span: &SourceSpan) -> Option<Vec<Object>> {
     let mut remaining = text;
     let mut objects = Vec::new();
 

@@ -11,7 +11,9 @@ pub(super) struct FlowDecl {
 }
 
 pub(super) fn is_knot_declaration_line(line: &str) -> bool {
-    line.trim_start().starts_with("===")
+    let trimmed = line.trim_start();
+    let equals = trimmed.chars().take_while(|ch| *ch == '=').count();
+    equals >= 2
 }
 
 pub(super) fn parse_knot_declaration(parser: &mut RuleParser<'_>) -> Option<FlowDecl> {

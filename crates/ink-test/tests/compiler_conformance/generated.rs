@@ -20,6 +20,7 @@ fixture!(choices_one, "inkfiles/choices/one.ink");
 fixture!(choices_single_choice, "inkfiles/choices/single-choice.ink");
 fixture!(choices_suppress_choice, "inkfiles/choices/suppress-choice.ink");
 fixture!(divert_invisible_divert, "inkfiles/divert/invisible-divert.ink");
+fixture!(divert_on_choice, "inkfiles/divert/divert-on-choice.ink");
 fixture!(divert_simple_divert, "inkfiles/divert/simple-divert.ink");
 fixture!(glue_glue_with_divert, "inkfiles/glue/glue-with-divert.ink");
 fixture!(glue_simple_glue, "inkfiles/glue/simple-glue.ink");

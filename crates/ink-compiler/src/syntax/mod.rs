@@ -114,7 +114,7 @@ impl Parser {
             Some("constant declaration")
         } else if trimmed.starts_with("EXTERNAL ") {
             Some("external declaration")
-        } else if trimmed.starts_with("===") {
+        } else if knot::is_knot_declaration_line(trimmed) {
             Some("knot declaration")
         } else if trimmed.starts_with('=') {
             Some("stitch declaration")
@@ -243,6 +243,21 @@ mod tests {
     }
 
     #[test]
+    fn parses_choice_with_inner_divert() {
+        let output = parse(SourceInput::new("* [Open the gate] -> paragraph_2"));
+        assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
+        let story = output.artifact.unwrap();
+
+        let Object::Choice(choice) = &story.root_weave().content()[0] else {
+            panic!("expected choice");
+        };
+        assert!(matches!(
+            choice.inner_content().objects()[1],
+            Object::Divert(_)
+        ));
+    }
+
+    #[test]
     fn parses_inline_divert_in_text() {
         let output = parse(SourceInput::new("A line. -> END"));
         assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
@@ -268,7 +283,7 @@ mod tests {
     #[test]
     fn parses_knot_definition() {
         let output = parse(SourceInput::new(
-            "Top line.\n-> knot_name\n\n=== knot_name ===\nInside knot. -> END",
+            "Top line.\n-> knot_name\n\n== knot_name ===\nInside knot. -> END",
         ));
         assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
         let story = output.artifact.unwrap();
