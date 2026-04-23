@@ -2,6 +2,7 @@ mod choice;
 mod content_list;
 mod divert;
 mod flow;
+mod gather;
 mod glue;
 mod story;
 mod text;
@@ -11,6 +12,7 @@ pub use choice::Choice;
 pub use content_list::ContentList;
 pub use divert::{Divert, DivertTarget};
 pub use flow::{Flow, FlowArgument, FlowLevel};
+pub use gather::Gather;
 pub use glue::Glue;
 pub use story::Story;
 pub use text::Text;
@@ -22,6 +24,7 @@ pub enum Object {
     Glue(Glue),
     Choice(Choice),
     Divert(Divert),
+    Gather(Gather),
 }
 
 impl Object {
@@ -31,6 +34,7 @@ impl Object {
             Object::Glue(glue) => glue.write_parse_snapshot(out, indent),
             Object::Choice(choice) => choice.write_parse_snapshot(out, indent),
             Object::Divert(divert) => divert.write_parse_snapshot(out, indent),
+            Object::Gather(gather) => gather.write_parse_snapshot(out, indent),
         }
     }
 }

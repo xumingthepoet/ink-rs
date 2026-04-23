@@ -78,7 +78,7 @@ impl Parser {
 
         let mut line_parser = RuleParser::new(line);
         let statement_rules: &[StatementRule] =
-            &[choice_statement, divert_statement, text_statement];
+            &[choice_statement, gather_statement, divert_statement, text_statement];
 
         for rule in statement_rules {
             if let Some(objects) = line_parser.parse_rule(*rule) {
@@ -118,8 +118,6 @@ impl Parser {
             Some("knot declaration")
         } else if trimmed.starts_with('*') || trimmed.starts_with('+') {
             Some("choice")
-        } else if trimmed.starts_with('-') && !trimmed.starts_with("->") {
-            Some("gather")
         } else if trimmed.starts_with('~') {
             Some("logic line")
         } else if trimmed.contains('{') || trimmed.contains('}') {
@@ -236,6 +234,39 @@ impl Parser {
 
 fn choice_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
     choice::parse_choice(parser).map(|choice| vec![Object::Choice(choice)])
+}
+
+fn gather_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
+    parser.skip_horizontal_whitespace();
+    let span = parser.current_span();
+
+    // Match '-' but not '->'
+    if parser.match_string("-").is_none() {
+        return None;
+    }
+
+    // Make sure we didn't match '->' by checking if next char is '>'
+    let remainder = parser.line_remainder();
+    if remainder.starts_with('>') {
+        return None;
+    }
+
+    parser.skip_horizontal_whitespace();
+
+    let mut objects = vec![Object::Gather(crate::parsed::Gather::new(span.clone(), 1))];
+
+    // Parse any remaining text on the line as text content
+    let remaining = parser.line_remainder().trim();
+    if !remaining.is_empty() {
+        let text_objects = text::parse_inline_content(remaining, &span).unwrap_or_default();
+        objects.extend(text_objects);
+        parser.skip_to_end();
+    }
+
+    // Add trailing newline (like text_statement does)
+    objects.push(Object::Text(crate::parsed::Text::new("\n", span)));
+
+    Some(objects)
 }
 
 fn divert_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {

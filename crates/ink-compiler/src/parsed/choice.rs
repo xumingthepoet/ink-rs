@@ -92,6 +92,10 @@ impl Choice {
         self.is_invisible_default
     }
 
+    pub fn set_is_invisible_default(&mut self, is_invisible_default: bool) {
+        self.is_invisible_default = is_invisible_default;
+    }
+
     pub fn indentation_depth(&self) -> usize {
         self.indentation_depth
     }

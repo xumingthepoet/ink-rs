@@ -193,6 +193,7 @@ fn lower_choice_weave(weave: &Weave, path_mode: ChoicePathMode) -> Vec<RuntimeOb
     let mut named_content = Vec::new();
     let mut index = 0;
     let mut any_gather = false;
+    let mut gather_count = 0;
     let objects = weave.content();
 
     while index < objects.len() {
@@ -201,10 +202,37 @@ fn lower_choice_weave(weave: &Weave, path_mode: ChoicePathMode) -> Vec<RuntimeOb
                 lower_object_into(&mut main_content, &objects[index]);
                 index += 1;
             }
+            Object::Gather(_gather) => {
+                // Create a named container for the gather
+                let gather_name = format!("g-{gather_count}");
+                gather_count += 1;
+
+                // Collect content after the gather
+                let mut gather_content = Vec::new();
+                index += 1;
+                while index < objects.len() {
+                    if matches!(objects[index], Object::Gather(_) | Object::Choice(_)) {
+                        break;
+                    }
+                    lower_object_into_with_context(
+                        &mut gather_content,
+                        &objects[index],
+                        &path_mode,
+                    );
+                    index += 1;
+                }
+
+                named_content.push(Container {
+                    content: gather_content,
+                    name: Some(gather_name),
+                    flags: None,
+                });
+                any_gather = true;
+            }
             Object::Choice(choice) => {
                 let choice_index = named_content.len();
                 let choice_container_name = format!("c-{choice_index}");
-                let gather_container_name = "g-0";
+                let gather_container_name = format!("g-{gather_count}");
                 let choice_container_path =
                     choice_point_target(&path_mode, choice.has_start_content(), choice_index);
 
@@ -233,7 +261,7 @@ fn lower_choice_weave(weave: &Weave, path_mode: ChoicePathMode) -> Vec<RuntimeOb
 
                 index += 1;
                 while index < objects.len() {
-                    if matches!(objects[index], Object::Choice(_)) {
+                    if matches!(objects[index], Object::Choice(_) | Object::Gather(_)) {
                         break;
                     }
                     lower_object_into_with_context(
@@ -250,7 +278,7 @@ fn lower_choice_weave(weave: &Weave, path_mode: ChoicePathMode) -> Vec<RuntimeOb
                 };
                 if include_gather {
                     choice_content.push(RuntimeObject::Divert {
-                        target: gather_target(&path_mode, gather_container_name),
+                        target: gather_target(&path_mode, &gather_container_name),
                         variable: false,
                     });
                     any_gather = true;
@@ -266,8 +294,9 @@ fn lower_choice_weave(weave: &Weave, path_mode: ChoicePathMode) -> Vec<RuntimeOb
         }
     }
 
-    if any_gather {
-        named_content.push(done_container("g-0"));
+    if any_gather && gather_count == 0 {
+        // Add a default gather if there were choices but no explicit gathers
+        named_content.push(done_container(&format!("g-{gather_count}")));
     }
     if !named_content.is_empty() {
         main_content.push(RuntimeObject::NamedContent(named_content));
@@ -388,6 +417,7 @@ fn lower_object_into(content: &mut Vec<RuntimeObject>, object: &Object) {
         Object::Glue(_) => content.push(RuntimeObject::Glue),
         Object::Divert(divert) => push_divert(content, divert.target()),
         Object::Choice(_) => {}
+        Object::Gather(_) => {} // Handled in lower_choice_weave
     }
 }
 
@@ -401,6 +431,7 @@ fn lower_object_into_with_context(
         Object::Glue(_) => content.push(RuntimeObject::Glue),
         Object::Divert(divert) => push_divert_with_context(content, divert.target(), path_mode),
         Object::Choice(_) => {}
+        Object::Gather(_) => {} // Handled in lower_choice_weave
     }
 }
 

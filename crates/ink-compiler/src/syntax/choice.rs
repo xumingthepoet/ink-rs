@@ -31,6 +31,24 @@ pub(super) fn parse_choice(parser: &mut RuleParser<'_>) -> Option<Choice> {
         |parser| parser.skip_to_end(),
     )?;
 
+    // Handle fallback choices like "* -> " which have no text content
+    // and the -> is a divert to empty (fall through to gather)
+    let trimmed_body = choice_body.trim();
+    if trimmed_body == "->" || trimmed_body.is_empty() {
+        // Invisible default choice - inner content is just a newline
+        let inner = append_newline(ContentList::new(vec![]), span.clone());
+        let mut choice = Choice::new_with_inline_brackets(
+            None, // no start content
+            None, // no choice-only content
+            inner,
+            span,
+            false, // no inline brackets
+        );
+        choice.set_once_only(once_only);
+        choice.set_is_invisible_default(true);
+        return Some(choice);
+    }
+
     let segments = parse_choice_segments(&choice_body)
         .map_err(|message| {
             parser.error(message);
@@ -50,6 +68,13 @@ pub(super) fn parse_choice(parser: &mut RuleParser<'_>) -> Option<Choice> {
         segments.has_inline_brackets,
     );
     choice.set_once_only(once_only);
+
+    // Check if this is an invisible default (empty content)
+    let is_invisible_default = !choice.has_start_content()
+        && !choice.has_choice_only_content()
+        && choice.inner_content().objects().len() <= 1; // Only newline
+    choice.set_is_invisible_default(is_invisible_default);
+
     Some(choice)
 }
 
