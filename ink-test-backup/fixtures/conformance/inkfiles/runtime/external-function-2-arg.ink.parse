@@ -1,0 +1,15 @@
+Story
+  Weave(baseIndent=0)
+    ExternalDeclaration(name="externalFunction", args=["x","y"])
+    Text("The value is ")
+    ContentList
+      FunctionCall(externalFunction, args=2)
+    Text(".")
+    Text("\n")
+    Divert(target="-> END", empty=false, tunnel=false, thread=false)
+    Gather(name=null, depth=1)
+    Divert(target="-> DONE", empty=false, tunnel=false, thread=false)
+  Flow(level=Knot, name="externalFunction", function=true)
+    Weave(baseIndent=0)
+      Return
+        Binary(+, VariableReference(x), VariableReference(y))

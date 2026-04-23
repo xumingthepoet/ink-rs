@@ -1,0 +1,35 @@
+Story
+  Weave(baseIndent=0)
+    Text("Who do you accuse?")
+    Text("\n")
+    Choice(name=null, once=true, invisible=false, depth=1, inline=true)
+      ContentList
+        Text("Accuse Hasting")
+      ContentList
+        Text(" ")
+        Divert(target="-> accuse", empty=false, tunnel=false, thread=false)
+        Text("\n")
+    Choice(name=null, once=true, invisible=false, depth=1, inline=true)
+      ContentList
+        Text("Accuse Mrs Black")
+      ContentList
+        Text(" ")
+        Divert(target="-> accuse", empty=false, tunnel=false, thread=false)
+        Text("\n")
+    Choice(name=null, once=true, invisible=false, depth=1, inline=true)
+      ContentList
+        Text("Accuse myself")
+      ContentList
+        Text(" ")
+        Divert(target="-> accuse", empty=false, tunnel=false, thread=false)
+        Text("\n")
+    Gather(name=null, depth=1)
+    Divert(target="-> DONE", empty=false, tunnel=false, thread=false)
+  Flow(level=Knot, name="accuse", function=false)
+    Weave(baseIndent=0)
+      Text("\"I accuse ")
+      ContentList
+        VariableReference(who)
+      Text("!\" Poirot declared.")
+      Text("\n")
+      Divert(target="-> END", empty=false, tunnel=false, thread=false)

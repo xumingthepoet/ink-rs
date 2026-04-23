@@ -1,0 +1,36 @@
+Story
+  Weave(baseIndent=0)
+    VariableAssignment(name="x", global=true, temp=false)
+      DivertTarget(-> knot)
+    Text("Count start: ")
+    ContentList
+      FunctionCall(READ_COUNT, args=1)
+    Text(" ")
+    ContentList
+      FunctionCall(READ_COUNT, args=1)
+    Text(" ")
+    ContentList
+      VariableReference(knot)
+    Text("\n")
+    Divert(target="-> x", empty=false, tunnel=true, thread=false)
+    Divert(target="-> x", empty=false, tunnel=true, thread=false)
+    Divert(target="-> x", empty=false, tunnel=true, thread=false)
+    Text("Count end: ")
+    ContentList
+      FunctionCall(READ_COUNT, args=1)
+    Text(" ")
+    ContentList
+      FunctionCall(READ_COUNT, args=1)
+    Text(" ")
+    ContentList
+      VariableReference(knot)
+    Text("\n")
+    Divert(target="-> END", empty=false, tunnel=false, thread=false)
+    Gather(name=null, depth=1)
+    Divert(target="-> DONE", empty=false, tunnel=false, thread=false)
+  Flow(level=Knot, name="knot", function=false)
+    Weave(baseIndent=0)
+      ContentList
+        VariableReference(a)
+      Text("\n")
+      TunnelOnwards

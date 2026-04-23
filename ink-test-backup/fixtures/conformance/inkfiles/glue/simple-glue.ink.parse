@@ -1,0 +1,12 @@
+Story
+  Weave(baseIndent=0)
+    Text("Some ")
+    Glue
+    Text("\n")
+    Text("content ")
+    Glue
+    Text("\n")
+    Text("with glue.")
+    Text("\n")
+    Gather(name=null, depth=1)
+    Divert(target="-> DONE", empty=false, tunnel=false, thread=false)

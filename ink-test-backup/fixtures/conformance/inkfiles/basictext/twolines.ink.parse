@@ -1,0 +1,8 @@
+Story
+  Weave(baseIndent=0)
+    Text("Line.")
+    Text("\n")
+    Text("Other line.")
+    Text("\n")
+    Gather(name=null, depth=1)
+    Divert(target="-> DONE", empty=false, tunnel=false, thread=false)

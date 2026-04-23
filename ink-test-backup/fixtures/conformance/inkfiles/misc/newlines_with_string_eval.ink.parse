@@ -1,0 +1,23 @@
+Story
+  Weave(baseIndent=0)
+    Text("A")
+    Text("\n")
+    ContentList
+      VariableAssignment(name="someTemp", global=false, temp=true)
+        FunctionCall(string, args=0)
+      Text("\n")
+    Text("B")
+    Text("\n")
+    Text("A")
+    Text("\n")
+    ContentList
+      FunctionCall(string, args=0)
+    Text("\n")
+    Text("B")
+    Text("\n")
+    Gather(name=null, depth=1)
+    Divert(target="-> DONE", empty=false, tunnel=false, thread=false)
+  Flow(level=Knot, name="string", function=true)
+    Weave(baseIndent=0)
+      Return
+        String("ContentList(3)")

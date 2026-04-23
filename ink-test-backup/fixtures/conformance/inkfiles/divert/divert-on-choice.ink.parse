@@ -1,0 +1,21 @@
+Story
+  Weave(baseIndent=0)
+    Divert(target="-> paragraph_1", empty=false, tunnel=false, thread=false)
+    Gather(name=null, depth=1)
+    Divert(target="-> DONE", empty=false, tunnel=false, thread=false)
+  Flow(level=Knot, name="paragraph_1", function=false)
+    Weave(baseIndent=0)
+      Text("You stand by the wall of Analand, sword in hand.")
+      Text("\n")
+      Choice(name=null, once=true, invisible=false, depth=1, inline=true)
+        ContentList
+          Text("Open the gate")
+        ContentList
+          Text(" ")
+          Divert(target="-> paragraph_2", empty=false, tunnel=false, thread=false)
+          Text("\n")
+  Flow(level=Knot, name="paragraph_2", function=false)
+    Weave(baseIndent=0)
+      Text("You open the gate, and step out onto the path. ")
+      Divert(target="-> END", empty=false, tunnel=false, thread=false)
+      Text("\n")

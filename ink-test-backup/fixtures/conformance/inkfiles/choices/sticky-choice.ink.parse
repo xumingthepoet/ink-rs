@@ -1,0 +1,23 @@
+Story
+  Weave(baseIndent=0)
+    Divert(target="-> homers_couch", empty=false, tunnel=false, thread=false)
+    Gather(name=null, depth=1)
+    Divert(target="-> DONE", empty=false, tunnel=false, thread=false)
+  Flow(level=Knot, name="homers_couch", function=false)
+    Weave(baseIndent=0)
+      Choice(name=null, once=false, invisible=false, depth=1, inline=true)
+        ContentList
+          Text("Eat another donut")
+        ContentList
+          Text("\n")
+      Text("You eat another donut. ")
+      Divert(target="-> homers_couch", empty=false, tunnel=false, thread=false)
+      Text("\n")
+      Choice(name=null, once=true, invisible=false, depth=1, inline=true)
+        ContentList
+          Text("Get off the couch")
+        ContentList
+          Text("\n")
+      Text("You struggle up off the couch to go and compose epic poetry.")
+      Text("\n")
+      Divert(target="-> END", empty=false, tunnel=false, thread=false)

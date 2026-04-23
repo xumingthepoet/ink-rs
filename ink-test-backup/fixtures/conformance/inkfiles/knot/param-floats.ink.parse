@@ -1,0 +1,35 @@
+Story
+  Weave(baseIndent=0)
+    Text("How much do you give?")
+    Text("\n")
+    Choice(name=null, once=true, invisible=false, depth=1, inline=true)
+      ContentList
+        Text("$1")
+      ContentList
+        Text(" ")
+        Divert(target="-> give", empty=false, tunnel=false, thread=false)
+        Text("\n")
+    Choice(name=null, once=true, invisible=false, depth=1, inline=true)
+      ContentList
+        Text("$2")
+      ContentList
+        Text(" ")
+        Divert(target="-> give", empty=false, tunnel=false, thread=false)
+        Text("\n")
+    Choice(name=null, once=true, invisible=false, depth=1, inline=true)
+      ContentList
+        Text("Nothing")
+      ContentList
+        Text(" ")
+        Divert(target="-> give", empty=false, tunnel=false, thread=false)
+        Text("\n")
+    Gather(name=null, depth=1)
+    Divert(target="-> DONE", empty=false, tunnel=false, thread=false)
+  Flow(level=Knot, name="give", function=false)
+    Weave(baseIndent=0)
+      Text("You give ")
+      ContentList
+        VariableReference(amount)
+      Text(" dollars.")
+      Text("\n")
+      Divert(target="-> END", empty=false, tunnel=false, thread=false)

@@ -1,0 +1,63 @@
+Story
+  Weave(baseIndent=0)
+    Text("Well, Poirot? Murder or suicide?\"")
+    Text("\n")
+    Choice(name=null, once=true, invisible=false, depth=1, inline=false)
+      ContentList
+        Text("\"Murder!\"")
+      ContentList
+        Text("\n")
+    Text("\"And who did it?\"")
+    Text("\n")
+    Weave(baseIndent=1)
+      Choice(name=null, once=true, invisible=false, depth=2, inline=false)
+        ContentList
+          Text("\"Detective-Inspector Japp!\"")
+        ContentList
+          Text("\n")
+      Choice(name=null, once=true, invisible=false, depth=2, inline=false)
+        ContentList
+          Text("\"Captain Hastings!\"")
+        ContentList
+          Text("\n")
+      Choice(name=null, once=true, invisible=false, depth=2, inline=false)
+        ContentList
+          Text("\"Myself!\"")
+        ContentList
+          Text("\n")
+      Gather(name=null, depth=2)
+      Text("\"You must be joking!\"")
+      Text("\n")
+      Choice(name=null, once=true, invisible=false, depth=2, inline=false)
+        ContentList
+          Text("\"Mon ami, I am deadly serious.\"")
+        ContentList
+          Text("\n")
+      Choice(name=null, once=true, invisible=false, depth=2, inline=false)
+        ContentList
+          Text("\"If only...\"")
+        ContentList
+          Text("\n")
+    Choice(name=null, once=true, invisible=false, depth=1, inline=false)
+      ContentList
+        Text("\"Suicide!\"")
+      ContentList
+        Text("\n")
+    Text("\"Really, Poirot? Are you quite sure?\"")
+    Text("\n")
+    Weave(baseIndent=1)
+      Choice(name=null, once=true, invisible=false, depth=2, inline=false)
+        ContentList
+          Text("\"Quite sure.\"")
+        ContentList
+          Text("\n")
+      Choice(name=null, once=true, invisible=false, depth=2, inline=false)
+        ContentList
+          Text("\"It is perfectly obvious.\"")
+        ContentList
+          Text("\n")
+    Gather(name=null, depth=1)
+    Text("Mrs. Christie lowered her manuscript a moment. The rest of the writing group sat, open-mouthed.")
+    Text("\n")
+    Gather(name=null, depth=1)
+    Divert(target="-> DONE", empty=false, tunnel=false, thread=false)

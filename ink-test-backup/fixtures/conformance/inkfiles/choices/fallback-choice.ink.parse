@@ -1,0 +1,34 @@
+Story
+  Weave(baseIndent=0)
+    Divert(target="-> find_help", empty=false, tunnel=false, thread=false)
+    Gather(name=null, depth=1)
+    Divert(target="-> DONE", empty=false, tunnel=false, thread=false)
+  Flow(level=Knot, name="find_help", function=false)
+    Weave(baseIndent=0)
+      Text("You search desperately for a friendly face in the crowd.")
+      Text("\n")
+      Choice(name=null, once=true, invisible=false, depth=1, inline=true)
+        ContentList
+          Text("The woman in the hat")
+        ContentList
+          Text("?")
+        ContentList
+          Text(" pushes you roughly aside. ")
+          Divert(target="-> find_help", empty=false, tunnel=false, thread=false)
+          Text("\n")
+      Choice(name=null, once=true, invisible=false, depth=1, inline=true)
+        ContentList
+          Text("The man with the briefcase")
+        ContentList
+          Text("?")
+        ContentList
+          Text(" looks disgusted as you stumble past him. ")
+          Divert(target="-> find_help", empty=false, tunnel=false, thread=false)
+          Text("\n")
+      Choice(name=null, once=true, invisible=true, depth=1, inline=false)
+        ContentList
+          Text("\n")
+      Gather(name=null, depth=1)
+      Text("But it is too late: you collapse onto the station platform. This is the end.")
+      Text("\n")
+      Divert(target="-> END", empty=false, tunnel=false, thread=false)

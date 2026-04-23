@@ -1,0 +1,12 @@
+Story
+  Weave(baseIndent=0)
+    Text("We hurried home to Savile Row ")
+    Divert(target="-> as_fast_as_we_could", empty=false, tunnel=false, thread=false)
+    Text("\n")
+    Gather(name=null, depth=1)
+    Divert(target="-> DONE", empty=false, tunnel=false, thread=false)
+  Flow(level=Knot, name="as_fast_as_we_could", function=false)
+    Weave(baseIndent=0)
+      Text("as fast as we could. ")
+      Divert(target="-> END", empty=false, tunnel=false, thread=false)
+      Text("\n")

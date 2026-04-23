@@ -1,0 +1,37 @@
+Story
+  Weave(baseIndent=0)
+    Divert(target="-> knot", empty=false, tunnel=true, thread=false)
+    Divert(target="-> knot", empty=false, tunnel=true, thread=false)
+    Gather(name=null, depth=1)
+    Divert(target="-> DONE", empty=false, tunnel=false, thread=false)
+  Flow(level=Knot, name="knot", function=false)
+    Weave(baseIndent=0)
+      Text("A ")
+      ContentList
+        Sequence(type=Stopping)
+          Weave(baseIndent=0)
+            Text("red ")
+            Tag(start=true, inChoice=false)
+            Text("red")
+          Weave(baseIndent=0)
+            Text("white ")
+            ContentList
+              Tag(start=false, inChoice=false)
+              Tag(start=true, inChoice=false)
+            Text("white")
+          Weave(baseIndent=0)
+            Text("blue ")
+            ContentList
+              Tag(start=false, inChoice=false)
+              Tag(start=true, inChoice=false)
+            Text("blue")
+          Weave(baseIndent=0)
+            Text("green ")
+            ContentList
+              Tag(start=false, inChoice=false)
+              Tag(start=true, inChoice=false)
+            Text("green")
+        Tag(start=false, inChoice=false)
+      Text(" sequence.")
+      Text("\n")
+      TunnelOnwards

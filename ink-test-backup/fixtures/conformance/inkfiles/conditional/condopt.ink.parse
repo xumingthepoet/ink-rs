@@ -1,0 +1,56 @@
+Story
+  Weave(baseIndent=0)
+    Text("I looked...")
+    Text("\n")
+    Choice(name=null, once=true, invisible=false, depth=1, inline=true)
+      ContentList
+        Text("at the door")
+      ContentList
+        Text("\n")
+    Divert(target="-> door_open", empty=false, tunnel=false, thread=false)
+    Choice(name=null, once=true, invisible=false, depth=1, inline=true)
+      ContentList
+        Text("outside")
+      ContentList
+        Text("\n")
+    Divert(target="-> leave", empty=false, tunnel=false, thread=false)
+    Gather(name=null, depth=1)
+    Divert(target="-> DONE", empty=false, tunnel=false, thread=false)
+  Flow(level=Knot, name="door_open", function=false)
+    Weave(baseIndent=0)
+      Text("at the door. It was open.")
+      Text("\n")
+      Divert(target="-> leave", empty=false, tunnel=false, thread=false)
+  Flow(level=Knot, name="leave", function=false)
+    Weave(baseIndent=0)
+      Text("I stood up and...")
+      Text("\n")
+      ContentList
+        Conditional
+          VariableReference(door_open)
+          ConditionalBranch(true=true, else=false, inline=false)
+            Weave(baseIndent=0)
+              Choice(name=null, once=true, invisible=false, depth=1, inline=true)
+                ContentList
+                  Text("I strode out of the compartment")
+                ContentList
+                  Text(" and I fancied I heard my master quietly tutting to himself. ")
+                  Divert(target="-> END", empty=false, tunnel=false, thread=false)
+                  Text("\n")
+          ConditionalBranch(true=false, else=true, inline=false)
+            Weave(baseIndent=0)
+              Choice(name=null, once=true, invisible=false, depth=1, inline=true)
+                ContentList
+                  Text("I asked permission to leave")
+                ContentList
+                  Text(" and Monsieur Fogg looked surprised.    ")
+                  Divert(target="-> END", empty=false, tunnel=false, thread=false)
+                  Text("\n")
+              Choice(name=null, once=true, invisible=false, depth=1, inline=true)
+                ContentList
+                  Text("I stood and went to open the door")
+                ContentList
+                  Text(". Monsieur Fogg seemed untroubled by this small rebellion. ")
+                  Divert(target="-> END", empty=false, tunnel=false, thread=false)
+                  Text("\n")
+      Text("\n")

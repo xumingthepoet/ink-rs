@@ -1,0 +1,35 @@
+Story
+  Weave(baseIndent=0)
+    Divert(target="-> test", empty=false, tunnel=false, thread=false)
+    Gather(name=null, depth=1)
+    Divert(target="-> DONE", empty=false, tunnel=false, thread=false)
+  Flow(level=Knot, name="test", function=false)
+    Weave(baseIndent=0)
+      ContentList
+        Sequence(type=Stopping)
+          Weave(baseIndent=0)
+            Text("\n")
+            Text("At the table, I drew a card. Ace of Hearts.")
+            Text("\n")
+          Weave(baseIndent=0)
+            Text("\n")
+            Glue
+            Text(" 2 of Diamonds.")
+            Text("\n")
+            Text("\"Should I hit you again,\" the croupier asks.")
+            Text("\n")
+          Weave(baseIndent=0)
+            Text("\n")
+            Glue
+            Text(" King of Spades.")
+            Text("\n")
+            Text("\"You lose,\" he crowed.")
+            Text("\n")
+      Text("\n")
+      Choice(name=null, once=false, invisible=false, depth=1, inline=true)
+        ContentList
+          Text("Draw a card")
+        ContentList
+          Text(" I drew a card. ")
+          Divert(target="-> test", empty=false, tunnel=false, thread=false)
+          Text("\n")
