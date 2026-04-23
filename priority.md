@@ -1,6 +1,6 @@
 # Ink Fixture Priority
 
-通过统计: 30/118
+通过统计: 31/118
 
 Sorted by the latest `WritingWithInk.md` syntax point used by each file.
 
@@ -34,7 +34,7 @@ Sorted by the latest `WritingWithInk.md` syntax point used by each file.
 - [x] `choices/conditional-choice.ink`
 - [x] `variabletext/cycle.ink`
 - [x] `variabletext/once.ink`
-- [ ] `variabletext/sequence.ink`
+- [x] `variabletext/sequence.ink`
 - [ ] `variabletext/empty-elements.ink`
 - [ ] `variabletext/list-in-choice.ink`
 - [ ] `choices/multi-choice.ink`

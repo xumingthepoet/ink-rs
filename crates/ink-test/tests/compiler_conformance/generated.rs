@@ -45,3 +45,4 @@ fixture!(
 );
 fixture!(variabletext_cycle, "inkfiles/variabletext/cycle.ink");
 fixture!(variabletext_once, "inkfiles/variabletext/once.ink");
+fixture!(variabletext_sequence, "inkfiles/variabletext/sequence.ink");
