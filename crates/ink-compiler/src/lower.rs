@@ -98,21 +98,40 @@ fn lower_root_weave(weave: &Weave) -> Vec<RuntimeObject> {
 }
 
 fn lower_flow(flow: &Flow) -> Container {
+    let mut content = Vec::new();
+
+    // Lower any content in the flow's own weave
+    if weave_has_choice(flow.weave()) {
+        content.push(RuntimeObject::Container(Container {
+            content: lower_choice_weave(
+                flow.weave(),
+                ChoicePathMode::Flow {
+                    flow_name: flow.name().to_string(),
+                },
+            ),
+            name: None,
+            flags: None,
+        }));
+    } else if !flow.weave().content().is_empty() {
+        content.extend(lower_linear_weave(flow.weave()));
+    }
+
+    // Lower child flows (stitches)
+    if !flow.child_flows().is_empty() {
+        // Add auto-divert to first child flow
+        let first_child_name = flow.child_flows()[0].name();
+        content.push(RuntimeObject::Divert {
+            target: format!(".^.{}", first_child_name),
+            variable: false,
+        });
+
+        // Lower each child flow as named content
+        let child_containers: Vec<Container> = flow.child_flows().iter().map(lower_flow).collect();
+        content.push(RuntimeObject::NamedContent(child_containers));
+    }
+
     Container {
-        content: if weave_has_choice(flow.weave()) {
-            vec![RuntimeObject::Container(Container {
-                content: lower_choice_weave(
-                    flow.weave(),
-                    ChoicePathMode::Flow {
-                        flow_name: flow.name().to_string(),
-                    },
-                ),
-                name: None,
-                flags: None,
-            })]
-        } else {
-            lower_linear_weave(flow.weave())
-        },
+        content,
         name: Some(flow.name().to_string()),
         flags: None,
     }

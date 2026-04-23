@@ -116,8 +116,6 @@ impl Parser {
             Some("external declaration")
         } else if knot::is_knot_declaration_line(trimmed) {
             Some("knot declaration")
-        } else if trimmed.starts_with('=') {
-            Some("stitch declaration")
         } else if trimmed.starts_with('*') || trimmed.starts_with('+') {
             Some("choice")
         } else if trimmed.starts_with('-') && !trimmed.starts_with("->") {
@@ -154,6 +152,7 @@ impl Parser {
 
         *index += 1;
         let mut content = Vec::new();
+        let mut child_flows = Vec::new();
 
         while *index < lines.len() {
             let next_line = &lines[*index];
@@ -166,6 +165,15 @@ impl Parser {
                 break;
             }
 
+            if knot::is_stitch_declaration_line(&next_line.text) {
+                if let Some(stitch) = self.parse_stitch(lines, index) {
+                    child_flows.push(stitch);
+                } else {
+                    *index += 1;
+                }
+                continue;
+            }
+
             content.extend(self.parse_statement(next_line));
             *index += 1;
         }
@@ -174,6 +182,52 @@ impl Parser {
             declaration.level,
             declaration.name,
             content,
+            child_flows,
+            declaration.arguments,
+            declaration.is_function,
+        ))
+    }
+
+    fn parse_stitch(&mut self, lines: &[SourceLine], index: &mut usize) -> Option<Flow> {
+        let line = &lines[*index];
+        let mut line_parser = RuleParser::new(line);
+        let declaration = line_parser.parse_rule(knot::parse_stitch_declaration);
+        let had_error = line_parser.had_error();
+        self.diagnostics.extend(line_parser.finish());
+
+        let Some(declaration) = declaration else {
+            return None;
+        };
+
+        if had_error {
+            return None;
+        }
+
+        *index += 1;
+        let mut content = Vec::new();
+
+        while *index < lines.len() {
+            let next_line = &lines[*index];
+            if next_line.text.trim().is_empty() {
+                *index += 1;
+                continue;
+            }
+
+            if knot::is_knot_declaration_line(&next_line.text)
+                || knot::is_stitch_declaration_line(&next_line.text)
+            {
+                break;
+            }
+
+            content.extend(self.parse_statement(next_line));
+            *index += 1;
+        }
+
+        Some(Flow::new(
+            declaration.level,
+            declaration.name,
+            content,
+            Vec::new(),
             declaration.arguments,
             declaration.is_function,
         ))

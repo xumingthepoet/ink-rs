@@ -1,4 +1,4 @@
-use super::{push_indent, Weave};
+use super::{push_indent, Object, Weave};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FlowLevel {
@@ -18,6 +18,7 @@ pub struct Flow {
     level: FlowLevel,
     name: String,
     weave: Weave,
+    child_flows: Vec<Flow>,
     arguments: Vec<FlowArgument>,
     is_function: bool,
 }
@@ -48,7 +49,8 @@ impl Flow {
     pub fn new(
         level: FlowLevel,
         name: impl Into<String>,
-        content: Vec<super::Object>,
+        content: Vec<Object>,
+        child_flows: Vec<Flow>,
         arguments: Vec<FlowArgument>,
         is_function: bool,
     ) -> Self {
@@ -56,6 +58,7 @@ impl Flow {
             level,
             name: name.into(),
             weave: Weave::new(content, 0),
+            child_flows,
             arguments,
             is_function,
         }
@@ -71,6 +74,10 @@ impl Flow {
 
     pub fn weave(&self) -> &Weave {
         &self.weave
+    }
+
+    pub fn child_flows(&self) -> &[Flow] {
+        &self.child_flows
     }
 
     pub fn arguments(&self) -> &[FlowArgument] {
@@ -94,6 +101,11 @@ impl Flow {
         out.push_str("\", function=");
         out.push_str(if self.is_function { "true" } else { "false" });
         out.push(')');
-        self.weave.write_parse_snapshot(out, indent + 2);
+        if !self.weave.content().is_empty() {
+            self.weave.write_parse_snapshot(out, indent + 2);
+        }
+        for child in &self.child_flows {
+            child.write_parse_snapshot(out, indent + 2);
+        }
     }
 }

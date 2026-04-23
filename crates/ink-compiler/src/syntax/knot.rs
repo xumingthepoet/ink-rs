@@ -16,6 +16,11 @@ pub(super) fn is_knot_declaration_line(line: &str) -> bool {
     equals >= 2
 }
 
+pub(super) fn is_stitch_declaration_line(line: &str) -> bool {
+    let trimmed = line.trim_start();
+    trimmed.starts_with('=') && !is_knot_declaration_line(trimmed)
+}
+
 pub(super) fn parse_knot_declaration(parser: &mut RuleParser<'_>) -> Option<FlowDecl> {
     parser.skip_horizontal_whitespace();
 
@@ -70,6 +75,38 @@ pub(super) fn parse_knot_declaration(parser: &mut RuleParser<'_>) -> Option<Flow
         name,
         arguments,
         is_function,
+    })
+}
+
+pub(super) fn parse_stitch_declaration(parser: &mut RuleParser<'_>) -> Option<FlowDecl> {
+    parser.skip_horizontal_whitespace();
+
+    let equals = parser.take_while(|ch| ch == '=')?;
+    if equals.chars().count() != 1 {
+        return None;
+    }
+
+    parser.skip_horizontal_whitespace();
+
+    let name = parser.expect("stitch name", parse_identifier, |parser| {
+        parser.skip_to_end()
+    })?;
+
+    parser.skip_horizontal_whitespace();
+
+    if !parser.line_remainder().is_empty() {
+        parser.error(format!(
+            "Expected end of line after stitch declaration but saw '{}'",
+            parser.line_remainder()
+        ));
+        parser.skip_to_end();
+    }
+
+    Some(FlowDecl {
+        level: FlowLevel::Stitch,
+        name,
+        arguments: Vec::new(),
+        is_function: false,
     })
 }
 
