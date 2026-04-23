@@ -90,6 +90,7 @@ fn runtime_object_to_value(object: &RuntimeObject) -> Value {
         RuntimeObject::NamedContent(containers) => named_content_to_value(containers),
         RuntimeObject::String(text) if text == "\n" => Value::String("\n".to_string()),
         RuntimeObject::String(text) => Value::String(format!("^{text}")),
+        RuntimeObject::Glue => Value::String("<>".to_string()),
         RuntimeObject::ControlCommand(command) => Value::String(
             match command {
                 ControlCommand::Done => "done",

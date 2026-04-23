@@ -2,6 +2,7 @@ mod choice;
 mod content_list;
 mod divert;
 mod flow;
+mod glue;
 mod story;
 mod text;
 mod weave;
@@ -10,6 +11,7 @@ pub use choice::Choice;
 pub use content_list::ContentList;
 pub use divert::{Divert, DivertTarget};
 pub use flow::{Flow, FlowArgument, FlowLevel};
+pub use glue::Glue;
 pub use story::Story;
 pub use text::Text;
 pub use weave::Weave;
@@ -17,6 +19,7 @@ pub use weave::Weave;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Object {
     Text(Text),
+    Glue(Glue),
     Choice(Choice),
     Divert(Divert),
 }
@@ -25,6 +28,7 @@ impl Object {
     pub(crate) fn write_parse_snapshot(&self, out: &mut String, indent: usize) {
         match self {
             Object::Text(text) => text.write_parse_snapshot(out, indent),
+            Object::Glue(glue) => glue.write_parse_snapshot(out, indent),
             Object::Choice(choice) => choice.write_parse_snapshot(out, indent),
             Object::Divert(divert) => divert.write_parse_snapshot(out, indent),
         }

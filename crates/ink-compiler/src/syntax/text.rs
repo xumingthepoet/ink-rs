@@ -1,4 +1,4 @@
-use crate::parsed::{Divert, DivertTarget, Object, Text};
+use crate::parsed::{Divert, DivertTarget, Glue, Object, Text};
 
 use super::rule::RuleParser;
 
@@ -15,17 +15,7 @@ pub(super) fn parse_text_line(parser: &mut RuleParser<'_>) -> Option<Vec<Object>
         return None;
     }
 
-    let mut objects = Vec::new();
-
-    if let Some((text_content, divert_target)) = split_inline_divert(&text) {
-        objects.push(Object::Text(Text::new(text_content, span.clone())));
-        objects.push(Object::Divert(Divert::new(
-            DivertTarget::from_source(divert_target),
-            span.clone(),
-        )));
-    } else {
-        objects.push(Object::Text(Text::new(text, span.clone())));
-    }
+    let mut objects = parse_inline_content(&text, &span)?;
 
     objects.push(Object::Text(Text::new("\n", span)));
     Some(objects)
@@ -45,15 +35,60 @@ fn has_unsupported_text_syntax(text: &str) -> bool {
         || text.starts_with('~')
         || text.contains('{')
         || text.contains('}')
-        || text.contains("<>")
         || text.contains('#')
 }
 
-fn split_inline_divert(text: &str) -> Option<(&str, &str)> {
-    let (prefix, target) = text.rsplit_once("->")?;
-    if prefix.trim().is_empty() || target.trim().is_empty() {
-        return None;
+fn parse_inline_content(text: &str, span: &crate::source::SourceSpan) -> Option<Vec<Object>> {
+    let mut remaining = text;
+    let mut objects = Vec::new();
+
+    while !remaining.is_empty() {
+        if let Some(rest) = remaining.strip_prefix("<>") {
+            objects.push(Object::Glue(Glue::new()));
+            remaining = rest;
+            continue;
+        }
+
+        if remaining.starts_with("->") {
+            let target = remaining.strip_prefix("->")?.trim();
+            if target.is_empty() {
+                return None;
+            }
+            objects.push(Object::Divert(Divert::new(
+                DivertTarget::from_source(target),
+                span.clone(),
+            )));
+            break;
+        }
+
+        let next_glue = remaining.find("<>");
+        let next_divert = remaining.find("->");
+        let next_token = match (next_glue, next_divert) {
+            (Some(glue), Some(divert)) => Some(glue.min(divert)),
+            (Some(glue), None) => Some(glue),
+            (None, Some(divert)) => Some(divert),
+            (None, None) => None,
+        };
+
+        match next_token {
+            Some(0) => return None,
+            Some(index) => {
+                let prefix = &remaining[..index];
+                if !prefix.is_empty() {
+                    objects.push(Object::Text(Text::new(prefix, span.clone())));
+                }
+                remaining = &remaining[index..];
+            }
+            None => {
+                objects.push(Object::Text(Text::new(remaining, span.clone())));
+                remaining = "";
+            }
+        }
     }
 
-    Some((prefix, target))
+    if objects.is_empty() {
+        None
+    } else {
+        Some(objects)
+    }
 }

@@ -26,6 +26,7 @@ pub enum RuntimeObject {
     DivertTarget(String),
     VariableAssignment(String),
     ChoicePoint { target: String, flags: i32 },
+    Glue,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -116,7 +117,9 @@ fn lower_choice_weave(weave: &Weave) -> Vec<RuntimeObject> {
 
     while let Some(object) = iter.next() {
         match object {
-            Object::Text(_) | Object::Divert(_) => lower_object_into(&mut main_content, object),
+            Object::Text(_) | Object::Glue(_) | Object::Divert(_) => {
+                lower_object_into(&mut main_content, object)
+            }
             Object::Choice(choice) => {
                 let choice_index = 0;
                 let choice_container_name = format!("c-{choice_index}");
@@ -267,6 +270,7 @@ fn lower_content_list(content_list: &ContentList) -> Vec<RuntimeObject> {
 fn lower_object_into(content: &mut Vec<RuntimeObject>, object: &Object) {
     match object {
         Object::Text(text) => content.push(RuntimeObject::String(text.text().to_string())),
+        Object::Glue(_) => content.push(RuntimeObject::Glue),
         Object::Divert(divert) => push_divert(content, divert.target()),
         Object::Choice(_) => {}
     }

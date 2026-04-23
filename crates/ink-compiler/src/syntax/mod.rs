@@ -253,6 +253,19 @@ mod tests {
     }
 
     #[test]
+    fn parses_glue_and_inline_divert_in_text() {
+        let output = parse(SourceInput::new("A line <> -> knot"));
+        assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
+        let story = output.artifact.unwrap();
+
+        assert!(matches!(story.root_weave().content()[0], Object::Text(_)));
+        assert!(matches!(story.root_weave().content()[1], Object::Glue(_)));
+        assert!(matches!(story.root_weave().content()[2], Object::Text(_)));
+        assert!(matches!(story.root_weave().content()[3], Object::Divert(_)));
+        assert!(matches!(story.root_weave().content()[4], Object::Text(_)));
+    }
+
+    #[test]
     fn parses_knot_definition() {
         let output = parse(SourceInput::new(
             "Top line.\n-> knot_name\n\n=== knot_name ===\nInside knot. -> END",
