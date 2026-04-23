@@ -150,6 +150,35 @@ mod tests {
     }
 
     #[test]
+    fn parses_inline_choice_segments() {
+        let output = parse(SourceInput::new("* Hello [back!] right back to you!"));
+        assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
+        let story = output.artifact.unwrap();
+
+        let Object::Choice(choice) = &story.root_weave().content()[0] else {
+            panic!("expected choice");
+        };
+        assert_eq!(choice.start_content().unwrap().objects().len(), 1);
+        assert_eq!(choice.choice_only_content().unwrap().objects().len(), 1);
+        assert_eq!(choice.inner_content().objects().len(), 2);
+        assert!(choice.has_weave_style_inline_brackets());
+    }
+
+    #[test]
+    fn parses_choice_only_inline_choice() {
+        let output = parse(SourceInput::new("* [Hello back!]"));
+        assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
+        let story = output.artifact.unwrap();
+
+        let Object::Choice(choice) = &story.root_weave().content()[0] else {
+            panic!("expected choice");
+        };
+        assert!(!choice.has_start_content());
+        assert!(choice.has_choice_only_content());
+        assert_eq!(choice.inner_content().objects().len(), 1);
+    }
+
+    #[test]
     fn reports_unsupported_sticky_choice() {
         let output = parse(SourceInput::new("+ Choice"));
         assert_eq!(output.diagnostics.len(), 1);

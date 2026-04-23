@@ -38,6 +38,11 @@ pub enum ControlCommand {
     EndString,
 }
 
+enum ChoiceOuter {
+    Inline(Vec<RuntimeObject>),
+    Nested(Container),
+}
+
 pub(crate) fn lower(story: &CheckedStory) -> StageOutput<RuntimeProgram> {
     let root_weave = story.parsed.root_weave();
     let main_content = if root_weave
@@ -87,21 +92,23 @@ fn lower_choice_weave(weave: &Weave) -> Vec<RuntimeObject> {
             Object::Text(_) | Object::Divert(_) => lower_object_into(&mut main_content, object),
             Object::Choice(choice) => {
                 let choice_index = 0;
-                let choice_point_index = main_content.len();
                 let choice_container_name = format!("c-{choice_index}");
-                let choice_point_path = format!("0.{choice_point_index}");
                 let choice_container_path = format!("0.{choice_container_name}");
                 let gather_container_name = "g-0";
 
-                main_content.push(choice_point(
-                    choice,
-                    &choice_point_path,
-                    &choice_container_path,
-                    1,
-                ));
+                match choice_outer(choice, &choice_container_path, main_content.len()) {
+                    ChoiceOuter::Inline(objects) => main_content.extend(objects),
+                    ChoiceOuter::Nested(container) => {
+                        main_content.push(RuntimeObject::Container(container))
+                    }
+                }
 
-                let mut choice_content =
-                    choice_container_prefix(&choice_container_path, &choice_point_path, 2);
+                let mut choice_content = Vec::new();
+                if choice.has_start_content() {
+                    let choice_point_path = format!("0.{}", main_content.len() - 1);
+                    choice_content =
+                        choice_container_prefix(&choice_container_path, &choice_point_path, 2);
+                }
                 choice_content.extend(lower_content_list(choice.inner_content()));
 
                 for remaining in iter {
@@ -129,12 +136,56 @@ fn lower_choice_weave(weave: &Weave) -> Vec<RuntimeObject> {
     main_content
 }
 
-fn choice_point(
+fn choice_outer(
     choice: &Choice,
-    choice_point_path: &str,
     choice_container_path: &str,
-    return_index: usize,
-) -> RuntimeObject {
+    choice_point_index: usize,
+) -> ChoiceOuter {
+    let mut outer_content = Vec::new();
+    let has_eval_content = choice.has_start_content() || choice.has_choice_only_content();
+
+    if has_eval_content {
+        outer_content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
+    }
+
+    if choice.has_start_content() {
+        let choice_point_path = format!("0.{choice_point_index}");
+        outer_content.push(RuntimeObject::DivertTarget(format!(
+            "{choice_point_path}.$r1"
+        )));
+        outer_content.push(RuntimeObject::VariableAssignment("$r".to_string()));
+        outer_content.push(RuntimeObject::ControlCommand(ControlCommand::BeginString));
+        outer_content.push(RuntimeObject::Divert {
+            target: ".^.s".to_string(),
+            variable: false,
+        });
+        outer_content.push(RuntimeObject::Container(Container {
+            content: Vec::new(),
+            name: Some("$r1".to_string()),
+            flags: None,
+        }));
+        outer_content.push(RuntimeObject::ControlCommand(ControlCommand::EndString));
+    }
+
+    if let Some(choice_only_content) = choice.choice_only_content() {
+        outer_content.push(RuntimeObject::ControlCommand(ControlCommand::BeginString));
+        outer_content.extend(lower_content_list(choice_only_content));
+        outer_content.push(RuntimeObject::ControlCommand(ControlCommand::EndString));
+    }
+
+    if has_eval_content {
+        outer_content.push(RuntimeObject::ControlCommand(ControlCommand::EvalEnd));
+    }
+
+    outer_content.push(RuntimeObject::ChoicePoint {
+        target: choice_container_path.to_string(),
+        flags: choice.choice_flags(),
+    });
+
+    if !choice.has_start_content() {
+        return ChoiceOuter::Inline(outer_content);
+    }
+
     let mut start_content = choice
         .start_content()
         .map(lower_content_list)
@@ -143,34 +194,14 @@ fn choice_point(
         target: "$r".to_string(),
         variable: true,
     });
+    outer_content.push(RuntimeObject::NamedContent(vec![Container {
+        content: start_content,
+        name: Some("s".to_string()),
+        flags: None,
+    }]));
 
-    RuntimeObject::Container(Container {
-        content: vec![
-            RuntimeObject::ControlCommand(ControlCommand::EvalStart),
-            RuntimeObject::DivertTarget(format!("{choice_point_path}.$r{return_index}")),
-            RuntimeObject::VariableAssignment("$r".to_string()),
-            RuntimeObject::ControlCommand(ControlCommand::BeginString),
-            RuntimeObject::Divert {
-                target: ".^.s".to_string(),
-                variable: false,
-            },
-            RuntimeObject::Container(Container {
-                content: Vec::new(),
-                name: Some(format!("$r{return_index}")),
-                flags: None,
-            }),
-            RuntimeObject::ControlCommand(ControlCommand::EndString),
-            RuntimeObject::ControlCommand(ControlCommand::EvalEnd),
-            RuntimeObject::ChoicePoint {
-                target: choice_container_path.to_string(),
-                flags: 18,
-            },
-            RuntimeObject::NamedContent(vec![Container {
-                content: start_content,
-                name: Some("s".to_string()),
-                flags: None,
-            }]),
-        ],
+    ChoiceOuter::Nested(Container {
+        content: outer_content,
         name: None,
         flags: None,
     })

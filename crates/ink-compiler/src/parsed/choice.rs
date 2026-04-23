@@ -22,6 +22,7 @@ impl Choice {
         inner_content: ContentList,
         span: SourceSpan,
     ) -> Self {
+        let has_weave_style_inline_brackets = choice_only_content.is_some();
         Self {
             start_content,
             choice_only_content,
@@ -31,7 +32,7 @@ impl Choice {
             once_only: true,
             is_invisible_default: false,
             indentation_depth: 1,
-            has_weave_style_inline_brackets: false,
+            has_weave_style_inline_brackets,
         }
     }
 
@@ -59,6 +60,14 @@ impl Choice {
         self.once_only
     }
 
+    pub fn has_start_content(&self) -> bool {
+        self.start_content.is_some()
+    }
+
+    pub fn has_choice_only_content(&self) -> bool {
+        self.choice_only_content.is_some()
+    }
+
     pub fn is_invisible_default(&self) -> bool {
         self.is_invisible_default
     }
@@ -69,6 +78,23 @@ impl Choice {
 
     pub fn has_weave_style_inline_brackets(&self) -> bool {
         self.has_weave_style_inline_brackets
+    }
+
+    pub fn choice_flags(&self) -> i32 {
+        let mut flags = 0;
+        if self.has_start_content() {
+            flags |= 2;
+        }
+        if self.has_choice_only_content() {
+            flags |= 4;
+        }
+        if self.is_invisible_default {
+            flags |= 8;
+        }
+        if self.once_only {
+            flags |= 16;
+        }
+        flags
     }
 
     pub(crate) fn write_parse_snapshot(&self, out: &mut String, indent: usize) {
