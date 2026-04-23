@@ -5,6 +5,7 @@ mod expression;
 mod flow;
 mod gather;
 mod glue;
+mod sequence;
 mod story;
 mod tag;
 mod text;
@@ -17,6 +18,7 @@ pub use expression::{BinaryOperator, Expression};
 pub use flow::{Flow, FlowArgument, FlowLevel};
 pub use gather::Gather;
 pub use glue::Glue;
+pub use sequence::{Sequence, SequenceType};
 pub use story::Story;
 pub use tag::Tag;
 pub use text::Text;
@@ -25,22 +27,31 @@ pub use weave::Weave;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Object {
     Text(Text),
+    ContentList(ContentList),
     Glue(Glue),
     Choice(Choice),
     Divert(Divert),
     Gather(Gather),
     Tag(Tag),
+    Sequence(Sequence),
 }
 
 impl Object {
     pub(crate) fn write_parse_snapshot(&self, out: &mut String, indent: usize) {
         match self {
             Object::Text(text) => text.write_parse_snapshot(out, indent),
+            Object::ContentList(content_list) => {
+                out.push('\n');
+                push_indent(out, indent);
+                out.push_str("ContentList");
+                content_list.write_parse_snapshot(out, indent + 2);
+            }
             Object::Glue(glue) => glue.write_parse_snapshot(out, indent),
             Object::Choice(choice) => choice.write_parse_snapshot(out, indent),
             Object::Divert(divert) => divert.write_parse_snapshot(out, indent),
             Object::Gather(gather) => gather.write_parse_snapshot(out, indent),
             Object::Tag(tag) => tag.write_parse_snapshot(out, indent),
+            Object::Sequence(sequence) => sequence.write_parse_snapshot(out, indent),
         }
     }
 }

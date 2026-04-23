@@ -43,3 +43,4 @@ fixture!(
     choices_conditional_choice,
     "inkfiles/choices/conditional-choice.ink"
 );
+fixture!(variabletext_cycle, "inkfiles/variabletext/cycle.ink");

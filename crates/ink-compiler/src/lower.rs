@@ -1,7 +1,10 @@
 use crate::{
     analysis::CheckedStory,
     compiler::StageOutput,
-    parsed::{BinaryOperator, Choice, ContentList, DivertTarget, Expression, Flow, Object, Weave},
+    parsed::{
+        BinaryOperator, Choice, ContentList, DivertTarget, Expression, Flow, Object, Sequence,
+        SequenceType, Weave,
+    },
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -23,12 +26,14 @@ pub enum RuntimeObject {
     String(String),
     ControlCommand(ControlCommand),
     Divert { target: String, variable: bool },
+    ConditionalDivert { target: String },
     DivertTarget(String),
     VariableAssignment(String),
     ChoicePoint { target: String, flags: i32 },
     Glue,
     Tag { is_start: bool },
     Bool(bool),
+    Int(i32),
     NativeFunction(String),
 }
 
@@ -40,6 +45,10 @@ pub enum ControlCommand {
     EvalEnd,
     BeginString,
     EndString,
+    VisitIndex,
+    Duplicate,
+    NoOp,
+    Pop,
 }
 
 enum ChoiceOuter {
@@ -54,7 +63,27 @@ enum ChoicePathMode {
         flow_name: String,
         parent_flow_name: Option<String>,
         sibling_stitch_names: Vec<String>,
+        self_target_relative: bool,
     },
+}
+
+impl ChoicePathMode {
+    fn with_self_target_relative(&self, self_target_relative: bool) -> Self {
+        match self {
+            ChoicePathMode::Root => ChoicePathMode::Root,
+            ChoicePathMode::Flow {
+                flow_name,
+                parent_flow_name,
+                sibling_stitch_names,
+                ..
+            } => ChoicePathMode::Flow {
+                flow_name: flow_name.clone(),
+                parent_flow_name: parent_flow_name.clone(),
+                sibling_stitch_names: sibling_stitch_names.clone(),
+                self_target_relative,
+            },
+        }
+    }
 }
 
 pub(crate) fn lower(story: &CheckedStory) -> StageOutput<RuntimeProgram> {
@@ -128,6 +157,7 @@ fn lower_flow_with_context(
             flow_name: flow.name().to_string(),
             parent_flow_name: parent_knot_name.map(|s| s.to_string()),
             sibling_stitch_names: sibling_stitch_names.to_vec(),
+            self_target_relative: false,
         };
         content.push(RuntimeObject::Container(Container {
             content: lower_choice_weave(flow.weave(), path_mode),
@@ -203,7 +233,12 @@ fn lower_choice_weave(weave: &Weave, path_mode: ChoicePathMode) -> Vec<RuntimeOb
 
     while index < objects.len() {
         match &objects[index] {
-            Object::Text(_) | Object::Glue(_) | Object::Divert(_) | Object::Tag(_) => {
+            Object::Text(_)
+            | Object::ContentList(_)
+            | Object::Glue(_)
+            | Object::Divert(_)
+            | Object::Tag(_)
+            | Object::Sequence(_) => {
                 lower_object_into(&mut main_content, &objects[index]);
                 index += 1;
             }
@@ -255,6 +290,8 @@ fn lower_choice_weave(weave: &Weave, path_mode: ChoicePathMode) -> Vec<RuntimeOb
                 }
 
                 let mut choice_content = Vec::new();
+                let choice_content_path_mode =
+                    path_mode.with_self_target_relative(choice.has_start_content());
                 if choice.has_start_content() {
                     choice_content = choice_container_prefix(
                         &path_mode,
@@ -265,8 +302,9 @@ fn lower_choice_weave(weave: &Weave, path_mode: ChoicePathMode) -> Vec<RuntimeOb
                 }
                 choice_content.extend(lower_content_list_with_context(
                     choice.inner_content(),
-                    &path_mode,
+                    &choice_content_path_mode,
                 ));
+                let nested_choice_content_path_mode = path_mode.with_self_target_relative(true);
 
                 index += 1;
                 while index < objects.len() {
@@ -276,7 +314,7 @@ fn lower_choice_weave(weave: &Weave, path_mode: ChoicePathMode) -> Vec<RuntimeOb
                     lower_object_into_with_context(
                         &mut choice_content,
                         &objects[index],
-                        &path_mode,
+                        &nested_choice_content_path_mode,
                     );
                     index += 1;
                 }
@@ -468,9 +506,81 @@ fn operator_runtime_name(operator: BinaryOperator) -> &'static str {
     operator.runtime_name()
 }
 
+fn lower_sequence(sequence: &Sequence) -> Container {
+    let mut content = vec![
+        RuntimeObject::ControlCommand(ControlCommand::EvalStart),
+        RuntimeObject::ControlCommand(ControlCommand::VisitIndex),
+        RuntimeObject::Int(sequence.elements().len() as i32),
+    ];
+
+    match sequence.sequence_type() {
+        SequenceType::Cycle => content.push(RuntimeObject::NativeFunction("%".to_string())),
+        SequenceType::Stopping => {
+            content.push(RuntimeObject::Int(
+                sequence.elements().len().saturating_sub(1) as i32,
+            ));
+            content.push(RuntimeObject::NativeFunction("MIN".to_string()));
+        }
+        SequenceType::Once => {}
+    }
+
+    content.push(RuntimeObject::ControlCommand(ControlCommand::EvalEnd));
+
+    for (index, _) in sequence.elements().iter().enumerate() {
+        content.extend([
+            RuntimeObject::ControlCommand(ControlCommand::EvalStart),
+            RuntimeObject::ControlCommand(ControlCommand::Duplicate),
+            RuntimeObject::Int(index as i32),
+            RuntimeObject::NativeFunction("==".to_string()),
+            RuntimeObject::ControlCommand(ControlCommand::EvalEnd),
+            RuntimeObject::ConditionalDivert {
+                target: format!(".^.s{index}"),
+            },
+        ]);
+    }
+
+    let post_sequence_index = content.len();
+    content.push(RuntimeObject::ControlCommand(ControlCommand::NoOp));
+
+    let branch_containers = sequence
+        .elements()
+        .iter()
+        .enumerate()
+        .map(|(index, element)| {
+            let mut branch_content = vec![RuntimeObject::ControlCommand(ControlCommand::Pop)];
+            branch_content.extend(lower_content_list_with_context(
+                element,
+                &ChoicePathMode::Root,
+            ));
+            branch_content.push(RuntimeObject::Divert {
+                target: format!(".^.^.{post_sequence_index}"),
+                variable: false,
+            });
+            Container {
+                content: branch_content,
+                name: Some(format!("s{index}")),
+                flags: None,
+            }
+        })
+        .collect::<Vec<_>>();
+    content.push(RuntimeObject::NamedContent(branch_containers));
+
+    Container {
+        content,
+        name: None,
+        flags: Some(5),
+    }
+}
+
 fn lower_object_into(content: &mut Vec<RuntimeObject>, object: &Object) {
     match object {
         Object::Text(text) => content.push(RuntimeObject::String(text.text().to_string())),
+        Object::ContentList(content_list) => {
+            content.extend(lower_content_list_with_context(
+                content_list,
+                &ChoicePathMode::Root,
+            ));
+        }
         Object::Glue(_) => content.push(RuntimeObject::Glue),
         Object::Divert(divert) => push_divert(content, divert.target()),
         Object::Choice(_) => {}
@@ -478,6 +588,9 @@ fn lower_object_into(content: &mut Vec<RuntimeObject>, object: &Object) {
         Object::Tag(tag) => content.push(RuntimeObject::Tag {
             is_start: tag.is_start(),
         }),
+        Object::Sequence(sequence) => {
+            content.push(RuntimeObject::Container(lower_sequence(sequence)))
+        }
     }
 }
 
@@ -488,6 +601,9 @@ fn lower_object_into_with_context(
 ) {
     match object {
         Object::Text(text) => content.push(RuntimeObject::String(text.text().to_string())),
+        Object::ContentList(content_list) => {
+            content.extend(lower_content_list_with_context(content_list, path_mode));
+        }
         Object::Glue(_) => content.push(RuntimeObject::Glue),
         Object::Divert(divert) => push_divert_with_context(content, divert.target(), path_mode),
         Object::Choice(_) => {}
@@ -495,6 +611,9 @@ fn lower_object_into_with_context(
         Object::Tag(tag) => content.push(RuntimeObject::Tag {
             is_start: tag.is_start(),
         }),
+        Object::Sequence(sequence) => {
+            content.push(RuntimeObject::Container(lower_sequence(sequence)))
+        }
     }
 }
 
@@ -559,6 +678,7 @@ fn resolve_single_stitch_target(target: &str, path_mode: &ChoicePathMode) -> Str
             sibling_stitch_names,
             parent_flow_name,
             flow_name,
+            self_target_relative,
         } => {
             if parent_flow_name.is_some() {
                 // We're in a stitch - check if target is a sibling stitch
@@ -583,7 +703,7 @@ fn resolve_single_stitch_target(target: &str, path_mode: &ChoicePathMode) -> Str
                     // 2. Weave content array
                     // 3. Knot container (where child stitches are defined)
                     ".^.^.^.".to_string() + target
-                } else if target == *flow_name {
+                } else if *self_target_relative && target == *flow_name {
                     // Target is the knot itself - 3 levels up
                     ".^.^.^".to_string()
                 } else {

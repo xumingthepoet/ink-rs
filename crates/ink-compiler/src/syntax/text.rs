@@ -1,5 +1,5 @@
 use crate::{
-    parsed::{Divert, DivertTarget, Glue, Object, Tag, Text},
+    parsed::{ContentList, Divert, DivertTarget, Glue, Object, Sequence, SequenceType, Tag, Text},
     source::SourceSpan,
 };
 
@@ -37,8 +37,7 @@ fn has_unsupported_text_syntax(text: &str) -> bool {
         || text.starts_with('+')
         || (text.starts_with('-') && !text.starts_with("->"))
         || text.starts_with('~')
-        || text.contains('{')
-        || text.contains('}')
+        || text.trim_start().starts_with('{')
 }
 
 pub(super) fn parse_inline_content(text: &str, span: &SourceSpan) -> Option<Vec<Object>> {
@@ -54,6 +53,15 @@ pub(super) fn parse_inline_content(text: &str, span: &SourceSpan) -> Option<Vec<
             objects.push(Object::Tag(Tag::new(true, false)));
             tag_active = true;
             remaining = rest.trim_start_matches([' ', '\t']);
+            continue;
+        }
+
+        if let Some(rest) = remaining.strip_prefix('{') {
+            let close_index = rest.find('}')?;
+            objects.push(Object::ContentList(ContentList::new(vec![
+                Object::Sequence(parse_inline_sequence(&rest[..close_index], span)?),
+            ])));
+            remaining = &rest[close_index + 1..];
             continue;
         }
 
@@ -83,6 +91,7 @@ pub(super) fn parse_inline_content(text: &str, span: &SourceSpan) -> Option<Vec<
             remaining.find("<>"),
             remaining.find("->"),
             remaining.find('#'),
+            remaining.find('{'),
         ]
         .into_iter()
         .flatten()
@@ -116,6 +125,32 @@ pub(super) fn parse_inline_content(text: &str, span: &SourceSpan) -> Option<Vec<
         None
     } else {
         Some(objects)
+    }
+}
+
+fn parse_inline_sequence(source: &str, span: &SourceSpan) -> Option<Sequence> {
+    let (sequence_type, elements_source) = parse_sequence_type(source.trim_start());
+    let elements = elements_source
+        .split('|')
+        .map(|element| {
+            let objects = parse_inline_content(element.trim(), span).unwrap_or_default();
+            ContentList::new(objects)
+        })
+        .collect::<Vec<_>>();
+
+    Some(Sequence::new(sequence_type, elements))
+}
+
+fn parse_sequence_type(source: &str) -> (SequenceType, &str) {
+    let Some(first) = source.chars().next() else {
+        return (SequenceType::Stopping, source);
+    };
+
+    match first {
+        '&' => (SequenceType::Cycle, &source[first.len_utf8()..]),
+        '!' => (SequenceType::Once, &source[first.len_utf8()..]),
+        '$' => (SequenceType::Stopping, &source[first.len_utf8()..]),
+        _ => (SequenceType::Stopping, source),
     }
 }
 

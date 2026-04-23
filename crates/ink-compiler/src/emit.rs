@@ -55,8 +55,12 @@ fn container_to_value_with_name(container: &Container, include_name: bool) -> Va
         .collect::<Vec<_>>();
 
     if named_content_tail {
-        if let Some(object) = container.content.last() {
-            values.push(runtime_object_to_value(object));
+        if let Some(RuntimeObject::NamedContent(containers)) = container.content.last() {
+            values.push(named_content_to_value_with_metadata(
+                containers,
+                container,
+                include_name,
+            ));
         }
     } else {
         values.push(container_terminator_to_value(container, include_name));
@@ -99,6 +103,10 @@ fn runtime_object_to_value(object: &RuntimeObject) -> Value {
                 ControlCommand::EvalEnd => "/ev",
                 ControlCommand::BeginString => "str",
                 ControlCommand::EndString => "/str",
+                ControlCommand::VisitIndex => "visit",
+                ControlCommand::Duplicate => "du",
+                ControlCommand::NoOp => "nop",
+                ControlCommand::Pop => "pop",
             }
             .to_string(),
         ),
@@ -106,7 +114,14 @@ fn runtime_object_to_value(object: &RuntimeObject) -> Value {
             Value::String(if *is_start { "#" } else { "/#" }.to_string())
         }
         RuntimeObject::Bool(value) => Value::Bool(*value),
+        RuntimeObject::Int(value) => Value::Number((*value).into()),
         RuntimeObject::NativeFunction(name) => Value::String(name.clone()),
+        RuntimeObject::ConditionalDivert { target } => {
+            let mut obj = Map::new();
+            obj.insert("->".to_string(), Value::String(target.clone()));
+            obj.insert("c".to_string(), Value::Bool(true));
+            Value::Object(obj)
+        }
         RuntimeObject::Divert { target, variable } => {
             let mut obj = Map::new();
             obj.insert("->".to_string(), Value::String(target.clone()));
@@ -122,7 +137,25 @@ fn runtime_object_to_value(object: &RuntimeObject) -> Value {
 }
 
 fn named_content_to_value(containers: &[Container]) -> Value {
-    let mut obj = Map::new();
+    named_content_to_value_with_extra(containers, Map::new())
+}
+
+fn named_content_to_value_with_metadata(
+    containers: &[Container],
+    container: &Container,
+    include_name: bool,
+) -> Value {
+    let extra = match container_terminator_to_value(container, include_name) {
+        Value::Object(map) => map,
+        _ => Map::new(),
+    };
+    named_content_to_value_with_extra(containers, extra)
+}
+
+fn named_content_to_value_with_extra(
+    containers: &[Container],
+    mut obj: Map<String, Value>,
+) -> Value {
     for container in containers {
         let Some(name) = &container.name else {
             continue;
