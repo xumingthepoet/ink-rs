@@ -194,6 +194,8 @@ fn lower_choice_weave(weave: &Weave, path_mode: ChoicePathMode) -> Vec<RuntimeOb
     let mut index = 0;
     let mut any_gather = false;
     let mut gather_count = 0;
+    let mut choice_count = 0;
+    let mut needs_terminal_gather = false;
     let objects = weave.content();
 
     while index < objects.len() {
@@ -206,6 +208,7 @@ fn lower_choice_weave(weave: &Weave, path_mode: ChoicePathMode) -> Vec<RuntimeOb
                 // Create a named container for the gather
                 let gather_name = format!("g-{gather_count}");
                 gather_count += 1;
+                needs_terminal_gather = false;
 
                 // Collect content after the gather
                 let mut gather_content = Vec::new();
@@ -230,7 +233,8 @@ fn lower_choice_weave(weave: &Weave, path_mode: ChoicePathMode) -> Vec<RuntimeOb
                 any_gather = true;
             }
             Object::Choice(choice) => {
-                let choice_index = named_content.len();
+                let choice_index = choice_count;
+                choice_count += 1;
                 let choice_container_name = format!("c-{choice_index}");
                 let gather_container_name = format!("g-{gather_count}");
                 let choice_container_path =
@@ -282,6 +286,7 @@ fn lower_choice_weave(weave: &Weave, path_mode: ChoicePathMode) -> Vec<RuntimeOb
                         variable: false,
                     });
                     any_gather = true;
+                    needs_terminal_gather = true;
                 }
 
                 named_content.push(Container {
@@ -294,7 +299,10 @@ fn lower_choice_weave(weave: &Weave, path_mode: ChoicePathMode) -> Vec<RuntimeOb
         }
     }
 
-    if any_gather && gather_count == 0 {
+    if needs_terminal_gather {
+        // Add a terminal gather for choices that divert to it
+        named_content.push(done_container(&format!("g-{gather_count}")));
+    } else if any_gather && gather_count == 0 {
         // Add a default gather if there were choices but no explicit gathers
         named_content.push(done_container(&format!("g-{gather_count}")));
     }
