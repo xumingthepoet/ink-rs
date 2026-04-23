@@ -1,4 +1,4 @@
-#![cfg(feature = "legacy-compiler-conformance")]
+#![cfg(feature = "compiler-conformance")]
 
 #[path = "compiler_conformance/mod.rs"]
 mod compiler_conformance;

@@ -5,8 +5,8 @@ edition.workspace = true
 publish = false
 
 [features]
-legacy-compiler-conformance = []
-legacy-csharp-tests = []
+compiler-conformance = []
+csharp-tests = []
 
 [dependencies]
 ink_runtime = { package = "ink-runtime", path = "../ink-runtime" }
