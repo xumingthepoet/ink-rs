@@ -1,4 +1,8 @@
-use crate::{analysis::CheckedStory, ast::AstNode, compiler::StageOutput};
+use crate::{
+    analysis::CheckedStory,
+    compiler::StageOutput,
+    parsed::{Choice, ContentList, DivertTarget, Object, Weave},
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RuntimeProgram {
@@ -35,22 +39,18 @@ pub enum ControlCommand {
 }
 
 pub(crate) fn lower(story: &CheckedStory) -> StageOutput<RuntimeProgram> {
-    let main_content = if story
-        .parsed
-        .nodes
+    let root_weave = story.parsed.root_weave();
+    let main_content = if root_weave
+        .content()
         .iter()
-        .any(|node| matches!(node, AstNode::Choice { .. }))
+        .any(|object| matches!(object, Object::Choice(_)))
     {
-        lower_choice_weave(&story.parsed.nodes)
+        lower_choice_weave(root_weave)
     } else {
         let mut content = Vec::new();
 
-        for node in &story.parsed.nodes {
-            match node {
-                AstNode::TextLine { text, .. } => push_text_line(&mut content, text),
-                AstNode::Divert { target, .. } => push_divert(&mut content, target),
-                AstNode::Choice { .. } => {}
-            }
+        for object in root_weave.content() {
+            lower_object_into(&mut content, object);
         }
 
         content.push(RuntimeObject::Container(done_container("g-0")));
@@ -78,15 +78,14 @@ pub(crate) fn lower(story: &CheckedStory) -> StageOutput<RuntimeProgram> {
     }
 }
 
-fn lower_choice_weave(nodes: &[AstNode]) -> Vec<RuntimeObject> {
+fn lower_choice_weave(weave: &Weave) -> Vec<RuntimeObject> {
     let mut main_content = Vec::new();
-    let mut iter = nodes.iter().peekable();
+    let mut iter = weave.content().iter().peekable();
 
-    while let Some(node) = iter.next() {
-        match node {
-            AstNode::TextLine { text, .. } => push_text_line(&mut main_content, text),
-            AstNode::Divert { target, .. } => push_divert(&mut main_content, target),
-            AstNode::Choice { text, .. } => {
+    while let Some(object) = iter.next() {
+        match object {
+            Object::Text(_) | Object::Divert(_) => lower_object_into(&mut main_content, object),
+            Object::Choice(choice) => {
                 let choice_index = 0;
                 let choice_point_index = main_content.len();
                 let choice_container_name = format!("c-{choice_index}");
@@ -95,7 +94,7 @@ fn lower_choice_weave(nodes: &[AstNode]) -> Vec<RuntimeObject> {
                 let gather_container_name = "g-0";
 
                 main_content.push(choice_point(
-                    text,
+                    choice,
                     &choice_point_path,
                     &choice_container_path,
                     1,
@@ -103,14 +102,10 @@ fn lower_choice_weave(nodes: &[AstNode]) -> Vec<RuntimeObject> {
 
                 let mut choice_content =
                     choice_container_prefix(&choice_container_path, &choice_point_path, 2);
-                choice_content.push(RuntimeObject::String("\n".to_string()));
+                choice_content.extend(lower_content_list(choice.inner_content()));
 
                 for remaining in iter {
-                    match remaining {
-                        AstNode::TextLine { text, .. } => push_text_line(&mut choice_content, text),
-                        AstNode::Divert { target, .. } => push_divert(&mut choice_content, target),
-                        AstNode::Choice { .. } => {}
-                    }
+                    lower_object_into(&mut choice_content, remaining);
                 }
 
                 choice_content.push(RuntimeObject::Divert {
@@ -135,11 +130,20 @@ fn lower_choice_weave(nodes: &[AstNode]) -> Vec<RuntimeObject> {
 }
 
 fn choice_point(
-    choice_text: &str,
+    choice: &Choice,
     choice_point_path: &str,
     choice_container_path: &str,
     return_index: usize,
 ) -> RuntimeObject {
+    let mut start_content = choice
+        .start_content()
+        .map(lower_content_list)
+        .unwrap_or_default();
+    start_content.push(RuntimeObject::Divert {
+        target: "$r".to_string(),
+        variable: true,
+    });
+
     RuntimeObject::Container(Container {
         content: vec![
             RuntimeObject::ControlCommand(ControlCommand::EvalStart),
@@ -162,13 +166,7 @@ fn choice_point(
                 flags: 18,
             },
             RuntimeObject::NamedContent(vec![Container {
-                content: vec![
-                    RuntimeObject::String(choice_text.to_string()),
-                    RuntimeObject::Divert {
-                        target: "$r".to_string(),
-                        variable: true,
-                    },
-                ],
+                content: start_content,
                 name: Some("s".to_string()),
                 flags: None,
             }]),
@@ -200,17 +198,32 @@ fn choice_container_prefix(
     ]
 }
 
-fn push_text_line(content: &mut Vec<RuntimeObject>, text: &str) {
-    content.push(RuntimeObject::String(text.to_string()));
-    content.push(RuntimeObject::String("\n".to_string()));
+fn lower_content_list(content_list: &ContentList) -> Vec<RuntimeObject> {
+    let mut content = Vec::new();
+    for object in content_list.objects() {
+        lower_object_into(&mut content, object);
+    }
+    content
 }
 
-fn push_divert(content: &mut Vec<RuntimeObject>, target: &str) {
+fn lower_object_into(content: &mut Vec<RuntimeObject>, object: &Object) {
+    match object {
+        Object::Text(text) => content.push(RuntimeObject::String(text.text().to_string())),
+        Object::Divert(divert) => push_divert(content, divert.target()),
+        Object::Choice(_) => {}
+    }
+}
+
+fn push_divert(content: &mut Vec<RuntimeObject>, target: &DivertTarget) {
     match target {
-        "DONE" => content.push(RuntimeObject::ControlCommand(ControlCommand::Done)),
-        "END" => content.push(RuntimeObject::ControlCommand(ControlCommand::End)),
-        other => content.push(RuntimeObject::Divert {
-            target: other.to_string(),
+        DivertTarget::Done => content.push(RuntimeObject::ControlCommand(ControlCommand::Done)),
+        DivertTarget::End => content.push(RuntimeObject::ControlCommand(ControlCommand::End)),
+        DivertTarget::Path(target) => content.push(RuntimeObject::Divert {
+            target: target.clone(),
+            variable: false,
+        }),
+        DivertTarget::Empty => content.push(RuntimeObject::Divert {
+            target: String::new(),
             variable: false,
         }),
     }

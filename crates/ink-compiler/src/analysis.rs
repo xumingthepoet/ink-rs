@@ -1,11 +1,11 @@
-use crate::{ast::ParsedStory, compiler::StageOutput};
+use crate::{compiler::StageOutput, parsed::Story};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CheckedStory {
-    pub parsed: ParsedStory,
+    pub parsed: Story,
 }
 
-pub(crate) fn analyze(parsed: ParsedStory) -> StageOutput<CheckedStory> {
+pub(crate) fn analyze(parsed: Story) -> StageOutput<CheckedStory> {
     StageOutput {
         artifact: Some(CheckedStory { parsed }),
         diagnostics: Vec::new(),

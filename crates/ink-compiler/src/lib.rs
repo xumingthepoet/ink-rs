@@ -5,15 +5,17 @@
 //! wire format directly.
 
 mod analysis;
-mod ast;
 mod compiler;
 mod diagnostic;
 mod emit;
 mod lower;
+mod parsed;
 mod source;
 mod syntax;
 
-pub use ast::{AstNode, ParsedStory};
 pub use compiler::{CompiledStory, Compiler, CompilerOptions, StageOutput};
 pub use diagnostic::{Diagnostic, DiagnosticSeverity};
+pub use parsed::{
+    Choice, ContentList, Divert, DivertTarget, Object, Story as ParsedStory, Text, Weave,
+};
 pub use source::{FileHandler, SourceInput, SourceSpan};

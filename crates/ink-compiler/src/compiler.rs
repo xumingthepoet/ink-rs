@@ -2,10 +2,10 @@ use std::sync::Arc;
 
 use crate::{
     analysis::{self, CheckedStory},
-    ast::ParsedStory,
     diagnostic::{Diagnostic, DiagnosticSeverity},
     emit,
     lower::{self, RuntimeProgram},
+    parsed::Story as ParsedStory,
     source::{FileHandler, SourceInput},
     syntax,
 };
