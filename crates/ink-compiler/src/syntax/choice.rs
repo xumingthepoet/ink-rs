@@ -28,7 +28,7 @@ pub(super) fn parse_choice(parser: &mut RuleParser<'_>) -> Option<Choice> {
         })
         .ok()?;
 
-    Some(Choice::new(
+    Some(Choice::new_with_inline_brackets(
         content_list_from_segment(segments.start, span.clone(), false),
         segments.choice_only.map(|segment| {
             content_list_from_segment(segment, span.clone(), true).unwrap_or_default()
@@ -38,6 +38,7 @@ pub(super) fn parse_choice(parser: &mut RuleParser<'_>) -> Option<Choice> {
             span.clone(),
         ),
         span,
+        segments.has_inline_brackets,
     ))
 }
 
@@ -45,6 +46,7 @@ struct ChoiceSegments {
     start: String,
     choice_only: Option<String>,
     inner: String,
+    has_inline_brackets: bool,
 }
 
 fn parse_choice_segments(choice_body: &str) -> Result<ChoiceSegments, &'static str> {
@@ -61,6 +63,7 @@ fn parse_choice_segments(choice_body: &str) -> Result<ChoiceSegments, &'static s
             start: choice_body.to_string(),
             choice_only: None,
             inner: String::new(),
+            has_inline_brackets: false,
         });
     };
 
@@ -82,8 +85,10 @@ fn parse_choice_segments(choice_body: &str) -> Result<ChoiceSegments, &'static s
 
     Ok(ChoiceSegments {
         start: choice_body[..open_index].to_string(),
-        choice_only: Some(choice_body[open_index + 1..close_index].to_string()),
+        choice_only: (!choice_body[open_index + 1..close_index].is_empty())
+            .then(|| choice_body[open_index + 1..close_index].to_string()),
         inner: choice_body[close_index + 1..].to_string(),
+        has_inline_brackets: true,
     })
 }
 

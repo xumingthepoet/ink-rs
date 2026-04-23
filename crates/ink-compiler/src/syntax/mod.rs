@@ -258,6 +258,19 @@ mod tests {
     }
 
     #[test]
+    fn parses_empty_inline_choice_brackets_without_choice_only_content() {
+        let output = parse(SourceInput::new("* Text[] inner"));
+        assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
+        let story = output.artifact.unwrap();
+
+        let Object::Choice(choice) = &story.root_weave().content()[0] else {
+            panic!("expected choice");
+        };
+        assert!(choice.has_weave_style_inline_brackets());
+        assert!(!choice.has_choice_only_content());
+    }
+
+    #[test]
     fn parses_inline_divert_in_text() {
         let output = parse(SourceInput::new("A line. -> END"));
         assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
@@ -278,6 +291,18 @@ mod tests {
         assert!(matches!(story.root_weave().content()[2], Object::Text(_)));
         assert!(matches!(story.root_weave().content()[3], Object::Divert(_)));
         assert!(matches!(story.root_weave().content()[4], Object::Text(_)));
+    }
+
+    #[test]
+    fn trims_extra_separator_whitespace_before_terminal_divert() {
+        let output = parse(SourceInput::new("<>as fast as we could.  -> END"));
+        assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
+        let story = output.artifact.unwrap();
+
+        let Object::Text(text) = &story.root_weave().content()[1] else {
+            panic!("expected text");
+        };
+        assert_eq!(text.text(), "as fast as we could. ");
     }
 
     #[test]

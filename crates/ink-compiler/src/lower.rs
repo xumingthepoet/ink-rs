@@ -135,15 +135,19 @@ fn lower_linear_weave(weave: &Weave) -> Vec<RuntimeObject> {
 
 fn lower_choice_weave(weave: &Weave, path_mode: ChoicePathMode) -> Vec<RuntimeObject> {
     let mut main_content = Vec::new();
-    let mut iter = weave.content().iter().peekable();
+    let mut named_content = Vec::new();
+    let mut index = 0;
+    let mut any_gather = false;
+    let objects = weave.content();
 
-    while let Some(object) = iter.next() {
-        match object {
+    while index < objects.len() {
+        match &objects[index] {
             Object::Text(_) | Object::Glue(_) | Object::Divert(_) => {
-                lower_object_into(&mut main_content, object)
+                lower_object_into(&mut main_content, &objects[index]);
+                index += 1;
             }
             Object::Choice(choice) => {
-                let choice_index = 0;
+                let choice_index = named_content.len();
                 let choice_container_name = format!("c-{choice_index}");
                 let gather_container_name = "g-0";
                 let choice_container_path =
@@ -172,34 +176,41 @@ fn lower_choice_weave(weave: &Weave, path_mode: ChoicePathMode) -> Vec<RuntimeOb
                 }
                 choice_content.extend(lower_content_list(choice.inner_content()));
 
-                for remaining in iter {
-                    lower_object_into(&mut choice_content, remaining);
+                index += 1;
+                while index < objects.len() {
+                    if matches!(objects[index], Object::Choice(_)) {
+                        break;
+                    }
+                    lower_object_into(&mut choice_content, &objects[index]);
+                    index += 1;
                 }
 
                 let include_gather = match path_mode {
                     ChoicePathMode::Root => true,
-                    ChoicePathMode::Flow { .. } => !ends_with_divert(&choice_content),
+                    ChoicePathMode::Flow { .. } => !ends_with_flow_terminator(&choice_content),
                 };
                 if include_gather {
                     choice_content.push(RuntimeObject::Divert {
                         target: gather_target(&path_mode, gather_container_name),
                         variable: false,
                     });
+                    any_gather = true;
                 }
 
-                let mut named_content = vec![Container {
+                named_content.push(Container {
                     content: choice_content,
                     name: Some(choice_container_name),
                     flags: Some(5),
-                }];
-                if include_gather {
-                    named_content.push(done_container(gather_container_name));
-                }
-
-                main_content.push(RuntimeObject::NamedContent(named_content));
-                break;
+                });
             }
         }
+    }
+
+    if any_gather {
+        named_content.push(done_container("g-0"));
+    }
+    if !named_content.is_empty() {
+        main_content.push(RuntimeObject::NamedContent(named_content));
     }
 
     main_content
@@ -360,12 +371,18 @@ fn gather_target(path_mode: &ChoicePathMode, gather_container_name: &str) -> Str
     }
 }
 
-fn ends_with_divert(content: &[RuntimeObject]) -> bool {
+fn ends_with_flow_terminator(content: &[RuntimeObject]) -> bool {
     content
         .iter()
         .rev()
         .find(|object| !matches!(object, RuntimeObject::String(text) if text == "\n"))
-        .is_some_and(|object| matches!(object, RuntimeObject::Divert { .. }))
+        .is_some_and(|object| {
+            matches!(
+                object,
+                RuntimeObject::Divert { .. }
+                    | RuntimeObject::ControlCommand(ControlCommand::End | ControlCommand::Done)
+            )
+        })
 }
 
 fn push_divert(content: &mut Vec<RuntimeObject>, target: &DivertTarget) {

@@ -23,6 +23,22 @@ impl Choice {
         span: SourceSpan,
     ) -> Self {
         let has_weave_style_inline_brackets = choice_only_content.is_some();
+        Self::new_with_inline_brackets(
+            start_content,
+            choice_only_content,
+            inner_content,
+            span,
+            has_weave_style_inline_brackets,
+        )
+    }
+
+    pub fn new_with_inline_brackets(
+        start_content: Option<ContentList>,
+        choice_only_content: Option<ContentList>,
+        inner_content: ContentList,
+        span: SourceSpan,
+        has_weave_style_inline_brackets: bool,
+    ) -> Self {
         Self {
             start_content,
             choice_only_content,

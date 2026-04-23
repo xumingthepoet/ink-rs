@@ -76,7 +76,11 @@ pub(super) fn parse_inline_content(text: &str, span: &SourceSpan) -> Option<Vec<
         match next_token {
             Some(0) => return None,
             Some(index) => {
-                let prefix = &remaining[..index];
+                let prefix = if remaining[index..].starts_with("->") {
+                    trim_separator_whitespace(&remaining[..index])
+                } else {
+                    &remaining[..index]
+                };
                 if !prefix.is_empty() {
                     objects.push(Object::Text(Text::new(prefix, span.clone())));
                 }
@@ -94,4 +98,17 @@ pub(super) fn parse_inline_content(text: &str, span: &SourceSpan) -> Option<Vec<
     } else {
         Some(objects)
     }
+}
+
+fn trim_separator_whitespace(text: &str) -> &str {
+    let trimmed = text.trim_end_matches([' ', '\t']);
+    if trimmed.len() == text.len() {
+        return text;
+    }
+
+    if trimmed.is_empty() {
+        return " ";
+    }
+
+    &text[..trimmed.len() + 1]
 }
