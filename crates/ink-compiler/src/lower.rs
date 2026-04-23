@@ -137,12 +137,16 @@ fn lower_flow_with_context(
 
     // Lower child flows (stitches)
     if !flow.child_flows().is_empty() {
-        // Add auto-divert to first child flow
-        let first_child_name = flow.child_flows()[0].name();
-        content.push(RuntimeObject::Divert {
-            target: format!(".^.{}", first_child_name),
-            variable: false,
-        });
+        // Only add auto-divert to first child flow if the knot's weave doesn't have choices
+        // When choices are present, they explicitly divert to stitches
+        let weave_has_choices = weave_has_choice(flow.weave());
+        if !weave_has_choices {
+            let first_child_name = flow.child_flows()[0].name();
+            content.push(RuntimeObject::Divert {
+                target: format!(".^.{}", first_child_name),
+                variable: false,
+            });
+        }
 
         // Collect all child stitch names for sibling reference
         let child_stitch_names: Vec<String> = flow
@@ -424,6 +428,36 @@ fn push_divert_with_context(
 /// Resolve a divert target path, converting absolute flow names to relative paths
 /// when the target is a sibling stitch or child stitch inside a choice container.
 fn resolve_divert_target(target: &str, path_mode: &ChoicePathMode) -> String {
+    match path_mode {
+        ChoicePathMode::Root => target.to_string(),
+        ChoicePathMode::Flow {
+            parent_flow_name,
+            flow_name,
+            ..
+        } => {
+            // Check if target is a dotted path like "knot.stitch"
+            if let Some(dot_pos) = target.find('.') {
+                let first_part = &target[..dot_pos];
+                let second_part = &target[dot_pos + 1..];
+
+                // Check if it's "parent_knot.child_stitch" format
+                if parent_flow_name.is_some() && Some(first_part) == parent_flow_name.as_deref()
+                    || first_part == flow_name
+                {
+                    // It's a dotted reference to a sibling/child stitch
+                    // Treat the second part as the target stitch name
+                    return resolve_single_stitch_target(second_part, path_mode);
+                }
+            }
+
+            // Handle simple target names
+            resolve_single_stitch_target(target, path_mode)
+        }
+    }
+}
+
+/// Resolve a single stitch name to a relative path if applicable.
+fn resolve_single_stitch_target(target: &str, path_mode: &ChoicePathMode) -> String {
     match path_mode {
         ChoicePathMode::Root => target.to_string(),
         ChoicePathMode::Flow {
