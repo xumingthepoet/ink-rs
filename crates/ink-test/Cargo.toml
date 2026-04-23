@@ -11,5 +11,4 @@ legacy-csharp-tests = []
 [dependencies]
 ink_runtime = { package = "ink-runtime", path = "../ink-runtime" }
 ink_compiler = { package = "ink-compiler", path = "../ink-compiler" }
-rand = "0.9"
 serde_json = "1"
