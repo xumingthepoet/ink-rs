@@ -75,6 +75,29 @@ enum ChoicePathMode {
     },
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum GatherLocation {
+    Main(Vec<usize>),
+    Named(Vec<usize>),
+}
+
+impl GatherLocation {
+    fn child(&self, child_index: usize) -> Self {
+        match self {
+            GatherLocation::Main(path) => {
+                let mut path = path.clone();
+                path.push(child_index);
+                GatherLocation::Main(path)
+            }
+            GatherLocation::Named(path) => {
+                let mut path = path.clone();
+                path.push(child_index);
+                GatherLocation::Named(path)
+            }
+        }
+    }
+}
+
 impl ChoicePathMode {
     fn with_self_target_relative(&self, self_target_relative: bool) -> Self {
         match self {
@@ -107,6 +130,7 @@ impl ChoicePathMode {
         &self,
         choice_container_name: &str,
         gather_container_name: &str,
+        has_following_gather: bool,
     ) -> Self {
         match self {
             ChoicePathMode::Root => ChoicePathMode::NestedRoot {
@@ -122,7 +146,11 @@ impl ChoicePathMode {
                 gather_target,
             } => ChoicePathMode::NestedRoot {
                 container_path: format!("{container_path}.{choice_container_name}"),
-                gather_target: gather_target.clone(),
+                gather_target: if has_following_gather {
+                    format!("{container_path}.{gather_container_name}")
+                } else {
+                    gather_target.clone()
+                },
             },
             ChoicePathMode::Flow { .. } => self.with_self_target_relative(true),
         }
@@ -162,6 +190,13 @@ impl ChoicePathMode {
                 gather_target: gather_target.clone(),
             },
             other => other.clone(),
+        }
+    }
+
+    fn fallback_gather_target(&self) -> Option<String> {
+        match self {
+            ChoicePathMode::NestedRoot { gather_target, .. } => Some(gather_target.clone()),
+            _ => None,
         }
     }
 }
@@ -310,7 +345,8 @@ fn lower_choice_weave(weave: &Weave, path_mode: ChoicePathMode) -> Vec<RuntimeOb
     let mut gather_count = 0;
     let mut choice_count = 0;
     let mut needs_terminal_gather = false;
-    let mut last_gather_container_index = None;
+    let mut last_gather_location = None;
+    let mut last_section_had_choice = false;
     let objects = weave.content();
 
     // Check if there's an explicit gather anywhere in the weave
@@ -324,28 +360,31 @@ fn lower_choice_weave(weave: &Weave, path_mode: ChoicePathMode) -> Vec<RuntimeOb
             | Object::Divert(_)
             | Object::Tag(_)
             | Object::Sequence(_)
-            | Object::Weave(_) => lower_weave_section(
-                objects,
-                &mut index,
-                &mut main_content,
-                &mut named_content,
-                &mut choice_count,
-                &mut needs_terminal_gather,
-                gather_count,
-                &path_mode,
-                has_explicit_gather,
-            ),
+            | Object::Weave(_) => {
+                last_section_had_choice = lower_weave_section(
+                    objects,
+                    &mut index,
+                    &mut main_content,
+                    &mut named_content,
+                    &mut choice_count,
+                    &mut needs_terminal_gather,
+                    gather_count,
+                    &path_mode,
+                    has_explicit_gather,
+                );
+            }
             Object::Gather(_gather) => {
                 // Create a named container for the gather
                 let gather_name = format!("g-{gather_count}");
                 gather_count += 1;
+                let auto_enter_gather = !last_section_had_choice;
 
                 let mut gather_content = Vec::new();
                 let mut gather_named_content = Vec::new();
                 index += 1;
 
                 let gather_path_mode = path_mode.for_gather(&gather_name);
-                lower_weave_section(
+                let gather_has_choice = lower_weave_section(
                     objects,
                     &mut index,
                     &mut gather_content,
@@ -359,36 +398,76 @@ fn lower_choice_weave(weave: &Weave, path_mode: ChoicePathMode) -> Vec<RuntimeOb
                 if !gather_named_content.is_empty() {
                     gather_content.push(RuntimeObject::NamedContent(gather_named_content));
                 }
+                if matches!(path_mode, ChoicePathMode::NestedRoot { .. })
+                    && !gather_has_choice
+                    && !ends_with_flow_terminator(&gather_content)
+                {
+                    if let Some(target) = gather_path_mode.fallback_gather_target() {
+                        gather_content.push(RuntimeObject::Divert {
+                            target,
+                            variable: false,
+                        });
+                    }
+                }
 
-                named_content.push(Container {
+                let gather_container = Container {
                     content: gather_content,
                     name: Some(gather_name),
                     flags: None,
                     merge_tail_metadata: true,
-                });
-                last_gather_container_index = Some(named_content.len() - 1);
+                };
+                if auto_enter_gather {
+                    if let Some(location) = last_gather_location.clone() {
+                        if let Some(parent) = gather_container_at_location_mut(
+                            &mut main_content,
+                            &mut named_content,
+                            &location,
+                        ) {
+                            let child_index = parent.content.len();
+                            parent
+                                .content
+                                .push(RuntimeObject::Container(gather_container));
+                            last_gather_location = Some(location.child(child_index));
+                        }
+                    } else {
+                        let child_index = main_content.len();
+                        main_content.push(RuntimeObject::Container(gather_container));
+                        last_gather_location = Some(GatherLocation::Main(vec![child_index]));
+                    }
+                } else {
+                    named_content.push(gather_container);
+                    last_gather_location =
+                        Some(GatherLocation::Named(vec![named_content.len() - 1]));
+                }
+                last_section_had_choice = gather_has_choice;
             }
-            Object::Choice(_) => lower_weave_section(
-                objects,
-                &mut index,
-                &mut main_content,
-                &mut named_content,
-                &mut choice_count,
-                &mut needs_terminal_gather,
-                gather_count,
-                &path_mode,
-                has_explicit_gather,
-            ),
+            Object::Choice(_) => {
+                last_section_had_choice = lower_weave_section(
+                    objects,
+                    &mut index,
+                    &mut main_content,
+                    &mut named_content,
+                    &mut choice_count,
+                    &mut needs_terminal_gather,
+                    gather_count,
+                    &path_mode,
+                    has_explicit_gather,
+                );
+            }
         }
     }
 
     if matches!(path_mode, ChoicePathMode::Root) && has_explicit_gather {
-        if let Some(last_gather_container_index) = last_gather_container_index {
-            named_content[last_gather_container_index]
-                .content
-                .push(RuntimeObject::Container(done_container(&format!(
-                    "g-{gather_count}"
-                ))));
+        if let Some(location) = last_gather_location {
+            if let Some(container) =
+                gather_container_at_location_mut(&mut main_content, &mut named_content, &location)
+            {
+                container
+                    .content
+                    .push(RuntimeObject::Container(done_container(&format!(
+                        "g-{gather_count}"
+                    ))));
+            }
         }
     } else if !matches!(path_mode, ChoicePathMode::NestedRoot { .. })
         && !has_explicit_gather
@@ -414,7 +493,8 @@ fn lower_weave_section(
     gather_count: usize,
     path_mode: &ChoicePathMode,
     has_explicit_gather: bool,
-) {
+) -> bool {
+    let mut section_has_choice = false;
     while *index < objects.len() {
         match &objects[*index] {
             Object::Gather(_) => break,
@@ -429,6 +509,7 @@ fn lower_weave_section(
                 *index += 1;
             }
             Object::Choice(_) => {
+                section_has_choice = true;
                 lower_choice_in_section(
                     objects,
                     index,
@@ -443,6 +524,51 @@ fn lower_weave_section(
             }
         }
     }
+    section_has_choice
+}
+
+fn gather_container_at_location_mut<'a>(
+    main_content: &'a mut Vec<RuntimeObject>,
+    named_content: &'a mut [Container],
+    location: &GatherLocation,
+) -> Option<&'a mut Container> {
+    match location {
+        GatherLocation::Main(path) => nested_container_in_runtime_content_mut(main_content, path),
+        GatherLocation::Named(path) => nested_container_in_named_content_mut(named_content, path),
+    }
+}
+
+fn nested_container_in_named_content_mut<'a>(
+    named_content: &'a mut [Container],
+    path: &[usize],
+) -> Option<&'a mut Container> {
+    let (&first, rest) = path.split_first()?;
+    let container = named_content.get_mut(first)?;
+    nested_container_in_container_mut(container, rest)
+}
+
+fn nested_container_in_runtime_content_mut<'a>(
+    content: &'a mut Vec<RuntimeObject>,
+    path: &[usize],
+) -> Option<&'a mut Container> {
+    let (&first, rest) = path.split_first()?;
+    let RuntimeObject::Container(container) = content.get_mut(first)? else {
+        return None;
+    };
+    nested_container_in_container_mut(container, rest)
+}
+
+fn nested_container_in_container_mut<'a>(
+    container: &'a mut Container,
+    path: &[usize],
+) -> Option<&'a mut Container> {
+    let Some((&first, rest)) = path.split_first() else {
+        return Some(container);
+    };
+    let RuntimeObject::Container(child) = container.content.get_mut(first)? else {
+        return None;
+    };
+    nested_container_in_container_mut(child, rest)
 }
 
 fn lower_choice_in_section(
@@ -485,8 +611,11 @@ fn lower_choice_in_section(
         choice.inner_content(),
         &choice_content_path_mode,
     ));
-    let nested_choice_content_path_mode =
-        path_mode.for_choice_nested_content(&choice_container_name, &gather_container_name);
+    let nested_choice_content_path_mode = path_mode.for_choice_nested_content(
+        &choice_container_name,
+        &gather_container_name,
+        has_following_gather,
+    );
     let mut has_nested_weave_content = false;
 
     *index += 1;
