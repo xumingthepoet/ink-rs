@@ -43,8 +43,12 @@ impl Sequence {
         for element in &self.elements {
             out.push('\n');
             push_indent(out, indent + 2);
-            out.push_str("Weave(baseIndent=0)");
-            element.write_parse_snapshot(out, indent + 4);
+            if element.objects().is_empty() {
+                out.push_str("ContentList");
+            } else {
+                out.push_str("Weave(baseIndent=0)");
+                element.write_parse_snapshot(out, indent + 4);
+            }
         }
     }
 }
