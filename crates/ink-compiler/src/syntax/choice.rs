@@ -45,6 +45,7 @@ pub(super) fn parse_choice(parser: &mut RuleParser<'_>) -> Option<Choice> {
         |parser| parser.skip_to_end(),
     )?;
 
+    let (identifier, choice_body) = parse_choice_identifier(&choice_body);
     let (condition, choice_body) = parse_choice_conditions(&choice_body)?;
 
     // Handle fallback choices like "* -> " which have no text content
@@ -58,6 +59,7 @@ pub(super) fn parse_choice(parser: &mut RuleParser<'_>) -> Option<Choice> {
             None, // no choice-only content
             inner, span, false, // no inline brackets
         );
+        choice.set_identifier(identifier);
         choice.set_once_only(once_only);
         choice.set_is_invisible_default(true);
         choice.set_condition(condition);
@@ -83,6 +85,7 @@ pub(super) fn parse_choice(parser: &mut RuleParser<'_>) -> Option<Choice> {
         span,
         segments.has_inline_brackets,
     );
+    choice.set_identifier(identifier);
     choice.set_once_only(once_only);
     choice.set_condition(condition);
     choice.set_indentation_depth(indentation_depth);
@@ -94,6 +97,24 @@ pub(super) fn parse_choice(parser: &mut RuleParser<'_>) -> Option<Choice> {
     choice.set_is_invisible_default(is_invisible_default);
 
     Some(choice)
+}
+
+fn parse_choice_identifier(choice_body: &str) -> (Option<String>, String) {
+    let remaining = choice_body.trim_start();
+    let Some(after_open) = remaining.strip_prefix('(') else {
+        return (None, choice_body.to_string());
+    };
+    let Some(close_index) = after_open.find(')') else {
+        return (None, choice_body.to_string());
+    };
+    let name = after_open[..close_index].trim();
+    if !is_identifier(name) {
+        return (None, choice_body.to_string());
+    }
+    (
+        Some(name.to_string()),
+        after_open[close_index + 1..].trim_start().to_string(),
+    )
 }
 
 fn parse_choice_conditions(choice_body: &str) -> Option<(Option<Expression>, String)> {
@@ -132,8 +153,15 @@ fn parse_bool_literal(source: &str) -> Option<Expression> {
     match source {
         "true" => Some(Expression::NumberBool(true)),
         "false" => Some(Expression::NumberBool(false)),
+        _ if is_identifier(source) => Some(Expression::VariableReference(source.to_string())),
         _ => None,
     }
+}
+
+fn is_identifier(source: &str) -> bool {
+    let mut chars = source.chars();
+    matches!(chars.next(), Some(ch) if ch == '_' || ch.is_ascii_alphabetic())
+        && chars.all(|ch| ch == '_' || ch.is_ascii_alphanumeric())
 }
 
 struct ChoiceSegments {

@@ -69,7 +69,15 @@ impl SourceFile {
                 text = text.trim_start_matches('\u{feff}').to_string();
             }
 
-            let text = strip_line_comment(&text).trim_end().to_string();
+            let uncommented = strip_line_comment(&text);
+            let is_choice_line = uncommented
+                .trim_start()
+                .starts_with(|ch| matches!(ch, '*' | '+'));
+            let text = if uncommented.len() == text.len() && is_choice_line {
+                uncommented.to_string()
+            } else {
+                uncommented.trim_end().to_string()
+            };
             lines.push(SourceLine {
                 text,
                 span: SourceSpan::new(source_name.clone(), index + 1, 1),

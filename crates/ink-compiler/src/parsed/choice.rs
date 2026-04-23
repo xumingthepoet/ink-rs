@@ -74,6 +74,10 @@ impl Choice {
         self.identifier.as_deref()
     }
 
+    pub fn set_identifier(&mut self, identifier: Option<String>) {
+        self.identifier = identifier;
+    }
+
     pub fn once_only(&self) -> bool {
         self.once_only
     }

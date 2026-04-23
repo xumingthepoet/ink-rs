@@ -3,6 +3,7 @@ use super::push_indent;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expression {
     NumberBool(bool),
+    VariableReference(String),
     Binary {
         operator: BinaryOperator,
         left: Box<Expression>,
@@ -23,6 +24,11 @@ impl Expression {
             Expression::NumberBool(value) => {
                 out.push_str("Number(");
                 out.push_str(if *value { "true" } else { "false" });
+                out.push(')');
+            }
+            Expression::VariableReference(name) => {
+                out.push_str("VariableReference(");
+                out.push_str(name);
                 out.push(')');
             }
             Expression::Binary {
