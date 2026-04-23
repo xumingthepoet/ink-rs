@@ -1,13 +1,13 @@
 # Ink Fixture Priority
 
-通过统计: 4/118
+通过统计: 5/118
 
 Sorted by the latest `WritingWithInk.md` syntax point used by each file.
 
 - [x] `basictext/oneline.ink`
 - [x] `basictext/twolines.ink`
 - [x] `knot/multi-line.ink`
-- [ ] `knot/single-line.ink`
+- [x] `knot/single-line.ink`
 - [ ] `knot/strip-empty-lines.ink`
 - [ ] `choices/mixed-choice.ink`
 - [ ] `choices/no-choice-text.ink`
