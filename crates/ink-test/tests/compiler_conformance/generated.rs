@@ -54,3 +54,4 @@ fixture!(
     variabletext_list_in_choice,
     "inkfiles/variabletext/list-in-choice.ink"
 );
+fixture!(choices_multi_choice, "inkfiles/choices/multi-choice.ink");
