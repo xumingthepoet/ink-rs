@@ -8,5 +8,7 @@
     non_upper_case_globals
 )]
 
+#[path = "conformance/mod.rs"]
 mod conformance;
+#[path = "csharp_tests/mod.rs"]
 mod csharp_tests;
