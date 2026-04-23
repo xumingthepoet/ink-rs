@@ -88,3 +88,20 @@ For the continuation workflow above, the minimum required validation before mark
 - Use the conformance fixtures in `crates/ink-test/` to pin behavior.
 - Keep diagnostics clear and actionable.
 - Prefer small, reviewable changes that isolate parser, parsed-model, and export logic.
+
+## Working Notes
+
+- During fix work, only record notes that are general, reusable, and likely to help later compiler-conformance work.
+- Do not record fixture-specific hacks, temporary observations, or narrow one-off facts.
+- Keep this section to at most 10 entries total.
+- If you want to add a new entry when the section already has 10, first delete the least important entry, delete outdated material, or merge overlapping entries.
+- Keep each entry under 100 words.
+- Keep entries high-signal and durable.
+- Each note should carry both counts, such as `[👍0][👎0]`.
+- Only increment a note's like count when, during the current work, that note provided real practical help.
+- Only increment a note's downvote count when, during the current work, that note caused real confusion, wasted work, or pushed the fix in the wrong direction.
+- Use likes and downvotes as signals when deciding what to keep, merge, rewrite, or delete, but still remove or rewrite notes that have become outdated.
+
+## Working Note Entries
+
+- [2026-04-24 00:02 CST] [👍0][👎0] First distinguish “queue maintenance” from real compiler work: if a priority fixture already passes under existing generic behavior, just enable it, validate it, update `priority.md`, and commit. Only change compiler code when the fixture exposes a genuine model or export gap.
