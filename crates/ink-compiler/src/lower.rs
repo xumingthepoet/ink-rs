@@ -197,6 +197,9 @@ fn lower_choice_weave(weave: &Weave, path_mode: ChoicePathMode) -> Vec<RuntimeOb
     let mut needs_terminal_gather = false;
     let objects = weave.content();
 
+    // Check if there's an explicit gather anywhere in the weave
+    let has_explicit_gather = objects.iter().any(|o| matches!(o, Object::Gather(_)));
+
     while index < objects.len() {
         match &objects[index] {
             Object::Text(_) | Object::Glue(_) | Object::Divert(_) => {
@@ -274,9 +277,16 @@ fn lower_choice_weave(weave: &Weave, path_mode: ChoicePathMode) -> Vec<RuntimeOb
                     index += 1;
                 }
 
-                let include_gather = match path_mode {
-                    ChoicePathMode::Root => true,
-                    ChoicePathMode::Flow { .. } => !ends_with_flow_terminator(&choice_content),
+                // Include gather divert if:
+                // 1. There's an explicit gather in the weave (choices should flow to it), OR
+                // 2. The choice doesn't end with a flow terminator (needs a terminal gather)
+                let include_gather = if has_explicit_gather {
+                    true
+                } else {
+                    match path_mode {
+                        ChoicePathMode::Root => true,
+                        ChoicePathMode::Flow { .. } => !ends_with_flow_terminator(&choice_content),
+                    }
                 };
                 if include_gather {
                     choice_content.push(RuntimeObject::Divert {
