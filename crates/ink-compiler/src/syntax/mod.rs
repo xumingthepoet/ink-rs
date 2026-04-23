@@ -255,14 +255,17 @@ fn gather_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
 
     let mut objects = vec![Object::Gather(crate::parsed::Gather::new(span.clone(), 1))];
 
-    // Parse any remaining text on the line as text content
+    // Parse any remaining content on the line
     let remaining = parser.line_remainder().trim();
     if !remaining.is_empty() {
-        let text_objects = text::parse_inline_content(remaining, &span).unwrap_or_default();
-        objects.extend(text_objects);
+        let parsed = text::parse_inline_content(remaining, &span).unwrap_or_default();
+        let has_text = parsed.iter().any(|o| matches!(o, Object::Text(_)));
+        objects.extend(parsed);
         parser.skip_to_end();
-        // Add trailing newline only when there's text content
-        objects.push(Object::Text(crate::parsed::Text::new("\n", span)));
+        // Add trailing newline only when there's actual text content
+        if has_text {
+            objects.push(Object::Text(crate::parsed::Text::new("\n", span)));
+        }
     } else {
         parser.skip_to_end();
     }
