@@ -1,3 +1,5 @@
+#![allow(dead_code, unused_imports, unused_variables)]
+
 //! Compiler-layer port for ink.
 //!
 //! This crate intentionally depends on `ink_runtime` for the runtime layer and
@@ -8,7 +10,6 @@ pub mod error;
 pub mod parsed;
 pub mod parser;
 pub mod results;
-mod runtime_export;
 
 pub use compiler::Compiler;
 pub use error::{CompilerError, Diagnostic, DiagnosticSeverity, Result};
