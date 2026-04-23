@@ -34,6 +34,36 @@ The upstream reference lives in `ink-csharp/`.
 - Match upstream behavior first, then improve Rust-side structure only where it does not change semantics.
 - Avoid broad unrelated edits when working on compiler behavior.
 
+## Continuation Workflow
+
+- If the user sends a continuation prompt such as `continue`, `go on`, `keep going`, `next`, `继续`, `继续吧`, or similar without replacing the task, interpret it as: continue the compiler conformance campaign.
+- `priority.md` is the authoritative queue for that campaign. Always take the first unchecked compiler-conformance fixture from `priority.md`, work in that order, and do not skip ahead.
+- Keep `priority.md` synchronized with reality. When a fixture genuinely passes, update its checkbox and progress count before moving on. If the file has drifted from the actual passing set, fix the drift before resuming the queue.
+
+## Compiler Conformance Campaign Rules
+
+- The target suite is `crates/ink-test/tests/compiler_conformance.rs` and the corresponding `make compiler-gate` target.
+- Every continuation cycle must end with at least one additional compiler-conformance fixture genuinely passing.
+- After one fixture is genuinely passing, validated, and recorded in `priority.md`, create a git commit before starting the next unchecked fixture.
+- After that commit, continue immediately to the next unchecked fixture in `priority.md`.
+- Repeat until all 118 fixtures pass, unless the user interrupts or changes the task.
+
+## Architecture Requirements
+
+- Pass tests by moving the Rust compiler closer to the C# compiler model in `ink-csharp/compiler`, not by shaping the code around individual fixtures.
+- Prefer Rust-native representations of the same compiler concepts: `enum`/`struct`/module boundaries, ownership-friendly APIs, explicit parser state, and typed parsed-model objects instead of C#-style inheritance.
+- When parser behavior is added, prefer reusable parser rules, parser state transitions, and parsed-model nodes that can naturally support future fixtures.
+- When compiler behavior is unclear, inspect the corresponding C# parser or parsed-hierarchy implementation before choosing a Rust-side design.
+
+## Forbidden Shortcuts
+
+- Do not add fixture-name checks, fixture-path checks, or expected-output checks in compiler code.
+- Do not hardcode JSON fragments, runtime paths, container names, or snapshot strings purely to satisfy a specific fixture.
+- Do not intentionally narrow accepted syntax to only the exact surface form used by the current fixture.
+- Do not add “temporary” special cases, one-off branches, or test-order-dependent logic just to make a fixture pass.
+- Do not modify tests, fixtures, or `priority.md` to hide failures instead of fixing compiler behavior.
+- In short: no “special-case”, “narrowed scope”, or other cheating-style test passes.
+
 ## Validation
 
 Use the smallest relevant validation first, then widen coverage:
@@ -46,10 +76,15 @@ Use the smallest relevant validation first, then widen coverage:
 
 When touching compiler logic, favor focused test runs in `crates/ink-test` before running the full workspace.
 
+For the continuation workflow above, the minimum required validation before marking a fixture done is:
+
+- the focused compiler-conformance test for the current fixture
+- `make gate`
+- `make compiler-gate`
+
 ## Practical Guidance
 
 - Compare against the official C# implementation when debugging parser or export differences.
 - Use the conformance fixtures in `crates/ink-test/` to pin behavior.
 - Keep diagnostics clear and actionable.
 - Prefer small, reviewable changes that isolate parser, parsed-model, and export logic.
-
