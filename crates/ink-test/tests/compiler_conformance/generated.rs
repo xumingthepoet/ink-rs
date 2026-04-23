@@ -11,3 +11,4 @@ macro_rules! fixture {
 
 fixture!(basictext_oneline, "inkfiles/basictext/oneline.ink");
 fixture!(basictext_twolines, "inkfiles/basictext/twolines.ink");
+fixture!(choices_one, "inkfiles/choices/one.ink");

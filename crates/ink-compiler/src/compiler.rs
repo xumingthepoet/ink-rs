@@ -165,7 +165,7 @@ mod tests {
     #[test]
     fn unsupported_syntax_blocks_compile() {
         let compiler = Compiler::default();
-        let output = compiler.compile(SourceInput::new("* Choice"));
+        let output = compiler.compile(SourceInput::new("VAR x = 1"));
         assert!(output.artifact.is_none());
         assert_eq!(output.diagnostics.len(), 1);
     }

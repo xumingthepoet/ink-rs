@@ -32,25 +32,49 @@ pub(crate) fn emit_json(program: RuntimeProgram) -> StageOutput<String> {
 }
 
 fn container_to_value(container: &Container) -> Value {
-    let mut values = container
+    container_to_value_with_name(container, true)
+}
+
+fn container_to_value_without_name(container: &Container) -> Value {
+    container_to_value_with_name(container, false)
+}
+
+fn container_to_value_with_name(container: &Container, include_name: bool) -> Value {
+    let named_content_tail = container
         .content
+        .last()
+        .is_some_and(|object| matches!(object, RuntimeObject::NamedContent(_)));
+    let value_content = if named_content_tail {
+        &container.content[..container.content.len() - 1]
+    } else {
+        &container.content
+    };
+    let mut values = value_content
         .iter()
         .map(runtime_object_to_value)
         .collect::<Vec<_>>();
 
-    values.push(container_terminator_to_value(container));
+    if named_content_tail {
+        if let Some(object) = container.content.last() {
+            values.push(runtime_object_to_value(object));
+        }
+    } else {
+        values.push(container_terminator_to_value(container, include_name));
+    }
     Value::Array(values)
 }
 
-fn container_terminator_to_value(container: &Container) -> Value {
+fn container_terminator_to_value(container: &Container, include_name: bool) -> Value {
     let mut obj = Map::new();
 
     if let Some(flags) = container.flags {
         obj.insert("#f".to_string(), Value::Number(flags.into()));
     }
 
-    if let Some(name) = &container.name {
-        obj.insert("#n".to_string(), Value::String(name.clone()));
+    if include_name {
+        if let Some(name) = &container.name {
+            obj.insert("#n".to_string(), Value::String(name.clone()));
+        }
     }
 
     if obj.is_empty() {
@@ -63,15 +87,43 @@ fn container_terminator_to_value(container: &Container) -> Value {
 fn runtime_object_to_value(object: &RuntimeObject) -> Value {
     match object {
         RuntimeObject::Container(container) => container_to_value(container),
+        RuntimeObject::NamedContent(containers) => named_content_to_value(containers),
         RuntimeObject::String(text) if text == "\n" => Value::String("\n".to_string()),
         RuntimeObject::String(text) => Value::String(format!("^{text}")),
         RuntimeObject::ControlCommand(command) => Value::String(
             match command {
                 ControlCommand::Done => "done",
+                ControlCommand::End => "end",
+                ControlCommand::EvalStart => "ev",
+                ControlCommand::EvalEnd => "/ev",
+                ControlCommand::BeginString => "str",
+                ControlCommand::EndString => "/str",
             }
             .to_string(),
         ),
+        RuntimeObject::Divert { target, variable } => {
+            let mut obj = Map::new();
+            obj.insert("->".to_string(), Value::String(target.clone()));
+            if *variable {
+                obj.insert("var".to_string(), Value::Bool(true));
+            }
+            Value::Object(obj)
+        }
+        RuntimeObject::DivertTarget(target) => json!({ "^->": target }),
+        RuntimeObject::VariableAssignment(name) => json!({ "temp=": name }),
+        RuntimeObject::ChoicePoint { target, flags } => json!({ "*": target, "flg": flags }),
     }
+}
+
+fn named_content_to_value(containers: &[Container]) -> Value {
+    let mut obj = Map::new();
+    for container in containers {
+        let Some(name) = &container.name else {
+            continue;
+        };
+        obj.insert(name.clone(), container_to_value_without_name(container));
+    }
+    Value::Object(obj)
 }
 
 #[cfg(test)]

@@ -46,6 +46,14 @@ impl Parser {
             return None;
         }
 
+        if let Some(choice) = self.parse_choice(line) {
+            return Some(choice);
+        }
+
+        if let Some(divert) = self.parse_divert(line) {
+            return Some(divert);
+        }
+
         if let Some(diagnostic) = self.try_unsupported_statement(line) {
             self.diagnostics.push(diagnostic);
             return None;
@@ -74,12 +82,10 @@ impl Parser {
             Some("knot declaration")
         } else if trimmed.starts_with('=') {
             Some("stitch declaration")
-        } else if trimmed.starts_with('*') || trimmed.starts_with('+') {
+        } else if trimmed.starts_with('+') {
             Some("choice")
         } else if trimmed.starts_with('-') && !trimmed.starts_with("->") {
             Some("gather")
-        } else if trimmed.starts_with("->") {
-            Some("divert")
         } else if trimmed.starts_with('~') {
             Some("logic line")
         } else if trimmed.contains('{') || trimmed.contains('}') {
@@ -93,6 +99,32 @@ impl Parser {
         };
 
         feature.map(|feature| Diagnostic::unsupported(line.span.clone(), feature))
+    }
+
+    fn parse_choice(&self, line: &SourceLine) -> Option<AstNode> {
+        let trimmed = line.text.trim_start();
+        let choice_text = trimmed.strip_prefix('*')?.trim_start();
+        let inline = choice_text.contains('[') || choice_text.contains(']');
+        let text = choice_text
+            .trim_matches(|ch| ch == '[' || ch == ']')
+            .trim()
+            .to_string();
+
+        Some(AstNode::Choice {
+            text,
+            inline,
+            span: line.span.clone(),
+        })
+    }
+
+    fn parse_divert(&self, line: &SourceLine) -> Option<AstNode> {
+        let trimmed = line.text.trim_start();
+        let target = trimmed.strip_prefix("->")?.trim().to_string();
+
+        Some(AstNode::Divert {
+            target,
+            span: line.span.clone(),
+        })
     }
 }
 
@@ -109,8 +141,16 @@ mod tests {
     }
 
     #[test]
-    fn reports_unsupported_choice() {
+    fn parses_choice() {
         let output = parse(SourceInput::new("* Choice"));
+        assert!(output.diagnostics.is_empty());
+        let story = output.artifact.unwrap();
+        assert_eq!(story.nodes.len(), 1);
+    }
+
+    #[test]
+    fn reports_unsupported_sticky_choice() {
+        let output = parse(SourceInput::new("+ Choice"));
         assert_eq!(output.diagnostics.len(), 1);
         assert!(output.artifact.unwrap().nodes.is_empty());
     }
