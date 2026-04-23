@@ -26,6 +26,7 @@ fixture!(divert_simple_divert, "inkfiles/divert/simple-divert.ink");
 fixture!(glue_glue_with_divert, "inkfiles/glue/glue-with-divert.ink");
 fixture!(glue_simple_glue, "inkfiles/glue/simple-glue.ink");
 fixture!(runtime_jump_knot, "inkfiles/runtime/jump-knot.ink");
+fixture!(runtime_load_save, "inkfiles/runtime/load-save.ink");
 fixture!(runtime_saving_loading, "inkfiles/runtime/saving-loading.ink");
 fixture!(
     runtime_multiflow_basics,

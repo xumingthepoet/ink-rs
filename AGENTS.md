@@ -104,6 +104,6 @@ For the continuation workflow above, the minimum required validation before mark
 
 ## Working Note Entries
 
-- [2026-04-24 00:02 CST] [👍9][👎0] First distinguish “queue maintenance” from real compiler work: if a priority fixture already passes under existing generic behavior, just enable it, validate it, update `priority.md`, and commit. Only change compiler code when the fixture exposes a genuine model or export gap.
+- [2026-04-24 00:02 CST] [👍10][👎0] First distinguish “queue maintenance” from real compiler work: if a priority fixture already passes under existing generic behavior, just enable it, validate it, update `priority.md`, and commit. Only change compiler code when the fixture exposes a genuine model or export gap.
 - [2026-04-24 00:22 CST] [👍1][👎0] When a conformance fixture introduces a new structural node in the parse snapshot, add that node to the parsed model first, then lower JSON from that model. Keeping `Story`/`Flow` aligned with the C# compiler shape prevents flow semantics from leaking into ad hoc export logic and keeps parser, snapshot, and runtime output moving together.
 - [2026-04-24 00:39 CST] [👍0][👎0] Choice lowering inside named flows needs its own path context. Root choices can use root-relative targets like `0.c-0`, but flow-local choices need compact relative targets such as `.^.c-0` or `.^.^.c-0`, while return labels still need stable absolute anchors inside the flow container.
