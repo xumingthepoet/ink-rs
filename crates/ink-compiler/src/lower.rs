@@ -465,7 +465,7 @@ fn resolve_single_stitch_target(target: &str, path_mode: &ChoicePathMode) -> Str
         ChoicePathMode::Flow {
             sibling_stitch_names,
             parent_flow_name,
-            ..
+            flow_name,
         } => {
             if parent_flow_name.is_some() {
                 // We're in a stitch - check if target is a sibling stitch
@@ -483,13 +483,16 @@ fn resolve_single_stitch_target(target: &str, path_mode: &ChoicePathMode) -> Str
                     target.to_string()
                 }
             } else {
-                // We're in a knot - check if target is a child stitch
+                // We're in a knot
                 if sibling_stitch_names.contains(&target.to_string()) {
-                    // From inside a choice container in a knot, we need 3 levels up:
+                    // Target is a child stitch - 3 levels up:
                     // 1. Named content container (containing c-0, c-1, g-0)
                     // 2. Weave content array
                     // 3. Knot container (where child stitches are defined)
                     ".^.^.^.".to_string() + target
+                } else if target == *flow_name {
+                    // Target is the knot itself - 3 levels up
+                    ".^.^.^".to_string()
                 } else {
                     target.to_string()
                 }

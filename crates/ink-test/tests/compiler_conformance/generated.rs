@@ -35,3 +35,4 @@ fixture!(
 fixture!(runtime_jump_stitch, "inkfiles/runtime/jump-stitch.ink");
 fixture!(stitch_auto_stitch, "inkfiles/stitch/auto-stitch.ink");
 fixture!(stitch_manual_stitch, "inkfiles/stitch/manual-stitch.ink");
+fixture!(choices_varying_choice, "inkfiles/choices/varying-choice.ink");

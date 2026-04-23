@@ -1,6 +1,6 @@
 # Ink Fixture Priority
 
-通过统计: 23/118
+通过统计: 24/118
 
 Sorted by the latest `WritingWithInk.md` syntax point used by each file.
 
@@ -27,7 +27,7 @@ Sorted by the latest `WritingWithInk.md` syntax point used by each file.
 - [x] `runtime/jump-stitch.ink`
 - [x] `stitch/auto-stitch.ink`
 - [x] `stitch/manual-stitch.ink`
-- [ ] `choices/varying-choice.ink`
+- [x] `choices/varying-choice.ink`
 - [ ] `choices/fallback-choice.ink`
 - [ ] `choices/sticky-choice.ink`
 - [ ] `tags/tagsInChoice.ink`
