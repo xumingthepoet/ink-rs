@@ -433,6 +433,7 @@ fn resolve_divert_target(target: &str, path_mode: &ChoicePathMode) -> String {
         ChoicePathMode::Flow {
             parent_flow_name,
             flow_name,
+            sibling_stitch_names,
             ..
         } => {
             // Check if target is a dotted path like "knot.stitch"
@@ -440,12 +441,13 @@ fn resolve_divert_target(target: &str, path_mode: &ChoicePathMode) -> String {
                 let first_part = &target[..dot_pos];
                 let second_part = &target[dot_pos + 1..];
 
-                // Check if it's "parent_knot.child_stitch" format
-                if parent_flow_name.is_some() && Some(first_part) == parent_flow_name.as_deref()
-                    || first_part == flow_name
+                // Only strip prefix if first part matches parent/current flow
+                // AND second part is a known child stitch
+                let prefix_matches = parent_flow_name.as_deref() == Some(first_part)
+                    || first_part == flow_name;
+                if prefix_matches
+                    && sibling_stitch_names.contains(&second_part.to_string())
                 {
-                    // It's a dotted reference to a sibling/child stitch
-                    // Treat the second part as the target stitch name
                     return resolve_single_stitch_target(second_part, path_mode);
                 }
             }
