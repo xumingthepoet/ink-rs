@@ -104,4 +104,4 @@ For the continuation workflow above, the minimum required validation before mark
 
 ## Working Note Entries
 
-- [2026-04-24 00:02 CST] [👍2][👎0] First distinguish “queue maintenance” from real compiler work: if a priority fixture already passes under existing generic behavior, just enable it, validate it, update `priority.md`, and commit. Only change compiler code when the fixture exposes a genuine model or export gap.
+- [2026-04-24 00:02 CST] [👍3][👎0] First distinguish “queue maintenance” from real compiler work: if a priority fixture already passes under existing generic behavior, just enable it, validate it, update `priority.md`, and commit. Only change compiler code when the fixture exposes a genuine model or export gap.
