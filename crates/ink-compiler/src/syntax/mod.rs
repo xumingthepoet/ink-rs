@@ -261,10 +261,11 @@ fn gather_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
         let text_objects = text::parse_inline_content(remaining, &span).unwrap_or_default();
         objects.extend(text_objects);
         parser.skip_to_end();
+        // Add trailing newline only when there's text content
+        objects.push(Object::Text(crate::parsed::Text::new("\n", span)));
+    } else {
+        parser.skip_to_end();
     }
-
-    // Add trailing newline (like text_statement does)
-    objects.push(Object::Text(crate::parsed::Text::new("\n", span)));
 
     Some(objects)
 }
