@@ -20,3 +20,4 @@ fixture!(choices_one, "inkfiles/choices/one.ink");
 fixture!(choices_single_choice, "inkfiles/choices/single-choice.ink");
 fixture!(choices_suppress_choice, "inkfiles/choices/suppress-choice.ink");
 fixture!(divert_simple_divert, "inkfiles/divert/simple-divert.ink");
+fixture!(runtime_jump_knot, "inkfiles/runtime/jump-knot.ink");
