@@ -192,7 +192,6 @@ fn lower_choice_weave(weave: &Weave, path_mode: ChoicePathMode) -> Vec<RuntimeOb
     let mut main_content = Vec::new();
     let mut named_content = Vec::new();
     let mut index = 0;
-    let mut any_gather = false;
     let mut gather_count = 0;
     let mut choice_count = 0;
     let mut needs_terminal_gather = false;
@@ -230,7 +229,6 @@ fn lower_choice_weave(weave: &Weave, path_mode: ChoicePathMode) -> Vec<RuntimeOb
                     name: Some(gather_name),
                     flags: None,
                 });
-                any_gather = true;
             }
             Object::Choice(choice) => {
                 let choice_index = choice_count;
@@ -285,7 +283,6 @@ fn lower_choice_weave(weave: &Weave, path_mode: ChoicePathMode) -> Vec<RuntimeOb
                         target: gather_target(&path_mode, &gather_container_name),
                         variable: false,
                     });
-                    any_gather = true;
                     needs_terminal_gather = true;
                 }
 
@@ -301,9 +298,6 @@ fn lower_choice_weave(weave: &Weave, path_mode: ChoicePathMode) -> Vec<RuntimeOb
 
     if needs_terminal_gather {
         // Add a terminal gather for choices that divert to it
-        named_content.push(done_container(&format!("g-{gather_count}")));
-    } else if any_gather && gather_count == 0 {
-        // Add a default gather if there were choices but no explicit gathers
         named_content.push(done_container(&format!("g-{gather_count}")));
     }
     if !named_content.is_empty() {
