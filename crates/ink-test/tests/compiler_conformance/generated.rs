@@ -56,3 +56,4 @@ fixture!(
 );
 fixture!(choices_multi_choice, "inkfiles/choices/multi-choice.ink");
 fixture!(gather_gather_basic, "inkfiles/gather/gather-basic.ink");
+fixture!(test1, "inkfiles/test1.ink");
