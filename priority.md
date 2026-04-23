@@ -1,6 +1,6 @@
 # Ink Fixture Priority
 
-通过统计: 9/118
+通过统计: 10/118
 
 Sorted by the latest `WritingWithInk.md` syntax point used by each file.
 
@@ -13,7 +13,7 @@ Sorted by the latest `WritingWithInk.md` syntax point used by each file.
 - [x] `choices/no-choice-text.ink`
 - [x] `choices/one.ink`
 - [x] `choices/single-choice.ink`
-- [ ] `choices/suppress-choice.ink`
+- [x] `choices/suppress-choice.ink`
 - [ ] `divert/simple-divert.ink`
 - [ ] `runtime/jump-knot.ink`
 - [ ] `runtime/multiflow-basics.ink`

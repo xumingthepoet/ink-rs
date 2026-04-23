@@ -18,3 +18,4 @@ fixture!(choices_mixed_choice, "inkfiles/choices/mixed-choice.ink");
 fixture!(choices_no_choice_text, "inkfiles/choices/no-choice-text.ink");
 fixture!(choices_one, "inkfiles/choices/one.ink");
 fixture!(choices_single_choice, "inkfiles/choices/single-choice.ink");
+fixture!(choices_suppress_choice, "inkfiles/choices/suppress-choice.ink");
