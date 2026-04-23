@@ -13,4 +13,5 @@ fixture!(basictext_oneline, "inkfiles/basictext/oneline.ink");
 fixture!(basictext_twolines, "inkfiles/basictext/twolines.ink");
 fixture!(knot_multi_line, "inkfiles/knot/multi-line.ink");
 fixture!(knot_single_line, "inkfiles/knot/single-line.ink");
+fixture!(knot_strip_empty_lines, "inkfiles/knot/strip-empty-lines.ink");
 fixture!(choices_one, "inkfiles/choices/one.ink");
