@@ -446,7 +446,7 @@ fn resolve_divert_target(target: &str, path_mode: &ChoicePathMode) -> String {
                 let prefix_matches = parent_flow_name.as_deref() == Some(first_part)
                     || first_part == flow_name;
                 if prefix_matches
-                    && sibling_stitch_names.contains(&second_part.to_string())
+                    && sibling_stitch_names.iter().any(|s| s == second_part)
                 {
                     return resolve_single_stitch_target(second_part, path_mode);
                 }
@@ -469,7 +469,7 @@ fn resolve_single_stitch_target(target: &str, path_mode: &ChoicePathMode) -> Str
         } => {
             if parent_flow_name.is_some() {
                 // We're in a stitch - check if target is a sibling stitch
-                if sibling_stitch_names.contains(&target.to_string()) {
+                if sibling_stitch_names.iter().any(|s| s == target) {
                     // From inside a choice container in a stitch, we need 4 levels up:
                     // 1. Named content container (containing c-0, c-1, g-0)
                     // 2. Weave content array
@@ -484,7 +484,7 @@ fn resolve_single_stitch_target(target: &str, path_mode: &ChoicePathMode) -> Str
                 }
             } else {
                 // We're in a knot
-                if sibling_stitch_names.contains(&target.to_string()) {
+                if sibling_stitch_names.iter().any(|s| s == target) {
                     // Target is a child stitch - 3 levels up:
                     // 1. Named content container (containing c-0, c-1, g-0)
                     // 2. Weave content array
