@@ -76,6 +76,10 @@ impl Choice {
         self.once_only
     }
 
+    pub fn set_once_only(&mut self, once_only: bool) {
+        self.once_only = once_only;
+    }
+
     pub fn has_start_content(&self) -> bool {
         self.start_content.is_some()
     }

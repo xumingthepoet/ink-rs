@@ -5,7 +5,16 @@ use super::{rule::RuleParser, text};
 pub(super) fn parse_choice(parser: &mut RuleParser<'_>) -> Option<Choice> {
     parser.skip_horizontal_whitespace();
     let span = parser.current_span();
-    parser.match_string("*")?;
+
+    // Match either '*' (once-only) or '+' (sticky)
+    let once_only = if parser.match_string("*").is_some() {
+        true
+    } else if parser.match_string("+").is_some() {
+        false
+    } else {
+        return None;
+    };
+
     parser.skip_horizontal_whitespace();
 
     let choice_body = parser.expect(
@@ -28,7 +37,7 @@ pub(super) fn parse_choice(parser: &mut RuleParser<'_>) -> Option<Choice> {
         })
         .ok()?;
 
-    Some(Choice::new_with_inline_brackets(
+    let mut choice = Choice::new_with_inline_brackets(
         content_list_from_segment(segments.start, span.clone(), false),
         segments.choice_only.map(|segment| {
             content_list_from_segment(segment, span.clone(), true).unwrap_or_default()
@@ -39,7 +48,9 @@ pub(super) fn parse_choice(parser: &mut RuleParser<'_>) -> Option<Choice> {
         ),
         span,
         segments.has_inline_brackets,
-    ))
+    );
+    choice.set_once_only(once_only);
+    Some(choice)
 }
 
 struct ChoiceSegments {

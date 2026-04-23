@@ -259,7 +259,8 @@ fn lower_choice_weave(weave: &Weave, path_mode: ChoicePathMode) -> Vec<RuntimeOb
                 named_content.push(Container {
                     content: choice_content,
                     name: Some(choice_container_name),
-                    flags: Some(5),
+                    // Only set visitsShouldBeCounted flag (5) for once-only choices
+                    flags: if choice.once_only() { Some(5) } else { None },
                 });
             }
         }
