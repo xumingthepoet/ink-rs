@@ -7,10 +7,8 @@
     non_upper_case_globals
 )]
 
-use crate::conformance::api::story::Story as RuntimeStory;
-use crate::conformance::api::{
-    story::ExternalFunction, story::VariableObserver, value_type::ValueType,
-};
+use crate::api::story::Story as RuntimeStory;
+use crate::api::{story::ExternalFunction, story::VariableObserver, value_type::ValueType};
 use ink_compiler::{
     parsed::Story as ParsedStory,
     parser::{character_range::CharacterRange, CommentEliminator, StringParser},
@@ -121,7 +119,7 @@ struct MessageBuckets {
     authors: Vec<String>,
 }
 
-pub struct CSharpHarness {
+pub struct CSharpTestSuite {
     mode: TestMode,
     testing_errors: bool,
     buckets: Arc<Mutex<MessageBuckets>>,
@@ -246,7 +244,7 @@ trait RuntimeStoryExt {
     fn observe_variable(&mut self, variable_name: &str, observer: Arc<Mutex<dyn VariableObserver>>);
 }
 
-impl CSharpHarness {
+impl CSharpTestSuite {
     pub fn new(mode: TestMode) -> Self {
         Self {
             mode,
@@ -576,14 +574,14 @@ impl RuntimeStoryExt for RuntimeStory {
     }
 }
 
-fn run_in_both_modes(mut f: impl FnMut(&mut CSharpHarness)) {
+fn run_in_both_modes(mut f: impl FnMut(&mut CSharpTestSuite)) {
     let mut modes = vec![TestMode::Normal];
     if std::env::var_os("INK_CSHARP_RUN_JSON_ROUNDTRIP").is_some() {
         modes.push(TestMode::JsonRoundTrip);
     }
     for mode in modes {
-        let mut harness = CSharpHarness::new(mode);
-        f(&mut harness);
+        let mut suite = CSharpTestSuite::new(mode);
+        f(&mut suite);
     }
 }
 
@@ -5849,7 +5847,7 @@ The second line.
     //         }
     #[test]
     fn TestConstRedefinition() {
-        let mut suite = CSharpHarness::new(TestMode::Normal);
+        let mut suite = CSharpTestSuite::new(TestMode::Normal);
         suite.compile_string_without_runtime(
             r#"
 CONST pi = 3.1415
@@ -6822,7 +6820,7 @@ VAR gatherCount = 0
     //         }
     #[test]
     fn TestKnotTerminationSkipsGlobalObjects() {
-        let mut suite = CSharpHarness::new(TestMode::Normal);
+        let mut suite = CSharpTestSuite::new(TestMode::Normal);
         suite.compile_string_without_runtime(
             r#"
 === stuff ===
@@ -7406,7 +7404,7 @@ text 2
     //         }
     #[test]
     fn TestLooseEnds() {
-        let mut suite = CSharpHarness::new(TestMode::Normal);
+        let mut suite = CSharpTestSuite::new(TestMode::Normal);
         suite.compile_string_without_runtime(
             r#"
 No loose ends in main content.
@@ -8156,7 +8154,7 @@ This is the {first|second|third} time.
     // C#: }
     #[test]
     fn TestRequireVariableTargetsTyped() {
-        let mut suite = CSharpHarness::new(TestMode::Normal);
+        let mut suite = CSharpTestSuite::new(TestMode::Normal);
         suite.compile_string_without_runtime(
             r#"
 -> test(-> elsewhere)
@@ -8604,7 +8602,7 @@ A {red #red|white #white|blue #blue|green #green} sequence.
     // C#: }
     #[test]
     fn TestTempNotAllowedCrossStitch() {
-        let mut suite = CSharpHarness::new(TestMode::Normal);
+        let mut suite = CSharpTestSuite::new(TestMode::Normal);
         suite.compile_string_without_runtime(
             r#"
 -> knot.stitch
@@ -8639,7 +8637,7 @@ A {red #red|white #white|blue #blue|green #green} sequence.
     // C#: }
     #[test]
     fn TestTempNotFound() {
-        let mut suite = CSharpHarness::new(TestMode::Normal);
+        let mut suite = CSharpTestSuite::new(TestMode::Normal);
         suite.compile_string_without_runtime(
             r#"
 {x}
@@ -8963,7 +8961,7 @@ Now in B.
     //         }
     #[test]
     fn TestUsingFunctionAndIncrementTogether() {
-        let mut suite = CSharpHarness::new(TestMode::Normal);
+        let mut suite = CSharpTestSuite::new(TestMode::Normal);
         suite.compile_string_without_runtime(
             r#"
 VAR x = 5
@@ -9392,7 +9390,7 @@ this is the end
     //         }
     #[test]
     fn TestWrongVariableDivertTargetReference() {
-        let mut suite = CSharpHarness::new(TestMode::Normal);
+        let mut suite = CSharpTestSuite::new(TestMode::Normal);
         suite.compile_string_without_runtime(
             r#"
 -> go_to_broken(-> SOMEWHERE)

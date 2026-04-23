@@ -5,7 +5,7 @@ use std::{fs, path::Path};
 use ink_compiler::{Compiler, CompilerOptions};
 use serde_json::Value;
 
-pub fn compile_json(filename: &str) -> String {
+pub fn compile_json(filename: &str) -> Value {
     let source = get_ink_string(filename);
     let mut compiler = Compiler::new(
         source,
@@ -20,28 +20,27 @@ pub fn compile_json(filename: &str) -> String {
         "compiler_conformance compile_json for {filename} should not emit diagnostics: {:#?}",
         result.diagnostics
     );
-    result.json.expect("expected compiled json")
+    let json = result.json.expect("expected compiled json");
+    parse_json_value(filename, &json, "generated")
 }
 
 pub fn assert_compiled_json_matches_fixture(filename: &str) {
-    let generated_json = compile_json(filename);
+    let generated_value = compile_json(filename);
     let fixture_json = get_fixture_json_string(filename);
-    let generated_value = parse_json_value(filename, &generated_json, "generated");
     let fixture_value = parse_json_value(filename, &fixture_json, "fixture");
     assert_eq!(
         generated_value,
         fixture_value,
         "{}",
-        format_compiled_json_mismatch(filename, &generated_json, &fixture_json)
+        format_compiled_json_mismatch(filename, &generated_value, &fixture_value)
     );
 }
 
 pub fn all_fixture_paths() -> Vec<String> {
-    let root = ink_test::fixture_root()
-        .join("conformance")
-        .join("inkfiles");
+    let root = ink_test::fixture_root().join("conformance");
+    let inkfiles_root = root.join("inkfiles");
     let mut fixtures = Vec::new();
-    collect_ink_files(&root, &root, &mut fixtures);
+    collect_ink_files(&root, &inkfiles_root, &mut fixtures);
     fixtures.sort();
     fixtures
 }
@@ -129,8 +128,8 @@ fn strip_utf8_bom(text: String) -> String {
 
 fn format_compiled_json_mismatch(
     filename: &str,
-    generated_json: &str,
-    fixture_json: &str,
+    generated_value: &Value,
+    fixture_value: &Value,
 ) -> String {
     let fixture_path = if let Some(prefix) = filename.strip_suffix(".ink") {
         format!("fixtures/conformance/{prefix}.ink.json")
@@ -139,6 +138,8 @@ fn format_compiled_json_mismatch(
     };
 
     format!(
-        "compiled json differs for {filename}\n--- generated ---\n{generated_json}\n--- fixture ({fixture_path}) ---\n{fixture_json}"
+        "compiled json differs for {filename}\n--- generated ---\n{}\n--- fixture ({fixture_path}) ---\n{}",
+        serde_json::to_string_pretty(generated_value).unwrap_or_else(|_| generated_value.to_string()),
+        serde_json::to_string_pretty(fixture_value).unwrap_or_else(|_| fixture_value.to_string())
     )
 }
