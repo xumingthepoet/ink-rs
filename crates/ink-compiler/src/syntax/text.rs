@@ -1,5 +1,5 @@
 use crate::{
-    parsed::{Divert, DivertTarget, Glue, Object, Text},
+    parsed::{Divert, DivertTarget, Glue, Object, Tag, Text},
     source::SourceSpan,
 };
 
@@ -25,7 +25,8 @@ pub(super) fn parse_text_line(parser: &mut RuleParser<'_>) -> Option<Vec<Object>
 }
 
 fn has_unsupported_text_syntax(text: &str) -> bool {
-    text.starts_with("INCLUDE ")
+    text.starts_with('#')
+        || text.starts_with("INCLUDE ")
         || text.starts_with("VAR ")
         || text.starts_with("LIST ")
         || text.starts_with("CONST ")
@@ -38,14 +39,24 @@ fn has_unsupported_text_syntax(text: &str) -> bool {
         || text.starts_with('~')
         || text.contains('{')
         || text.contains('}')
-        || text.contains('#')
 }
 
 pub(super) fn parse_inline_content(text: &str, span: &SourceSpan) -> Option<Vec<Object>> {
     let mut remaining = text;
     let mut objects = Vec::new();
+    let mut tag_active = false;
 
     while !remaining.is_empty() {
+        if let Some(rest) = remaining.strip_prefix('#') {
+            if tag_active {
+                objects.push(Object::Tag(Tag::new(false, false)));
+            }
+            objects.push(Object::Tag(Tag::new(true, false)));
+            tag_active = true;
+            remaining = rest.trim_start_matches([' ', '\t']);
+            continue;
+        }
+
         if let Some(rest) = remaining.strip_prefix("<>") {
             objects.push(Object::Glue(Glue::new()));
             remaining = rest;
@@ -57,6 +68,10 @@ pub(super) fn parse_inline_content(text: &str, span: &SourceSpan) -> Option<Vec<
             if target.is_empty() {
                 return None;
             }
+            if tag_active {
+                objects.push(Object::Tag(Tag::new(false, false)));
+                tag_active = false;
+            }
             objects.push(Object::Divert(Divert::new(
                 DivertTarget::from_source(target),
                 span.clone(),
@@ -64,14 +79,14 @@ pub(super) fn parse_inline_content(text: &str, span: &SourceSpan) -> Option<Vec<
             break;
         }
 
-        let next_glue = remaining.find("<>");
-        let next_divert = remaining.find("->");
-        let next_token = match (next_glue, next_divert) {
-            (Some(glue), Some(divert)) => Some(glue.min(divert)),
-            (Some(glue), None) => Some(glue),
-            (None, Some(divert)) => Some(divert),
-            (None, None) => None,
-        };
+        let next_token = [
+            remaining.find("<>"),
+            remaining.find("->"),
+            remaining.find('#'),
+        ]
+        .into_iter()
+        .flatten()
+        .min();
 
         match next_token {
             Some(0) => return None,
@@ -91,6 +106,10 @@ pub(super) fn parse_inline_content(text: &str, span: &SourceSpan) -> Option<Vec<
                 remaining = "";
             }
         }
+    }
+
+    if tag_active {
+        objects.push(Object::Tag(Tag::new(false, false)));
     }
 
     if objects.is_empty() {

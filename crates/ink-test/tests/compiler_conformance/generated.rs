@@ -38,3 +38,4 @@ fixture!(stitch_manual_stitch, "inkfiles/stitch/manual-stitch.ink");
 fixture!(choices_varying_choice, "inkfiles/choices/varying-choice.ink");
 fixture!(choices_sticky_choice, "inkfiles/choices/sticky-choice.ink");
 fixture!(choices_fallback_choice, "inkfiles/choices/fallback-choice.ink");
+fixture!(tags_tags_in_choice, "inkfiles/tags/tagsInChoice.ink");

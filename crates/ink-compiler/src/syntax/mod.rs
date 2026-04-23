@@ -77,8 +77,12 @@ impl Parser {
         }
 
         let mut line_parser = RuleParser::new(line);
-        let statement_rules: &[StatementRule] =
-            &[choice_statement, gather_statement, divert_statement, text_statement];
+        let statement_rules: &[StatementRule] = &[
+            choice_statement,
+            gather_statement,
+            divert_statement,
+            text_statement,
+        ];
 
         for rule in statement_rules {
             if let Some(objects) = line_parser.parse_rule(*rule) {
@@ -408,9 +412,14 @@ mod tests {
     }
 
     #[test]
-    fn reports_unsupported_sticky_choice() {
+    fn parses_sticky_choice() {
         let output = parse(SourceInput::new("+ Choice"));
-        assert_eq!(output.diagnostics.len(), 1);
-        assert!(output.artifact.unwrap().root_weave().content().is_empty());
+        assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
+        let story = output.artifact.unwrap();
+
+        let Object::Choice(choice) = &story.root_weave().content()[0] else {
+            panic!("expected choice");
+        };
+        assert!(!choice.once_only());
     }
 }

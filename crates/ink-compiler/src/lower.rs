@@ -27,6 +27,7 @@ pub enum RuntimeObject {
     VariableAssignment(String),
     ChoicePoint { target: String, flags: i32 },
     Glue,
+    Tag { is_start: bool },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -159,9 +160,7 @@ fn lower_flow_with_context(
         let child_containers: Vec<Container> = flow
             .child_flows()
             .iter()
-            .map(|child| {
-                lower_flow_with_context(child, Some(flow.name()), &child_stitch_names)
-            })
+            .map(|child| lower_flow_with_context(child, Some(flow.name()), &child_stitch_names))
             .collect();
         content.push(RuntimeObject::NamedContent(child_containers));
     }
@@ -202,7 +201,7 @@ fn lower_choice_weave(weave: &Weave, path_mode: ChoicePathMode) -> Vec<RuntimeOb
 
     while index < objects.len() {
         match &objects[index] {
-            Object::Text(_) | Object::Glue(_) | Object::Divert(_) => {
+            Object::Text(_) | Object::Glue(_) | Object::Divert(_) | Object::Tag(_) => {
                 lower_object_into(&mut main_content, &objects[index]);
                 index += 1;
             }
@@ -262,7 +261,10 @@ fn lower_choice_weave(weave: &Weave, path_mode: ChoicePathMode) -> Vec<RuntimeOb
                         2,
                     );
                 }
-                choice_content.extend(lower_content_list_with_context(choice.inner_content(), &path_mode));
+                choice_content.extend(lower_content_list_with_context(
+                    choice.inner_content(),
+                    &path_mode,
+                ));
 
                 index += 1;
                 while index < objects.len() {
@@ -351,7 +353,10 @@ fn choice_outer(
 
     if let Some(choice_only_content) = choice.choice_only_content() {
         outer_content.push(RuntimeObject::ControlCommand(ControlCommand::BeginString));
-        outer_content.extend(lower_content_list_with_context(choice_only_content, path_mode));
+        outer_content.extend(lower_content_list_with_context(
+            choice_only_content,
+            path_mode,
+        ));
         outer_content.push(RuntimeObject::ControlCommand(ControlCommand::EndString));
     }
 
@@ -415,7 +420,10 @@ fn choice_container_prefix(
     ]
 }
 
-fn lower_content_list_with_context(content_list: &ContentList, path_mode: &ChoicePathMode) -> Vec<RuntimeObject> {
+fn lower_content_list_with_context(
+    content_list: &ContentList,
+    path_mode: &ChoicePathMode,
+) -> Vec<RuntimeObject> {
     let mut content = Vec::new();
     for object in content_list.objects() {
         lower_object_into_with_context(&mut content, object, path_mode);
@@ -430,6 +438,9 @@ fn lower_object_into(content: &mut Vec<RuntimeObject>, object: &Object) {
         Object::Divert(divert) => push_divert(content, divert.target()),
         Object::Choice(_) => {}
         Object::Gather(_) => {} // Handled in lower_choice_weave
+        Object::Tag(tag) => content.push(RuntimeObject::Tag {
+            is_start: tag.is_start(),
+        }),
     }
 }
 
@@ -444,6 +455,9 @@ fn lower_object_into_with_context(
         Object::Divert(divert) => push_divert_with_context(content, divert.target(), path_mode),
         Object::Choice(_) => {}
         Object::Gather(_) => {} // Handled in lower_choice_weave
+        Object::Tag(tag) => content.push(RuntimeObject::Tag {
+            is_start: tag.is_start(),
+        }),
     }
 }
 
@@ -487,11 +501,9 @@ fn resolve_divert_target(target: &str, path_mode: &ChoicePathMode) -> String {
 
                 // Only strip prefix if first part matches parent/current flow
                 // AND second part is a known child stitch
-                let prefix_matches = parent_flow_name.as_deref() == Some(first_part)
-                    || first_part == flow_name;
-                if prefix_matches
-                    && sibling_stitch_names.iter().any(|s| s == second_part)
-                {
+                let prefix_matches =
+                    parent_flow_name.as_deref() == Some(first_part) || first_part == flow_name;
+                if prefix_matches && sibling_stitch_names.iter().any(|s| s == second_part) {
                     return resolve_single_stitch_target(second_part, path_mode);
                 }
             }

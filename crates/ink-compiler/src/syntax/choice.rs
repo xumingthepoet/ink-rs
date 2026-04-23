@@ -40,9 +40,7 @@ pub(super) fn parse_choice(parser: &mut RuleParser<'_>) -> Option<Choice> {
         let mut choice = Choice::new_with_inline_brackets(
             None, // no start content
             None, // no choice-only content
-            inner,
-            span,
-            false, // no inline brackets
+            inner, span, false, // no inline brackets
         );
         choice.set_once_only(once_only);
         choice.set_is_invisible_default(true);
