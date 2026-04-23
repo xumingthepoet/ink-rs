@@ -1,6 +1,6 @@
 # Ink Fixture Priority
 
-通过统计: 21/118
+通过统计: 22/118
 
 Sorted by the latest `WritingWithInk.md` syntax point used by each file.
 
@@ -25,7 +25,7 @@ Sorted by the latest `WritingWithInk.md` syntax point used by each file.
 - [x] `divert/complex-branching.ink`
 - [x] `runtime/load-save.ink`
 - [x] `runtime/jump-stitch.ink`
-- [ ] `stitch/auto-stitch.ink`
+- [x] `stitch/auto-stitch.ink`
 - [ ] `stitch/manual-stitch.ink`
 - [ ] `choices/varying-choice.ink`
 - [ ] `choices/fallback-choice.ink`

@@ -47,7 +47,11 @@ enum ChoiceOuter {
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum ChoicePathMode {
     Root,
-    Flow { flow_name: String },
+    Flow {
+        flow_name: String,
+        parent_flow_name: Option<String>,
+        sibling_stitch_names: Vec<String>,
+    },
 }
 
 pub(crate) fn lower(story: &CheckedStory) -> StageOutput<RuntimeProgram> {
@@ -98,17 +102,26 @@ fn lower_root_weave(weave: &Weave) -> Vec<RuntimeObject> {
 }
 
 fn lower_flow(flow: &Flow) -> Container {
+    lower_flow_with_context(flow, None, &[])
+}
+
+fn lower_flow_with_context(
+    flow: &Flow,
+    parent_knot_name: Option<&str>,
+    sibling_stitch_names: &[String],
+) -> Container {
     let mut content = Vec::new();
 
     // Lower any content in the flow's own weave
     if weave_has_choice(flow.weave()) {
+        // For stitches inside a knot, pass the parent knot name and sibling stitch names
+        let path_mode = ChoicePathMode::Flow {
+            flow_name: flow.name().to_string(),
+            parent_flow_name: parent_knot_name.map(|s| s.to_string()),
+            sibling_stitch_names: sibling_stitch_names.to_vec(),
+        };
         content.push(RuntimeObject::Container(Container {
-            content: lower_choice_weave(
-                flow.weave(),
-                ChoicePathMode::Flow {
-                    flow_name: flow.name().to_string(),
-                },
-            ),
+            content: lower_choice_weave(flow.weave(), path_mode),
             name: None,
             flags: None,
         }));
@@ -125,8 +138,21 @@ fn lower_flow(flow: &Flow) -> Container {
             variable: false,
         });
 
-        // Lower each child flow as named content
-        let child_containers: Vec<Container> = flow.child_flows().iter().map(lower_flow).collect();
+        // Collect all child stitch names for sibling reference
+        let child_stitch_names: Vec<String> = flow
+            .child_flows()
+            .iter()
+            .map(|f| f.name().to_string())
+            .collect();
+
+        // Lower each child flow as named content, passing sibling stitch names
+        let child_containers: Vec<Container> = flow
+            .child_flows()
+            .iter()
+            .map(|child| {
+                lower_flow_with_context(child, Some(flow.name()), &child_stitch_names)
+            })
+            .collect();
         content.push(RuntimeObject::NamedContent(child_containers));
     }
 
@@ -193,14 +219,18 @@ fn lower_choice_weave(weave: &Weave, path_mode: ChoicePathMode) -> Vec<RuntimeOb
                         2,
                     );
                 }
-                choice_content.extend(lower_content_list(choice.inner_content()));
+                choice_content.extend(lower_content_list_with_context(choice.inner_content(), &path_mode));
 
                 index += 1;
                 while index < objects.len() {
                     if matches!(objects[index], Object::Choice(_)) {
                         break;
                     }
-                    lower_object_into(&mut choice_content, &objects[index]);
+                    lower_object_into_with_context(
+                        &mut choice_content,
+                        &objects[index],
+                        &path_mode,
+                    );
                     index += 1;
                 }
 
@@ -341,12 +371,88 @@ fn lower_content_list(content_list: &ContentList) -> Vec<RuntimeObject> {
     content
 }
 
+fn lower_content_list_with_context(content_list: &ContentList, path_mode: &ChoicePathMode) -> Vec<RuntimeObject> {
+    let mut content = Vec::new();
+    for object in content_list.objects() {
+        lower_object_into_with_context(&mut content, object, path_mode);
+    }
+    content
+}
+
 fn lower_object_into(content: &mut Vec<RuntimeObject>, object: &Object) {
     match object {
         Object::Text(text) => content.push(RuntimeObject::String(text.text().to_string())),
         Object::Glue(_) => content.push(RuntimeObject::Glue),
         Object::Divert(divert) => push_divert(content, divert.target()),
         Object::Choice(_) => {}
+    }
+}
+
+fn lower_object_into_with_context(
+    content: &mut Vec<RuntimeObject>,
+    object: &Object,
+    path_mode: &ChoicePathMode,
+) {
+    match object {
+        Object::Text(text) => content.push(RuntimeObject::String(text.text().to_string())),
+        Object::Glue(_) => content.push(RuntimeObject::Glue),
+        Object::Divert(divert) => push_divert_with_context(content, divert.target(), path_mode),
+        Object::Choice(_) => {}
+    }
+}
+
+fn push_divert_with_context(
+    content: &mut Vec<RuntimeObject>,
+    target: &DivertTarget,
+    path_mode: &ChoicePathMode,
+) {
+    match target {
+        DivertTarget::Done => content.push(RuntimeObject::ControlCommand(ControlCommand::Done)),
+        DivertTarget::End => content.push(RuntimeObject::ControlCommand(ControlCommand::End)),
+        DivertTarget::Path(target) => {
+            let resolved_target = resolve_divert_target(target, path_mode);
+            content.push(RuntimeObject::Divert {
+                target: resolved_target,
+                variable: false,
+            });
+        }
+        DivertTarget::Empty => content.push(RuntimeObject::Divert {
+            target: String::new(),
+            variable: false,
+        }),
+    }
+}
+
+/// Resolve a divert target path, converting absolute flow names to relative paths
+/// when the target is a sibling stitch inside a choice container within a stitch.
+fn resolve_divert_target(target: &str, path_mode: &ChoicePathMode) -> String {
+    match path_mode {
+        ChoicePathMode::Root => target.to_string(),
+        ChoicePathMode::Flow {
+            sibling_stitch_names,
+            parent_flow_name,
+            ..
+        } => {
+            // Check if the target is a sibling stitch
+            if sibling_stitch_names.contains(&target.to_string()) {
+                // From inside a choice container, we need 4 levels up to reach the knot level:
+                // 1. Named content container (containing c-0, c-1, g-0)
+                // 2. Weave content array
+                // 3. Stitch container
+                // 4. Knot container (where sibling stitches are defined)
+                ".^.^.^.^.".to_string() + target
+            } else if let Some(parent_name) = parent_flow_name {
+                // Check if the target is the parent knot itself
+                if target == parent_name {
+                    // From inside a choice container, go up 4 levels to the knot
+                    ".^.^.^.^".to_string()
+                } else {
+                    target.to_string()
+                }
+            } else {
+                target.to_string()
+            }
+        }
     }
 }
 
@@ -365,14 +471,14 @@ fn choice_point_target(
 fn outer_return_target(path_mode: &ChoicePathMode, choice_point_index: usize) -> String {
     match path_mode {
         ChoicePathMode::Root => format!("0.{choice_point_index}"),
-        ChoicePathMode::Flow { flow_name } => format!("{flow_name}.0.{choice_point_index}"),
+        ChoicePathMode::Flow { flow_name, .. } => format!("{flow_name}.0.{choice_point_index}"),
     }
 }
 
 fn choice_content_return_target(path_mode: &ChoicePathMode, choice_container_name: &str) -> String {
     match path_mode {
         ChoicePathMode::Root => format!("0.{choice_container_name}"),
-        ChoicePathMode::Flow { flow_name } => format!("{flow_name}.0.{choice_container_name}"),
+        ChoicePathMode::Flow { flow_name, .. } => format!("{flow_name}.0.{choice_container_name}"),
     }
 }
 

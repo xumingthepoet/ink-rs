@@ -33,3 +33,4 @@ fixture!(
     "inkfiles/runtime/multiflow-basics.ink"
 );
 fixture!(runtime_jump_stitch, "inkfiles/runtime/jump-stitch.ink");
+fixture!(stitch_auto_stitch, "inkfiles/stitch/auto-stitch.ink");
