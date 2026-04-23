@@ -510,23 +510,33 @@ fn lower_sequence(sequence: &Sequence) -> Container {
     let mut content = vec![
         RuntimeObject::ControlCommand(ControlCommand::EvalStart),
         RuntimeObject::ControlCommand(ControlCommand::VisitIndex),
-        RuntimeObject::Int(sequence.elements().len() as i32),
     ];
 
     match sequence.sequence_type() {
-        SequenceType::Cycle => content.push(RuntimeObject::NativeFunction("%".to_string())),
+        SequenceType::Cycle => {
+            content.push(RuntimeObject::Int(sequence.elements().len() as i32));
+            content.push(RuntimeObject::NativeFunction("%".to_string()));
+        }
         SequenceType::Stopping => {
             content.push(RuntimeObject::Int(
                 sequence.elements().len().saturating_sub(1) as i32,
             ));
             content.push(RuntimeObject::NativeFunction("MIN".to_string()));
         }
-        SequenceType::Once => {}
+        SequenceType::Once => {
+            content.push(RuntimeObject::Int(sequence.elements().len() as i32));
+            content.push(RuntimeObject::NativeFunction("MIN".to_string()));
+        }
     }
 
     content.push(RuntimeObject::ControlCommand(ControlCommand::EvalEnd));
 
-    for (index, _) in sequence.elements().iter().enumerate() {
+    let branch_count = match sequence.sequence_type() {
+        SequenceType::Once => sequence.elements().len() + 1,
+        SequenceType::Cycle | SequenceType::Stopping => sequence.elements().len(),
+    };
+
+    for index in 0..branch_count {
         content.extend([
             RuntimeObject::ControlCommand(ControlCommand::EvalStart),
             RuntimeObject::ControlCommand(ControlCommand::Duplicate),
@@ -545,13 +555,17 @@ fn lower_sequence(sequence: &Sequence) -> Container {
     let branch_containers = sequence
         .elements()
         .iter()
+        .map(Some)
+        .chain((branch_count > sequence.elements().len()).then_some(None))
         .enumerate()
         .map(|(index, element)| {
             let mut branch_content = vec![RuntimeObject::ControlCommand(ControlCommand::Pop)];
-            branch_content.extend(lower_content_list_with_context(
-                element,
-                &ChoicePathMode::Root,
-            ));
+            if let Some(element) = element {
+                branch_content.extend(lower_content_list_with_context(
+                    element,
+                    &ChoicePathMode::Root,
+                ));
+            }
             branch_content.push(RuntimeObject::Divert {
                 target: format!(".^.^.{post_sequence_index}"),
                 variable: false,
