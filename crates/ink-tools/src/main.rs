@@ -4,7 +4,7 @@ use std::{
     sync::Arc,
 };
 
-use ink_compiler::{Compiler, CompilerOptions, FileHandler};
+use ink_compiler::{Compiler, CompilerOptions, FileHandler, SourceInput};
 
 #[derive(Debug)]
 struct CliFileHandler {
@@ -58,23 +58,21 @@ fn run() -> Result<(), String> {
     let file_handler: Arc<dyn FileHandler> = Arc::new(CliFileHandler::new(base_dir));
     let source_filename = source_path.display().to_string();
 
-    let mut compiler = Compiler::new(
-        source_text,
-        Some(CompilerOptions {
-            source_filename: Some(source_filename.clone()),
-            count_all_visits: false,
-            file_handler: Some(file_handler),
-        }),
-    );
+    let compiler = Compiler::with_options(CompilerOptions {
+        source_filename: Some(source_filename.clone()),
+        count_all_visits: false,
+        file_handler: Some(file_handler),
+    });
 
-    let result = compiler.compile_json();
+    let result = compiler.compile(SourceInput::named(source_text, source_filename.clone()));
     for diagnostic in &result.diagnostics {
         eprintln!("{}", format_diagnostic(diagnostic, &source_filename));
     }
 
-    let Some(json) = result.json else {
+    let Some(compiled) = result.artifact else {
         return Err("Compilation failed.".to_string());
     };
+    let json = compiled.json;
 
     if let Some(output_path) = output_path {
         fs::write(&output_path, json)
