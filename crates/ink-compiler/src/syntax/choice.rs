@@ -128,10 +128,6 @@ struct ChoiceSegments {
 }
 
 fn parse_choice_segments(choice_body: &str) -> Result<ChoiceSegments, &'static str> {
-    if choice_body.contains('{') || choice_body.contains('}') {
-        return Err("unsupported syntax: choice");
-    }
-
     let Some(open_index) = choice_body.find('[') else {
         if choice_body.contains(']') {
             return Err("Expected opening '[' for weave-style option but saw ']'");

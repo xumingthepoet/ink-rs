@@ -50,3 +50,7 @@ fixture!(
     variabletext_empty_elements,
     "inkfiles/variabletext/empty-elements.ink"
 );
+fixture!(
+    variabletext_list_in_choice,
+    "inkfiles/variabletext/list-in-choice.ink"
+);
