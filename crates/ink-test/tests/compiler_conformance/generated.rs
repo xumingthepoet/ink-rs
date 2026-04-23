@@ -15,4 +15,5 @@ fixture!(knot_multi_line, "inkfiles/knot/multi-line.ink");
 fixture!(knot_single_line, "inkfiles/knot/single-line.ink");
 fixture!(knot_strip_empty_lines, "inkfiles/knot/strip-empty-lines.ink");
 fixture!(choices_mixed_choice, "inkfiles/choices/mixed-choice.ink");
+fixture!(choices_no_choice_text, "inkfiles/choices/no-choice-text.ink");
 fixture!(choices_one, "inkfiles/choices/one.ink");
