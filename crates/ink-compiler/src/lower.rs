@@ -102,7 +102,13 @@ fn lower_root_weave(weave: &Weave) -> Vec<RuntimeObject> {
 }
 
 fn lower_flow(flow: &Flow) -> Container {
-    lower_flow_with_context(flow, None, &[])
+    // Collect child stitch names upfront so knot-level choices can reference them
+    let child_stitch_names: Vec<String> = flow
+        .child_flows()
+        .iter()
+        .map(|f| f.name().to_string())
+        .collect();
+    lower_flow_with_context(flow, None, &child_stitch_names)
 }
 
 fn lower_flow_with_context(
@@ -299,7 +305,7 @@ fn choice_outer(
 
     if let Some(choice_only_content) = choice.choice_only_content() {
         outer_content.push(RuntimeObject::ControlCommand(ControlCommand::BeginString));
-        outer_content.extend(lower_content_list(choice_only_content));
+        outer_content.extend(lower_content_list_with_context(choice_only_content, path_mode));
         outer_content.push(RuntimeObject::ControlCommand(ControlCommand::EndString));
     }
 
@@ -318,7 +324,7 @@ fn choice_outer(
 
     let mut start_content = choice
         .start_content()
-        .map(lower_content_list)
+        .map(|cl| lower_content_list_with_context(cl, path_mode))
         .unwrap_or_default();
     start_content.push(RuntimeObject::Divert {
         target: "$r".to_string(),
@@ -361,14 +367,6 @@ fn choice_container_prefix(
             flags: None,
         }),
     ]
-}
-
-fn lower_content_list(content_list: &ContentList) -> Vec<RuntimeObject> {
-    let mut content = Vec::new();
-    for object in content_list.objects() {
-        lower_object_into(&mut content, object);
-    }
-    content
 }
 
 fn lower_content_list_with_context(content_list: &ContentList, path_mode: &ChoicePathMode) -> Vec<RuntimeObject> {
@@ -424,7 +422,7 @@ fn push_divert_with_context(
 }
 
 /// Resolve a divert target path, converting absolute flow names to relative paths
-/// when the target is a sibling stitch inside a choice container within a stitch.
+/// when the target is a sibling stitch or child stitch inside a choice container.
 fn resolve_divert_target(target: &str, path_mode: &ChoicePathMode) -> String {
     match path_mode {
         ChoicePathMode::Root => target.to_string(),
@@ -433,24 +431,32 @@ fn resolve_divert_target(target: &str, path_mode: &ChoicePathMode) -> String {
             parent_flow_name,
             ..
         } => {
-            // Check if the target is a sibling stitch
-            if sibling_stitch_names.contains(&target.to_string()) {
-                // From inside a choice container, we need 4 levels up to reach the knot level:
-                // 1. Named content container (containing c-0, c-1, g-0)
-                // 2. Weave content array
-                // 3. Stitch container
-                // 4. Knot container (where sibling stitches are defined)
-                ".^.^.^.^.".to_string() + target
-            } else if let Some(parent_name) = parent_flow_name {
-                // Check if the target is the parent knot itself
-                if target == parent_name {
-                    // From inside a choice container, go up 4 levels to the knot
+            if parent_flow_name.is_some() {
+                // We're in a stitch - check if target is a sibling stitch
+                if sibling_stitch_names.contains(&target.to_string()) {
+                    // From inside a choice container in a stitch, we need 4 levels up:
+                    // 1. Named content container (containing c-0, c-1, g-0)
+                    // 2. Weave content array
+                    // 3. Stitch container
+                    // 4. Knot container (where sibling stitches are defined)
+                    ".^.^.^.^.".to_string() + target
+                } else if Some(target) == parent_flow_name.as_deref() {
+                    // Target is the parent knot itself
                     ".^.^.^.^".to_string()
                 } else {
                     target.to_string()
                 }
             } else {
-                target.to_string()
+                // We're in a knot - check if target is a child stitch
+                if sibling_stitch_names.contains(&target.to_string()) {
+                    // From inside a choice container in a knot, we need 3 levels up:
+                    // 1. Named content container (containing c-0, c-1, g-0)
+                    // 2. Weave content array
+                    // 3. Knot container (where child stitches are defined)
+                    ".^.^.^.".to_string() + target
+                } else {
+                    target.to_string()
+                }
             }
         }
     }
