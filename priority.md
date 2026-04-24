@@ -1,6 +1,6 @@
 # Ink Fixture Priority
 
-通过统计: 98/118
+通过统计: 99/118
 
 Sorted by the latest `WritingWithInk.md` syntax point used by each file.
 
@@ -102,7 +102,7 @@ Sorted by the latest `WritingWithInk.md` syntax point used by each file.
 - [x] `runtime/external-function-0-arg.ink`
 - [x] `runtime/external-function-1-arg.ink`
 - [x] `runtime/external-function-2-arg.ink`
-- [ ] `runtime/external-function-3-arg.ink`
+- [x] `runtime/external-function-3-arg.ink`
 - [ ] `TheIntercept.ink`
 - [ ] `function/evaluating-function-variablestate-bug.ink`
 - [ ] `misc/read-counts.ink`
