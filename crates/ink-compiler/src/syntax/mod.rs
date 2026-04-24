@@ -539,11 +539,14 @@ fn return_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
     parser.skip_horizontal_whitespace();
     parser.match_string("~")?;
     parser.skip_horizontal_whitespace();
-    parser.match_string("return")?;
+    let keyword = parser.take_while(is_identifier_continue)?;
+    if keyword != "return" {
+        return None;
+    }
     parser.skip_horizontal_whitespace();
-    let expression = parse_initial_expression(parser.line_remainder().trim())?;
+    let expression = parse_initial_expression(parser.line_remainder().trim());
     parser.skip_to_end();
-    Some(vec![Object::Return(Return::new(Some(expression)))])
+    Some(vec![Object::Return(Return::new(expression))])
 }
 
 fn expression_contains_function_call(expr: &Expression) -> bool {
@@ -553,6 +556,9 @@ fn expression_contains_function_call(expr: &Expression) -> bool {
             expression_contains_function_call(left) || expression_contains_function_call(right)
         }
         Expression::Unary { expression, .. } => expression_contains_function_call(expression),
+        Expression::MultipleCondition(expressions) => {
+            expressions.iter().any(expression_contains_function_call)
+        }
         _ => false,
     }
 }
@@ -1181,6 +1187,33 @@ mod tests {
         assert_eq!(story.flows().len(), 1);
         assert_eq!(story.flows()[0].name(), "knot_name");
         assert_eq!(story.flows()[0].weave().content().len(), 3);
+    }
+
+    #[test]
+    fn parses_return_without_expression() {
+        let output = parse(SourceInput::new("=== function f() ===\n~ return"));
+        assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
+        let story = output.artifact.unwrap();
+
+        let Object::Return(ret) = &story.flows()[0].weave().content()[0] else {
+            panic!("expected return");
+        };
+        assert!(ret.returned_expression().is_none());
+    }
+
+    #[test]
+    fn return_prefix_identifier_stays_expression() {
+        let output = parse(SourceInput::new("~ returnValue()"));
+        assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
+        let story = output.artifact.unwrap();
+
+        let Object::LogicLine(Expression::FunctionCall { name, args }) =
+            &story.root_weave().content()[0]
+        else {
+            panic!("expected function-call logic line");
+        };
+        assert_eq!(name, "returnValue");
+        assert!(args.is_empty());
     }
 
     #[test]

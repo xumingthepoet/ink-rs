@@ -44,6 +44,7 @@ pub enum RuntimeObject {
     Bool(bool),
     Int(i32),
     Float(FloatLiteral),
+    Void,
     NativeFunction(String),
 }
 
@@ -2166,6 +2167,8 @@ fn lower_object_into_with_context(
                     path_mode,
                     false,
                 );
+            } else {
+                content.push(RuntimeObject::Void);
             }
             content.push(RuntimeObject::ControlCommand(ControlCommand::EvalEnd));
             content.push(RuntimeObject::ControlCommand(ControlCommand::PopFunction));

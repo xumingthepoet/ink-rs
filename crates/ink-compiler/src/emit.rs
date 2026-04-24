@@ -122,6 +122,7 @@ fn runtime_object_to_value(object: &RuntimeObject) -> Value {
         RuntimeObject::Float(value) => Value::Number(
             serde_json::Number::from_f64(value.value()).expect("finite ink float literal"),
         ),
+        RuntimeObject::Void => Value::String("void".to_string()),
         RuntimeObject::NativeFunction(name) => Value::String(name.clone()),
         RuntimeObject::ConditionalDivert { target } => {
             let mut obj = Map::new();
@@ -196,5 +197,10 @@ mod tests {
             merge_tail_metadata: true,
         };
         assert_eq!(container_to_value(&container), json!(["^Line.", null]));
+    }
+
+    #[test]
+    fn emits_void_token() {
+        assert_eq!(runtime_object_to_value(&RuntimeObject::Void), json!("void"));
     }
 }
