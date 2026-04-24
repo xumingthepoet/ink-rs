@@ -264,6 +264,35 @@ impl ChoicePathMode {
         }
     }
 
+    fn for_sequence_branch(&self, sequence_container_path: &str, branch_name: &str) -> Self {
+        let container_path = format!("{sequence_container_path}.{branch_name}");
+        match self {
+            ChoicePathMode::Root | ChoicePathMode::RootGather { .. } => {
+                ChoicePathMode::NestedRoot {
+                    container_path,
+                    gather_target: "0.g-0".to_string(),
+                }
+            }
+            ChoicePathMode::NestedRoot { gather_target, .. } => ChoicePathMode::NestedRoot {
+                container_path,
+                gather_target: gather_target.clone(),
+            },
+            ChoicePathMode::Flow {
+                flow_name,
+                parent_flow_name,
+                sibling_stitch_names,
+                self_target_relative,
+                ..
+            } => ChoicePathMode::Flow {
+                flow_name: flow_name.clone(),
+                container_path,
+                parent_flow_name: parent_flow_name.clone(),
+                sibling_stitch_names: sibling_stitch_names.clone(),
+                self_target_relative: *self_target_relative,
+            },
+        }
+    }
+
     fn fallback_gather_target(&self) -> Option<String> {
         match self {
             ChoicePathMode::NestedRoot { gather_target, .. } => Some(gather_target.clone()),
@@ -780,6 +809,13 @@ fn flow_container_flags(
 fn weave_has_choice(weave: &Weave) -> bool {
     weave
         .content()
+        .iter()
+        .any(|object| matches!(object, Object::Choice(_)))
+}
+
+fn content_list_has_choice(content_list: &ContentList) -> bool {
+    content_list
+        .objects()
         .iter()
         .any(|object| matches!(object, Object::Choice(_)))
 }
@@ -1631,6 +1667,7 @@ fn lower_sequence(
     choice_labels: &HashMap<String, String>,
     global_labels: &HashMap<String, String>,
     global_variables: &HashSet<String>,
+    path_mode: &ChoicePathMode,
     sequence_container_path: &str,
 ) -> Container {
     let mut content = vec![
@@ -1685,26 +1722,50 @@ fn lower_sequence(
         .chain((branch_count > sequence.elements().len()).then_some(None))
         .enumerate()
         .map(|(index, element)| {
+            let branch_name = format!("s{index}");
+            let branch_path_mode =
+                path_mode.for_sequence_branch(sequence_container_path, &branch_name);
             let mut branch_content = vec![RuntimeObject::ControlCommand(ControlCommand::Pop)];
             if let Some(element) = element {
-                lower_content_list_into_context(
-                    &mut branch_content,
-                    element,
-                    &ChoicePathMode::Root,
-                    choice_labels,
-                    global_labels,
-                    global_variables,
-                );
+                if content_list_has_choice(element) {
+                    let element_weave = Weave::new(element.objects().to_vec(), 0);
+                    branch_content = lower_choice_weave_with_initial_content(
+                        &element_weave,
+                        branch_path_mode.clone(),
+                        global_labels,
+                        global_variables,
+                        false,
+                        branch_content,
+                    );
+                } else {
+                    lower_content_list_into_context(
+                        &mut branch_content,
+                        element,
+                        &branch_path_mode,
+                        choice_labels,
+                        global_labels,
+                        global_variables,
+                    );
+                }
             }
             let relative_return_target = format!(".^.^.{post_sequence_index}");
             let global_return_target = format!("{sequence_container_path}.{post_sequence_index}");
+            let trailing_named_content =
+                if matches!(branch_content.last(), Some(RuntimeObject::NamedContent(_))) {
+                    branch_content.pop()
+                } else {
+                    None
+                };
             branch_content.push(RuntimeObject::Divert {
                 target: compact_relative_path(&relative_return_target, &global_return_target),
                 variable: false,
             });
+            if let Some(named_content) = trailing_named_content {
+                branch_content.push(named_content);
+            }
             Container {
                 content: branch_content,
-                name: Some(format!("s{index}")),
+                name: Some(branch_name),
                 flags: None,
                 merge_tail_metadata: true,
             }
@@ -1927,6 +1988,7 @@ fn lower_object_into_with_context(
             choice_labels,
             global_labels,
             global_variables,
+            path_mode,
             &sequence_container_path_for(path_mode, content.len()),
         ))),
         Object::Weave(weave) => {

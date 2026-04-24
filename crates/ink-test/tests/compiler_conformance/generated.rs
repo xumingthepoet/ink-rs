@@ -126,3 +126,7 @@ fixture!(
     "inkfiles/conditional/ifelse-ext-text3.ink"
 );
 fixture!(conditional_cycle, "inkfiles/conditional/cycle.ink");
+fixture!(
+    conditional_multiline_choice,
+    "inkfiles/conditional/multiline-choice.ink"
+);
