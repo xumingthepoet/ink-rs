@@ -3339,7 +3339,15 @@ fn lower_object_into_with_context_count(
             external_signatures,
         ),
         Object::TunnelOnwards(tunnel_onwards) => {
-            lower_tunnel_onwards_into(content, tunnel_onwards, path_mode);
+            lower_tunnel_onwards_into(
+                content,
+                tunnel_onwards,
+                path_mode,
+                choice_labels,
+                global_labels,
+                global_variables,
+                external_signatures,
+            );
         }
         Object::Choice(_) => {}
         Object::ConstantDeclaration(_) => {}
@@ -3559,13 +3567,44 @@ fn lower_tunnel_onwards_into(
     content: &mut Vec<RuntimeObject>,
     tunnel_onwards: &crate::parsed::TunnelOnwards,
     path_mode: &ChoicePathMode,
+    choice_labels: &HashMap<String, String>,
+    global_labels: &HashMap<String, String>,
+    global_variables: &HashSet<String>,
+    external_signatures: &ExternalSignatures,
 ) {
     content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
+    for argument in tunnel_onwards.arguments() {
+        lower_expression_into(
+            content,
+            argument,
+            choice_labels,
+            global_labels,
+            external_signatures,
+            path_mode,
+            false,
+        );
+    }
     if let Some(target) = tunnel_onwards.override_target() {
         match target {
-            DivertTarget::Path(target) => content.push(RuntimeObject::DivertTarget(
-                resolve_divert_target(target, path_mode),
-            )),
+            DivertTarget::Path(target) => {
+                if let Some(choice_target) = choice_labels.get(target) {
+                    content.push(RuntimeObject::DivertTarget(choice_target.clone()));
+                } else if let Some(label_target) =
+                    scoped_label_target(target, global_labels, path_mode)
+                        .filter(|label_target| label_target.as_str() != target)
+                {
+                    content.push(RuntimeObject::DivertTarget(resolve_label_target(
+                        label_target,
+                        path_mode,
+                    )));
+                } else if path_mode.is_local_variable(target) || global_variables.contains(target) {
+                    content.push(RuntimeObject::VariableReference(target.clone()));
+                } else {
+                    content.push(RuntimeObject::DivertTarget(resolve_divert_target(
+                        target, path_mode,
+                    )));
+                }
+            }
             DivertTarget::Done => content.push(RuntimeObject::DivertTarget("DONE".to_string())),
             DivertTarget::End => content.push(RuntimeObject::DivertTarget("END".to_string())),
             DivertTarget::Empty => content.push(RuntimeObject::Void),

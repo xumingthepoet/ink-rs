@@ -35,15 +35,11 @@ pub(super) fn parse_divert_objects_source(source: &str, span: SourceSpan) -> Opt
     }
 
     if let Some(rest) = source.strip_prefix("->->") {
-        let override_target = rest
-            .trim()
-            .is_empty()
-            .then_some(None)
-            .unwrap_or_else(|| Some(DivertTarget::from_source(rest.trim())));
-        return Some(vec![Object::TunnelOnwards(TunnelOnwards::new(
-            override_target,
+        let override_source = (!rest.trim().is_empty()).then_some(rest.trim());
+        return Some(vec![Object::TunnelOnwards(parse_tunnel_onwards(
+            override_source,
             span,
-        ))]);
+        )?)]);
     }
 
     let after_arrow = source.strip_prefix("->")?.trim();
@@ -67,13 +63,22 @@ pub(super) fn parse_divert_objects_source(source: &str, span: SourceSpan) -> Opt
         .collect::<Option<Vec<_>>>()?;
 
     if let TrailingDivertSyntax::TunnelOnwards(target) = trailing {
-        objects.push(Object::TunnelOnwards(TunnelOnwards::new(
-            target.map(DivertTarget::from_source),
-            span,
-        )));
+        objects.push(Object::TunnelOnwards(parse_tunnel_onwards(target, span)?));
     }
 
     Some(objects)
+}
+
+fn parse_tunnel_onwards(source: Option<&str>, span: SourceSpan) -> Option<TunnelOnwards> {
+    let Some(source) = source else {
+        return Some(TunnelOnwards::new(None, span));
+    };
+    let divert = parse_divert_source(source, span.clone())?;
+    Some(TunnelOnwards::with_arguments(
+        Some(divert.target().clone()),
+        divert.arguments().to_vec(),
+        span,
+    ))
 }
 
 pub(super) fn parse_divert_source(source: &str, span: SourceSpan) -> Option<Divert> {
