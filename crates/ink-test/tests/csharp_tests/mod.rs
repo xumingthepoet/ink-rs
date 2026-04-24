@@ -3092,7 +3092,6 @@ This is default.
     //             Assert.IsTrue(HadError("not found"));
     //         }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestDivertNotFoundError() {
         run_in_both_modes(|suite| {
             let _ = suite.compile_string_without_runtime(
