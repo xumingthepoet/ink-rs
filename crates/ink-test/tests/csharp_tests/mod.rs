@@ -460,7 +460,7 @@ impl RuntimeStoryExt for RuntimeStory {
     }
 
     fn choose_path_string_simple(&mut self, path: &str) {
-        self.choose_path_string(path, false, None);
+        self.choose_path_string(path, true, None);
     }
 
     fn choose_path_string_with_args(
@@ -5544,7 +5544,6 @@ VAR x = ->place
     //             Assert.AreEqual("somewhere else\n", story.ContinueMaximally());
     //         }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestCleanCallstackResetOnPathChoice() {
         run_in_both_modes(|suite| {
             let mut story = suite
@@ -5557,7 +5556,7 @@ The first line.
 The second line.
 
 == SomewhereElse ==
-{""somewhere else""}
+{"somewhere else"}
 ->END
 "#,
                     false,
