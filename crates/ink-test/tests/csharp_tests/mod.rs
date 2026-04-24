@@ -8548,7 +8548,6 @@ Here.
     //             Assert.AreEqual("choice\n1\n", story.ContinueMaximally());
     //         }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestVisitCountBugDueToNestedContainers() {
         run_in_both_modes(|suite| {
             let mut story = suite
