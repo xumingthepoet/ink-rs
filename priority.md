@@ -1,6 +1,6 @@
 # Ink Fixture Priority
 
-通过统计: 79/118
+通过统计: 80/118
 
 Sorted by the latest `WritingWithInk.md` syntax point used by each file.
 
@@ -83,7 +83,7 @@ Sorted by the latest `WritingWithInk.md` syntax point used by each file.
 - [x] `conditional/shuffle_stopping.ink`
 - [x] `knot/param-floats.ink`
 - [x] `knot/param-ints.ink`
-- [ ] `knot/param-multi.ink`
+- [x] `knot/param-multi.ink`
 - [ ] `knot/param-strings.ink`
 - [ ] `knot/param-vars.ink`
 - [ ] `knot/param-recurse.ink`
