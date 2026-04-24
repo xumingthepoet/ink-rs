@@ -178,3 +178,7 @@ fixture!(
     runtime_external_function_1_arg,
     "inkfiles/runtime/external-function-1-arg.ink"
 );
+fixture!(
+    runtime_external_function_2_arg,
+    "inkfiles/runtime/external-function-2-arg.ink"
+);
