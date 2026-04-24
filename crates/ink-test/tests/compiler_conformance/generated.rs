@@ -79,3 +79,7 @@ fixture!(
     variable_variable_declaration,
     "inkfiles/variable/variable-declaration.ink"
 );
+fixture!(
+    runtime_variable_observers,
+    "inkfiles/runtime/variable-observers.ink"
+);

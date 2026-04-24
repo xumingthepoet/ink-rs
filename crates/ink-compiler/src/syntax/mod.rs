@@ -79,6 +79,7 @@ impl Parser {
         let mut line_parser = RuleParser::new(line);
         let statement_rules: &[StatementRule] = &[
             variable_declaration_statement,
+            variable_assignment_statement,
             choice_statement,
             gather_statement,
             divert_statement,
@@ -293,6 +294,26 @@ fn variable_declaration_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Obj
 
     Some(vec![Object::VariableAssignment(VariableAssignment::new(
         name, expression, true, false, span,
+    ))])
+}
+
+fn variable_assignment_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
+    parser.skip_horizontal_whitespace();
+    let span = parser.current_span();
+    parser.match_string("~")?;
+    parser.skip_horizontal_whitespace();
+    let name = parser.take_while(|ch| ch == '_' || ch.is_ascii_alphanumeric())?;
+    if !is_identifier(&name) {
+        return None;
+    }
+    parser.skip_horizontal_whitespace();
+    parser.match_string("=")?;
+    parser.skip_horizontal_whitespace();
+    let expression = parse_initial_expression(parser.line_remainder().trim())?;
+    parser.skip_to_end();
+
+    Some(vec![Object::VariableAssignment(VariableAssignment::new(
+        name, expression, false, false, span,
     ))])
 }
 

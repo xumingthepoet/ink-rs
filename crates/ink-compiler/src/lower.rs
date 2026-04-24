@@ -34,6 +34,7 @@ pub enum RuntimeObject {
     ReadCount(String),
     VariableAssignment(String),
     GlobalVariableAssignment(String),
+    VariableReassignment(String),
     VariableReference(String),
     ChoicePoint { target: String, flags: i32 },
     Glue,
@@ -1506,6 +1507,7 @@ fn lower_variable_assignment_into(
         return;
     }
 
+    content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
     lower_expression_into(
         content,
         assignment.expression(),
@@ -1514,9 +1516,17 @@ fn lower_variable_assignment_into(
         path_mode,
         false,
     );
-    content.push(RuntimeObject::VariableAssignment(
-        assignment.name().to_string(),
-    ));
+    content.push(RuntimeObject::ControlCommand(ControlCommand::EvalEnd));
+
+    if assignment.is_temporary() {
+        content.push(RuntimeObject::VariableAssignment(
+            assignment.name().to_string(),
+        ));
+    } else {
+        content.push(RuntimeObject::VariableReassignment(
+            assignment.name().to_string(),
+        ));
+    }
 }
 
 fn push_divert_with_context(
