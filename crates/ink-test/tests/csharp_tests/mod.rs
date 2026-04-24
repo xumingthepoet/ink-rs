@@ -4161,7 +4161,6 @@ CONST kX = "hi"
     //             Assert.AreEqual("test1 test4\n", story.Continue());
     //         }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestStringsInChoices() {
         run_in_both_modes(|suite| {
             let mut story = suite
