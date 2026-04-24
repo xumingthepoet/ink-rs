@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use crate::{
     compiler::StageOutput,
     diagnostic::Diagnostic,
-    parsed::{ContentList, DivertTarget, Flow, Object, Return, Story, Weave},
+    parsed::{ContentList, DivertTarget, Expression, Flow, Object, Return, Story, Weave},
     source::SourceSpan,
 };
 
@@ -15,6 +15,7 @@ pub struct CheckedStory {
 pub(crate) fn analyze(parsed: Story) -> StageOutput<CheckedStory> {
     let mut diagnostics = naming_diagnostics(&parsed);
     diagnostics.extend(flow_diagnostics(&parsed));
+    diagnostics.extend(call_target_diagnostics(&parsed));
     StageOutput {
         artifact: Some(CheckedStory { parsed }),
         diagnostics,
@@ -180,6 +181,249 @@ fn flow_diagnostics(story: &Story) -> Vec<Diagnostic> {
         check_flow(flow, &mut diagnostics);
     }
     diagnostics
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct FlowSymbol {
+    is_function: bool,
+}
+
+fn call_target_diagnostics(story: &Story) -> Vec<Diagnostic> {
+    let flow_symbols = build_flow_symbol_index(story);
+    let mut diagnostics = Vec::new();
+
+    check_call_targets_in_weave(story.root_weave(), &flow_symbols, &mut diagnostics);
+    for flow in story.flows() {
+        check_call_targets_in_flow(flow, &flow_symbols, &mut diagnostics);
+    }
+
+    diagnostics
+}
+
+fn build_flow_symbol_index(story: &Story) -> HashMap<String, FlowSymbol> {
+    let mut symbols = HashMap::new();
+    for flow in story.flows() {
+        collect_flow_symbol(flow, None, &mut symbols);
+    }
+    symbols
+}
+
+fn collect_flow_symbol(
+    flow: &Flow,
+    parent_path: Option<&str>,
+    symbols: &mut HashMap<String, FlowSymbol>,
+) {
+    let path = parent_path
+        .map(|parent| format!("{parent}.{}", flow.name()))
+        .unwrap_or_else(|| flow.name().to_string());
+    let symbol = FlowSymbol {
+        is_function: flow.is_function(),
+    };
+
+    symbols.entry(path.clone()).or_insert(symbol);
+    if parent_path.is_none() {
+        symbols.entry(flow.name().to_string()).or_insert(symbol);
+    }
+
+    for child in flow.child_flows() {
+        collect_flow_symbol(child, Some(&path), symbols);
+    }
+}
+
+fn check_call_targets_in_flow(
+    flow: &Flow,
+    flow_symbols: &HashMap<String, FlowSymbol>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    check_call_targets_in_weave(flow.weave(), flow_symbols, diagnostics);
+    for child in flow.child_flows() {
+        check_call_targets_in_flow(child, flow_symbols, diagnostics);
+    }
+}
+
+fn check_call_targets_in_weave(
+    weave: &Weave,
+    flow_symbols: &HashMap<String, FlowSymbol>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    for object in weave.content() {
+        check_call_targets_in_object(object, flow_symbols, diagnostics);
+    }
+}
+
+fn check_call_targets_in_content_list(
+    content: &ContentList,
+    flow_symbols: &HashMap<String, FlowSymbol>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    for object in content.objects() {
+        check_call_targets_in_object(object, flow_symbols, diagnostics);
+    }
+}
+
+fn check_call_targets_in_object(
+    object: &Object,
+    flow_symbols: &HashMap<String, FlowSymbol>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    match object {
+        Object::Divert(divert) => {
+            if let DivertTarget::Path(target) = divert.target() {
+                check_plain_divert_target(target, divert.span(), flow_symbols, diagnostics);
+            }
+            for argument in divert.arguments() {
+                check_call_targets_in_expression(
+                    argument,
+                    divert.span(),
+                    flow_symbols,
+                    diagnostics,
+                );
+            }
+        }
+        Object::Expression(expression) | Object::LogicLine(expression) => {
+            check_call_targets_in_expression(
+                expression,
+                &object_span(object),
+                flow_symbols,
+                diagnostics,
+            );
+        }
+        Object::VariableAssignment(assignment) => check_call_targets_in_expression(
+            assignment.expression(),
+            assignment.span(),
+            flow_symbols,
+            diagnostics,
+        ),
+        Object::IncDec(inc_dec) => check_call_targets_in_expression(
+            inc_dec.expression(),
+            inc_dec.span(),
+            flow_symbols,
+            diagnostics,
+        ),
+        Object::Return(ret) => {
+            if let Some(expression) = ret.returned_expression() {
+                check_call_targets_in_expression(expression, ret.span(), flow_symbols, diagnostics);
+            }
+        }
+        Object::ContentList(content) => {
+            check_call_targets_in_content_list(content, flow_symbols, diagnostics)
+        }
+        Object::Conditional(conditional) => {
+            if let Some(condition) = conditional.initial_condition() {
+                check_call_targets_in_expression(
+                    condition,
+                    &object_span(object),
+                    flow_symbols,
+                    diagnostics,
+                );
+            }
+            for branch in conditional.branches() {
+                if let Some(condition) = branch.own_condition() {
+                    check_call_targets_in_expression(
+                        condition,
+                        &object_span(object),
+                        flow_symbols,
+                        diagnostics,
+                    );
+                }
+                check_call_targets_in_weave(branch.content(), flow_symbols, diagnostics);
+            }
+        }
+        Object::Choice(choice) => {
+            if let Some(condition) = choice.condition() {
+                check_call_targets_in_expression(
+                    condition,
+                    choice.span(),
+                    flow_symbols,
+                    diagnostics,
+                );
+            }
+            if let Some(content) = choice.start_content() {
+                check_call_targets_in_content_list(content, flow_symbols, diagnostics);
+            }
+            if let Some(content) = choice.choice_only_content() {
+                check_call_targets_in_content_list(content, flow_symbols, diagnostics);
+            }
+            check_call_targets_in_content_list(choice.inner_content(), flow_symbols, diagnostics);
+        }
+        Object::Sequence(sequence) => {
+            for element in sequence.elements() {
+                check_call_targets_in_content_list(element, flow_symbols, diagnostics);
+            }
+        }
+        Object::Weave(weave) => check_call_targets_in_weave(weave, flow_symbols, diagnostics),
+        Object::ConstantDeclaration(_)
+        | Object::ExternalDeclaration(_)
+        | Object::Gather(_)
+        | Object::Glue(_)
+        | Object::Tag(_)
+        | Object::Text(_)
+        | Object::TunnelOnwards(_) => {}
+    }
+}
+
+fn check_plain_divert_target(
+    target: &str,
+    span: &SourceSpan,
+    flow_symbols: &HashMap<String, FlowSymbol>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    if let Some(symbol) = flow_symbols.get(target) {
+        if symbol.is_function {
+            diagnostics.push(Diagnostic::error(
+                span.clone(),
+                format!(
+                    "{target} can't be diverted to. It can only be called as a function since it's been marked as such: '{target}(...)'"
+                ),
+            ));
+        }
+    }
+}
+
+fn check_call_targets_in_expression(
+    expression: &Expression,
+    span: &SourceSpan,
+    flow_symbols: &HashMap<String, FlowSymbol>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    match expression {
+        Expression::FunctionCall { name, args } => {
+            if let Some(symbol) = flow_symbols.get(name) {
+                if !symbol.is_function {
+                    diagnostics.push(Diagnostic::error(
+                        span.clone(),
+                        format!(
+                            "{name} hasn't been marked as a function, but it's being called as one. Do you need to delcare the knot as '== function {name} =='?"
+                        ),
+                    ));
+                }
+            }
+            for arg in args {
+                check_call_targets_in_expression(arg, span, flow_symbols, diagnostics);
+            }
+        }
+        Expression::StringContent(content) => {
+            check_call_targets_in_content_list(content, flow_symbols, diagnostics)
+        }
+        Expression::Binary { left, right, .. } => {
+            check_call_targets_in_expression(left, span, flow_symbols, diagnostics);
+            check_call_targets_in_expression(right, span, flow_symbols, diagnostics);
+        }
+        Expression::Unary { expression, .. } => {
+            check_call_targets_in_expression(expression, span, flow_symbols, diagnostics);
+        }
+        Expression::MultipleCondition(expressions) => {
+            for expression in expressions {
+                check_call_targets_in_expression(expression, span, flow_symbols, diagnostics);
+            }
+        }
+        Expression::String(_)
+        | Expression::NumberInt(_)
+        | Expression::NumberFloat(_)
+        | Expression::NumberBool(_)
+        | Expression::DivertTarget(_)
+        | Expression::VariableReference(_) => {}
+    }
 }
 
 fn check_flow(flow: &Flow, diagnostics: &mut Vec<Diagnostic>) {

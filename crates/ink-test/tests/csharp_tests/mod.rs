@@ -1501,7 +1501,6 @@ VAR result = 0
     //             Assert.IsTrue(_errorMessages[1].Contains("can only be called as a function"));
     //         }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestFunctionCallRestrictions() {
         run_in_both_modes(|suite| {
             suite
