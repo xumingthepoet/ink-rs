@@ -293,10 +293,12 @@ fn gather_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
         return None;
     }
 
-    let mut objects = vec![Object::Gather(crate::parsed::Gather::new(
-        span.clone(),
-        indentation_depth,
-    ))];
+    let identifier = parse_bracketed_identifier(parser);
+    parser.skip_horizontal_whitespace();
+
+    let mut gather = crate::parsed::Gather::new(span.clone(), indentation_depth);
+    gather.set_identifier(identifier);
+    let mut objects = vec![Object::Gather(gather)];
 
     // Parse any remaining content on the line
     let remaining = parser.line_remainder().trim();
@@ -314,6 +316,27 @@ fn gather_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
     }
 
     Some(objects)
+}
+
+fn parse_bracketed_identifier(parser: &mut RuleParser<'_>) -> Option<String> {
+    parser.parse_rule(|parser| {
+        parser.skip_horizontal_whitespace();
+        parser.match_string("(")?;
+        parser.skip_horizontal_whitespace();
+        let name = parser.take_while(|ch| ch == '_' || ch.is_ascii_alphanumeric())?;
+        if !is_identifier(&name) {
+            return None;
+        }
+        parser.skip_horizontal_whitespace();
+        parser.match_string(")")?;
+        Some(name)
+    })
+}
+
+fn is_identifier(source: &str) -> bool {
+    let mut chars = source.chars();
+    matches!(chars.next(), Some(ch) if ch == '_' || ch.is_ascii_alphabetic())
+        && chars.all(|ch| ch == '_' || ch.is_ascii_alphanumeric())
 }
 
 fn divert_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {

@@ -5,7 +5,7 @@ use crate::{
     compiler::StageOutput,
     parsed::{
         BinaryOperator, Choice, ContentList, DivertTarget, Expression, Flow, Object, Sequence,
-        SequenceType, Weave,
+        SequenceType, Story, Weave,
     },
 };
 
@@ -234,8 +234,9 @@ impl ChoicePathMode {
 }
 
 pub(crate) fn lower(story: &CheckedStory) -> StageOutput<RuntimeProgram> {
+    let global_labels = build_label_index(&story.parsed);
     let root_weave = story.parsed.root_weave();
-    let main_content = lower_root_weave(root_weave);
+    let main_content = lower_root_weave(root_weave, &global_labels);
 
     let main_container = RuntimeObject::Container(Container {
         content: main_content,
@@ -253,7 +254,7 @@ pub(crate) fn lower(story: &CheckedStory) -> StageOutput<RuntimeProgram> {
         .parsed
         .flows()
         .iter()
-        .map(lower_flow)
+        .map(|flow| lower_flow(flow, &global_labels))
         .collect::<Vec<_>>();
     if !flow_containers.is_empty() {
         root_content.push(RuntimeObject::NamedContent(flow_containers));
@@ -272,51 +273,129 @@ pub(crate) fn lower(story: &CheckedStory) -> StageOutput<RuntimeProgram> {
     }
 }
 
-fn lower_root_weave(weave: &Weave) -> Vec<RuntimeObject> {
+fn build_label_index(story: &Story) -> HashMap<String, String> {
+    let mut labels = HashMap::new();
+    collect_weave_labels(story.root_weave(), "0", &mut labels);
+    for flow in story.flows() {
+        collect_flow_labels(flow, None, &mut labels);
+    }
+    labels
+}
+
+fn collect_flow_labels(
+    flow: &Flow,
+    parent_flow_name: Option<&str>,
+    labels: &mut HashMap<String, String>,
+) {
+    let flow_path = parent_flow_name
+        .map(|parent| format!("{parent}.{}", flow.name()))
+        .unwrap_or_else(|| flow.name().to_string());
+    collect_weave_labels(flow.weave(), &format!("{flow_path}.0"), labels);
+    for child in flow.child_flows() {
+        collect_flow_labels(child, Some(&flow_path), labels);
+    }
+}
+
+fn collect_weave_labels(weave: &Weave, container_path: &str, labels: &mut HashMap<String, String>) {
+    let mut choice_count = 0;
+    let mut gather_count = 0;
+    for object in weave.content() {
+        match object {
+            Object::Choice(choice) => {
+                if let Some(identifier) = choice.identifier() {
+                    insert_label_aliases(
+                        labels,
+                        identifier,
+                        container_path,
+                        &format!("{container_path}.c-{choice_count}"),
+                    );
+                }
+                choice_count += 1;
+            }
+            Object::Gather(gather) => {
+                let gather_name = gather.identifier().map(str::to_string).unwrap_or_else(|| {
+                    let name = format!("g-{gather_count}");
+                    gather_count += 1;
+                    name
+                });
+                if let Some(identifier) = gather.identifier() {
+                    insert_label_aliases(
+                        labels,
+                        identifier,
+                        container_path,
+                        &format!("{container_path}.{gather_name}"),
+                    );
+                }
+            }
+            Object::Weave(weave) => {
+                collect_weave_labels(weave, container_path, labels);
+            }
+            _ => {}
+        }
+    }
+}
+
+fn insert_label_aliases(
+    labels: &mut HashMap<String, String>,
+    identifier: &str,
+    container_path: &str,
+    target_path: &str,
+) {
+    labels.insert(identifier.to_string(), target_path.to_string());
+    if let Some(flow_path) = container_path.strip_suffix(".0") {
+        labels.insert(format!("{flow_path}.{identifier}"), target_path.to_string());
+    }
+}
+
+fn lower_root_weave(weave: &Weave, global_labels: &HashMap<String, String>) -> Vec<RuntimeObject> {
     if weave_has_choice(weave) {
-        lower_choice_weave(weave, ChoicePathMode::Root)
+        lower_choice_weave(weave, ChoicePathMode::Root, global_labels)
     } else {
-        let mut content = lower_linear_weave(weave);
+        let mut content = lower_linear_weave(weave, global_labels);
         content.push(RuntimeObject::Container(done_container("g-0")));
         content
     }
 }
 
-fn lower_flow(flow: &Flow) -> Container {
+fn lower_flow(flow: &Flow, global_labels: &HashMap<String, String>) -> Container {
     // Collect child stitch names upfront so knot-level choices can reference them
     let child_stitch_names: Vec<String> = flow
         .child_flows()
         .iter()
         .map(|f| f.name().to_string())
         .collect();
-    lower_flow_with_context(flow, None, &child_stitch_names)
+    lower_flow_with_context(flow, None, &child_stitch_names, global_labels)
 }
 
 fn lower_flow_with_context(
     flow: &Flow,
     parent_knot_name: Option<&str>,
     sibling_stitch_names: &[String],
+    global_labels: &HashMap<String, String>,
 ) -> Container {
     let mut content = Vec::new();
 
     // Lower any content in the flow's own weave
     if weave_has_choice(flow.weave()) {
         // For stitches inside a knot, pass the parent knot name and sibling stitch names
+        let flow_container_path = parent_knot_name
+            .map(|parent| format!("{parent}.{}.0", flow.name()))
+            .unwrap_or_else(|| format!("{}.0", flow.name()));
         let path_mode = ChoicePathMode::Flow {
             flow_name: flow.name().to_string(),
-            container_path: format!("{}.0", flow.name()),
+            container_path: flow_container_path,
             parent_flow_name: parent_knot_name.map(|s| s.to_string()),
             sibling_stitch_names: sibling_stitch_names.to_vec(),
             self_target_relative: false,
         };
         content.push(RuntimeObject::Container(Container {
-            content: lower_choice_weave(flow.weave(), path_mode),
+            content: lower_choice_weave(flow.weave(), path_mode, global_labels),
             name: None,
             flags: None,
             merge_tail_metadata: true,
         }));
     } else if !flow.weave().content().is_empty() {
-        content.extend(lower_linear_weave(flow.weave()));
+        content.extend(lower_linear_weave(flow.weave(), global_labels));
     }
 
     // Lower child flows (stitches)
@@ -343,7 +422,14 @@ fn lower_flow_with_context(
         let child_containers: Vec<Container> = flow
             .child_flows()
             .iter()
-            .map(|child| lower_flow_with_context(child, Some(flow.name()), &child_stitch_names))
+            .map(|child| {
+                lower_flow_with_context(
+                    child,
+                    Some(flow.name()),
+                    &child_stitch_names,
+                    global_labels,
+                )
+            })
             .collect();
         content.push(RuntimeObject::NamedContent(child_containers));
     }
@@ -363,15 +449,22 @@ fn weave_has_choice(weave: &Weave) -> bool {
         .any(|object| matches!(object, Object::Choice(_)))
 }
 
-fn lower_linear_weave(weave: &Weave) -> Vec<RuntimeObject> {
+fn lower_linear_weave(
+    weave: &Weave,
+    global_labels: &HashMap<String, String>,
+) -> Vec<RuntimeObject> {
     let mut content = Vec::new();
     for object in weave.content() {
-        lower_object_into(&mut content, object);
+        lower_object_into(&mut content, object, global_labels);
     }
     content
 }
 
-fn lower_choice_weave(weave: &Weave, path_mode: ChoicePathMode) -> Vec<RuntimeObject> {
+fn lower_choice_weave(
+    weave: &Weave,
+    path_mode: ChoicePathMode,
+    global_labels: &HashMap<String, String>,
+) -> Vec<RuntimeObject> {
     let mut main_content = Vec::new();
     let mut named_content = Vec::new();
     let mut index = 0;
@@ -403,6 +496,7 @@ fn lower_choice_weave(weave: &Weave, path_mode: ChoicePathMode) -> Vec<RuntimeOb
                     &mut choice_count,
                     &mut needs_terminal_gather,
                     &mut choice_labels,
+                    global_labels,
                     gather_count,
                     &path_mode,
                     has_explicit_gather,
@@ -410,8 +504,20 @@ fn lower_choice_weave(weave: &Weave, path_mode: ChoicePathMode) -> Vec<RuntimeOb
             }
             Object::Gather(_gather) => {
                 // Create a named container for the gather
-                let gather_name = format!("g-{gather_count}");
-                gather_count += 1;
+                let gather = match &objects[index] {
+                    Object::Gather(gather) => gather,
+                    _ => unreachable!(),
+                };
+                let gather_name = if let Some(identifier) = gather.identifier() {
+                    identifier.to_string()
+                } else {
+                    let gather_name = format!("g-{gather_count}");
+                    gather_count += 1;
+                    gather_name
+                };
+                if let Some(identifier) = gather.identifier() {
+                    choice_labels.insert(identifier.to_string(), gather_name.clone());
+                }
                 let auto_enter_gather = !last_section_had_choice;
 
                 let mut gather_content = Vec::new();
@@ -427,6 +533,7 @@ fn lower_choice_weave(weave: &Weave, path_mode: ChoicePathMode) -> Vec<RuntimeOb
                     &mut choice_count,
                     &mut needs_terminal_gather,
                     &mut choice_labels,
+                    global_labels,
                     gather_count,
                     &gather_path_mode,
                     has_explicit_gather,
@@ -449,7 +556,11 @@ fn lower_choice_weave(weave: &Weave, path_mode: ChoicePathMode) -> Vec<RuntimeOb
                 let gather_container = Container {
                     content: gather_content,
                     name: Some(gather_name),
-                    flags: None,
+                    flags: if gather.identifier().is_some() {
+                        Some(5)
+                    } else {
+                        None
+                    },
                     merge_tail_metadata: true,
                 };
                 if auto_enter_gather {
@@ -486,6 +597,7 @@ fn lower_choice_weave(weave: &Weave, path_mode: ChoicePathMode) -> Vec<RuntimeOb
                     &mut choice_count,
                     &mut needs_terminal_gather,
                     &mut choice_labels,
+                    global_labels,
                     gather_count,
                     &path_mode,
                     has_explicit_gather,
@@ -528,6 +640,7 @@ fn lower_weave_section(
     choice_count: &mut usize,
     needs_terminal_gather: &mut bool,
     choice_labels: &mut HashMap<String, String>,
+    global_labels: &HashMap<String, String>,
     gather_count: usize,
     path_mode: &ChoicePathMode,
     has_explicit_gather: bool,
@@ -543,7 +656,7 @@ fn lower_weave_section(
             | Object::Tag(_)
             | Object::Sequence(_)
             | Object::Weave(_) => {
-                lower_object_into_with_context(content, &objects[*index], path_mode);
+                lower_object_into_with_context(content, &objects[*index], path_mode, global_labels);
                 *index += 1;
             }
             Object::Choice(_) => {
@@ -556,6 +669,7 @@ fn lower_weave_section(
                     choice_count,
                     needs_terminal_gather,
                     choice_labels,
+                    global_labels,
                     gather_count,
                     path_mode,
                     has_explicit_gather,
@@ -618,6 +732,7 @@ fn lower_choice_in_section(
     choice_count: &mut usize,
     needs_terminal_gather: &mut bool,
     choice_labels: &mut HashMap<String, String>,
+    global_labels: &HashMap<String, String>,
     gather_count: usize,
     path_mode: &ChoicePathMode,
     has_explicit_gather: bool,
@@ -632,7 +747,7 @@ fn lower_choice_in_section(
         .any(|object| matches!(object, Object::Gather(_)));
     *choice_count += 1;
     let choice_container_name = format!("c-{choice_index}");
-    let gather_container_name = format!("g-{gather_count}");
+    let gather_container_name = next_gather_name(objects, *index + 1, gather_count);
     let choice_container_path =
         choice_point_target(path_mode, choice.has_start_content(), choice_index);
 
@@ -642,6 +757,7 @@ fn lower_choice_in_section(
         content.len(),
         path_mode,
         choice_labels,
+        global_labels,
     ) {
         ChoiceOuter::Inline(objects) => content.extend(objects),
         ChoiceOuter::Nested(container) => content.push(RuntimeObject::Container(container)),
@@ -656,6 +772,7 @@ fn lower_choice_in_section(
     choice_content.extend(lower_content_list_with_context(
         choice.inner_content(),
         &choice_content_path_mode,
+        global_labels,
     ));
     let nested_choice_content_path_mode = path_mode.for_choice_nested_content(
         &choice_container_name,
@@ -676,6 +793,7 @@ fn lower_choice_in_section(
             &mut choice_content,
             &objects[*index],
             &nested_choice_content_path_mode,
+            global_labels,
         );
         *index += 1;
     }
@@ -689,7 +807,7 @@ fn lower_choice_in_section(
             ChoicePathMode::Root
             | ChoicePathMode::RootGather { .. }
             | ChoicePathMode::NestedRoot { .. } => true,
-            ChoicePathMode::Flow { .. } => !ends_with_flow_terminator(&choice_content),
+            ChoicePathMode::Flow { .. } => false,
         }
     };
     if include_gather {
@@ -712,12 +830,28 @@ fn lower_choice_in_section(
     }
 }
 
+fn next_gather_name(objects: &[Object], start_index: usize, unnamed_gather_count: usize) -> String {
+    objects[start_index..]
+        .iter()
+        .find_map(|object| match object {
+            Object::Gather(gather) => Some(
+                gather
+                    .identifier()
+                    .map(str::to_string)
+                    .unwrap_or_else(|| format!("g-{unnamed_gather_count}")),
+            ),
+            _ => None,
+        })
+        .unwrap_or_else(|| format!("g-{unnamed_gather_count}"))
+}
+
 fn choice_outer(
     choice: &Choice,
     choice_container_path: &str,
     choice_point_index: usize,
     path_mode: &ChoicePathMode,
     choice_labels: &HashMap<String, String>,
+    global_labels: &HashMap<String, String>,
 ) -> ChoiceOuter {
     let mut outer_content = Vec::new();
     let has_eval_content = choice.has_start_content()
@@ -753,6 +887,7 @@ fn choice_outer(
         outer_content.extend(lower_content_list_with_context(
             choice_only_content,
             path_mode,
+            global_labels,
         ));
         outer_content.push(RuntimeObject::ControlCommand(ControlCommand::EndString));
     }
@@ -762,6 +897,7 @@ fn choice_outer(
             &mut outer_content,
             condition,
             choice_labels,
+            global_labels,
             path_mode,
             choice.has_start_content(),
         );
@@ -782,7 +918,7 @@ fn choice_outer(
 
     let mut start_content = choice
         .start_content()
-        .map(|cl| lower_content_list_with_context(cl, path_mode))
+        .map(|cl| lower_content_list_with_context(cl, path_mode, global_labels))
         .unwrap_or_default();
     start_content.push(RuntimeObject::Divert {
         target: "$r".to_string(),
@@ -833,10 +969,11 @@ fn choice_container_prefix(
 fn lower_content_list_with_context(
     content_list: &ContentList,
     path_mode: &ChoicePathMode,
+    global_labels: &HashMap<String, String>,
 ) -> Vec<RuntimeObject> {
     let mut content = Vec::new();
     for object in content_list.objects() {
-        lower_object_into_with_context(&mut content, object, path_mode);
+        lower_object_into_with_context(&mut content, object, path_mode, global_labels);
     }
     content
 }
@@ -845,6 +982,7 @@ fn lower_expression_into(
     content: &mut Vec<RuntimeObject>,
     expression: &Expression,
     choice_labels: &HashMap<String, String>,
+    global_labels: &HashMap<String, String>,
     path_mode: &ChoicePathMode,
     has_start_content: bool,
 ) {
@@ -857,6 +995,8 @@ fn lower_expression_into(
                     choice_container_name,
                     has_start_content,
                 )));
+            } else if let Some(label_target) = global_labels.get(name) {
+                content.push(RuntimeObject::ReadCount(label_target.clone()));
             } else {
                 content.push(RuntimeObject::VariableReference(name.clone()));
             }
@@ -866,8 +1006,22 @@ fn lower_expression_into(
             left,
             right,
         } => {
-            lower_expression_into(content, left, choice_labels, path_mode, has_start_content);
-            lower_expression_into(content, right, choice_labels, path_mode, has_start_content);
+            lower_expression_into(
+                content,
+                left,
+                choice_labels,
+                global_labels,
+                path_mode,
+                has_start_content,
+            );
+            lower_expression_into(
+                content,
+                right,
+                choice_labels,
+                global_labels,
+                path_mode,
+                has_start_content,
+            );
             content.push(RuntimeObject::NativeFunction(
                 operator_runtime_name(*operator).to_string(),
             ));
@@ -878,6 +1032,7 @@ fn lower_expression_into(
                     content,
                     expression,
                     choice_labels,
+                    global_labels,
                     path_mode,
                     has_start_content,
                 );
@@ -893,7 +1048,7 @@ fn operator_runtime_name(operator: BinaryOperator) -> &'static str {
     operator.runtime_name()
 }
 
-fn lower_sequence(sequence: &Sequence) -> Container {
+fn lower_sequence(sequence: &Sequence, global_labels: &HashMap<String, String>) -> Container {
     let mut content = vec![
         RuntimeObject::ControlCommand(ControlCommand::EvalStart),
         RuntimeObject::ControlCommand(ControlCommand::VisitIndex),
@@ -951,6 +1106,7 @@ fn lower_sequence(sequence: &Sequence) -> Container {
                 branch_content.extend(lower_content_list_with_context(
                     element,
                     &ChoicePathMode::Root,
+                    global_labels,
                 ));
             }
             branch_content.push(RuntimeObject::Divert {
@@ -975,13 +1131,18 @@ fn lower_sequence(sequence: &Sequence) -> Container {
     }
 }
 
-fn lower_object_into(content: &mut Vec<RuntimeObject>, object: &Object) {
+fn lower_object_into(
+    content: &mut Vec<RuntimeObject>,
+    object: &Object,
+    global_labels: &HashMap<String, String>,
+) {
     match object {
         Object::Text(text) => content.push(RuntimeObject::String(text.text().to_string())),
         Object::ContentList(content_list) => {
             content.extend(lower_content_list_with_context(
                 content_list,
                 &ChoicePathMode::Root,
+                global_labels,
             ));
         }
         Object::Glue(_) => content.push(RuntimeObject::Glue),
@@ -991,11 +1152,12 @@ fn lower_object_into(content: &mut Vec<RuntimeObject>, object: &Object) {
         Object::Tag(tag) => content.push(RuntimeObject::Tag {
             is_start: tag.is_start(),
         }),
-        Object::Sequence(sequence) => {
-            content.push(RuntimeObject::Container(lower_sequence(sequence)))
-        }
+        Object::Sequence(sequence) => content.push(RuntimeObject::Container(lower_sequence(
+            sequence,
+            global_labels,
+        ))),
         Object::Weave(weave) => content.push(RuntimeObject::Container(Container {
-            content: lower_choice_weave(weave, ChoicePathMode::Root),
+            content: lower_choice_weave(weave, ChoicePathMode::Root, global_labels),
             name: None,
             flags: None,
             merge_tail_metadata: true,
@@ -1007,11 +1169,16 @@ fn lower_object_into_with_context(
     content: &mut Vec<RuntimeObject>,
     object: &Object,
     path_mode: &ChoicePathMode,
+    global_labels: &HashMap<String, String>,
 ) {
     match object {
         Object::Text(text) => content.push(RuntimeObject::String(text.text().to_string())),
         Object::ContentList(content_list) => {
-            content.extend(lower_content_list_with_context(content_list, path_mode));
+            content.extend(lower_content_list_with_context(
+                content_list,
+                path_mode,
+                global_labels,
+            ));
         }
         Object::Glue(_) => content.push(RuntimeObject::Glue),
         Object::Divert(divert) => push_divert_with_context(content, divert.target(), path_mode),
@@ -1020,13 +1187,14 @@ fn lower_object_into_with_context(
         Object::Tag(tag) => content.push(RuntimeObject::Tag {
             is_start: tag.is_start(),
         }),
-        Object::Sequence(sequence) => {
-            content.push(RuntimeObject::Container(lower_sequence(sequence)))
-        }
+        Object::Sequence(sequence) => content.push(RuntimeObject::Container(lower_sequence(
+            sequence,
+            global_labels,
+        ))),
         Object::Weave(weave) => {
             let nested_path_mode = path_mode.for_nested_weave(content.len());
             content.push(RuntimeObject::Container(Container {
-                content: lower_choice_weave(weave, nested_path_mode),
+                content: lower_choice_weave(weave, nested_path_mode, global_labels),
                 name: None,
                 flags: None,
                 merge_tail_metadata: true,
@@ -1070,18 +1238,14 @@ fn resolve_divert_target(target: &str, path_mode: &ChoicePathMode) -> String {
             sibling_stitch_names,
             ..
         } => {
-            // Check if target is a dotted path like "knot.stitch"
-            if let Some(dot_pos) = target.find('.') {
-                let first_part = &target[..dot_pos];
-                let second_part = &target[dot_pos + 1..];
-
-                // Only strip prefix if first part matches parent/current flow
-                // AND second part is a known child stitch
-                let prefix_matches =
-                    parent_flow_name.as_deref() == Some(first_part) || first_part == flow_name;
-                if prefix_matches && sibling_stitch_names.iter().any(|s| s == second_part) {
+            if let Some((first_part, second_part)) = target.split_once('.') {
+                if parent_flow_name.is_none()
+                    && first_part == flow_name
+                    && sibling_stitch_names.iter().any(|name| name == second_part)
+                {
                     return resolve_single_stitch_target(second_part, path_mode);
                 }
+                return target.to_string();
             }
 
             // Handle simple target names
