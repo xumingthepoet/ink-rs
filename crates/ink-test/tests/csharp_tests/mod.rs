@@ -7441,7 +7441,6 @@ Phrase 1
     // C#:     Assert.AreEqual("A\nB\nA\n3\nB\n", story.ContinueMaximally());
     // C#: }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestNewlinesWithStringEval() {
         run_in_both_modes(|suite| {
             let mut story = suite
@@ -7456,7 +7455,7 @@ A
 B
 
 === function string()
-    ~ return ""{3}""
+    ~ return "{3}"
 }
 "#,
                     false,
