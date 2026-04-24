@@ -6346,7 +6346,6 @@ C
     //             Assert.AreEqual("This is include 1.\nThis is include 2.\nThis is the main file.\n", story.ContinueMaximally());
     //         }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestInclude() {
         run_in_both_modes(|suite| {
             let mut story = suite
