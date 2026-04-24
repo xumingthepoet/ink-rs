@@ -4484,7 +4484,6 @@ Done.
     //             Assert.AreEqual("more stuff\n1 = 1\n", story.ContinueMaximally());
     //         }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestTurnsSinceNested() {
         run_in_both_modes(|suite| {
             let mut story = suite

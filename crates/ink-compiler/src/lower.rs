@@ -1476,6 +1476,7 @@ fn lower_choice_weave_with_initial_content(
                     &path_mode,
                     has_explicit_gather,
                     count_all_visits,
+                    &counted_paths,
                 );
             }
             Object::Gather(_gather) => {
@@ -1525,6 +1526,7 @@ fn lower_choice_weave_with_initial_content(
                     &path_mode,
                     has_explicit_gather,
                     count_all_visits,
+                    &counted_paths,
                 );
                 if !gather_named_content.is_empty() {
                     gather_content.push(RuntimeObject::NamedContent(gather_named_content));
@@ -1598,6 +1600,7 @@ fn lower_choice_weave_with_initial_content(
                     &path_mode,
                     has_explicit_gather,
                     count_all_visits,
+                    &counted_paths,
                 );
             }
         }
@@ -1650,6 +1653,7 @@ fn lower_weave_section(
     weave_path_mode: &ChoicePathMode,
     has_explicit_gather: bool,
     count_all_visits: bool,
+    counted_paths: &CountedFlowPaths,
 ) -> bool {
     let mut section_has_choice = false;
     while *index < objects.len() {
@@ -1701,6 +1705,7 @@ fn lower_weave_section(
                     weave_path_mode,
                     has_explicit_gather,
                     count_all_visits,
+                    counted_paths,
                 );
             }
         }
@@ -1774,6 +1779,7 @@ fn lower_choice_in_section(
     weave_path_mode: &ChoicePathMode,
     has_explicit_gather: bool,
     count_all_visits: bool,
+    counted_paths: &CountedFlowPaths,
 ) {
     let Object::Choice(choice) = &objects[*index] else {
         return;
@@ -1882,12 +1888,13 @@ fn lower_choice_in_section(
     named_content.push(Container {
         content: choice_content,
         name: Some(choice_container_name),
-        // Only set visitsShouldBeCounted flag (5) for once-only choices.
-        flags: if count_all_visits || choice.once_only() {
-            Some(5)
-        } else {
-            None
-        },
+        flags: named_container_flags(
+            count_all_visits
+                || choice.once_only()
+                || counted_paths.visits.contains(&choice_container_path),
+            counted_paths.turns.contains(&choice_container_path),
+            false,
+        ),
         merge_tail_metadata: true,
     });
     if let Some(identifier) = choice.identifier() {
