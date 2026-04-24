@@ -149,3 +149,4 @@ fixture!(
 fixture!(knot_param_floats, "inkfiles/knot/param-floats.ink");
 fixture!(knot_param_ints, "inkfiles/knot/param-ints.ink");
 fixture!(knot_param_multi, "inkfiles/knot/param-multi.ink");
+fixture!(knot_param_strings, "inkfiles/knot/param-strings.ink");
