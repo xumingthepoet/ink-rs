@@ -10,7 +10,7 @@ use crate::{
     compiler::StageOutput,
     diagnostic::Diagnostic,
     parsed::{
-        BinaryOperator, Conditional, ConditionalBranch, ConstantDeclaration, ContentList,
+        BinaryOperator, Choice, Conditional, ConditionalBranch, ConstantDeclaration, ContentList,
         Expression, ExternalDeclaration, FloatLiteral, Flow, IncDec, Object, Return, Sequence,
         Story, Text, UnaryOperator, VariableAssignment, Weave,
     },
@@ -78,6 +78,11 @@ impl Parser {
                     flows.push(flow);
                     continue;
                 }
+            }
+
+            if let Some(parsed) = self.parse_choice_with_continuation(&lines, &mut index) {
+                objects.extend(parsed);
+                continue;
             }
 
             if let Some(parsed) = self.parse_multiline_sequence(&lines, &mut index) {
@@ -214,6 +219,11 @@ impl Parser {
                 continue;
             }
 
+            if let Some(parsed) = self.parse_choice_with_continuation(lines, index) {
+                content.extend(parsed);
+                continue;
+            }
+
             if let Some(parsed) = self.parse_multiline_sequence(lines, index) {
                 content.extend(parsed);
                 continue;
@@ -274,6 +284,11 @@ impl Parser {
                 break;
             }
 
+            if let Some(parsed) = self.parse_choice_with_continuation(lines, index) {
+                content.extend(parsed);
+                continue;
+            }
+
             if let Some(parsed) = self.parse_multiline_sequence(lines, index) {
                 content.extend(parsed);
                 continue;
@@ -296,6 +311,61 @@ impl Parser {
             declaration.arguments,
             declaration.is_function,
         ))
+    }
+
+    fn parse_choice_with_continuation(
+        &mut self,
+        lines: &[SourceLine],
+        index: &mut usize,
+    ) -> Option<Vec<Object>> {
+        let line = &lines[*index];
+        if !line
+            .text
+            .trim_start()
+            .starts_with(|ch| matches!(ch, '*' | '+'))
+        {
+            return None;
+        }
+
+        let initial_choice = parse_choice_from_line(line)?;
+        if !initial_choice.is_invisible_default() || initial_choice.condition().is_none() {
+            return None;
+        }
+
+        let current_indent = leading_whitespace_count(&line.text);
+        let mut next_index = *index + 1;
+        let mut continuation_parts = Vec::new();
+        while next_index < lines.len() {
+            let next_line = &lines[next_index];
+            let trimmed = next_line.text.trim();
+            if trimmed.is_empty()
+                || trimmed == "}"
+                || leading_whitespace_count(&next_line.text) <= current_indent
+                || is_choice_continuation_boundary(trimmed)
+            {
+                break;
+            }
+
+            continuation_parts.push(trimmed.to_string());
+            next_index += 1;
+        }
+
+        if continuation_parts.is_empty() {
+            return None;
+        }
+
+        let combined = format!("{} {}", line.text.trim_end(), continuation_parts.join(" "));
+        let combined_line = SourceLine {
+            text: combined,
+            span: line.span.clone(),
+        };
+        let combined_choice = parse_choice_from_line(&combined_line)?;
+        if combined_choice.is_invisible_default() {
+            return None;
+        }
+
+        *index = next_index;
+        Some(vec![Object::Choice(combined_choice)])
     }
 
     fn parse_multiline_conditional(
@@ -739,8 +809,35 @@ fn object_depth(object: &Object) -> Option<usize> {
     }
 }
 
+fn parse_choice_from_line(line: &SourceLine) -> Option<Choice> {
+    let mut line_parser = RuleParser::new(line);
+    let choice = line_parser.parse_rule(choice::parse_choice);
+    if line_parser.had_error() {
+        None
+    } else {
+        choice
+    }
+}
+
 fn choice_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
     choice::parse_choice(parser).map(|choice| vec![Object::Choice(choice)])
+}
+
+fn leading_whitespace_count(source: &str) -> usize {
+    source
+        .chars()
+        .take_while(|ch| ch.is_whitespace() && *ch != '\n' && *ch != '\r')
+        .count()
+}
+
+fn is_choice_continuation_boundary(trimmed: &str) -> bool {
+    trimmed.starts_with('*')
+        || trimmed.starts_with('+')
+        || trimmed.starts_with('-')
+        || trimmed.starts_with('=')
+        || trimmed.starts_with("->")
+        || knot::is_knot_declaration_line(trimmed)
+        || knot::is_stitch_declaration_line(trimmed)
 }
 
 fn variable_declaration_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {

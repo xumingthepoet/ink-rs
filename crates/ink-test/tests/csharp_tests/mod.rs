@@ -2806,7 +2806,6 @@ Shuffle once: {f_shuffle_once()} {f_shuffle_once()} {f_shuffle_once()} {f_shuffl
     //             Assert.AreEqual("four", story.currentChoices[3].text);
     //         }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestConditionalChoices() {
         run_in_both_modes(|suite| {
             let mut story = suite
