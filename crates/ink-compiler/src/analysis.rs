@@ -59,6 +59,7 @@ fn naming_diagnostics(story: &Story) -> Vec<Diagnostic> {
     }
 
     let mut diagnostics = Vec::new();
+    check_weave_point_names(story.root_weave(), &global_variables, &mut diagnostics);
     for flow in story.flows() {
         check_subflow_and_weave_names(flow, &global_variables, &mut diagnostics);
         check_flow_arguments(flow, &top_level_flows, &global_variables, &mut diagnostics);

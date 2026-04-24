@@ -5136,7 +5136,6 @@ VAR stitch = 0
     //             Assert.IsTrue(HadError ("with the same label"));
     //         }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestWeavePointNamingCollision() {
         run_in_both_modes(|suite| {
             suite
