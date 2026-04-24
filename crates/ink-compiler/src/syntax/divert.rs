@@ -38,24 +38,33 @@ pub(super) fn parse_divert_objects_source(source: &str, span: SourceSpan) -> Opt
     }
 
     let after_arrow = source.strip_prefix("->")?.trim();
-    let (segments, has_trailing_tunnel_arrow) = split_multidivert_segments(after_arrow);
+    let (segments, trailing) = split_multidivert_segments(after_arrow);
     if segments.is_empty() {
         return Some(vec![Object::Divert(Divert::new(DivertTarget::Empty, span))]);
     }
 
     let last_index = segments.len() - 1;
-    segments
+    let mut objects = segments
         .into_iter()
         .enumerate()
         .map(|(index, segment)| {
-            let is_tunnel = index < last_index || has_trailing_tunnel_arrow;
+            let is_tunnel = index < last_index || trailing.is_some();
             let mut divert = parse_divert_source(segment, span.clone())?;
             if is_tunnel {
                 divert = divert.with_tunnel();
             }
             Some(Object::Divert(divert))
         })
-        .collect()
+        .collect::<Option<Vec<_>>>()?;
+
+    if let TrailingDivertSyntax::TunnelOnwards(target) = trailing {
+        objects.push(Object::TunnelOnwards(TunnelOnwards::new(
+            target.map(DivertTarget::from_source),
+            span,
+        )));
+    }
+
+    Some(objects)
 }
 
 pub(super) fn parse_divert_source(source: &str, span: SourceSpan) -> Option<Divert> {
@@ -68,7 +77,20 @@ pub(super) fn parse_divert_source(source: &str, span: SourceSpan) -> Option<Dive
     ))
 }
 
-fn split_multidivert_segments(source: &str) -> (Vec<&str>, bool) {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TrailingDivertSyntax<'a> {
+    None,
+    TunnelArrow,
+    TunnelOnwards(Option<&'a str>),
+}
+
+impl TrailingDivertSyntax<'_> {
+    fn is_some(self) -> bool {
+        !matches!(self, Self::None)
+    }
+}
+
+fn split_multidivert_segments(source: &str) -> (Vec<&str>, TrailingDivertSyntax<'_>) {
     let mut segments = Vec::new();
     let mut start = 0;
     let mut index = 0;
@@ -91,6 +113,18 @@ fn split_multidivert_segments(source: &str) -> (Vec<&str>, bool) {
             '"' => in_string = !in_string,
             '(' if !in_string => paren_depth += 1,
             ')' if !in_string => paren_depth -= 1,
+            '-' if !in_string && paren_depth == 0 && rest.starts_with("->->") => {
+                let segment = source[start..index].trim();
+                if !segment.is_empty() {
+                    segments.push(segment);
+                }
+                let override_target = rest["->->".len()..].trim();
+                let override_target = (!override_target.is_empty()).then_some(override_target);
+                return (
+                    segments,
+                    TrailingDivertSyntax::TunnelOnwards(override_target),
+                );
+            }
             '-' if !in_string && paren_depth == 0 && rest.starts_with("->") => {
                 let segment = source[start..index].trim();
                 if !segment.is_empty() {
@@ -107,12 +141,16 @@ fn split_multidivert_segments(source: &str) -> (Vec<&str>, bool) {
     }
 
     let tail = source[start..].trim();
-    let has_trailing_tunnel_arrow = tail.is_empty() && !segments.is_empty();
+    let trailing = if tail.is_empty() && !segments.is_empty() {
+        TrailingDivertSyntax::TunnelArrow
+    } else {
+        TrailingDivertSyntax::None
+    };
     if !tail.is_empty() {
         segments.push(tail);
     }
 
-    (segments, has_trailing_tunnel_arrow)
+    (segments, trailing)
 }
 
 fn parse_divert_target_and_arguments(source: &str) -> Option<(&str, Vec<Expression>)> {
