@@ -1793,8 +1793,9 @@ fn parse_bracketed_identifier(parser: &mut RuleParser<'_>) -> Option<String> {
 }
 
 pub(super) fn is_identifier(source: &str) -> bool {
-    let mut chars = source.chars();
-    matches!(chars.next(), Some(ch) if is_identifier_start(ch)) && chars.all(is_identifier_continue)
+    !source.is_empty()
+        && source.chars().all(is_identifier_continue)
+        && source.chars().any(|ch| !ch.is_ascii_digit())
 }
 
 fn is_path_identifier(source: &str) -> bool {
@@ -1802,7 +1803,7 @@ fn is_path_identifier(source: &str) -> bool {
 }
 
 pub(super) fn is_identifier_start(ch: char) -> bool {
-    ch == '_' || ch.is_ascii_alphabetic() || is_supported_unicode_identifier(ch)
+    is_identifier_continue(ch)
 }
 
 pub(super) fn is_identifier_continue(ch: char) -> bool {
@@ -1984,6 +1985,18 @@ mod tests {
         assert_eq!(story.flows().len(), 1);
         assert_eq!(story.flows()[0].name(), "knot_name");
         assert_eq!(story.flows()[0].weave().content().len(), 3);
+    }
+
+    #[test]
+    fn parses_identifiers_that_start_with_numbers() {
+        assert!(is_identifier("2tests"));
+        assert!(is_identifier("512x2"));
+        assert!(!is_identifier("512"));
+
+        let output = parse(SourceInput::new("== 2tests ==\n-> DONE"));
+        assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
+        let story = output.artifact.unwrap();
+        assert_eq!(story.flows()[0].name(), "2tests");
     }
 
     #[test]

@@ -6197,7 +6197,6 @@ In top external
     //             Assert.AreEqual("512x2 = 1024\n512x2p2 = 1026\n", story.ContinueMaximally());
     //         }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestIdentifersCanStartWithNumbers() {
         run_in_both_modes(|suite| {
             let mut story = suite

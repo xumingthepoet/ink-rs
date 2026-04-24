@@ -194,11 +194,11 @@ fn parse_argument(parser: &mut RuleParser<'_>) -> Option<FlowArgument> {
 }
 
 fn parse_identifier(parser: &mut RuleParser<'_>) -> Option<String> {
-    let first = parser.take_while(is_identifier_start)?;
-    let rest = parser
-        .take_while(is_identifier_continue)
-        .unwrap_or_default();
-    Some(format!("{first}{rest}"))
+    let name = parser.take_while(is_identifier_continue)?;
+    if !is_identifier_start(name.chars().next()?) || !super::is_identifier(&name) {
+        return None;
+    }
+    Some(name)
 }
 
 fn parse_horizontal_whitespace(parser: &mut RuleParser<'_>) -> Option<String> {
