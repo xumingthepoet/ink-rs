@@ -425,20 +425,36 @@ impl Parser {
             let current_line = &lines[*index];
             let current_trimmed = current_line.text.trim();
 
-            if current_trimmed == "}" {
+            if let Some(after_close) = current_trimmed.strip_prefix('}') {
                 branches.push(current_branch);
                 classify_conditional_branches(initial_condition.is_some(), &mut branches);
                 let branches = branches
                     .into_iter()
                     .map(ConditionalBranchBuilder::finish)
                     .collect();
-                *index += 1;
                 let conditional = Conditional::new(initial_condition, branches);
                 let mut objects = prefix;
                 objects.push(Object::ContentList(ContentList::new(vec![
                     Object::Conditional(conditional),
                 ])));
-                objects.push(Object::Text(Text::new("\n", current_line.span.clone())));
+                let suffix = after_close.trim_start();
+                if suffix.is_empty() {
+                    *index += 1;
+                    objects.push(Object::Text(Text::new("\n", current_line.span.clone())));
+                    return Some(objects);
+                }
+                if let Some(mut suffix_objects) =
+                    self.parse_multiline_conditional_suffix(suffix, current_line, lines, index)
+                {
+                    objects.append(&mut suffix_objects);
+                    return Some(objects);
+                }
+                let suffix_line = SourceLine {
+                    text: suffix.to_string(),
+                    span: current_line.span.clone(),
+                };
+                objects.extend(self.parse_statement(&suffix_line));
+                *index += 1;
                 return Some(objects);
             }
 
@@ -503,6 +519,45 @@ impl Parser {
                 .objects
                 .extend(self.parse_statement(current_line));
             *index += 1;
+        }
+
+        None
+    }
+
+    fn parse_multiline_conditional_suffix(
+        &mut self,
+        suffix: &str,
+        source_line: &SourceLine,
+        lines: &[SourceLine],
+        index: &mut usize,
+    ) -> Option<Vec<Object>> {
+        for (brace_index, _) in suffix.match_indices('{') {
+            let prefix = &suffix[..brace_index];
+            let nested_source = suffix[brace_index..].trim_start();
+            let mut nested_lines = Vec::with_capacity(lines.len() - *index);
+            nested_lines.push(SourceLine {
+                text: nested_source.to_string(),
+                span: source_line.span.clone(),
+            });
+            nested_lines.extend(lines[*index + 1..].iter().cloned());
+
+            let mut nested_index = 0;
+            let nested_objects =
+                self.parse_multiline_conditional(&nested_lines, &mut nested_index)?;
+            if nested_index == 0 {
+                continue;
+            }
+
+            let mut objects = Vec::new();
+            if !prefix.trim().is_empty() {
+                objects.extend(text::parse_inline_content(
+                    prefix.trim_start(),
+                    &source_line.span,
+                )?);
+            }
+            objects.extend(nested_objects);
+            *index += nested_index;
+            return Some(objects);
         }
 
         None

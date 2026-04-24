@@ -7095,7 +7095,6 @@ This is place 2.
     //         	Assert.AreEqual ("a b\na b\n", story.ContinueMaximally ());
     //         }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestMultilineLogicWithGlue() {
         run_in_both_modes(|suite| {
             let mut story = suite
