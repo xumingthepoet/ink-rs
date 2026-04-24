@@ -190,3 +190,4 @@ fixture!(
     function_evaluating_function_variablestate_bug,
     "inkfiles/function/evaluating-function-variablestate-bug.ink"
 );
+fixture_count_all_visits!(misc_read_counts, "inkfiles/misc/read-counts.ink");
