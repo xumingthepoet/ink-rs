@@ -4589,7 +4589,6 @@ Done.
     //             Assert.AreEqual(0, story.currentChoices.Count);
     //         }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestUnbalancedWeaveIndentation() {
         run_in_both_modes(|suite| {
             let mut story = suite

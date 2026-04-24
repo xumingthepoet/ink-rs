@@ -99,7 +99,7 @@ impl Parser {
             index += 1;
         }
 
-        Story::new(group_nested_weaves(objects, 1), flows)
+        Story::new(group_weave_content(objects), flows)
     }
 
     fn parse_statement(&mut self, line: &SourceLine) -> Vec<Object> {
@@ -241,7 +241,7 @@ impl Parser {
         Some(Flow::new(
             declaration.level,
             declaration.name,
-            group_nested_weaves(content, 1),
+            group_weave_content(content),
             child_flows,
             declaration.arguments,
             declaration.is_function,
@@ -306,7 +306,7 @@ impl Parser {
         Some(Flow::new(
             declaration.level,
             declaration.name,
-            group_nested_weaves(content, 1),
+            group_weave_content(content),
             Vec::new(),
             declaration.arguments,
             declaration.is_function,
@@ -693,7 +693,7 @@ impl ConditionalBranchBuilder {
             self.is_true_branch,
             self.is_else,
             false,
-            Weave::new(group_nested_weaves(self.objects, 1), 0),
+            weave_from_objects(self.objects),
             self.own_condition,
         )
     }
@@ -842,9 +842,10 @@ fn group_nested_weaves(objects: Vec<Object>, base_depth: usize) -> Vec<Object> {
                 nested.push(objects[index].clone());
                 index += 1;
             }
+            let nested_base_depth = determine_base_depth(&nested);
             grouped.push(Object::Weave(Weave::new(
-                group_nested_weaves(nested, base_depth + 1),
-                base_depth,
+                group_nested_weaves(nested, nested_base_depth),
+                nested_base_depth.saturating_sub(1),
             )));
         } else {
             grouped.push(objects[index].clone());
@@ -853,6 +854,23 @@ fn group_nested_weaves(objects: Vec<Object>, base_depth: usize) -> Vec<Object> {
     }
 
     grouped
+}
+
+fn group_weave_content(objects: Vec<Object>) -> Vec<Object> {
+    let base_depth = determine_base_depth(&objects);
+    group_nested_weaves(objects, base_depth)
+}
+
+fn weave_from_objects(objects: Vec<Object>) -> Weave {
+    let base_depth = determine_base_depth(&objects);
+    Weave::new(
+        group_nested_weaves(objects, base_depth),
+        base_depth.saturating_sub(1),
+    )
+}
+
+fn determine_base_depth(objects: &[Object]) -> usize {
+    objects.iter().find_map(object_depth).unwrap_or(1)
 }
 
 fn object_depth(object: &Object) -> Option<usize> {
