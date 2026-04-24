@@ -1,5 +1,8 @@
 use crate::{
-    parsed::{ContentList, Glue, Object, Sequence, SequenceType, Tag, Text},
+    parsed::{
+        Conditional, ConditionalBranch, ContentList, Glue, Object, Sequence, SequenceType, Tag,
+        Text, Weave,
+    },
     source::SourceSpan,
 };
 
@@ -75,11 +78,7 @@ fn parse_inline_content_with_options(
         if let Some(rest) = remaining.strip_prefix('{') {
             let close_index = rest.find('}')?;
             let inner = &rest[..close_index];
-            let object = if inner.contains('|') {
-                Object::Sequence(parse_inline_sequence(inner, span)?)
-            } else {
-                Object::Expression(super::parse_initial_expression(inner.trim())?)
-            };
+            let object = parse_inline_braced_object(inner, span)?;
             objects.push(Object::ContentList(ContentList::new(vec![object])));
             remaining = &rest[close_index + 1..];
             continue;
@@ -149,10 +148,58 @@ fn parse_inline_content_with_options(
     }
 }
 
+fn parse_inline_braced_object(source: &str, span: &SourceSpan) -> Option<Object> {
+    let source = source.trim();
+    if parse_sequence_type_annotation(source).is_some() {
+        return Some(Object::Sequence(parse_inline_sequence(source, span)?));
+    }
+
+    if let Some((condition_source, branch_source)) = split_top_level_once(source, ':') {
+        let condition = super::parse_initial_expression(condition_source.trim())?;
+        let alternatives = split_top_level(branch_source, '|');
+        if alternatives.len() > 2 {
+            return None;
+        }
+
+        let true_content =
+            parse_inline_content(alternatives.first().copied().unwrap_or("").trim(), span)
+                .unwrap_or_default();
+        let mut branches = vec![ConditionalBranch::new(
+            true,
+            false,
+            true,
+            Weave::new(true_content, 0),
+            None,
+        )];
+
+        if let Some(else_source) = alternatives.get(1) {
+            let else_content = parse_inline_content(else_source.trim(), span).unwrap_or_default();
+            branches.push(ConditionalBranch::new(
+                false,
+                true,
+                true,
+                Weave::new(else_content, 0),
+                None,
+            ));
+        }
+
+        return Some(Object::Conditional(Conditional::new(
+            Some(condition),
+            branches,
+        )));
+    }
+
+    if contains_top_level(source, '|') {
+        return Some(Object::Sequence(parse_inline_sequence(source, span)?));
+    }
+
+    Some(Object::Expression(super::parse_initial_expression(source)?))
+}
+
 fn parse_inline_sequence(source: &str, span: &SourceSpan) -> Option<Sequence> {
     let (sequence_type, elements_source) = parse_sequence_type(source.trim_start());
-    let elements = elements_source
-        .split('|')
+    let elements = split_top_level(elements_source, '|')
+        .into_iter()
         .map(|element| {
             let objects = parse_inline_content(element.trim(), span).unwrap_or_default();
             ContentList::new(objects)
@@ -203,6 +250,48 @@ pub(super) fn parse_sequence_type_annotation(source: &str) -> Option<(SequenceTy
 
 fn parse_sequence_type(source: &str) -> (SequenceType, &str) {
     parse_sequence_type_annotation(source).unwrap_or((SequenceType::STOPPING, source))
+}
+
+fn contains_top_level(source: &str, needle: char) -> bool {
+    split_top_level_once(source, needle).is_some()
+}
+
+fn split_top_level_once(source: &str, needle: char) -> Option<(&str, &str)> {
+    let mut in_string = false;
+    let mut escaped = false;
+    let mut paren_depth = 0;
+
+    for (index, ch) in source.char_indices() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+
+        match ch {
+            '\\' if in_string => escaped = true,
+            '"' => in_string = !in_string,
+            '(' if !in_string => paren_depth += 1,
+            ')' if !in_string => paren_depth -= 1,
+            _ if ch == needle && !in_string && paren_depth == 0 => {
+                let right_start = index + ch.len_utf8();
+                return Some((&source[..index], &source[right_start..]));
+            }
+            _ => {}
+        }
+    }
+
+    None
+}
+
+fn split_top_level(source: &str, separator: char) -> Vec<&str> {
+    let mut parts = Vec::new();
+    let mut rest = source;
+    while let Some((left, right)) = split_top_level_once(rest, separator) {
+        parts.push(left);
+        rest = right;
+    }
+    parts.push(rest);
+    parts
 }
 
 fn trim_separator_whitespace(text: &str) -> &str {
