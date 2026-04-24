@@ -60,6 +60,7 @@ fn naming_diagnostics(story: &Story) -> Vec<Diagnostic> {
 
     let mut diagnostics = Vec::new();
     for flow in story.flows() {
+        check_subflow_and_weave_names(flow, &global_variables, &mut diagnostics);
         check_flow_arguments(flow, &top_level_flows, &global_variables, &mut diagnostics);
     }
     diagnostics
@@ -159,6 +160,161 @@ fn check_flow_arguments(
 
     for child in flow.child_flows() {
         check_flow_arguments(child, top_level_flows, global_variables, diagnostics);
+    }
+}
+
+fn check_subflow_and_weave_names(
+    flow: &Flow,
+    global_variables: &HashSet<String>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    check_weave_point_names(flow.weave(), global_variables, diagnostics);
+
+    for child in flow.child_flows() {
+        if global_variables.contains(child.name()) {
+            diagnostics.push(name_conflict_diagnostic(
+                "stitch",
+                child.name(),
+                SymbolKind::Var,
+                first_span_in_weave(child.weave()),
+            ));
+        }
+        check_subflow_and_weave_names(child, global_variables, diagnostics);
+    }
+}
+
+fn check_weave_point_names(
+    weave: &Weave,
+    global_variables: &HashSet<String>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    let mut local_names: HashMap<String, SourceSpan> = HashMap::new();
+    for object in weave.content() {
+        match object {
+            Object::Choice(choice) => {
+                if let Some(name) = choice.identifier() {
+                    check_weave_point_name(
+                        "choice",
+                        name,
+                        choice.span().clone(),
+                        &mut local_names,
+                        global_variables,
+                        diagnostics,
+                    );
+                }
+                if let Some(content) = choice.start_content() {
+                    check_weave_point_names_in_content_list(content, global_variables, diagnostics);
+                }
+                if let Some(content) = choice.choice_only_content() {
+                    check_weave_point_names_in_content_list(content, global_variables, diagnostics);
+                }
+                check_weave_point_names_in_content_list(
+                    choice.inner_content(),
+                    global_variables,
+                    diagnostics,
+                );
+            }
+            Object::Gather(gather) => {
+                if let Some(name) = gather.identifier() {
+                    check_weave_point_name(
+                        "gather",
+                        name,
+                        gather.span().clone(),
+                        &mut local_names,
+                        global_variables,
+                        diagnostics,
+                    );
+                }
+            }
+            Object::Conditional(conditional) => {
+                for branch in conditional.branches() {
+                    check_weave_point_names(branch.content(), global_variables, diagnostics);
+                }
+            }
+            Object::Sequence(sequence) => {
+                for element in sequence.elements() {
+                    check_weave_point_names_in_content_list(element, global_variables, diagnostics);
+                }
+            }
+            Object::ContentList(content) => {
+                check_weave_point_names_in_content_list(content, global_variables, diagnostics)
+            }
+            Object::Weave(weave) => check_weave_point_names(weave, global_variables, diagnostics),
+            Object::ConstantDeclaration(_)
+            | Object::Divert(_)
+            | Object::Expression(_)
+            | Object::ExternalDeclaration(_)
+            | Object::Glue(_)
+            | Object::IncDec(_)
+            | Object::LogicLine(_)
+            | Object::Return(_)
+            | Object::Tag(_)
+            | Object::Text(_)
+            | Object::TunnelOnwards(_)
+            | Object::VariableAssignment(_) => {}
+        }
+    }
+}
+
+fn check_weave_point_names_in_content_list(
+    content: &ContentList,
+    global_variables: &HashSet<String>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    for object in content.objects() {
+        match object {
+            Object::Conditional(conditional) => {
+                for branch in conditional.branches() {
+                    check_weave_point_names(branch.content(), global_variables, diagnostics);
+                }
+            }
+            Object::Sequence(sequence) => {
+                for element in sequence.elements() {
+                    check_weave_point_names_in_content_list(element, global_variables, diagnostics);
+                }
+            }
+            Object::ContentList(content) => {
+                check_weave_point_names_in_content_list(content, global_variables, diagnostics)
+            }
+            Object::Weave(weave) => check_weave_point_names(weave, global_variables, diagnostics),
+            Object::Choice(_)
+            | Object::ConstantDeclaration(_)
+            | Object::Divert(_)
+            | Object::Expression(_)
+            | Object::ExternalDeclaration(_)
+            | Object::Gather(_)
+            | Object::Glue(_)
+            | Object::IncDec(_)
+            | Object::LogicLine(_)
+            | Object::Return(_)
+            | Object::Tag(_)
+            | Object::Text(_)
+            | Object::TunnelOnwards(_)
+            | Object::VariableAssignment(_) => {}
+        }
+    }
+}
+
+fn check_weave_point_name(
+    symbol_type: &str,
+    name: &str,
+    span: SourceSpan,
+    local_names: &mut HashMap<String, SourceSpan>,
+    global_variables: &HashSet<String>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    if global_variables.contains(name) {
+        diagnostics.push(name_conflict_diagnostic(
+            symbol_type,
+            name,
+            SymbolKind::Var,
+            span,
+        ));
+    } else if local_names.insert(name.to_string(), span.clone()).is_some() {
+        diagnostics.push(Diagnostic::error(
+            span,
+            format!("{symbol_type} with the same label '{name}' already exists in this context"),
+        ));
     }
 }
 

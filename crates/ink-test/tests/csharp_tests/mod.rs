@@ -5101,7 +5101,6 @@ TODO: b
     //             Assert.IsTrue (HadError ("already been used for a var"));
     //         }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestStitchNamingCollision() {
         run_in_both_modes(|suite| {
             suite
