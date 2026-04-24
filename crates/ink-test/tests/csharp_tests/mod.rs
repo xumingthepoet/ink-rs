@@ -7541,7 +7541,6 @@ B
     // C#:     Assert.AreEqual(null, story.currentErrors);
     // C#: }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestOnceOnlyChoicesCanLinkBackToSelf() {
         run_in_both_modes(|suite| {
             let mut story = suite
