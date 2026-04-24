@@ -296,7 +296,10 @@ fn variable_declaration_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Obj
     ))])
 }
 
-fn parse_initial_expression(source: &str) -> Option<Expression> {
+pub(super) fn parse_initial_expression(source: &str) -> Option<Expression> {
+    if let Some(value) = parse_quoted_string_literal(source) {
+        return Some(Expression::String(value));
+    }
     if let Some(target) = source.strip_prefix("->") {
         return Some(Expression::DivertTarget(
             crate::parsed::DivertTarget::from_source(target).to_snapshot_string(),
@@ -312,6 +315,44 @@ fn parse_initial_expression(source: &str) -> Option<Expression> {
         return Some(Expression::NumberInt(value));
     }
     is_identifier(source).then(|| Expression::VariableReference(source.to_string()))
+}
+
+fn parse_quoted_string_literal(source: &str) -> Option<String> {
+    let mut chars = source.chars();
+    if chars.next()? != '"' {
+        return None;
+    }
+
+    let mut value = String::new();
+    let mut escaped = false;
+    for ch in chars.by_ref() {
+        if escaped {
+            match ch {
+                'n' => value.push('\n'),
+                'r' => value.push('\r'),
+                't' => value.push('\t'),
+                '"' => value.push('"'),
+                '\\' => value.push('\\'),
+                other => value.push(other),
+            }
+            escaped = false;
+            continue;
+        }
+
+        match ch {
+            '\\' => escaped = true,
+            '"' => {
+                return if chars.as_str().trim().is_empty() {
+                    Some(value)
+                } else {
+                    None
+                };
+            }
+            other => value.push(other),
+        }
+    }
+
+    None
 }
 
 fn gather_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {

@@ -101,6 +101,7 @@ fn runtime_object_to_value(object: &RuntimeObject) -> Value {
                 ControlCommand::Done => "done",
                 ControlCommand::End => "end",
                 ControlCommand::EvalStart => "ev",
+                ControlCommand::EvalOutput => "out",
                 ControlCommand::EvalEnd => "/ev",
                 ControlCommand::BeginString => "str",
                 ControlCommand::EndString => "/str",

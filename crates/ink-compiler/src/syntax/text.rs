@@ -75,9 +75,13 @@ fn parse_inline_content_with_options(
 
         if let Some(rest) = remaining.strip_prefix('{') {
             let close_index = rest.find('}')?;
-            objects.push(Object::ContentList(ContentList::new(vec![
-                Object::Sequence(parse_inline_sequence(&rest[..close_index], span)?),
-            ])));
+            let inner = &rest[..close_index];
+            let object = if inner.contains('|') {
+                Object::Sequence(parse_inline_sequence(inner, span)?)
+            } else {
+                Object::Expression(super::parse_initial_expression(inner.trim())?)
+            };
+            objects.push(Object::ContentList(ContentList::new(vec![object])));
             remaining = &rest[close_index + 1..];
             continue;
         }

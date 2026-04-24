@@ -48,6 +48,7 @@ pub enum ControlCommand {
     Done,
     End,
     EvalStart,
+    EvalOutput,
     EvalEnd,
     BeginString,
     EndString,
@@ -600,6 +601,7 @@ fn lower_choice_weave(
         match &objects[index] {
             Object::Text(_)
             | Object::ContentList(_)
+            | Object::Expression(_)
             | Object::Glue(_)
             | Object::Divert(_)
             | Object::Tag(_)
@@ -773,6 +775,7 @@ fn lower_weave_section(
             Object::Gather(_) => break,
             Object::Text(_)
             | Object::ContentList(_)
+            | Object::Expression(_)
             | Object::Glue(_)
             | Object::Divert(_)
             | Object::Tag(_)
@@ -1172,6 +1175,11 @@ fn lower_expression_into(
     has_start_content: bool,
 ) {
     match expression {
+        Expression::String(value) => {
+            content.push(RuntimeObject::ControlCommand(ControlCommand::BeginString));
+            content.push(RuntimeObject::String(value.clone()));
+            content.push(RuntimeObject::ControlCommand(ControlCommand::EndString));
+        }
         Expression::NumberInt(value) => content.push(RuntimeObject::Int(*value)),
         Expression::NumberBool(value) => content.push(RuntimeObject::Bool(*value)),
         Expression::DivertTarget(target) => content.push(RuntimeObject::DivertTarget(
@@ -1231,6 +1239,26 @@ fn lower_expression_into(
             }
         }
     }
+}
+
+fn lower_output_expression_into(
+    content: &mut Vec<RuntimeObject>,
+    expression: &Expression,
+    choice_labels: &HashMap<String, String>,
+    global_labels: &HashMap<String, String>,
+    path_mode: &ChoicePathMode,
+) {
+    content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
+    lower_expression_into(
+        content,
+        expression,
+        choice_labels,
+        global_labels,
+        path_mode,
+        false,
+    );
+    content.push(RuntimeObject::ControlCommand(ControlCommand::EvalOutput));
+    content.push(RuntimeObject::ControlCommand(ControlCommand::EvalEnd));
 }
 
 fn operator_runtime_name(operator: BinaryOperator) -> &'static str {
@@ -1345,6 +1373,13 @@ fn lower_object_into(
                 global_variables,
             ));
         }
+        Object::Expression(expression) => lower_output_expression_into(
+            content,
+            expression,
+            choice_labels,
+            global_labels,
+            &ChoicePathMode::Root,
+        ),
         Object::Glue(_) => content.push(RuntimeObject::Glue),
         Object::Divert(divert) => push_divert_with_context(
             content,
@@ -1407,6 +1442,13 @@ fn lower_object_into_with_context(
                 global_variables,
             ));
         }
+        Object::Expression(expression) => lower_output_expression_into(
+            content,
+            expression,
+            choice_labels,
+            global_labels,
+            path_mode,
+        ),
         Object::Glue(_) => content.push(RuntimeObject::Glue),
         Object::Divert(divert) => push_divert_with_context(
             content,

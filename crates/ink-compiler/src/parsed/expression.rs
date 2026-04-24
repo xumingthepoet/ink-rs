@@ -2,6 +2,7 @@ use super::push_indent;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expression {
+    String(String),
     NumberInt(i32),
     NumberBool(bool),
     DivertTarget(String),
@@ -23,6 +24,11 @@ impl Expression {
     pub fn write_parse_snapshot(&self, out: &mut String, indent: usize) {
         push_indent(out, indent);
         match self {
+            Expression::String(value) => {
+                out.push_str("String(\"");
+                out.push_str(&super::escape_snapshot_text(value));
+                out.push_str("\")");
+            }
             Expression::NumberInt(value) => {
                 out.push_str("Number(");
                 out.push_str(&value.to_string());

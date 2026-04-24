@@ -30,6 +30,7 @@ pub use weave::Weave;
 pub enum Object {
     Text(Text),
     ContentList(ContentList),
+    Expression(Expression),
     Glue(Glue),
     Choice(Choice),
     Divert(Divert),
@@ -49,6 +50,10 @@ impl Object {
                 push_indent(out, indent);
                 out.push_str("ContentList");
                 content_list.write_parse_snapshot(out, indent + 2);
+            }
+            Object::Expression(expression) => {
+                out.push('\n');
+                expression.write_parse_snapshot(out, indent);
             }
             Object::Glue(glue) => glue.write_parse_snapshot(out, indent),
             Object::Choice(choice) => choice.write_parse_snapshot(out, indent),
