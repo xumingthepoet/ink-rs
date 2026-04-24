@@ -67,6 +67,13 @@ impl Parser {
                 continue;
             }
 
+            if knot::is_stitch_declaration_line(&line.text) {
+                if let Some(flow) = self.parse_stitch(&lines, &mut index) {
+                    flows.push(flow);
+                    continue;
+                }
+            }
+
             if let Some(parsed) = self.parse_multiline_conditional(&lines, &mut index) {
                 objects.extend(parsed);
                 continue;

@@ -110,3 +110,4 @@ fixture!(
     "inkfiles/runtime/set-get-variables.ink"
 );
 fixture!(conditional_ifelse_ext, "inkfiles/conditional/ifelse-ext.ink");
+fixture!(misc_issue15, "inkfiles/misc/issue15.ink");
