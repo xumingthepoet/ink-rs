@@ -162,11 +162,17 @@ fn parse_argument(parser: &mut RuleParser<'_>) -> Option<FlowArgument> {
         parser.skip_horizontal_whitespace();
     }
 
+    let span = parser.current_span();
     let name = parser.expect("parameter name", parse_identifier, |parser| {
         parser.skip_to_end();
     })?;
 
-    Some(FlowArgument::new(name, is_by_reference, is_divert_target))
+    Some(FlowArgument::new(
+        name,
+        is_by_reference,
+        is_divert_target,
+        span,
+    ))
 }
 
 fn parse_identifier(parser: &mut RuleParser<'_>) -> Option<String> {

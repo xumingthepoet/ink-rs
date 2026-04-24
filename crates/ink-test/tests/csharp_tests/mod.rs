@@ -862,7 +862,6 @@ mod tests {
     //             Assert.IsTrue(HadError("name has already been used for a var"));
     //         }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestArgumentNameCollisions() {
         run_in_both_modes(|suite| {
             suite

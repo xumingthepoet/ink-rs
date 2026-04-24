@@ -1,3 +1,5 @@
+use crate::source::SourceSpan;
+
 use super::{push_indent, Object, Weave};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -11,6 +13,7 @@ pub struct FlowArgument {
     name: String,
     is_by_reference: bool,
     is_divert_target: bool,
+    span: SourceSpan,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -24,11 +27,17 @@ pub struct Flow {
 }
 
 impl FlowArgument {
-    pub fn new(name: impl Into<String>, is_by_reference: bool, is_divert_target: bool) -> Self {
+    pub fn new(
+        name: impl Into<String>,
+        is_by_reference: bool,
+        is_divert_target: bool,
+        span: SourceSpan,
+    ) -> Self {
         Self {
             name: name.into(),
             is_by_reference,
             is_divert_target,
+            span,
         }
     }
 
@@ -42,6 +51,10 @@ impl FlowArgument {
 
     pub fn is_divert_target(&self) -> bool {
         self.is_divert_target
+    }
+
+    pub fn span(&self) -> &SourceSpan {
+        &self.span
     }
 }
 
