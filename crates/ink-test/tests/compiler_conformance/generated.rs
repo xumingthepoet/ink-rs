@@ -125,3 +125,4 @@ fixture!(
     conditional_ifelse_ext_text3,
     "inkfiles/conditional/ifelse-ext-text3.ink"
 );
+fixture!(conditional_cycle, "inkfiles/conditional/cycle.ink");

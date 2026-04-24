@@ -162,17 +162,45 @@ fn parse_inline_sequence(source: &str, span: &SourceSpan) -> Option<Sequence> {
     Some(Sequence::new(sequence_type, elements))
 }
 
-fn parse_sequence_type(source: &str) -> (SequenceType, &str) {
-    let Some(first) = source.chars().next() else {
-        return (SequenceType::Stopping, source);
-    };
+pub(super) fn parse_sequence_type_annotation(source: &str) -> Option<(SequenceType, &str)> {
+    let source = source.trim_start();
+    let first = source.chars().next()?;
 
-    match first {
-        '&' => (SequenceType::Cycle, &source[first.len_utf8()..]),
-        '!' => (SequenceType::Once, &source[first.len_utf8()..]),
-        '$' => (SequenceType::Stopping, &source[first.len_utf8()..]),
-        _ => (SequenceType::Stopping, source),
+    let explicit_type = match first {
+        '&' => Some((SequenceType::Cycle, &source[first.len_utf8()..])),
+        '!' => Some((SequenceType::Once, &source[first.len_utf8()..])),
+        '$' => Some((SequenceType::Stopping, &source[first.len_utf8()..])),
+        _ => None,
+    };
+    if explicit_type.is_some() {
+        return explicit_type;
     }
+
+    for (word, sequence_type) in [
+        ("stopping", SequenceType::Stopping),
+        ("cycle", SequenceType::Cycle),
+        ("once", SequenceType::Once),
+    ] {
+        let Some(rest) = source.strip_prefix(word) else {
+            continue;
+        };
+        if rest
+            .chars()
+            .next()
+            .is_some_and(|ch| ch == '_' || ch.is_ascii_alphanumeric())
+        {
+            continue;
+        }
+        let rest = rest.trim_start();
+        let rest = rest.strip_prefix(':')?;
+        return Some((sequence_type, rest));
+    }
+
+    None
+}
+
+fn parse_sequence_type(source: &str) -> (SequenceType, &str) {
+    parse_sequence_type_annotation(source).unwrap_or((SequenceType::Stopping, source))
 }
 
 fn trim_separator_whitespace(text: &str) -> &str {
