@@ -3387,11 +3387,10 @@ Knot.
     //             Assert.AreEqual(expected, results);
     //         }
     #[test]
-    #[ignore]
     fn TestStringParserABAOptional2() {
         let mut p = StringParser::new("BABB".to_string());
         let results = p.Interleave::<String, _, _>(
-            |p| p.ParseString("A".to_string()),
+            StringParser::Optional(|p| p.ParseString("A".to_string())),
             |p| p.ParseString("B".to_string()),
             None,
             true,
