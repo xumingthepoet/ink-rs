@@ -49,6 +49,7 @@ pub enum Expression {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BinaryOperator {
     And,
+    AndSymbol,
     Equals,
     NotEquals,
     GreaterThan,
@@ -186,6 +187,8 @@ fn object_display(object: &Object) -> String {
         Object::Choice(_) => "Choice".to_string(),
         Object::Gather(_) => "Gather".to_string(),
         Object::Sequence(_) => "Sequence".to_string(),
+        Object::TunnelOnwards(_) => "TunnelOnwards".to_string(),
+        Object::ConstantDeclaration(declaration) => declaration.name().to_string(),
         Object::VariableAssignment(assignment) => assignment.name().to_string(),
         Object::ExternalDeclaration(external) => external.name().to_string(),
         Object::Weave(_) => "Weave".to_string(),
@@ -239,6 +242,7 @@ impl BinaryOperator {
     pub fn runtime_name(self) -> &'static str {
         match self {
             BinaryOperator::And => "&&",
+            BinaryOperator::AndSymbol => "&&",
             BinaryOperator::Equals => "==",
             BinaryOperator::NotEquals => "!=",
             BinaryOperator::GreaterThan => ">",
@@ -256,6 +260,7 @@ impl BinaryOperator {
     fn snapshot_name(self) -> &'static str {
         match self {
             BinaryOperator::And => "and",
+            BinaryOperator::AndSymbol => "&&",
             BinaryOperator::Equals => "==",
             BinaryOperator::NotEquals => "!=",
             BinaryOperator::GreaterThan => ">",
@@ -282,7 +287,7 @@ impl UnaryOperator {
     fn snapshot_name(self) -> &'static str {
         match self {
             UnaryOperator::Negate => "-",
-            UnaryOperator::Not => "!",
+            UnaryOperator::Not => "not",
         }
     }
 }

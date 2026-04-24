@@ -186,3 +186,7 @@ fixture!(
     runtime_external_function_3_arg,
     "inkfiles/runtime/external-function-3-arg.ink"
 );
+fixture!(
+    function_evaluating_function_variablestate_bug,
+    "inkfiles/function/evaluating-function-variablestate-bug.ink"
+);

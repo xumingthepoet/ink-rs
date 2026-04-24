@@ -62,6 +62,7 @@ impl SourceFile {
     pub fn from_input(input: SourceInput) -> Self {
         let source_name = input.filename;
         let mut lines = Vec::new();
+        let mut in_block_comment = false;
 
         for (index, raw_line) in input.text.lines().enumerate() {
             let mut text = raw_line.to_string();
@@ -69,12 +70,12 @@ impl SourceFile {
                 text = text.trim_start_matches('\u{feff}').to_string();
             }
 
-            let uncommented = strip_line_comment(&text);
+            let uncommented = strip_comments(&text, &mut in_block_comment);
             let is_choice_line = uncommented
                 .trim_start()
                 .starts_with(|ch| matches!(ch, '*' | '+'));
             let text = if uncommented.len() == text.len() && is_choice_line {
-                uncommented.to_string()
+                uncommented
             } else {
                 uncommented.trim_end().to_string()
             };
@@ -88,17 +89,52 @@ impl SourceFile {
     }
 }
 
-fn strip_line_comment(line: &str) -> &str {
-    let mut previous = '\0';
-    for (index, ch) in line.char_indices() {
-        if previous == '/' && ch == '/' {
-            let comment_start = index - previous.len_utf8();
-            return &line[..comment_start];
+fn strip_comments(line: &str, in_block_comment: &mut bool) -> String {
+    let mut output = String::new();
+    let mut index = 0;
+    let mut in_string = false;
+    let mut escaped = false;
+
+    while index < line.len() {
+        let rest = &line[index..];
+
+        if *in_block_comment {
+            if let Some(end) = rest.find("*/") {
+                index += end + "*/".len();
+                *in_block_comment = false;
+            } else {
+                break;
+            }
+            continue;
         }
-        previous = ch;
+
+        if !in_string && rest.starts_with("//") {
+            break;
+        }
+
+        if !in_string && rest.starts_with("/*") {
+            *in_block_comment = true;
+            index += "/*".len();
+            continue;
+        }
+
+        let ch = rest.chars().next().expect("index is inside line");
+        output.push(ch);
+        index += ch.len_utf8();
+
+        if escaped {
+            escaped = false;
+            continue;
+        }
+
+        match ch {
+            '\\' if in_string => escaped = true,
+            '"' => in_string = !in_string,
+            _ => {}
+        }
     }
 
-    line
+    output
 }
 
 #[cfg(test)]
@@ -110,5 +146,12 @@ mod tests {
         let file = SourceFile::from_input(SourceInput::new("Line. // comment\nOther."));
         assert_eq!(file.lines[0].text, "Line.");
         assert_eq!(file.lines[1].text, "Other.");
+    }
+
+    #[test]
+    fn strips_block_comments() {
+        let file = SourceFile::from_input(SourceInput::new("A /* comment\nstill comment */ B"));
+        assert_eq!(file.lines[0].text, "A");
+        assert_eq!(file.lines[1].text, " B");
     }
 }

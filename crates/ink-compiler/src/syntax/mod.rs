@@ -10,9 +10,9 @@ use crate::{
     compiler::StageOutput,
     diagnostic::Diagnostic,
     parsed::{
-        BinaryOperator, Conditional, ConditionalBranch, ContentList, Expression,
-        ExternalDeclaration, FloatLiteral, Flow, IncDec, Object, Return, Sequence, Story, Text,
-        UnaryOperator, VariableAssignment, Weave,
+        BinaryOperator, Conditional, ConditionalBranch, ConstantDeclaration, ContentList,
+        Expression, ExternalDeclaration, FloatLiteral, Flow, IncDec, Object, Return, Sequence,
+        Story, Text, UnaryOperator, VariableAssignment, Weave,
     },
     source::{SourceFile, SourceInput, SourceLine},
 };
@@ -105,6 +105,7 @@ impl Parser {
         let mut line_parser = RuleParser::new(line);
         let statement_rules: &[StatementRule] = &[
             variable_declaration_statement,
+            constant_declaration_statement,
             external_declaration_statement,
             return_statement,
             temp_declaration_statement,
@@ -303,7 +304,8 @@ impl Parser {
         index: &mut usize,
     ) -> Option<Vec<Object>> {
         let line = &lines[*index];
-        let trimmed = line.text.trim();
+        let (prefix, conditional_source) = parse_multiline_conditional_prefix(line)?;
+        let trimmed = conditional_source.trim();
         if !trimmed.starts_with('{') {
             return None;
         }
@@ -328,10 +330,12 @@ impl Parser {
                 branches.push(current_branch.finish());
                 *index += 1;
                 let conditional = Conditional::new(initial_condition, branches);
-                return Some(vec![
-                    Object::ContentList(ContentList::new(vec![Object::Conditional(conditional)])),
-                    Object::Text(Text::new("\n", current_line.span.clone())),
-                ]);
+                let mut objects = prefix;
+                objects.push(Object::ContentList(ContentList::new(vec![
+                    Object::Conditional(conditional),
+                ])));
+                objects.push(Object::Text(Text::new("\n", current_line.span.clone())));
+                return Some(objects);
             }
 
             if let Some(header) = parse_conditional_branch_header(current_trimmed) {
@@ -434,6 +438,54 @@ impl Parser {
 
         Some(ContentList::new(objects))
     }
+}
+
+fn parse_multiline_conditional_prefix(line: &SourceLine) -> Option<(Vec<Object>, &str)> {
+    let trimmed = line.text.trim_start();
+    if trimmed.starts_with('{') {
+        return Some((Vec::new(), trimmed));
+    }
+
+    let mut rest = trimmed;
+    let mut indentation_depth = 0;
+    loop {
+        if rest.starts_with("->") {
+            return None;
+        }
+        let Some(after_dash) = rest.strip_prefix('-') else {
+            break;
+        };
+        indentation_depth += 1;
+        rest = after_dash.trim_start();
+    }
+
+    if indentation_depth == 0 {
+        return None;
+    }
+
+    let (identifier, after_identifier) = parse_optional_gather_identifier(rest);
+    rest = after_identifier.trim_start();
+    if !rest.starts_with('{') {
+        return None;
+    }
+
+    let mut gather = crate::parsed::Gather::new(line.span.clone(), indentation_depth);
+    gather.set_identifier(identifier);
+    Some((vec![Object::Gather(gather)], rest))
+}
+
+fn parse_optional_gather_identifier(source: &str) -> (Option<String>, &str) {
+    let Some(after_open) = source.strip_prefix('(') else {
+        return (None, source);
+    };
+    let Some(close_index) = after_open.find(')') else {
+        return (None, source);
+    };
+    let name = after_open[..close_index].trim();
+    if !is_identifier(name) {
+        return (None, source);
+    }
+    (Some(name.to_string()), &after_open[close_index + 1..])
 }
 
 struct ConditionalBranchBuilder {
@@ -549,6 +601,26 @@ fn variable_declaration_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Obj
 
     Some(vec![Object::VariableAssignment(VariableAssignment::new(
         name, expression, true, false, span,
+    ))])
+}
+
+fn constant_declaration_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
+    parser.skip_horizontal_whitespace();
+    let span = parser.current_span();
+    parser.match_string("CONST")?;
+    parser.skip_horizontal_whitespace();
+    let name = parser.take_while(|ch| ch == '_' || ch.is_ascii_alphanumeric())?;
+    if !is_identifier(&name) {
+        return None;
+    }
+    parser.skip_horizontal_whitespace();
+    parser.match_string("=")?;
+    parser.skip_horizontal_whitespace();
+    let expression = parse_initial_expression(parser.line_remainder().trim())?;
+    parser.skip_to_end();
+
+    Some(vec![Object::ConstantDeclaration(ConstantDeclaration::new(
+        name, expression, span,
     ))])
 }
 
@@ -682,8 +754,10 @@ fn object_contains_function_call(object: &Object) -> bool {
             .is_some_and(expression_contains_function_call),
         Object::Weave(weave) => weave.content().iter().any(object_contains_function_call),
         Object::Text(_)
+        | Object::ConstantDeclaration(_)
         | Object::Glue(_)
         | Object::Divert(_)
+        | Object::TunnelOnwards(_)
         | Object::Gather(_)
         | Object::ExternalDeclaration(_)
         | Object::Tag(_) => false,
@@ -788,6 +862,20 @@ pub(super) fn parse_initial_expression(source: &str) -> Option<Expression> {
 
 fn parse_expression(source: &str) -> Option<Expression> {
     let source = strip_enclosing_parentheses(source.trim());
+    if let Some((left, right)) = split_top_level_text_operator(source, "&&") {
+        return Some(Expression::Binary {
+            operator: BinaryOperator::AndSymbol,
+            left: Box::new(parse_expression(left)?),
+            right: Box::new(parse_expression(right)?),
+        });
+    }
+    if let Some((left, right)) = split_top_level_word_text_operator(source, "and") {
+        return Some(Expression::Binary {
+            operator: BinaryOperator::And,
+            left: Box::new(parse_expression(left)?),
+            right: Box::new(parse_expression(right)?),
+        });
+    }
     if let Some((left, operator, right)) = split_top_level_word_operator(
         source,
         &[
@@ -870,7 +958,7 @@ fn parse_expression(source: &str) -> Option<Expression> {
             return Some(Expression::NumberFloat(FloatLiteral::new(value)));
         }
     }
-    is_identifier(source).then(|| Expression::VariableReference(source.to_string()))
+    is_path_identifier(source).then(|| Expression::VariableReference(source.to_string()))
 }
 
 fn parse_unary_prefix(source: &str) -> Option<(UnaryOperator, &str)> {
@@ -1068,6 +1156,63 @@ fn split_top_level_word_operator<'a>(
     None
 }
 
+fn split_top_level_text_operator<'a>(
+    source: &'a str,
+    operator: &str,
+) -> Option<(&'a str, &'a str)> {
+    split_top_level_text_operator_with_boundaries(source, operator, false)
+}
+
+fn split_top_level_word_text_operator<'a>(
+    source: &'a str,
+    operator: &str,
+) -> Option<(&'a str, &'a str)> {
+    split_top_level_text_operator_with_boundaries(source, operator, true)
+}
+
+fn split_top_level_text_operator_with_boundaries<'a>(
+    source: &'a str,
+    operator: &str,
+    require_word_boundaries: bool,
+) -> Option<(&'a str, &'a str)> {
+    let mut in_string = false;
+    let mut escaped = false;
+    let mut paren_depth = 0;
+
+    for (index, ch) in source.char_indices().rev() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+
+        match ch {
+            '\\' if in_string => escaped = true,
+            '"' => in_string = !in_string,
+            ')' if !in_string => paren_depth += 1,
+            '(' if !in_string => paren_depth -= 1,
+            _ if !in_string && paren_depth == 0 && source[index..].starts_with(operator) => {
+                if require_word_boundaries {
+                    let before = source[..index].chars().next_back();
+                    let after = source[index + operator.len()..].chars().next();
+                    let has_word_boundaries = before.is_none_or(|ch| !is_identifier_continue(ch))
+                        && after.is_none_or(|ch| !is_identifier_continue(ch));
+                    if !has_word_boundaries {
+                        continue;
+                    }
+                }
+                let left = source[..index].trim();
+                let right = source[index + operator.len()..].trim();
+                if !left.is_empty() && !right.is_empty() {
+                    return Some((left, right));
+                }
+            }
+            _ => {}
+        }
+    }
+
+    None
+}
+
 fn is_unary_operator_position(source: &str, index: usize) -> bool {
     let left = source[..index].trim_end();
     let Some(previous) = left.chars().next_back() else {
@@ -1223,12 +1368,16 @@ pub(super) fn is_identifier(source: &str) -> bool {
         && chars.all(is_identifier_continue)
 }
 
+fn is_path_identifier(source: &str) -> bool {
+    source.split('.').all(is_identifier)
+}
+
 fn is_identifier_continue(ch: char) -> bool {
     ch == '_' || ch.is_ascii_alphanumeric()
 }
 
 fn divert_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
-    divert::parse_divert(parser).map(|divert| vec![Object::Divert(divert)])
+    divert::parse_divert_objects(parser)
 }
 
 fn text_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {

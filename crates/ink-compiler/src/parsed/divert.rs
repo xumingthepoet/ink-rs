@@ -44,6 +44,11 @@ impl Divert {
         }
     }
 
+    pub fn with_tunnel(mut self) -> Self {
+        self.is_tunnel = true;
+        self
+    }
+
     pub fn target(&self) -> &DivertTarget {
         &self.target
     }

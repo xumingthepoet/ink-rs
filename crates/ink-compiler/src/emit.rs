@@ -111,6 +111,7 @@ fn runtime_object_to_value(object: &RuntimeObject) -> Value {
                 ControlCommand::NoOp => "nop",
                 ControlCommand::Pop => "pop",
                 ControlCommand::PopFunction => "~ret",
+                ControlCommand::PopTunnel => "->->",
                 ControlCommand::ChoiceCount => "choiceCnt",
                 ControlCommand::Turns => "turn",
                 ControlCommand::TurnsSince => "turns",
@@ -146,6 +147,14 @@ fn runtime_object_to_value(object: &RuntimeObject) -> Value {
             }
             Value::Object(obj)
         }
+        RuntimeObject::TunnelDivert { target, variable } => {
+            let mut obj = Map::new();
+            obj.insert("->t->".to_string(), Value::String(target.clone()));
+            if *variable {
+                obj.insert("var".to_string(), Value::Bool(true));
+            }
+            Value::Object(obj)
+        }
         RuntimeObject::FunctionDivert { target } => {
             let mut obj = Map::new();
             obj.insert("f()".to_string(), Value::String(target.clone()));
@@ -166,6 +175,10 @@ fn runtime_object_to_value(object: &RuntimeObject) -> Value {
         RuntimeObject::TempVariableReassignment(name) => json!({ "temp=": name, "re": true }),
         RuntimeObject::VariableReassignment(name) => json!({ "VAR=": name, "re": true }),
         RuntimeObject::VariableReference(name) => json!({ "VAR?": name }),
+        RuntimeObject::VariablePointer {
+            name,
+            context_index,
+        } => json!({ "^var": name, "ci": context_index }),
         RuntimeObject::ChoicePoint { target, flags } => json!({ "*": target, "flg": flags }),
     }
 }

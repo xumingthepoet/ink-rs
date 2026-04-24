@@ -1,5 +1,6 @@
 mod choice;
 mod conditional;
+mod constant_declaration;
 mod content_list;
 mod divert;
 mod expression;
@@ -13,11 +14,13 @@ mod sequence;
 mod story;
 mod tag;
 mod text;
+mod tunnel_onwards;
 mod variable_assignment;
 mod weave;
 
 pub use choice::Choice;
 pub use conditional::{Conditional, ConditionalBranch};
+pub use constant_declaration::ConstantDeclaration;
 pub use content_list::ContentList;
 pub use divert::{Divert, DivertTarget};
 pub use expression::{BinaryOperator, Expression, FloatLiteral, UnaryOperator};
@@ -31,6 +34,7 @@ pub use sequence::{Sequence, SequenceType};
 pub use story::Story;
 pub use tag::Tag;
 pub use text::Text;
+pub use tunnel_onwards::TunnelOnwards;
 pub use variable_assignment::VariableAssignment;
 pub use weave::Weave;
 
@@ -40,6 +44,7 @@ pub enum Object {
     ContentList(ContentList),
     Expression(Expression),
     Conditional(Conditional),
+    ConstantDeclaration(ConstantDeclaration),
     LogicLine(Expression),
     Glue(Glue),
     IncDec(IncDec),
@@ -49,6 +54,7 @@ pub enum Object {
     Tag(Tag),
     Sequence(Sequence),
     Return(Return),
+    TunnelOnwards(TunnelOnwards),
     VariableAssignment(VariableAssignment),
     ExternalDeclaration(ExternalDeclaration),
     Weave(Weave),
@@ -72,6 +78,9 @@ impl Object {
                 out.push('\n');
                 conditional.write_parse_snapshot(out, indent);
             }
+            Object::ConstantDeclaration(declaration) => {
+                declaration.write_parse_snapshot(out, indent)
+            }
             Object::LogicLine(expression) => {
                 out.push('\n');
                 push_indent(out, indent);
@@ -91,6 +100,9 @@ impl Object {
             Object::Sequence(sequence) => sequence.write_parse_snapshot(out, indent),
             Object::VariableAssignment(assignment) => assignment.write_parse_snapshot(out, indent),
             Object::ExternalDeclaration(external) => external.write_parse_snapshot(out, indent),
+            Object::TunnelOnwards(tunnel_onwards) => {
+                tunnel_onwards.write_parse_snapshot(out, indent)
+            }
             Object::Weave(weave) => weave.write_parse_snapshot(out, indent),
         }
     }

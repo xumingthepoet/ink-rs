@@ -76,7 +76,7 @@ fn parse_inline_content_with_options(
         }
 
         if let Some(rest) = remaining.strip_prefix('{') {
-            let close_index = rest.find('}')?;
+            let close_index = find_matching_brace(rest)?;
             let inner = &rest[..close_index];
             let object = parse_inline_braced_object(inner, span)?;
             objects.push(Object::ContentList(ContentList::new(vec![object])));
@@ -91,18 +91,14 @@ fn parse_inline_content_with_options(
         }
 
         if remaining.starts_with("->") {
-            let target = remaining.strip_prefix("->")?.trim();
-            if target.is_empty() {
-                return None;
-            }
             if tag_active {
                 objects.push(Object::Tag(Tag::new(false, false)));
                 tag_active = false;
             }
-            objects.push(Object::Divert(super::divert::parse_divert_source(
-                target,
+            objects.extend(super::divert::parse_divert_objects_source(
+                remaining,
                 span.clone(),
-            )?));
+            )?);
             break;
         }
 
@@ -121,9 +117,9 @@ fn parse_inline_content_with_options(
             Some(index) => {
                 let prefix =
                     if trim_divert_separator_whitespace && remaining[index..].starts_with("->") {
-                        trim_separator_whitespace(&remaining[..index])
+                        normalize_divert_separator_whitespace(&remaining[..index])
                     } else {
-                        &remaining[..index]
+                        remaining[..index].to_string()
                     };
                 if !prefix.is_empty() {
                     objects.push(Object::Text(Text::new(prefix, span.clone())));
@@ -148,10 +144,38 @@ fn parse_inline_content_with_options(
     }
 }
 
+fn find_matching_brace(source_after_open: &str) -> Option<usize> {
+    let mut depth = 0;
+    let mut in_string = false;
+    let mut escaped = false;
+
+    for (index, ch) in source_after_open.char_indices() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+
+        match ch {
+            '\\' if in_string => escaped = true,
+            '"' => in_string = !in_string,
+            '{' if !in_string => depth += 1,
+            '}' if !in_string => {
+                if depth == 0 {
+                    return Some(index);
+                }
+                depth -= 1;
+            }
+            _ => {}
+        }
+    }
+
+    None
+}
+
 fn parse_inline_braced_object(source: &str, span: &SourceSpan) -> Option<Object> {
-    let source = source.trim();
-    if parse_sequence_type_annotation(source).is_some() {
-        return Some(Object::Sequence(parse_inline_sequence(source, span)?));
+    let trimmed = source.trim();
+    if parse_sequence_type_annotation(trimmed).is_some() {
+        return Some(Object::Sequence(parse_inline_sequence(trimmed, span)?));
     }
 
     if let Some((condition_source, branch_source)) = split_top_level_once(source, ':') {
@@ -161,9 +185,8 @@ fn parse_inline_braced_object(source: &str, span: &SourceSpan) -> Option<Object>
             return None;
         }
 
-        let true_content =
-            parse_inline_content(alternatives.first().copied().unwrap_or("").trim(), span)
-                .unwrap_or_default();
+        let true_content = parse_inline_content(alternatives.first().copied().unwrap_or(""), span)
+            .unwrap_or_default();
         let mut branches = vec![ConditionalBranch::new(
             true,
             false,
@@ -173,7 +196,7 @@ fn parse_inline_braced_object(source: &str, span: &SourceSpan) -> Option<Object>
         )];
 
         if let Some(else_source) = alternatives.get(1) {
-            let else_content = parse_inline_content(else_source.trim(), span).unwrap_or_default();
+            let else_content = parse_inline_content(else_source, span).unwrap_or_default();
             branches.push(ConditionalBranch::new(
                 false,
                 true,
@@ -189,11 +212,13 @@ fn parse_inline_braced_object(source: &str, span: &SourceSpan) -> Option<Object>
         )));
     }
 
-    if contains_top_level(source, '|') {
-        return Some(Object::Sequence(parse_inline_sequence(source, span)?));
+    if contains_top_level(trimmed, '|') {
+        return Some(Object::Sequence(parse_inline_sequence(trimmed, span)?));
     }
 
-    Some(Object::Expression(super::parse_initial_expression(source)?))
+    Some(Object::Expression(super::parse_initial_expression(
+        trimmed,
+    )?))
 }
 
 fn parse_inline_sequence(source: &str, span: &SourceSpan) -> Option<Sequence> {
@@ -260,6 +285,7 @@ fn split_top_level_once(source: &str, needle: char) -> Option<(&str, &str)> {
     let mut in_string = false;
     let mut escaped = false;
     let mut paren_depth = 0;
+    let mut brace_depth = 0;
 
     for (index, ch) in source.char_indices() {
         if escaped {
@@ -272,7 +298,9 @@ fn split_top_level_once(source: &str, needle: char) -> Option<(&str, &str)> {
             '"' => in_string = !in_string,
             '(' if !in_string => paren_depth += 1,
             ')' if !in_string => paren_depth -= 1,
-            _ if ch == needle && !in_string && paren_depth == 0 => {
+            '{' if !in_string => brace_depth += 1,
+            '}' if !in_string => brace_depth -= 1,
+            _ if ch == needle && !in_string && paren_depth == 0 && brace_depth == 0 => {
                 let right_start = index + ch.len_utf8();
                 return Some((&source[..index], &source[right_start..]));
             }
@@ -294,15 +322,15 @@ fn split_top_level(source: &str, separator: char) -> Vec<&str> {
     parts
 }
 
-fn trim_separator_whitespace(text: &str) -> &str {
+fn normalize_divert_separator_whitespace(text: &str) -> String {
     let trimmed = text.trim_end_matches([' ', '\t']);
     if trimmed.len() == text.len() {
-        return text;
+        return format!("{text} ");
     }
 
     if trimmed.is_empty() {
-        return " ";
+        return " ".to_string();
     }
 
-    &text[..trimmed.len() + 1]
+    text[..trimmed.len() + 1].to_string()
 }

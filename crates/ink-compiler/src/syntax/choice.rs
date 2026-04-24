@@ -1,4 +1,4 @@
-use crate::parsed::{BinaryOperator, Choice, ContentList, Expression};
+use crate::parsed::{Choice, ContentList, Expression};
 
 use super::{rule::RuleParser, text};
 
@@ -135,31 +135,7 @@ fn parse_choice_conditions(choice_body: &str) -> Option<(Option<Expression>, Str
 }
 
 fn parse_condition_expression(source: &str) -> Option<Expression> {
-    let terms = source
-        .split(" and ")
-        .map(|term| parse_bool_literal(term.trim()))
-        .collect::<Option<Vec<_>>>()?;
-
-    let mut terms = terms.into_iter();
-    let first = terms.next()?;
-    Some(terms.fold(first, |left, right| Expression::Binary {
-        operator: BinaryOperator::And,
-        left: Box::new(left),
-        right: Box::new(right),
-    }))
-}
-
-fn parse_bool_literal(source: &str) -> Option<Expression> {
-    match source {
-        "true" => Some(Expression::NumberBool(true)),
-        "false" => Some(Expression::NumberBool(false)),
-        _ if is_path_identifier(source) => Some(Expression::VariableReference(source.to_string())),
-        _ => None,
-    }
-}
-
-fn is_path_identifier(source: &str) -> bool {
-    source.split('.').all(is_identifier)
+    super::parse_initial_expression(source)
 }
 
 fn is_identifier(source: &str) -> bool {
@@ -179,6 +155,15 @@ fn parse_choice_segments(choice_body: &str) -> Result<ChoiceSegments, &'static s
     let Some(open_index) = choice_body.find('[') else {
         if choice_body.contains(']') {
             return Err("Expected opening '[' for weave-style option but saw ']'");
+        }
+
+        if let Some(divert_index) = find_top_level_divert(choice_body) {
+            return Ok(ChoiceSegments {
+                start: choice_body[..divert_index].to_string(),
+                choice_only: None,
+                inner: choice_body[divert_index..].to_string(),
+                has_inline_brackets: false,
+            });
         }
 
         return Ok(ChoiceSegments {
@@ -212,6 +197,36 @@ fn parse_choice_segments(choice_body: &str) -> Result<ChoiceSegments, &'static s
         inner: choice_body[close_index + 1..].to_string(),
         has_inline_brackets: true,
     })
+}
+
+fn find_top_level_divert(source: &str) -> Option<usize> {
+    let mut in_string = false;
+    let mut escaped = false;
+    let mut paren_depth = 0;
+    let mut brace_depth = 0;
+
+    for (index, ch) in source.char_indices() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+
+        let rest = &source[index..];
+        match ch {
+            '\\' if in_string => escaped = true,
+            '"' => in_string = !in_string,
+            '(' if !in_string => paren_depth += 1,
+            ')' if !in_string => paren_depth -= 1,
+            '{' if !in_string => brace_depth += 1,
+            '}' if !in_string => brace_depth -= 1,
+            '-' if !in_string && paren_depth == 0 && brace_depth == 0 && rest.starts_with("->") => {
+                return Some(index);
+            }
+            _ => {}
+        }
+    }
+
+    None
 }
 
 fn content_list_from_segment(
