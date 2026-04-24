@@ -7830,16 +7830,15 @@ Text.
     // C#:     Assert.AreEqual("true\nfalse\ntrue\ntrue\n", result);
     // C#: }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestStringContains() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
                     r#"
-{""hello world"" ? ""o wo""}
-{""hello world"" ? ""something else""}
-{""hello"" ? """"}
-{"""" ? """"}
+{"hello world" ? "o wo"}
+{"hello world" ? "something else"}
+{"hello" ? ""}
+{"" ? ""}
 "#,
                     false,
                     false,

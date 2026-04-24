@@ -1350,6 +1350,29 @@ fn parse_expression(source: &str) -> Option<Expression> {
             right: Box::new(parse_expression(right)?),
         });
     }
+    if let Some((left, operator, right)) =
+        split_top_level_word_operator(source, &[("!?", BinaryOperator::Hasnt)])
+    {
+        return Some(Expression::Binary {
+            operator,
+            left: Box::new(parse_expression(left)?),
+            right: Box::new(parse_expression(right)?),
+        });
+    }
+    if let Some((left, operator, right)) = split_top_level_text_operators(
+        source,
+        &[
+            TextOperator::word("hasnt", BinaryOperator::Hasnt),
+            TextOperator::word("has", BinaryOperator::Has),
+            TextOperator::symbol("?", BinaryOperator::Has),
+        ],
+    ) {
+        return Some(Expression::Binary {
+            operator,
+            left: Box::new(parse_expression(left)?),
+            right: Box::new(parse_expression(right)?),
+        });
+    }
     if let Some((left, operator, right)) = split_top_level_operator(
         source,
         &[('+', BinaryOperator::Add), ('-', BinaryOperator::Subtract)],
