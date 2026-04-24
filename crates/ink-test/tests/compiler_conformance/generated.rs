@@ -138,3 +138,7 @@ fixture!(conditional_multiline, "inkfiles/conditional/multiline.ink");
 fixture!(conditional_once, "inkfiles/conditional/once.ink");
 fixture!(conditional_shuffle, "inkfiles/conditional/shuffle.ink");
 fixture!(conditional_stopping, "inkfiles/conditional/stopping.ink");
+fixture!(
+    conditional_shuffle_once,
+    "inkfiles/conditional/shuffle_once.ink"
+);
