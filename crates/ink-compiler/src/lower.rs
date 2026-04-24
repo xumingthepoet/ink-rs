@@ -4,8 +4,8 @@ use crate::{
     analysis::CheckedStory,
     compiler::StageOutput,
     parsed::{
-        BinaryOperator, Choice, ContentList, DivertTarget, Expression, FloatLiteral, Flow, Object,
-        Sequence, SequenceType, Story, Weave,
+        BinaryOperator, Choice, Conditional, ContentList, DivertTarget, Expression, FloatLiteral,
+        Flow, Object, Sequence, SequenceType, Story, Weave,
     },
 };
 
@@ -647,6 +647,7 @@ fn lower_choice_weave(
             Object::Text(_)
             | Object::ContentList(_)
             | Object::Expression(_)
+            | Object::Conditional(_)
             | Object::LogicLine(_)
             | Object::Glue(_)
             | Object::Divert(_)
@@ -831,6 +832,7 @@ fn lower_weave_section(
             Object::Text(_)
             | Object::ContentList(_)
             | Object::Expression(_)
+            | Object::Conditional(_)
             | Object::LogicLine(_)
             | Object::Glue(_)
             | Object::Divert(_)
@@ -1503,6 +1505,105 @@ fn lower_sequence(
     }
 }
 
+fn lower_conditional_into(
+    content: &mut Vec<RuntimeObject>,
+    conditional: &Conditional,
+    choice_labels: &HashMap<String, String>,
+    global_labels: &HashMap<String, String>,
+    global_variables: &HashSet<String>,
+    path_mode: &ChoicePathMode,
+) {
+    if let Some(condition) = conditional.initial_condition() {
+        content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
+        lower_expression_into(
+            content,
+            condition,
+            choice_labels,
+            global_labels,
+            path_mode,
+            false,
+        );
+        content.push(RuntimeObject::ControlCommand(ControlCommand::EvalEnd));
+    }
+
+    let rejoin_index = content.len() + conditional.branches().len();
+    let rejoin_target = runtime_index_path(path_mode, rejoin_index);
+    let has_initial_condition = conditional.initial_condition().is_some();
+
+    for branch in conditional.branches() {
+        let mut branch_content = Vec::new();
+        if !has_initial_condition {
+            if let Some(condition) = branch.own_condition() {
+                branch_content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
+                lower_expression_into(
+                    &mut branch_content,
+                    condition,
+                    choice_labels,
+                    global_labels,
+                    path_mode,
+                    false,
+                );
+                branch_content.push(RuntimeObject::ControlCommand(ControlCommand::EvalEnd));
+            }
+        }
+
+        if branch.is_else() {
+            branch_content.push(RuntimeObject::Divert {
+                target: ".^.b".to_string(),
+                variable: false,
+            });
+        } else {
+            branch_content.push(RuntimeObject::ConditionalDivert {
+                target: ".^.b".to_string(),
+            });
+        }
+
+        let mut content_container = Vec::new();
+        if !branch.is_inline() {
+            content_container.push(RuntimeObject::String("\n".to_string()));
+        }
+        for object in branch.content().content() {
+            lower_object_into_with_context(
+                &mut content_container,
+                object,
+                path_mode,
+                choice_labels,
+                global_labels,
+                global_variables,
+            );
+        }
+        content_container.push(RuntimeObject::Divert {
+            target: rejoin_target.clone(),
+            variable: false,
+        });
+
+        branch_content.push(RuntimeObject::NamedContent(vec![Container {
+            content: content_container,
+            name: Some("b".to_string()),
+            flags: None,
+            merge_tail_metadata: true,
+        }]));
+
+        content.push(RuntimeObject::Container(Container {
+            content: branch_content,
+            name: None,
+            flags: None,
+            merge_tail_metadata: true,
+        }));
+    }
+
+    content.push(RuntimeObject::ControlCommand(ControlCommand::NoOp));
+}
+
+fn runtime_index_path(path_mode: &ChoicePathMode, index: usize) -> String {
+    match path_mode {
+        ChoicePathMode::Root => format!("0.{index}"),
+        ChoicePathMode::RootGather { gather_name } => format!("0.{gather_name}.{index}"),
+        ChoicePathMode::NestedRoot { container_path, .. } => format!("{container_path}.{index}"),
+        ChoicePathMode::Flow { container_path, .. } => format!("{container_path}.{index}"),
+    }
+}
+
 fn lower_object_into(
     content: &mut Vec<RuntimeObject>,
     object: &Object,
@@ -1527,6 +1628,14 @@ fn lower_object_into(
             expression,
             choice_labels,
             global_labels,
+            &ChoicePathMode::Root,
+        ),
+        Object::Conditional(conditional) => lower_conditional_into(
+            content,
+            conditional,
+            choice_labels,
+            global_labels,
+            global_variables,
             &ChoicePathMode::Root,
         ),
         Object::LogicLine(expression) => lower_logic_line_into(
@@ -1615,6 +1724,14 @@ fn lower_object_into_with_context(
             expression,
             choice_labels,
             global_labels,
+            path_mode,
+        ),
+        Object::Conditional(conditional) => lower_conditional_into(
+            content,
+            conditional,
+            choice_labels,
+            global_labels,
+            global_variables,
             path_mode,
         ),
         Object::LogicLine(expression) => {

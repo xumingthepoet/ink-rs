@@ -48,6 +48,12 @@ pub enum Expression {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BinaryOperator {
     And,
+    Equals,
+    NotEquals,
+    GreaterThan,
+    LessThan,
+    GreaterThanOrEquals,
+    LessThanOrEquals,
     Add,
     Subtract,
     Multiply,
@@ -151,6 +157,12 @@ impl BinaryOperator {
     pub fn runtime_name(self) -> &'static str {
         match self {
             BinaryOperator::And => "&&",
+            BinaryOperator::Equals => "==",
+            BinaryOperator::NotEquals => "!=",
+            BinaryOperator::GreaterThan => ">",
+            BinaryOperator::LessThan => "<",
+            BinaryOperator::GreaterThanOrEquals => ">=",
+            BinaryOperator::LessThanOrEquals => "<=",
             BinaryOperator::Add => "+",
             BinaryOperator::Subtract => "-",
             BinaryOperator::Multiply => "*",
@@ -162,6 +174,12 @@ impl BinaryOperator {
     fn snapshot_name(self) -> &'static str {
         match self {
             BinaryOperator::And => "and",
+            BinaryOperator::Equals => "==",
+            BinaryOperator::NotEquals => "!=",
+            BinaryOperator::GreaterThan => ">",
+            BinaryOperator::LessThan => "<",
+            BinaryOperator::GreaterThanOrEquals => ">=",
+            BinaryOperator::LessThanOrEquals => "<=",
             BinaryOperator::Add => "+",
             BinaryOperator::Subtract => "-",
             BinaryOperator::Multiply => "*",

@@ -10,8 +10,8 @@ use crate::{
     compiler::StageOutput,
     diagnostic::Diagnostic,
     parsed::{
-        BinaryOperator, Expression, FloatLiteral, Flow, IncDec, Object, Story, UnaryOperator,
-        VariableAssignment, Weave,
+        BinaryOperator, Conditional, ConditionalBranch, ContentList, Expression, FloatLiteral,
+        Flow, IncDec, Object, Story, Text, UnaryOperator, VariableAssignment, Weave,
     },
     source::{SourceFile, SourceInput, SourceLine},
 };
@@ -64,6 +64,11 @@ impl Parser {
                 } else {
                     index += 1;
                 }
+                continue;
+            }
+
+            if let Some(parsed) = self.parse_multiline_conditional(&lines, &mut index) {
+                objects.extend(parsed);
                 continue;
             }
 
@@ -182,6 +187,11 @@ impl Parser {
                 continue;
             }
 
+            if let Some(parsed) = self.parse_multiline_conditional(lines, index) {
+                content.extend(parsed);
+                continue;
+            }
+
             content.extend(self.parse_statement(next_line));
             *index += 1;
         }
@@ -227,6 +237,11 @@ impl Parser {
                 break;
             }
 
+            if let Some(parsed) = self.parse_multiline_conditional(lines, index) {
+                content.extend(parsed);
+                continue;
+            }
+
             content.extend(self.parse_statement(next_line));
             *index += 1;
         }
@@ -240,6 +255,113 @@ impl Parser {
             declaration.is_function,
         ))
     }
+
+    fn parse_multiline_conditional(
+        &mut self,
+        lines: &[SourceLine],
+        index: &mut usize,
+    ) -> Option<Vec<Object>> {
+        let line = &lines[*index];
+        let trimmed = line.text.trim();
+        if !trimmed.starts_with('{') {
+            return None;
+        }
+
+        let after_open = trimmed.strip_prefix('{')?.trim();
+        let initial_condition = if after_open.is_empty() {
+            None
+        } else {
+            let condition_source = after_open.strip_suffix(':')?.trim();
+            Some(parse_initial_expression(condition_source)?)
+        };
+
+        *index += 1;
+        let mut branches = Vec::new();
+        let mut current_branch = ConditionalBranchBuilder::true_branch();
+
+        while *index < lines.len() {
+            let current_line = &lines[*index];
+            let current_trimmed = current_line.text.trim();
+
+            if current_trimmed == "}" {
+                branches.push(current_branch.finish());
+                *index += 1;
+                let conditional = Conditional::new(initial_condition, branches);
+                return Some(vec![
+                    Object::ContentList(ContentList::new(vec![Object::Conditional(conditional)])),
+                    Object::Text(Text::new("\n", current_line.span.clone())),
+                ]);
+            }
+
+            if let Some(header) = parse_conditional_branch_header(current_trimmed) {
+                if current_branch.has_content() || !branches.is_empty() {
+                    branches.push(current_branch.finish());
+                }
+                current_branch = header;
+                *index += 1;
+                continue;
+            }
+
+            current_branch
+                .objects
+                .extend(self.parse_statement(current_line));
+            *index += 1;
+        }
+
+        None
+    }
+}
+
+struct ConditionalBranchBuilder {
+    is_true_branch: bool,
+    is_else: bool,
+    own_condition: Option<Expression>,
+    objects: Vec<Object>,
+}
+
+impl ConditionalBranchBuilder {
+    fn true_branch() -> Self {
+        Self {
+            is_true_branch: true,
+            is_else: false,
+            own_condition: None,
+            objects: Vec::new(),
+        }
+    }
+
+    fn has_content(&self) -> bool {
+        !self.objects.is_empty() || self.own_condition.is_some() || self.is_else
+    }
+
+    fn finish(self) -> ConditionalBranch {
+        ConditionalBranch::new(
+            self.is_true_branch,
+            self.is_else,
+            false,
+            Weave::new(group_nested_weaves(self.objects, 1), 0),
+            self.own_condition,
+        )
+    }
+}
+
+fn parse_conditional_branch_header(trimmed: &str) -> Option<ConditionalBranchBuilder> {
+    let after_dash = trimmed.strip_prefix('-')?.trim_start();
+    if after_dash == "else:" {
+        return Some(ConditionalBranchBuilder {
+            is_true_branch: false,
+            is_else: true,
+            own_condition: None,
+            objects: Vec::new(),
+        });
+    }
+
+    let condition_source = after_dash.strip_suffix(':')?.trim();
+    Some(ConditionalBranchBuilder {
+        is_true_branch: false,
+        is_else: false,
+        own_condition: Some(parse_initial_expression(condition_source)?),
+        objects: Vec::new(),
+    })
 }
 
 fn group_nested_weaves(objects: Vec<Object>, base_depth: usize) -> Vec<Object> {
@@ -352,6 +474,23 @@ pub(super) fn parse_initial_expression(source: &str) -> Option<Expression> {
 
 fn parse_expression(source: &str) -> Option<Expression> {
     let source = strip_enclosing_parentheses(source.trim());
+    if let Some((left, operator, right)) = split_top_level_word_operator(
+        source,
+        &[
+            ("==", BinaryOperator::Equals),
+            ("!=", BinaryOperator::NotEquals),
+            (">=", BinaryOperator::GreaterThanOrEquals),
+            ("<=", BinaryOperator::LessThanOrEquals),
+            (">", BinaryOperator::GreaterThan),
+            ("<", BinaryOperator::LessThan),
+        ],
+    ) {
+        return Some(Expression::Binary {
+            operator,
+            left: Box::new(parse_expression(left)?),
+            right: Box::new(parse_expression(right)?),
+        });
+    }
     if let Some((left, operator, right)) = split_top_level_operator(
         source,
         &[('+', BinaryOperator::Add), ('-', BinaryOperator::Subtract)],
@@ -529,6 +668,49 @@ fn split_top_level_operator<'a>(
                 };
                 let left = &source[..index];
                 let right = &source[index + ch.len_utf8()..];
+                if !left.trim().is_empty()
+                    && !right.trim().is_empty()
+                    && !is_unary_operator_position(source, index)
+                {
+                    return Some((left.trim(), *operator, right.trim()));
+                }
+            }
+            _ => {}
+        }
+    }
+
+    None
+}
+
+fn split_top_level_word_operator<'a>(
+    source: &'a str,
+    operators: &[(&str, BinaryOperator)],
+) -> Option<(&'a str, BinaryOperator, &'a str)> {
+    let mut in_string = false;
+    let mut escaped = false;
+    let mut paren_depth = 0;
+
+    for (index, ch) in source.char_indices().rev() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+
+        match ch {
+            '\\' if in_string => escaped = true,
+            '"' => in_string = !in_string,
+            ')' if !in_string => paren_depth += 1,
+            '(' if !in_string => paren_depth -= 1,
+            _ if !in_string && paren_depth == 0 => {
+                let Some((operator_text, operator)) = operators
+                    .iter()
+                    .find(|(operator_text, _)| source[index..].starts_with(operator_text))
+                else {
+                    continue;
+                };
+                let right_start = index + operator_text.len();
+                let left = &source[..index];
+                let right = &source[right_start..];
                 if !left.trim().is_empty()
                     && !right.trim().is_empty()
                     && !is_unary_operator_position(source, index)

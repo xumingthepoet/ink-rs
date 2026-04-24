@@ -1,4 +1,5 @@
 mod choice;
+mod conditional;
 mod content_list;
 mod divert;
 mod expression;
@@ -14,6 +15,7 @@ mod variable_assignment;
 mod weave;
 
 pub use choice::Choice;
+pub use conditional::{Conditional, ConditionalBranch};
 pub use content_list::ContentList;
 pub use divert::{Divert, DivertTarget};
 pub use expression::{BinaryOperator, Expression, FloatLiteral, UnaryOperator};
@@ -33,6 +35,7 @@ pub enum Object {
     Text(Text),
     ContentList(ContentList),
     Expression(Expression),
+    Conditional(Conditional),
     LogicLine(Expression),
     Glue(Glue),
     IncDec(IncDec),
@@ -58,6 +61,10 @@ impl Object {
             Object::Expression(expression) => {
                 out.push('\n');
                 expression.write_parse_snapshot(out, indent);
+            }
+            Object::Conditional(conditional) => {
+                out.push('\n');
+                conditional.write_parse_snapshot(out, indent);
             }
             Object::LogicLine(expression) => {
                 out.push('\n');
