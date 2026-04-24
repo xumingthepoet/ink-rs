@@ -68,3 +68,4 @@ fixture!(
     "inkfiles/choices/label-scope-error.ink"
 );
 fixture!(choices_label_scope, "inkfiles/choices/label-scope.ink");
+fixture!(choices_divert_choice, "inkfiles/choices/divert-choice.ink");

@@ -454,8 +454,9 @@ fn lower_linear_weave(
     global_labels: &HashMap<String, String>,
 ) -> Vec<RuntimeObject> {
     let mut content = Vec::new();
+    let choice_labels = HashMap::new();
     for object in weave.content() {
-        lower_object_into(&mut content, object, global_labels);
+        lower_object_into(&mut content, object, &choice_labels, global_labels);
     }
     content
 }
@@ -473,8 +474,8 @@ fn lower_choice_weave(
     let mut needs_terminal_gather = false;
     let mut last_gather_location = None;
     let mut last_section_had_choice = false;
-    let mut choice_labels = HashMap::new();
     let objects = weave.content();
+    let mut choice_labels = collect_local_weave_labels(objects);
 
     // Check if there's an explicit gather anywhere in the weave
     let has_explicit_gather = objects.iter().any(|o| matches!(o, Object::Gather(_)));
@@ -656,7 +657,13 @@ fn lower_weave_section(
             | Object::Tag(_)
             | Object::Sequence(_)
             | Object::Weave(_) => {
-                lower_object_into_with_context(content, &objects[*index], path_mode, global_labels);
+                lower_object_into_with_context(
+                    content,
+                    &objects[*index],
+                    path_mode,
+                    choice_labels,
+                    global_labels,
+                );
                 *index += 1;
             }
             Object::Choice(_) => {
@@ -772,6 +779,7 @@ fn lower_choice_in_section(
     choice_content.extend(lower_content_list_with_context(
         choice.inner_content(),
         &choice_content_path_mode,
+        choice_labels,
         global_labels,
     ));
     let nested_choice_content_path_mode = path_mode.for_choice_nested_content(
@@ -793,6 +801,7 @@ fn lower_choice_in_section(
             &mut choice_content,
             &objects[*index],
             &nested_choice_content_path_mode,
+            choice_labels,
             global_labels,
         );
         *index += 1;
@@ -828,6 +837,34 @@ fn lower_choice_in_section(
     if let Some(identifier) = choice.identifier() {
         choice_labels.insert(identifier.to_string(), format!("c-{choice_index}"));
     }
+}
+
+fn collect_local_weave_labels(objects: &[Object]) -> HashMap<String, String> {
+    let mut labels = HashMap::new();
+    let mut choice_count = 0;
+    let mut gather_count = 0;
+    for object in objects {
+        match object {
+            Object::Choice(choice) => {
+                if let Some(identifier) = choice.identifier() {
+                    labels.insert(identifier.to_string(), format!("c-{choice_count}"));
+                }
+                choice_count += 1;
+            }
+            Object::Gather(gather) => {
+                let gather_name = gather.identifier().map(str::to_string).unwrap_or_else(|| {
+                    let name = format!("g-{gather_count}");
+                    gather_count += 1;
+                    name
+                });
+                if let Some(identifier) = gather.identifier() {
+                    labels.insert(identifier.to_string(), gather_name);
+                }
+            }
+            _ => {}
+        }
+    }
+    labels
 }
 
 fn next_gather_name(objects: &[Object], start_index: usize, unnamed_gather_count: usize) -> String {
@@ -887,6 +924,7 @@ fn choice_outer(
         outer_content.extend(lower_content_list_with_context(
             choice_only_content,
             path_mode,
+            choice_labels,
             global_labels,
         ));
         outer_content.push(RuntimeObject::ControlCommand(ControlCommand::EndString));
@@ -918,7 +956,7 @@ fn choice_outer(
 
     let mut start_content = choice
         .start_content()
-        .map(|cl| lower_content_list_with_context(cl, path_mode, global_labels))
+        .map(|cl| lower_content_list_with_context(cl, path_mode, choice_labels, global_labels))
         .unwrap_or_default();
     start_content.push(RuntimeObject::Divert {
         target: "$r".to_string(),
@@ -969,11 +1007,18 @@ fn choice_container_prefix(
 fn lower_content_list_with_context(
     content_list: &ContentList,
     path_mode: &ChoicePathMode,
+    choice_labels: &HashMap<String, String>,
     global_labels: &HashMap<String, String>,
 ) -> Vec<RuntimeObject> {
     let mut content = Vec::new();
     for object in content_list.objects() {
-        lower_object_into_with_context(&mut content, object, path_mode, global_labels);
+        lower_object_into_with_context(
+            &mut content,
+            object,
+            path_mode,
+            choice_labels,
+            global_labels,
+        );
     }
     content
 }
@@ -1048,7 +1093,11 @@ fn operator_runtime_name(operator: BinaryOperator) -> &'static str {
     operator.runtime_name()
 }
 
-fn lower_sequence(sequence: &Sequence, global_labels: &HashMap<String, String>) -> Container {
+fn lower_sequence(
+    sequence: &Sequence,
+    choice_labels: &HashMap<String, String>,
+    global_labels: &HashMap<String, String>,
+) -> Container {
     let mut content = vec![
         RuntimeObject::ControlCommand(ControlCommand::EvalStart),
         RuntimeObject::ControlCommand(ControlCommand::VisitIndex),
@@ -1106,6 +1155,7 @@ fn lower_sequence(sequence: &Sequence, global_labels: &HashMap<String, String>) 
                 branch_content.extend(lower_content_list_with_context(
                     element,
                     &ChoicePathMode::Root,
+                    choice_labels,
                     global_labels,
                 ));
             }
@@ -1134,6 +1184,7 @@ fn lower_sequence(sequence: &Sequence, global_labels: &HashMap<String, String>) 
 fn lower_object_into(
     content: &mut Vec<RuntimeObject>,
     object: &Object,
+    choice_labels: &HashMap<String, String>,
     global_labels: &HashMap<String, String>,
 ) {
     match object {
@@ -1142,6 +1193,7 @@ fn lower_object_into(
             content.extend(lower_content_list_with_context(
                 content_list,
                 &ChoicePathMode::Root,
+                choice_labels,
                 global_labels,
             ));
         }
@@ -1154,6 +1206,7 @@ fn lower_object_into(
         }),
         Object::Sequence(sequence) => content.push(RuntimeObject::Container(lower_sequence(
             sequence,
+            choice_labels,
             global_labels,
         ))),
         Object::Weave(weave) => content.push(RuntimeObject::Container(Container {
@@ -1169,6 +1222,7 @@ fn lower_object_into_with_context(
     content: &mut Vec<RuntimeObject>,
     object: &Object,
     path_mode: &ChoicePathMode,
+    choice_labels: &HashMap<String, String>,
     global_labels: &HashMap<String, String>,
 ) {
     match object {
@@ -1177,11 +1231,18 @@ fn lower_object_into_with_context(
             content.extend(lower_content_list_with_context(
                 content_list,
                 path_mode,
+                choice_labels,
                 global_labels,
             ));
         }
         Object::Glue(_) => content.push(RuntimeObject::Glue),
-        Object::Divert(divert) => push_divert_with_context(content, divert.target(), path_mode),
+        Object::Divert(divert) => push_divert_with_context(
+            content,
+            divert.target(),
+            path_mode,
+            choice_labels,
+            global_labels,
+        ),
         Object::Choice(_) => {}
         Object::Gather(_) => {} // Handled in lower_choice_weave
         Object::Tag(tag) => content.push(RuntimeObject::Tag {
@@ -1189,6 +1250,7 @@ fn lower_object_into_with_context(
         }),
         Object::Sequence(sequence) => content.push(RuntimeObject::Container(lower_sequence(
             sequence,
+            choice_labels,
             global_labels,
         ))),
         Object::Weave(weave) => {
@@ -1207,12 +1269,20 @@ fn push_divert_with_context(
     content: &mut Vec<RuntimeObject>,
     target: &DivertTarget,
     path_mode: &ChoicePathMode,
+    choice_labels: &HashMap<String, String>,
+    global_labels: &HashMap<String, String>,
 ) {
     match target {
         DivertTarget::Done => content.push(RuntimeObject::ControlCommand(ControlCommand::Done)),
         DivertTarget::End => content.push(RuntimeObject::ControlCommand(ControlCommand::End)),
         DivertTarget::Path(target) => {
-            let resolved_target = resolve_divert_target(target, path_mode);
+            let resolved_target = if let Some(choice_container_name) = choice_labels.get(target) {
+                choice_label_divert_target(path_mode, choice_container_name)
+            } else if let Some(label_target) = global_labels.get(target) {
+                label_target.clone()
+            } else {
+                resolve_divert_target(target, path_mode)
+            };
             content.push(RuntimeObject::Divert {
                 target: resolved_target,
                 variable: false,
@@ -1368,20 +1438,15 @@ fn gather_target(
             format!(".^.^.{gather_container_name}")
         }
         ChoicePathMode::NestedRoot { gather_target, .. } => gather_target.clone(),
-        ChoicePathMode::Flow {
-            flow_name,
-            container_path,
-            ..
-        } => up_path(
-            2 + flow_container_extra_depth(flow_name, container_path),
+        ChoicePathMode::Flow { container_path, .. } => up_path(
+            2 + flow_container_extra_depth(container_path),
             gather_container_name,
         ),
     }
 }
 
-fn flow_container_extra_depth(flow_name: &str, container_path: &str) -> usize {
-    let root_path = format!("{flow_name}.0");
-    let Some(rest) = container_path.strip_prefix(&root_path) else {
+fn flow_container_extra_depth(container_path: &str) -> usize {
+    let Some((_, rest)) = container_path.split_once(".0") else {
         return 0;
     };
     rest.trim_start_matches('.')
@@ -1412,10 +1477,25 @@ fn choice_label_count_target(
         | ChoicePathMode::NestedRoot { .. } => {
             format!(".^.^.{choice_container_name}")
         }
-        ChoicePathMode::Flow { .. } if has_start_content => {
-            format!(".^.^.^.{choice_container_name}")
+        ChoicePathMode::Flow { container_path, .. } => {
+            let levels =
+                1 + flow_container_extra_depth(container_path) + usize::from(has_start_content);
+            up_path(levels, choice_container_name)
         }
-        ChoicePathMode::Flow { .. } => format!(".^.^.{choice_container_name}"),
+    }
+}
+
+fn choice_label_divert_target(path_mode: &ChoicePathMode, choice_container_name: &str) -> String {
+    match path_mode {
+        ChoicePathMode::Root
+        | ChoicePathMode::RootGather { .. }
+        | ChoicePathMode::NestedRoot { .. } => {
+            format!(".^.^.{choice_container_name}")
+        }
+        ChoicePathMode::Flow { container_path, .. } => {
+            let levels = 2 + flow_container_extra_depth(container_path);
+            up_path(levels, choice_container_name)
+        }
     }
 }
 

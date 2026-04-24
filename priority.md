@@ -1,6 +1,6 @@
 # Ink Fixture Priority
 
-通过统计: 44/118
+通过统计: 45/118
 
 Sorted by the latest `WritingWithInk.md` syntax point used by each file.
 
@@ -48,7 +48,7 @@ Sorted by the latest `WritingWithInk.md` syntax point used by each file.
 - [x] `choices/label-flow.ink`
 - [x] `choices/label-scope-error.ink`
 - [x] `choices/label-scope.ink`
-- [ ] `choices/divert-choice.ink`
+- [x] `choices/divert-choice.ink`
 - [ ] `tags/tags.ink`
 - [ ] `variable/var-divert.ink`
 - [ ] `tags/tagsInChoiceDynamic.ink`
