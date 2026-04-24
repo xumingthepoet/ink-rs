@@ -553,6 +553,7 @@ fn variable_declaration_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Obj
 
 fn return_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
     parser.skip_horizontal_whitespace();
+    let span = parser.current_span();
     parser.match_string("~")?;
     parser.skip_horizontal_whitespace();
     let keyword = parser.take_while(is_identifier_continue)?;
@@ -562,7 +563,15 @@ fn return_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
     parser.skip_horizontal_whitespace();
     let expression = parse_initial_expression(parser.line_remainder().trim());
     parser.skip_to_end();
-    Some(vec![Object::Return(Return::new(expression))])
+    let ret = Object::Return(Return::new(expression));
+    if object_contains_function_call(&ret) {
+        Some(vec![Object::ContentList(ContentList::new(vec![
+            ret,
+            Object::Text(Text::new("\n", span)),
+        ]))])
+    } else {
+        Some(vec![ret])
+    }
 }
 
 fn expression_contains_function_call(expr: &Expression) -> bool {

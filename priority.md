@@ -1,6 +1,6 @@
 # Ink Fixture Priority
 
-通过统计: 89/118
+通过统计: 90/118
 
 Sorted by the latest `WritingWithInk.md` syntax point used by each file.
 
@@ -93,7 +93,7 @@ Sorted by the latest `WritingWithInk.md` syntax point used by each file.
 - [x] `glue/testbugfix1.ink`
 - [x] `glue/testbugfix2.ink`
 - [x] `misc/newlines_with_string_eval.ink`
-- [ ] `misc/turns-since.ink`
+- [x] `misc/turns-since.ink`
 - [ ] `function/complex-func1.ink`
 - [ ] `function/complex-func2.ink`
 - [ ] `function/complex-func3.ink`

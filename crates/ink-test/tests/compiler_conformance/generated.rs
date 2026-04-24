@@ -164,3 +164,4 @@ fixture_count_all_visits!(
     misc_newlines_with_string_eval,
     "inkfiles/misc/newlines_with_string_eval.ink"
 );
+fixture_count_all_visits!(misc_turns_since, "inkfiles/misc/turns-since.ink");

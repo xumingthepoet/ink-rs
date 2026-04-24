@@ -63,6 +63,14 @@ pub enum ControlCommand {
     NoOp,
     Pop,
     PopFunction,
+    ChoiceCount,
+    Turns,
+    TurnsSince,
+    ReadCount,
+    Random,
+    SeedRandom,
+    ListRange,
+    ListRandom,
 }
 
 enum ChoiceOuter {
@@ -587,7 +595,7 @@ fn collect_counted_paths_in_object(
         }
         Object::VariableAssignment(assignment) => match assignment.expression() {
             Expression::DivertTarget(target) if assignment.is_global() => {
-                paths.turns.insert(target.clone());
+                insert_counted_divert_target(target, global_labels, paths, true, true);
             }
             expression => collect_counted_paths_in_expression(expression, global_labels, paths),
         },
@@ -625,10 +633,10 @@ fn collect_counted_paths_in_expression(
             for arg in args {
                 match arg {
                     Expression::DivertTarget(target) if count_turns => {
-                        paths.turns.insert(target.clone());
+                        insert_counted_divert_target(target, global_labels, paths, false, true);
                     }
                     Expression::DivertTarget(target) if count_visits => {
-                        paths.visits.insert(target.clone());
+                        insert_counted_divert_target(target, global_labels, paths, true, false);
                     }
                     _ => collect_counted_paths_in_expression(arg, global_labels, paths),
                 }
@@ -646,11 +654,33 @@ fn collect_counted_paths_in_expression(
         Expression::Unary { expression, .. } => {
             collect_counted_paths_in_expression(expression, global_labels, paths);
         }
+        Expression::DivertTarget(target) => {
+            insert_counted_divert_target(target, global_labels, paths, true, true);
+        }
         Expression::String(_)
         | Expression::NumberInt(_)
         | Expression::NumberFloat(_)
-        | Expression::NumberBool(_)
-        | Expression::DivertTarget(_) => {}
+        | Expression::NumberBool(_) => {}
+    }
+}
+
+fn insert_counted_divert_target(
+    target: &str,
+    global_labels: &HashMap<String, String>,
+    paths: &mut CountedFlowPaths,
+    count_visits: bool,
+    count_turns: bool,
+) {
+    let counted_target = global_labels
+        .get(target)
+        .map(String::as_str)
+        .unwrap_or(target)
+        .to_string();
+    if count_visits {
+        paths.visits.insert(counted_target.clone());
+    }
+    if count_turns {
+        paths.turns.insert(counted_target);
     }
 }
 
@@ -1729,25 +1759,15 @@ fn lower_expression_into(
             }
         }
         Expression::FunctionCall { name, args } => {
-            for arg in args {
-                lower_expression_into(
-                    content,
-                    arg,
-                    choice_labels,
-                    global_labels,
-                    path_mode,
-                    has_start_content,
-                );
-            }
-            if is_builtin_function(name) {
-                content.push(RuntimeObject::NativeFunction(
-                    function_runtime_name(name).to_string(),
-                ));
-            } else {
-                content.push(RuntimeObject::FunctionDivert {
-                    target: name.clone(),
-                });
-            }
+            lower_function_call_into(
+                content,
+                name,
+                args,
+                choice_labels,
+                global_labels,
+                path_mode,
+                has_start_content,
+            );
         }
         Expression::Binary {
             operator,
@@ -1808,6 +1828,82 @@ fn lower_expression_into(
     }
 }
 
+fn lower_function_call_into(
+    content: &mut Vec<RuntimeObject>,
+    name: &str,
+    args: &[Expression],
+    choice_labels: &HashMap<String, String>,
+    global_labels: &HashMap<String, String>,
+    path_mode: &ChoicePathMode,
+    has_start_content: bool,
+) {
+    let mut lower_arg = |arg: &Expression| {
+        lower_expression_into(
+            content,
+            arg,
+            choice_labels,
+            global_labels,
+            path_mode,
+            has_start_content,
+        );
+    };
+
+    match name {
+        "CHOICE_COUNT" => content.push(RuntimeObject::ControlCommand(ControlCommand::ChoiceCount)),
+        "TURNS" => content.push(RuntimeObject::ControlCommand(ControlCommand::Turns)),
+        "TURNS_SINCE" => {
+            if let Some(arg) = args.first() {
+                lower_arg(arg);
+            }
+            content.push(RuntimeObject::ControlCommand(ControlCommand::TurnsSince));
+        }
+        "READ_COUNT" => {
+            if let Some(arg) = args.first() {
+                lower_arg(arg);
+            }
+            content.push(RuntimeObject::ControlCommand(ControlCommand::ReadCount));
+        }
+        "RANDOM" => {
+            for arg in args {
+                lower_arg(arg);
+            }
+            content.push(RuntimeObject::ControlCommand(ControlCommand::Random));
+        }
+        "SEED_RANDOM" => {
+            for arg in args {
+                lower_arg(arg);
+            }
+            content.push(RuntimeObject::ControlCommand(ControlCommand::SeedRandom));
+        }
+        "LIST_RANGE" => {
+            for arg in args {
+                lower_arg(arg);
+            }
+            content.push(RuntimeObject::ControlCommand(ControlCommand::ListRange));
+        }
+        "LIST_RANDOM" => {
+            for arg in args {
+                lower_arg(arg);
+            }
+            content.push(RuntimeObject::ControlCommand(ControlCommand::ListRandom));
+        }
+        _ if is_builtin_function(name) => {
+            for arg in args {
+                lower_arg(arg);
+            }
+            content.push(RuntimeObject::NativeFunction(name.to_string()));
+        }
+        _ => {
+            for arg in args {
+                lower_arg(arg);
+            }
+            content.push(RuntimeObject::FunctionDivert {
+                target: name.to_string(),
+            });
+        }
+    }
+}
+
 fn lower_output_expression_into(
     content: &mut Vec<RuntimeObject>,
     expression: &Expression,
@@ -1853,26 +1949,10 @@ fn operator_runtime_name(operator: BinaryOperator) -> &'static str {
     operator.runtime_name()
 }
 
-fn function_runtime_name(name: &str) -> &str {
-    match name {
-        "RANDOM" => "rnd",
-        "SEED_RANDOM" => "srnd",
-        other => other,
-    }
-}
-
 fn is_builtin_function(name: &str) -> bool {
     matches!(
         name,
-        "RANDOM"
-            | "SEED_RANDOM"
-            | "CHOICE_COUNT"
-            | "TURNS"
-            | "TURNS_SINCE"
-            | "READ_COUNT"
-            | "LIST_RANGE"
-            | "LIST_RANDOM"
-            | "LIST_VALUE"
+        "LIST_VALUE"
             | "MIN"
             | "MAX"
             | "POW"
@@ -2445,28 +2525,23 @@ fn resolve_single_stitch_target(target: &str, path_mode: &ChoicePathMode) -> Str
             ..
         } => {
             if parent_flow_name.is_some() {
+                let parent_flow_name = parent_flow_name.as_deref().unwrap();
                 // We're in a stitch - check if target is a sibling stitch
                 if sibling_stitch_names.iter().any(|s| s == target) {
-                    // From inside a choice container in a stitch, we need 4 levels up:
-                    // 1. Named content container (containing c-0, c-1, g-0)
-                    // 2. Weave content array
-                    // 3. Stitch container
-                    // 4. Knot container (where sibling stitches are defined)
-                    ".^.^.^.^.".to_string() + target
-                } else if Some(target) == parent_flow_name.as_deref() {
-                    // Target is the parent knot itself
-                    ".^.^.^.^".to_string()
+                    let relative = ".^.^.^.^.".to_string() + target;
+                    let global = format!("{parent_flow_name}.{target}");
+                    compact_relative_path(&relative, &global)
+                } else if target == parent_flow_name {
+                    compact_relative_path(".^.^.^.^", parent_flow_name)
                 } else {
                     target.to_string()
                 }
             } else {
                 // We're in a knot
                 if sibling_stitch_names.iter().any(|s| s == target) {
-                    // Target is a child stitch - 3 levels up:
-                    // 1. Named content container (containing c-0, c-1, g-0)
-                    // 2. Weave content array
-                    // 3. Knot container (where child stitches are defined)
-                    ".^.^.^.".to_string() + target
+                    let relative = ".^.^.^.".to_string() + target;
+                    let global = format!("{flow_name}.{target}");
+                    compact_relative_path(&relative, &global)
                 } else if *self_target_relative && target == *flow_name {
                     // Match C# CompactPathString behavior: use the relative
                     // self-target only when it is shorter than the global path.
