@@ -191,3 +191,7 @@ fixture!(
     "inkfiles/function/evaluating-function-variablestate-bug.ink"
 );
 fixture_count_all_visits!(misc_read_counts, "inkfiles/misc/read-counts.ink");
+fixture!(
+    tunnels_tunnel_onwards_divert_override,
+    "inkfiles/tunnels/tunnel-onwards-divert-override.ink"
+);

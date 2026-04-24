@@ -1,6 +1,6 @@
 # Ink Fixture Priority
 
-通过统计: 101/118
+通过统计: 102/118
 
 Sorted by the latest `WritingWithInk.md` syntax point used by each file.
 
@@ -105,8 +105,8 @@ Sorted by the latest `WritingWithInk.md` syntax point used by each file.
 - [x] `runtime/external-function-3-arg.ink`
 - [x] `function/evaluating-function-variablestate-bug.ink`
 - [x] `misc/read-counts.ink`
+- [x] `tunnels/tunnel-onwards-divert-override.ink`
 - [ ] `tags/tagsInSeq.ink`
-- [ ] `tunnels/tunnel-onwards-divert-override.ink`
 - [ ] `runtime/multiflow-saveloadthreads.ink`
 - [ ] `threads/thread-bug.ink`
 - [ ] `lists/list-comparison.ink`
