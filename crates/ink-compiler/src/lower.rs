@@ -532,10 +532,18 @@ fn lower_flow_with_context(
             merge_tail_metadata: true,
         }));
     } else if !flow.weave().content().is_empty() {
-        content.extend(lower_linear_weave(
+        let path_mode = ChoicePathMode::Flow {
+            flow_name: flow.name().to_string(),
+            container_path: flow_path.clone(),
+            parent_flow_name: parent_knot_name.map(str::to_string),
+            sibling_stitch_names: sibling_stitch_names.to_vec(),
+            self_target_relative: false,
+        };
+        content.extend(lower_linear_weave_with_context(
             flow.weave(),
             global_labels,
             global_variables,
+            &path_mode,
         ));
     }
 
@@ -607,12 +615,27 @@ fn lower_linear_weave(
     global_labels: &HashMap<String, String>,
     global_variables: &HashSet<String>,
 ) -> Vec<RuntimeObject> {
+    lower_linear_weave_with_context(
+        weave,
+        global_labels,
+        global_variables,
+        &ChoicePathMode::Root,
+    )
+}
+
+fn lower_linear_weave_with_context(
+    weave: &Weave,
+    global_labels: &HashMap<String, String>,
+    global_variables: &HashSet<String>,
+    path_mode: &ChoicePathMode,
+) -> Vec<RuntimeObject> {
     let mut content = Vec::new();
     let choice_labels = HashMap::new();
     for object in weave.content() {
-        lower_object_into(
+        lower_object_into_with_context(
             &mut content,
             object,
+            path_mode,
             &choice_labels,
             global_labels,
             global_variables,
@@ -1601,101 +1624,6 @@ fn runtime_index_path(path_mode: &ChoicePathMode, index: usize) -> String {
         ChoicePathMode::RootGather { gather_name } => format!("0.{gather_name}.{index}"),
         ChoicePathMode::NestedRoot { container_path, .. } => format!("{container_path}.{index}"),
         ChoicePathMode::Flow { container_path, .. } => format!("{container_path}.{index}"),
-    }
-}
-
-fn lower_object_into(
-    content: &mut Vec<RuntimeObject>,
-    object: &Object,
-    choice_labels: &HashMap<String, String>,
-    global_labels: &HashMap<String, String>,
-    global_variables: &HashSet<String>,
-) {
-    match object {
-        Object::Text(text) => content.push(RuntimeObject::String(text.text().to_string())),
-        Object::ContentList(content_list) => {
-            lower_content_list_into_context(
-                content,
-                content_list,
-                &ChoicePathMode::Root,
-                choice_labels,
-                global_labels,
-                global_variables,
-            );
-        }
-        Object::Expression(expression) => lower_output_expression_into(
-            content,
-            expression,
-            choice_labels,
-            global_labels,
-            &ChoicePathMode::Root,
-        ),
-        Object::Conditional(conditional) => lower_conditional_into(
-            content,
-            conditional,
-            choice_labels,
-            global_labels,
-            global_variables,
-            &ChoicePathMode::Root,
-        ),
-        Object::LogicLine(expression) => lower_logic_line_into(
-            content,
-            expression,
-            choice_labels,
-            global_labels,
-            &ChoicePathMode::Root,
-        ),
-        Object::Glue(_) => content.push(RuntimeObject::Glue),
-        Object::Divert(divert) => push_divert_with_context(
-            content,
-            divert.target(),
-            &ChoicePathMode::Root,
-            choice_labels,
-            global_labels,
-            global_variables,
-        ),
-        Object::Choice(_) => {}
-        Object::Gather(_) => {} // Handled in lower_choice_weave
-        Object::VariableAssignment(assignment) => {
-            lower_variable_assignment_into(
-                content,
-                assignment,
-                &ChoicePathMode::Root,
-                choice_labels,
-                global_labels,
-            );
-        }
-        Object::IncDec(inc_dec) => {
-            lower_inc_dec_into(
-                content,
-                inc_dec,
-                &ChoicePathMode::Root,
-                choice_labels,
-                global_labels,
-            );
-        }
-        Object::Tag(tag) => content.push(RuntimeObject::Tag {
-            is_start: tag.is_start(),
-        }),
-        Object::Sequence(sequence) => content.push(RuntimeObject::Container(lower_sequence(
-            sequence,
-            choice_labels,
-            global_labels,
-            global_variables,
-            &sequence_container_path_for(&ChoicePathMode::Root, content.len()),
-        ))),
-        Object::Weave(weave) => content.push(RuntimeObject::Container(Container {
-            content: lower_choice_weave(
-                weave,
-                ChoicePathMode::Root,
-                global_labels,
-                global_variables,
-                false,
-            ),
-            name: None,
-            flags: None,
-            merge_tail_metadata: true,
-        })),
     }
 }
 

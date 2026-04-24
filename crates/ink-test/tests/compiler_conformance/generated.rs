@@ -101,3 +101,7 @@ fixture!(conditional_ifelse, "inkfiles/conditional/ifelse.ink");
 fixture!(conditional_iffalse, "inkfiles/conditional/iffalse.ink");
 fixture!(conditional_iftrue, "inkfiles/conditional/iftrue.ink");
 fixture!(function_test_error, "inkfiles/function/test-error.ink");
+fixture_count_all_visits!(
+    runtime_read_visit_counts,
+    "inkfiles/runtime/read-visit-counts.ink"
+);
