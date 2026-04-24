@@ -4635,7 +4635,6 @@ Done.
     //             Assert.AreEqual("5\n", story.Continue());
     //         }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestVariableDeclarationInConditional() {
         run_in_both_modes(|suite| {
             let mut story = suite
