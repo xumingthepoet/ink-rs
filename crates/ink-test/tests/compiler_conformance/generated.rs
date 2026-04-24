@@ -99,3 +99,4 @@ fixture!(function_rnd_func, "inkfiles/function/rnd-func.ink");
 fixture_count_all_visits!(misc_operations, "inkfiles/misc/operations.ink");
 fixture!(conditional_ifelse, "inkfiles/conditional/ifelse.ink");
 fixture!(conditional_iffalse, "inkfiles/conditional/iffalse.ink");
+fixture!(conditional_iftrue, "inkfiles/conditional/iftrue.ink");

@@ -104,7 +104,7 @@ For the continuation workflow above, the minimum required validation before mark
 
 ## Working Note Entries
 
-- [2026-04-24 00:02 CST] [👍15][👎0] First distinguish “queue maintenance” from real compiler work: if a priority fixture already passes under existing generic behavior, just enable it, validate it, update `priority.md`, and commit. Only change compiler code when the fixture exposes a genuine model or export gap.
+- [2026-04-24 00:02 CST] [👍16][👎0] First distinguish “queue maintenance” from real compiler work: if a priority fixture already passes under existing generic behavior, just enable it, validate it, update `priority.md`, and commit. Only change compiler code when the fixture exposes a genuine model or export gap.
 - [2026-04-24 00:22 CST] [👍10][👎0] When a conformance fixture introduces a new structural node in the parse snapshot, add that node to the parsed model first, then lower JSON from that model. Keeping `Story`/`Flow` aligned with the C# compiler shape prevents flow semantics from leaking into ad hoc export logic and keeps parser, snapshot, and runtime output moving together.
 - [2026-04-24 08:50 CST] [👍0][👎0] Built-in function calls are expressions: lower arguments first, then emit the runtime native command token. Inline `{...}` expressions output with `out`, while standalone `~ expr` logic lines evaluate then `pop` and keep the line newline.
 - [2026-04-24 07:18 CST] [👍4][👎0] Weave lowering needs a current-container model. After a gather, later text and choices belong inside that gather until another gather moves the current container again; choices inside the gather need their own nested named content and paths relative to that container.
