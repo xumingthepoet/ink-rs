@@ -142,3 +142,7 @@ fixture!(
     conditional_shuffle_once,
     "inkfiles/conditional/shuffle_once.ink"
 );
+fixture!(
+    conditional_shuffle_stopping,
+    "inkfiles/conditional/shuffle_stopping.ink"
+);
