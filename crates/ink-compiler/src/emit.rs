@@ -112,6 +112,7 @@ fn runtime_object_to_value(object: &RuntimeObject) -> Value {
                 ControlCommand::Pop => "pop",
                 ControlCommand::PopFunction => "~ret",
                 ControlCommand::PopTunnel => "->->",
+                ControlCommand::StartThread => "thread",
                 ControlCommand::ChoiceCount => "choiceCnt",
                 ControlCommand::Turns => "turn",
                 ControlCommand::TurnsSince => "turns",

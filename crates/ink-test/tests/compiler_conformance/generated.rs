@@ -196,3 +196,8 @@ fixture!(
     "inkfiles/tunnels/tunnel-onwards-divert-override.ink"
 );
 fixture!(tags_tags_in_seq, "inkfiles/tags/tagsInSeq.ink");
+fixture!(
+    runtime_multiflow_saveloadthreads,
+    "inkfiles/runtime/multiflow-saveloadthreads.ink"
+);
+fixture!(threads_thread_bug, "inkfiles/threads/thread-bug.ink");

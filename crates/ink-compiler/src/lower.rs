@@ -67,6 +67,7 @@ pub enum ControlCommand {
     Pop,
     PopFunction,
     PopTunnel,
+    StartThread,
     ChoiceCount,
     Turns,
     TurnsSince,
@@ -903,7 +904,12 @@ fn collect_flow_labels(
     if parent_flow_name.is_none() {
         labels.insert(flow.name().to_string(), flow_path.clone());
     }
-    collect_weave_labels(flow.weave(), &format!("{flow_path}.0"), labels);
+    let weave_container_path = if weave_has_choice(flow.weave()) {
+        format!("{}.{}", flow_path, flow.arguments().len())
+    } else {
+        format!("{flow_path}.0")
+    };
+    collect_weave_labels(flow.weave(), &weave_container_path, labels);
     for child in flow.child_flows() {
         collect_flow_labels(child, Some(&flow_path), labels);
     }
@@ -1036,8 +1042,8 @@ fn lower_flow_with_context(
     if weave_has_choice(flow.weave()) {
         // For stitches inside a knot, pass the parent knot name and sibling stitch names
         let flow_container_path = parent_knot_name
-            .map(|parent| format!("{parent}.{}.0", flow.name()))
-            .unwrap_or_else(|| format!("{}.0", flow.name()));
+            .map(|parent| format!("{parent}.{}.{}", flow.name(), content.len()))
+            .unwrap_or_else(|| format!("{}.{}", flow.name(), content.len()));
         let path_mode = ChoicePathMode::Flow {
             flow_name: flow.name().to_string(),
             container_path: flow_container_path,
@@ -1142,6 +1148,25 @@ fn flow_container_flags(
         (false, true) => Some(1),
         (false, false) => None,
     }
+}
+
+fn named_container_flags(
+    count_visits: bool,
+    count_turns: bool,
+    force_named_flag: bool,
+) -> Option<i32> {
+    let mut flags = 0;
+    if count_visits {
+        flags |= 1;
+    }
+    if count_turns {
+        flags |= 2;
+    }
+    if force_named_flag || count_visits || count_turns {
+        flags |= 4;
+    }
+
+    (flags != 0).then_some(flags)
 }
 
 fn lower_flow_arguments_into(content: &mut Vec<RuntimeObject>, flow: &Flow) {
@@ -1358,6 +1383,8 @@ fn lower_choice_weave_with_initial_content(
     let mut current_path_mode = path_mode.clone();
     let objects = weave.content();
     let mut choice_labels = collect_local_weave_labels(objects, &path_mode);
+    let mut counted_paths = CountedFlowPaths::default();
+    collect_counted_paths_in_weave(weave, global_labels, &mut counted_paths);
 
     // Check if there's an explicit gather anywhere in the weave
     let has_explicit_gather = objects.iter().any(|o| matches!(o, Object::Gather(_)));
@@ -1461,11 +1488,17 @@ fn lower_choice_weave_with_initial_content(
                 let gather_container = Container {
                     content: gather_content,
                     name: Some(gather_name),
-                    flags: if count_all_visits || gather.identifier().is_some() {
-                        Some(5)
-                    } else {
-                        None
-                    },
+                    flags: named_container_flags(
+                        count_all_visits
+                            || gather.identifier().is_some()
+                            || counted_paths
+                                .visits
+                                .contains(&path_mode_container_path(&gather_path_mode)),
+                        counted_paths
+                            .turns
+                            .contains(&path_mode_container_path(&gather_path_mode)),
+                        gather.identifier().is_some(),
+                    ),
                     merge_tail_metadata: true,
                 };
                 if auto_enter_gather {
@@ -1788,7 +1821,10 @@ fn lower_choice_in_section(
         matches!(path_mode, ChoicePathMode::Flow { .. })
             && !path_mode_is_flow_before_gather(path_mode)
             && content_list_contains_nonreturning_divert(choice.inner_content(), choice_labels);
-    if include_gather && !suppress_rejoin_for_nonreturning_flow_divert {
+    if include_gather
+        && !suppress_rejoin_for_nonreturning_flow_divert
+        && !(has_explicit_gather && !has_following_gather && ends_with_end_or_done(&choice_content))
+    {
         choice_content.push(RuntimeObject::Divert {
             target: gather_target(
                 weave_path_mode,
@@ -2090,9 +2126,19 @@ fn lower_expression_into(
         Expression::NumberInt(value) => content.push(RuntimeObject::Int(*value)),
         Expression::NumberFloat(value) => content.push(RuntimeObject::Float(*value)),
         Expression::NumberBool(value) => content.push(RuntimeObject::Bool(*value)),
-        Expression::DivertTarget(target) => content.push(RuntimeObject::DivertTarget(
-            resolve_divert_target(target, path_mode),
-        )),
+        Expression::DivertTarget(target) => {
+            let resolved_target = if let Some(choice_target) = choice_labels.get(target) {
+                choice_target.clone()
+            } else if let Some(label_target) = global_labels
+                .get(target)
+                .filter(|label_target| label_target.as_str() != target)
+            {
+                resolve_label_target(label_target, path_mode)
+            } else {
+                resolve_divert_target(target, path_mode)
+            };
+            content.push(RuntimeObject::DivertTarget(resolved_target));
+        }
         Expression::VariableReference(name) => {
             if let Some(choice_target) = choice_labels.get(name) {
                 let _ = has_start_content;
@@ -3378,6 +3424,10 @@ fn push_divert_with_context(
         content.push(RuntimeObject::ControlCommand(ControlCommand::EvalEnd));
     }
 
+    if divert.is_thread() {
+        content.push(RuntimeObject::ControlCommand(ControlCommand::StartThread));
+    }
+
     match divert.target() {
         DivertTarget::Done => content.push(RuntimeObject::ControlCommand(ControlCommand::Done)),
         DivertTarget::End => content.push(RuntimeObject::ControlCommand(ControlCommand::End)),
@@ -3393,7 +3443,7 @@ fn push_divert_with_context(
                     false,
                     divert.is_tunnel(),
                 )
-            } else if global_variables.contains(target) {
+            } else if path_mode.is_local_variable(target) || global_variables.contains(target) {
                 runtime_divert(target.clone(), true, divert.is_tunnel())
             } else {
                 runtime_divert(
@@ -3625,6 +3675,19 @@ fn ends_with_flow_terminator(content: &[RuntimeObject]) -> bool {
                 object,
                 RuntimeObject::Divert { .. }
                     | RuntimeObject::ControlCommand(ControlCommand::End | ControlCommand::Done)
+            )
+        })
+}
+
+fn ends_with_end_or_done(content: &[RuntimeObject]) -> bool {
+    content
+        .iter()
+        .rev()
+        .find(|object| !matches!(object, RuntimeObject::String(text) if text == "\n"))
+        .is_some_and(|object| {
+            matches!(
+                object,
+                RuntimeObject::ControlCommand(ControlCommand::End | ControlCommand::Done)
             )
         })
 }

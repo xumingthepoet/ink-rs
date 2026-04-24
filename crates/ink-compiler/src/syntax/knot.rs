@@ -143,29 +143,28 @@ fn parse_arguments(parser: &mut RuleParser<'_>) -> Option<Vec<FlowArgument>> {
 }
 
 fn parse_argument(parser: &mut RuleParser<'_>) -> Option<FlowArgument> {
-    let first = parse_identifier(parser)?;
-    parser.skip_horizontal_whitespace();
-
     let mut is_by_reference = false;
     let mut is_divert_target = false;
-    let name = if first == "ref" {
+
+    if parser
+        .parse_rule(|parser| {
+            let keyword = parse_identifier(parser)?;
+            (keyword == "ref").then_some(())
+        })
+        .is_some()
+    {
         is_by_reference = true;
-        if parser.match_string("->").is_some() {
-            is_divert_target = true;
-            parser.skip_horizontal_whitespace();
-        }
-        parser.expect("parameter name", parse_identifier, |parser| {
-            parser.skip_to_end();
-        })?
-    } else if parser.match_string("->").is_some() {
+        parser.skip_horizontal_whitespace();
+    }
+
+    if parser.match_string("->").is_some() {
         is_divert_target = true;
         parser.skip_horizontal_whitespace();
-        parser.expect("parameter name", parse_identifier, |parser| {
-            parser.skip_to_end();
-        })?
-    } else {
-        first
-    };
+    }
+
+    let name = parser.expect("parameter name", parse_identifier, |parser| {
+        parser.skip_to_end();
+    })?;
 
     Some(FlowArgument::new(name, is_by_reference, is_divert_target))
 }

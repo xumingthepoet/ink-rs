@@ -49,6 +49,11 @@ impl Divert {
         self
     }
 
+    pub fn with_thread(mut self) -> Self {
+        self.is_thread = true;
+        self
+    }
+
     pub fn target(&self) -> &DivertTarget {
         &self.target
     }

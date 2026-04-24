@@ -16,6 +16,11 @@ pub(super) fn parse_divert_objects(parser: &mut RuleParser<'_>) -> Option<Vec<Ob
 
 pub(super) fn parse_divert_objects_source(source: &str, span: SourceSpan) -> Option<Vec<Object>> {
     let source = source.trim();
+    if let Some(after_thread_arrow) = source.strip_prefix("<-") {
+        let divert = parse_divert_source(after_thread_arrow, span)?.with_thread();
+        return Some(vec![Object::Divert(divert)]);
+    }
+
     if !source.starts_with("->") {
         return None;
     }
