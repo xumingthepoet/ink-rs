@@ -51,6 +51,11 @@ impl CharacterRangeParser {
     }
 }
 
+enum ParseResult<T> {
+    Value(T),
+    Success,
+}
+
 struct StringParser {
     input: String,
     cursor: usize,
@@ -62,45 +67,67 @@ impl StringParser {
         Self { input, cursor: 0 }
     }
 
-    fn ParseString(&mut self, target: String) -> Option<String> {
+    fn ParseString(&mut self, target: String) -> Option<ParseResult<String>> {
         let remainder = &self.input[self.cursor..];
         if !remainder.starts_with(&target) {
             return None;
         }
         self.cursor += target.len();
-        Some(target)
+        Some(ParseResult::Value(target))
+    }
+
+    fn Optional<T, R>(mut rule: R) -> impl FnMut(&mut Self) -> Option<ParseResult<T>>
+    where
+        R: FnMut(&mut Self) -> Option<ParseResult<T>>,
+    {
+        move |parser| rule(parser).or(Some(ParseResult::Success))
+    }
+
+    fn add_result<T>(result: ParseResult<T>, results: &mut Vec<T>) -> bool {
+        match result {
+            ParseResult::Value(value) => {
+                results.push(value);
+                false
+            }
+            ParseResult::Success => true,
+        }
     }
 
     fn Interleave<T, A, B>(
         &mut self,
         mut first: A,
         mut second: B,
-        _until: Option<fn(&mut Self) -> Option<T>>,
+        _until: Option<fn(&mut Self) -> Option<ParseResult<T>>>,
         _flatten: bool,
     ) -> Option<Vec<T>>
     where
-        A: FnMut(&mut Self) -> Option<T>,
-        B: FnMut(&mut Self) -> Option<T>,
+        A: FnMut(&mut Self) -> Option<ParseResult<T>>,
+        B: FnMut(&mut Self) -> Option<ParseResult<T>>,
     {
         let mut results = Vec::new();
-        results.push(first(self)?);
+        Self::add_result(first(self)?, &mut results);
 
         while self.cursor < self.input.len() {
-            let before = self.cursor;
-            if let Some(value) = second(self) {
-                results.push(value);
-                continue;
+            let Some(last_main_result) = second(self) else {
+                break;
+            };
+            let last_main_was_success = Self::add_result(last_main_result, &mut results);
+
+            let Some(outer_result) = first(self) else {
+                break;
+            };
+            let outer_was_success = Self::add_result(outer_result, &mut results);
+
+            if last_main_was_success && outer_was_success {
+                break;
             }
-            self.cursor = before;
-            if let Some(value) = first(self) {
-                results.push(value);
-                continue;
-            }
-            self.cursor = before;
-            break;
         }
 
-        Some(results)
+        if results.is_empty() {
+            None
+        } else {
+            Some(results)
+        }
     }
 }
 
@@ -3329,12 +3356,11 @@ Knot.
     //             Assert.AreEqual(expected, results);
     //         }
     #[test]
-    #[ignore]
     fn TestStringParserABAOptional() {
         let mut p = StringParser::new("ABAA".to_string());
         let results = p.Interleave::<String, _, _>(
             |p| p.ParseString("A".to_string()),
-            |p| p.ParseString("B".to_string()),
+            StringParser::Optional(|p| p.ParseString("B".to_string())),
             None,
             true,
         );
