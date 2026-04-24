@@ -835,7 +835,7 @@ fn return_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
     parser.skip_horizontal_whitespace();
     let expression = parse_initial_expression(parser.line_remainder().trim());
     parser.skip_to_end();
-    let ret = Object::Return(Return::new(expression));
+    let ret = Object::Return(Return::new(expression, span.clone()));
     if object_contains_function_call(&ret) {
         Some(vec![Object::ContentList(ContentList::new(vec![
             ret,

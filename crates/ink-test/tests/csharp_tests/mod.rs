@@ -1078,7 +1078,6 @@ VAR x = 3
     //             Assert.IsTrue(HadError("Functions may not contain diverts"));
     //         }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestEndOfContent() {
         run_in_both_modes(|suite| {
             let mut story = suite
