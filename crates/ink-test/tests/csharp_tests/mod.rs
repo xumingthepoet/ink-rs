@@ -2699,7 +2699,6 @@ Shuffle once: {f_shuffle_once()} {f_shuffle_once()} {f_shuffle_once()} {f_shuffl
     //             Assert.AreEqual("result\n", story.Continue());
     //         }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestConditionalChoiceInWeave() {
         run_in_both_modes(|suite| {
             let mut story = suite
