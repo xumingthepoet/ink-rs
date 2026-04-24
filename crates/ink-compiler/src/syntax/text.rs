@@ -123,7 +123,7 @@ fn parse_inline_content_inner(
             continue;
         }
 
-        if remaining.starts_with("->") {
+        if remaining.starts_with("->") || remaining.starts_with("<-") {
             if tag_state.active {
                 objects.push(Object::Tag(Tag::new(false, false)));
                 tag_state.active = false;
@@ -141,12 +141,14 @@ fn parse_inline_content_inner(
             Some(0) => return None,
             Some(index) => {
                 let prefix_text = unescape_content_text(&remaining[..index]);
-                let prefix =
-                    if trim_divert_separator_whitespace && remaining[index..].starts_with("->") {
-                        normalize_divert_separator_whitespace(&prefix_text)
-                    } else {
-                        prefix_text
-                    };
+                let prefix = if trim_divert_separator_whitespace
+                    && (remaining[index..].starts_with("->")
+                        || remaining[index..].starts_with("<-"))
+                {
+                    normalize_divert_separator_whitespace(&prefix_text)
+                } else {
+                    prefix_text
+                };
                 if !prefix.is_empty() {
                     objects.push(Object::Text(Text::new(prefix, span.clone())));
                 }
@@ -192,6 +194,7 @@ fn find_next_unescaped_inline_token(source: &str) -> Option<usize> {
             || ch == '{'
             || source[index..].starts_with("<>")
             || source[index..].starts_with("->")
+            || source[index..].starts_with("<-")
         {
             return Some(index);
         }

@@ -8248,7 +8248,6 @@ hello
     // C#:     Assert.AreEqual("Content\n", story.Continue());
     // C#: }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestThreadInLogic() {
         run_in_both_modes(|suite| {
             let mut story = suite
