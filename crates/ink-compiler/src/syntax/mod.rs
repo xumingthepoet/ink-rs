@@ -327,7 +327,12 @@ impl Parser {
             let current_trimmed = current_line.text.trim();
 
             if current_trimmed == "}" {
-                branches.push(current_branch.finish());
+                branches.push(current_branch);
+                classify_conditional_branches(initial_condition.is_some(), &mut branches);
+                let branches = branches
+                    .into_iter()
+                    .map(ConditionalBranchBuilder::finish)
+                    .collect();
                 *index += 1;
                 let conditional = Conditional::new(initial_condition, branches);
                 let mut objects = prefix;
@@ -338,11 +343,32 @@ impl Parser {
                 return Some(objects);
             }
 
-            if let Some(header) = parse_conditional_branch_header(current_trimmed) {
+            if let Some(parsed_branch) = parse_conditional_branch_header(current_trimmed) {
                 if current_branch.has_content() || !branches.is_empty() {
-                    branches.push(current_branch.finish());
+                    branches.push(current_branch);
                 }
-                current_branch = header;
+                current_branch = parsed_branch.builder;
+                if let Some(content) = parsed_branch.inline_content {
+                    self.append_conditional_branch_inline_content(
+                        &mut current_branch,
+                        content,
+                        current_line,
+                    );
+                }
+                *index += 1;
+                continue;
+            }
+
+            if let Some(content) = parse_default_conditional_branch_content(current_trimmed) {
+                if current_branch.has_content() || !branches.is_empty() {
+                    branches.push(current_branch);
+                }
+                current_branch = ConditionalBranchBuilder::content_branch();
+                self.append_conditional_branch_inline_content(
+                    &mut current_branch,
+                    content,
+                    current_line,
+                );
                 *index += 1;
                 continue;
             }
@@ -354,6 +380,23 @@ impl Parser {
         }
 
         None
+    }
+
+    fn append_conditional_branch_inline_content(
+        &mut self,
+        branch: &mut ConditionalBranchBuilder,
+        content: &str,
+        source_line: &SourceLine,
+    ) {
+        if content.trim().is_empty() {
+            return;
+        }
+
+        let content_line = SourceLine {
+            text: content.trim_start().to_string(),
+            span: source_line.span.clone(),
+        };
+        branch.objects.extend(self.parse_statement(&content_line));
     }
 
     fn parse_multiline_sequence(
@@ -491,6 +534,7 @@ fn parse_optional_gather_identifier(source: &str) -> (Option<String>, &str) {
 struct ConditionalBranchBuilder {
     is_true_branch: bool,
     is_else: bool,
+    explicit_else: bool,
     own_condition: Option<Expression>,
     objects: Vec<Object>,
 }
@@ -500,6 +544,17 @@ impl ConditionalBranchBuilder {
         Self {
             is_true_branch: true,
             is_else: false,
+            explicit_else: false,
+            own_condition: None,
+            objects: Vec::new(),
+        }
+    }
+
+    fn content_branch() -> Self {
+        Self {
+            is_true_branch: false,
+            is_else: false,
+            explicit_else: false,
             own_condition: None,
             objects: Vec::new(),
         }
@@ -520,24 +575,128 @@ impl ConditionalBranchBuilder {
     }
 }
 
-fn parse_conditional_branch_header(trimmed: &str) -> Option<ConditionalBranchBuilder> {
+struct ParsedConditionalBranchHeader<'a> {
+    builder: ConditionalBranchBuilder,
+    inline_content: Option<&'a str>,
+}
+
+fn parse_conditional_branch_header(trimmed: &str) -> Option<ParsedConditionalBranchHeader<'_>> {
     let after_dash = trimmed.strip_prefix('-')?.trim_start();
-    if after_dash == "else:" {
-        return Some(ConditionalBranchBuilder {
-            is_true_branch: false,
-            is_else: true,
-            own_condition: None,
-            objects: Vec::new(),
+    if trimmed.starts_with("->") {
+        return None;
+    }
+
+    if let Some(after_else) = after_dash.strip_prefix("else") {
+        if after_else
+            .chars()
+            .next()
+            .is_some_and(is_identifier_continue)
+        {
+            return None;
+        }
+
+        let inline_content = after_else.trim_start().strip_prefix(':')?;
+        return Some(ParsedConditionalBranchHeader {
+            builder: ConditionalBranchBuilder {
+                is_true_branch: false,
+                is_else: true,
+                explicit_else: true,
+                own_condition: None,
+                objects: Vec::new(),
+            },
+            inline_content: non_empty_trimmed(inline_content),
         });
     }
 
-    let condition_source = after_dash.strip_suffix(':')?.trim();
-    Some(ConditionalBranchBuilder {
-        is_true_branch: false,
-        is_else: false,
-        own_condition: Some(parse_initial_expression(condition_source)?),
-        objects: Vec::new(),
+    let (condition_source, inline_content) = split_top_level_once(after_dash, ':')?;
+    Some(ParsedConditionalBranchHeader {
+        builder: ConditionalBranchBuilder {
+            is_true_branch: false,
+            is_else: false,
+            explicit_else: false,
+            own_condition: Some(parse_initial_expression(condition_source.trim())?),
+            objects: Vec::new(),
+        },
+        inline_content: non_empty_trimmed(inline_content),
     })
+}
+
+fn parse_default_conditional_branch_content(trimmed: &str) -> Option<&str> {
+    if trimmed.starts_with("->") {
+        return None;
+    }
+    let content = trimmed.strip_prefix('-')?.trim_start();
+    Some(content)
+}
+
+fn classify_conditional_branches(
+    has_initial_condition: bool,
+    branches: &mut [ConditionalBranchBuilder],
+) {
+    if has_initial_condition {
+        let mut earlier_branches_have_own_condition = false;
+        let last_index = branches.len().saturating_sub(1);
+
+        for (index, branch) in branches.iter_mut().enumerate() {
+            let is_last = index == last_index;
+            branch.is_true_branch = false;
+
+            if branch.own_condition.is_some() {
+                branch.is_else = false;
+                earlier_branches_have_own_condition = true;
+            } else if branch.explicit_else || (earlier_branches_have_own_condition && is_last) {
+                branch.is_else = true;
+            } else if index == 0 {
+                branch.is_true_branch = true;
+                branch.is_else = false;
+            } else {
+                branch.is_else = true;
+            }
+        }
+    } else {
+        let last_index = branches.len().saturating_sub(1);
+        for (index, branch) in branches.iter_mut().enumerate() {
+            branch.is_true_branch = false;
+            if branch.explicit_else || (branch.own_condition.is_none() && index == last_index) {
+                branch.is_else = true;
+            }
+        }
+    }
+}
+
+fn non_empty_trimmed(source: &str) -> Option<&str> {
+    let trimmed = source.trim();
+    (!trimmed.is_empty()).then_some(trimmed)
+}
+
+fn split_top_level_once(source: &str, needle: char) -> Option<(&str, &str)> {
+    let mut in_string = false;
+    let mut escaped = false;
+    let mut paren_depth = 0;
+    let mut brace_depth = 0;
+
+    for (index, ch) in source.char_indices() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+
+        match ch {
+            '\\' if in_string => escaped = true,
+            '"' => in_string = !in_string,
+            '(' if !in_string => paren_depth += 1,
+            ')' if !in_string => paren_depth -= 1,
+            '{' if !in_string => brace_depth += 1,
+            '}' if !in_string => brace_depth -= 1,
+            _ if ch == needle && !in_string && paren_depth == 0 && brace_depth == 0 => {
+                let right_start = index + ch.len_utf8();
+                return Some((&source[..index], &source[right_start..]));
+            }
+            _ => {}
+        }
+    }
+
+    None
 }
 
 fn is_multiline_sequence_element_start(line: &SourceLine) -> bool {

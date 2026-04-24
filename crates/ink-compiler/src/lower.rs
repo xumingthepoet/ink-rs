@@ -3092,17 +3092,36 @@ fn lower_conditional_into(
         content.push(RuntimeObject::ControlCommand(ControlCommand::EvalEnd));
     }
 
-    let rejoin_index = content.len() + conditional.branches().len();
+    let has_initial_condition = conditional.initial_condition().is_some();
+    let switch_like = has_initial_condition
+        && conditional
+            .branches()
+            .iter()
+            .any(|branch| branch.own_condition().is_some());
+    let needs_fallthrough_pop = switch_like
+        && !conditional
+            .branches()
+            .last()
+            .is_some_and(|branch| branch.is_else());
+    let rejoin_index =
+        content.len() + conditional.branches().len() + usize::from(needs_fallthrough_pop);
     let rejoin_target = runtime_index_path(path_mode, rejoin_index);
     let branch_rejoin_target = rejoin_target;
-    let has_initial_condition = conditional.initial_condition().is_some();
 
     for branch in conditional.branches() {
         let branch_path_mode = path_mode.for_conditional_branch(content.len());
         let mut branch_content = Vec::new();
-        if !has_initial_condition {
-            if let Some(condition) = branch.own_condition() {
+        let duplicates_stack_value = switch_like && !branch.is_else();
+        if duplicates_stack_value {
+            branch_content.push(RuntimeObject::ControlCommand(ControlCommand::Duplicate));
+        }
+
+        if !branch.is_true_branch() && !branch.is_else() {
+            let needs_eval = branch.own_condition().is_some();
+            if needs_eval {
                 branch_content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
+            }
+            if let Some(condition) = branch.own_condition() {
                 lower_expression_into(
                     &mut branch_content,
                     condition,
@@ -3112,6 +3131,11 @@ fn lower_conditional_into(
                     path_mode,
                     false,
                 );
+            }
+            if switch_like {
+                branch_content.push(RuntimeObject::NativeFunction("==".to_string()));
+            }
+            if needs_eval {
                 branch_content.push(RuntimeObject::ControlCommand(ControlCommand::EvalEnd));
             }
         }
@@ -3129,9 +3153,18 @@ fn lower_conditional_into(
 
         if weave_has_choice(branch.content()) {
             let initial_content = if branch.is_inline() {
-                Vec::new()
+                if duplicates_stack_value || (branch.is_else() && switch_like) {
+                    vec![RuntimeObject::ControlCommand(ControlCommand::Pop)]
+                } else {
+                    Vec::new()
+                }
             } else {
-                vec![RuntimeObject::String("\n".to_string())]
+                let mut initial_content = Vec::new();
+                if duplicates_stack_value || (branch.is_else() && switch_like) {
+                    initial_content.push(RuntimeObject::ControlCommand(ControlCommand::Pop));
+                }
+                initial_content.push(RuntimeObject::String("\n".to_string()));
+                initial_content
             };
             let mut content_container = Vec::new();
             let mut lowered_branch = lower_choice_weave_with_initial_content(
@@ -3165,6 +3198,9 @@ fn lower_conditional_into(
             }]));
         } else {
             let mut content_container = Vec::new();
+            if duplicates_stack_value || (branch.is_else() && switch_like) {
+                content_container.push(RuntimeObject::ControlCommand(ControlCommand::Pop));
+            }
             if !branch.is_inline() {
                 content_container.push(RuntimeObject::String("\n".to_string()));
             }
@@ -3199,6 +3235,9 @@ fn lower_conditional_into(
         }));
     }
 
+    if needs_fallthrough_pop {
+        content.push(RuntimeObject::ControlCommand(ControlCommand::Pop));
+    }
     content.push(RuntimeObject::ControlCommand(ControlCommand::NoOp));
 }
 

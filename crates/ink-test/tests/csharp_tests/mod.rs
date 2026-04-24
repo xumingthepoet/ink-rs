@@ -1015,7 +1015,6 @@ two ({num})
     // C#: }
 
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestElseBranches() {
         run_in_both_modes(|suite| {
             let story_str = r#"
@@ -1047,7 +1046,7 @@ VAR x = 3
             let mut story = suite
                 .compile_string(story_str, false, false)
                 .expect("compile should succeed");
-            assert_eq!("other\nother\nother\nother\n", story.current_text());
+            assert_eq!("other\nother\nother\nother\n", story.continue_maximally());
         });
     }
 
