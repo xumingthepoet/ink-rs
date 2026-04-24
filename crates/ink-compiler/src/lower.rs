@@ -603,6 +603,7 @@ fn lower_choice_weave(
             Object::Text(_)
             | Object::ContentList(_)
             | Object::Expression(_)
+            | Object::LogicLine(_)
             | Object::Glue(_)
             | Object::Divert(_)
             | Object::Tag(_)
@@ -778,6 +779,7 @@ fn lower_weave_section(
             Object::Text(_)
             | Object::ContentList(_)
             | Object::Expression(_)
+            | Object::LogicLine(_)
             | Object::Glue(_)
             | Object::Divert(_)
             | Object::Tag(_)
@@ -1221,6 +1223,21 @@ fn lower_expression_into(
                 content.push(RuntimeObject::VariableReference(name.clone()));
             }
         }
+        Expression::FunctionCall { name, args } => {
+            for arg in args {
+                lower_expression_into(
+                    content,
+                    arg,
+                    choice_labels,
+                    global_labels,
+                    path_mode,
+                    has_start_content,
+                );
+            }
+            content.push(RuntimeObject::NativeFunction(
+                function_runtime_name(name).to_string(),
+            ));
+        }
         Expression::Binary {
             operator,
             left,
@@ -1284,8 +1301,37 @@ fn lower_output_expression_into(
     content.push(RuntimeObject::ControlCommand(ControlCommand::EvalEnd));
 }
 
+fn lower_logic_line_into(
+    content: &mut Vec<RuntimeObject>,
+    expression: &Expression,
+    choice_labels: &HashMap<String, String>,
+    global_labels: &HashMap<String, String>,
+    path_mode: &ChoicePathMode,
+) {
+    content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
+    lower_expression_into(
+        content,
+        expression,
+        choice_labels,
+        global_labels,
+        path_mode,
+        false,
+    );
+    content.push(RuntimeObject::ControlCommand(ControlCommand::Pop));
+    content.push(RuntimeObject::ControlCommand(ControlCommand::EvalEnd));
+    content.push(RuntimeObject::String("\n".to_string()));
+}
+
 fn operator_runtime_name(operator: BinaryOperator) -> &'static str {
     operator.runtime_name()
+}
+
+fn function_runtime_name(name: &str) -> &str {
+    match name {
+        "RANDOM" => "rnd",
+        "SEED_RANDOM" => "srnd",
+        other => other,
+    }
 }
 
 fn lower_sequence(
@@ -1408,6 +1454,13 @@ fn lower_object_into(
             global_labels,
             &ChoicePathMode::Root,
         ),
+        Object::LogicLine(expression) => lower_logic_line_into(
+            content,
+            expression,
+            choice_labels,
+            global_labels,
+            &ChoicePathMode::Root,
+        ),
         Object::Glue(_) => content.push(RuntimeObject::Glue),
         Object::Divert(divert) => push_divert_with_context(
             content,
@@ -1488,6 +1541,9 @@ fn lower_object_into_with_context(
             global_labels,
             path_mode,
         ),
+        Object::LogicLine(expression) => {
+            lower_logic_line_into(content, expression, choice_labels, global_labels, path_mode);
+        }
         Object::Glue(_) => content.push(RuntimeObject::Glue),
         Object::Divert(divert) => push_divert_with_context(
             content,

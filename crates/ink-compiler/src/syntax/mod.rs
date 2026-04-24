@@ -80,6 +80,7 @@ impl Parser {
         let statement_rules: &[StatementRule] = &[
             variable_declaration_statement,
             variable_assignment_statement,
+            logic_line_statement,
             choice_statement,
             gather_statement,
             divert_statement,
@@ -333,6 +334,15 @@ fn variable_assignment_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Obje
     ))])
 }
 
+fn logic_line_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
+    parser.skip_horizontal_whitespace();
+    parser.match_string("~")?;
+    parser.skip_horizontal_whitespace();
+    let expression = parse_initial_expression(parser.line_remainder().trim())?;
+    parser.skip_to_end();
+    Some(vec![Object::LogicLine(expression)])
+}
+
 pub(super) fn parse_initial_expression(source: &str) -> Option<Expression> {
     parse_expression(source.trim())
 }
@@ -361,6 +371,9 @@ fn parse_expression(source: &str) -> Option<Expression> {
     if let Some(value) = parse_quoted_string_literal(source) {
         return Some(Expression::String(value));
     }
+    if let Some((name, args)) = parse_function_call(source) {
+        return Some(Expression::FunctionCall { name, args });
+    }
     if let Some(target) = source.strip_prefix("->") {
         return Some(Expression::DivertTarget(
             crate::parsed::DivertTarget::from_source(target).to_snapshot_string(),
@@ -376,6 +389,58 @@ fn parse_expression(source: &str) -> Option<Expression> {
         return Some(Expression::NumberInt(value));
     }
     is_identifier(source).then(|| Expression::VariableReference(source.to_string()))
+}
+
+fn parse_function_call(source: &str) -> Option<(String, Vec<Expression>)> {
+    let open_index = source.find('(')?;
+    if !source.ends_with(')') {
+        return None;
+    }
+
+    let name = source[..open_index].trim();
+    if !is_identifier(name) {
+        return None;
+    }
+
+    let args_source = &source[open_index + 1..source.len() - 1];
+    let args = if args_source.trim().is_empty() {
+        Vec::new()
+    } else {
+        split_top_level_args(args_source)
+            .into_iter()
+            .map(parse_expression)
+            .collect::<Option<Vec<_>>>()?
+    };
+    Some((name.to_string(), args))
+}
+
+fn split_top_level_args(source: &str) -> Vec<&str> {
+    let mut args = Vec::new();
+    let mut start = 0;
+    let mut in_string = false;
+    let mut escaped = false;
+    let mut paren_depth = 0;
+
+    for (index, ch) in source.char_indices() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+
+        match ch {
+            '\\' if in_string => escaped = true,
+            '"' => in_string = !in_string,
+            '(' if !in_string => paren_depth += 1,
+            ')' if !in_string => paren_depth -= 1,
+            ',' if !in_string && paren_depth == 0 => {
+                args.push(source[start..index].trim());
+                start = index + ch.len_utf8();
+            }
+            _ => {}
+        }
+    }
+    args.push(source[start..].trim());
+    args
 }
 
 fn split_top_level_operator<'a>(

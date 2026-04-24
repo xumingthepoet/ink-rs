@@ -33,6 +33,7 @@ pub enum Object {
     Text(Text),
     ContentList(ContentList),
     Expression(Expression),
+    LogicLine(Expression),
     Glue(Glue),
     IncDec(IncDec),
     Choice(Choice),
@@ -57,6 +58,15 @@ impl Object {
             Object::Expression(expression) => {
                 out.push('\n');
                 expression.write_parse_snapshot(out, indent);
+            }
+            Object::LogicLine(expression) => {
+                out.push('\n');
+                push_indent(out, indent);
+                out.push_str("ContentList");
+                out.push('\n');
+                expression.write_parse_snapshot(out, indent + 2);
+                Text::new("\n", crate::source::SourceSpan::new(None, 1, 1))
+                    .write_parse_snapshot(out, indent + 2);
             }
             Object::Glue(glue) => glue.write_parse_snapshot(out, indent),
             Object::IncDec(inc_dec) => inc_dec.write_parse_snapshot(out, indent),

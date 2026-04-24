@@ -7,6 +7,10 @@ pub enum Expression {
     NumberBool(bool),
     DivertTarget(String),
     VariableReference(String),
+    FunctionCall {
+        name: String,
+        args: Vec<Expression>,
+    },
     Binary {
         operator: BinaryOperator,
         left: Box<Expression>,
@@ -50,6 +54,13 @@ impl Expression {
             Expression::VariableReference(name) => {
                 out.push_str("VariableReference(");
                 out.push_str(name);
+                out.push(')');
+            }
+            Expression::FunctionCall { name, args } => {
+                out.push_str("FunctionCall(");
+                out.push_str(name);
+                out.push_str(", args=");
+                out.push_str(&args.len().to_string());
                 out.push(')');
             }
             Expression::Binary {
