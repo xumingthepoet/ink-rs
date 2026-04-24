@@ -195,3 +195,4 @@ fixture!(
     tunnels_tunnel_onwards_divert_override,
     "inkfiles/tunnels/tunnel-onwards-divert-override.ink"
 );
+fixture!(tags_tags_in_seq, "inkfiles/tags/tagsInSeq.ink");

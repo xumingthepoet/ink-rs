@@ -60,17 +60,42 @@ fn parse_inline_content_with_options(
     span: &SourceSpan,
     trim_divert_separator_whitespace: bool,
 ) -> Option<Vec<Object>> {
+    let mut tag_state = InlineTagState::default();
+    parse_inline_content_inner(
+        text,
+        span,
+        trim_divert_separator_whitespace,
+        true,
+        &mut tag_state,
+    )
+}
+
+#[derive(Default)]
+struct InlineTagState {
+    active: bool,
+}
+
+fn parse_inline_content_inner(
+    text: &str,
+    span: &SourceSpan,
+    trim_divert_separator_whitespace: bool,
+    close_tag_at_end: bool,
+    tag_state: &mut InlineTagState,
+) -> Option<Vec<Object>> {
     let mut remaining = text;
     let mut objects = Vec::new();
-    let mut tag_active = false;
 
     while !remaining.is_empty() {
         if let Some(rest) = remaining.strip_prefix('#') {
-            if tag_active {
-                objects.push(Object::Tag(Tag::new(false, false)));
+            if tag_state.active {
+                objects.push(Object::ContentList(ContentList::new(vec![
+                    Object::Tag(Tag::new(false, false)),
+                    Object::Tag(Tag::new(true, false)),
+                ])));
+            } else {
+                objects.push(Object::Tag(Tag::new(true, false)));
             }
-            objects.push(Object::Tag(Tag::new(true, false)));
-            tag_active = true;
+            tag_state.active = true;
             remaining = rest.trim_start_matches([' ', '\t']);
             continue;
         }
@@ -78,8 +103,8 @@ fn parse_inline_content_with_options(
         if let Some(rest) = remaining.strip_prefix('{') {
             let close_index = find_matching_brace(rest)?;
             let inner = &rest[..close_index];
-            let object = parse_inline_braced_object(inner, span)?;
-            objects.push(Object::ContentList(ContentList::new(vec![object])));
+            let braced_objects = parse_inline_braced_objects(inner, span, tag_state)?;
+            objects.push(Object::ContentList(ContentList::new(braced_objects)));
             remaining = &rest[close_index + 1..];
             continue;
         }
@@ -91,9 +116,9 @@ fn parse_inline_content_with_options(
         }
 
         if remaining.starts_with("->") {
-            if tag_active {
+            if tag_state.active {
                 objects.push(Object::Tag(Tag::new(false, false)));
-                tag_active = false;
+                tag_state.active = false;
             }
             objects.extend(super::divert::parse_divert_objects_source(
                 remaining,
@@ -133,8 +158,9 @@ fn parse_inline_content_with_options(
         }
     }
 
-    if tag_active {
+    if close_tag_at_end && tag_state.active {
         objects.push(Object::Tag(Tag::new(false, false)));
+        tag_state.active = false;
     }
 
     if objects.is_empty() {
@@ -142,6 +168,22 @@ fn parse_inline_content_with_options(
     } else {
         Some(objects)
     }
+}
+
+fn parse_inline_braced_objects(
+    source: &str,
+    span: &SourceSpan,
+    tag_state: &mut InlineTagState,
+) -> Option<Vec<Object>> {
+    let was_tag_active = tag_state.active;
+    let mut objects = vec![parse_inline_braced_object(source, span, tag_state)?];
+
+    if !was_tag_active && tag_state.active {
+        objects.push(Object::Tag(Tag::new(false, false)));
+        tag_state.active = false;
+    }
+
+    Some(objects)
 }
 
 fn find_matching_brace(source_after_open: &str) -> Option<usize> {
@@ -172,10 +214,16 @@ fn find_matching_brace(source_after_open: &str) -> Option<usize> {
     None
 }
 
-fn parse_inline_braced_object(source: &str, span: &SourceSpan) -> Option<Object> {
+fn parse_inline_braced_object(
+    source: &str,
+    span: &SourceSpan,
+    tag_state: &mut InlineTagState,
+) -> Option<Object> {
     let trimmed = source.trim();
     if parse_sequence_type_annotation(trimmed).is_some() {
-        return Some(Object::Sequence(parse_inline_sequence(trimmed, span)?));
+        return Some(Object::Sequence(parse_inline_sequence(
+            trimmed, span, tag_state,
+        )?));
     }
 
     if let Some((condition_source, branch_source)) = split_top_level_once(source, ':') {
@@ -213,7 +261,9 @@ fn parse_inline_braced_object(source: &str, span: &SourceSpan) -> Option<Object>
     }
 
     if contains_top_level(trimmed, '|') {
-        return Some(Object::Sequence(parse_inline_sequence(trimmed, span)?));
+        return Some(Object::Sequence(parse_inline_sequence(
+            trimmed, span, tag_state,
+        )?));
     }
 
     Some(Object::Expression(super::parse_initial_expression(
@@ -221,12 +271,17 @@ fn parse_inline_braced_object(source: &str, span: &SourceSpan) -> Option<Object>
     )?))
 }
 
-fn parse_inline_sequence(source: &str, span: &SourceSpan) -> Option<Sequence> {
+fn parse_inline_sequence(
+    source: &str,
+    span: &SourceSpan,
+    tag_state: &mut InlineTagState,
+) -> Option<Sequence> {
     let (sequence_type, elements_source) = parse_sequence_type(source.trim_start());
     let elements = split_top_level(elements_source, '|')
         .into_iter()
         .map(|element| {
-            let objects = parse_inline_content(element.trim(), span).unwrap_or_default();
+            let objects = parse_inline_content_inner(element.trim(), span, true, false, tag_state)
+                .unwrap_or_default();
             ContentList::new(objects)
         })
         .collect::<Vec<_>>();
