@@ -921,6 +921,13 @@ fn parse_expression(source: &str) -> Option<Expression> {
             right: Box::new(parse_expression(right)?),
         });
     }
+    if let Some((left, right)) = split_top_level_word_text_operator(source, "mod") {
+        return Some(Expression::Binary {
+            operator: BinaryOperator::Modulo,
+            left: Box::new(parse_expression(left)?),
+            right: Box::new(parse_expression(right)?),
+        });
+    }
     if let Some((left, operator, right)) =
         split_top_level_operator(source, &[('%', BinaryOperator::Modulo)])
     {

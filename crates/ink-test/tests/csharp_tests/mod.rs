@@ -684,7 +684,6 @@ mod tests {
     //             Assert.AreEqual("36\n2\n3\n2\n2"+System.Globalization.NumberFormatInfo.CurrentInfo.NumberDecimalSeparator+"3333333\n8\n8\n", story.ContinueMaximally());
     //         }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestArithmetic() {
         run_in_both_modes(|suite| {
             let mut story = suite
@@ -702,21 +701,7 @@ mod tests {
                     false,
                 )
                 .expect("compile should succeed");
-            eprintln!("arith hierarchy=\n{}", story.BuildStringOfHierarchy());
-            eprintln!(
-                "arith pre can_continue={} choices={} text='{}'",
-                story.can_continue(),
-                story.current_choices_len(),
-                story.current_text()
-            );
             let first = story.cont();
-            eprintln!(
-                "arith first='{}' after choices={} can_continue={} text='{}'",
-                first,
-                story.current_choices_len(),
-                story.can_continue(),
-                story.current_text()
-            );
             assert_eq!(
                 "36\n2\n3\n2\n2.3333333\n8\n8\n",
                 first + &story.cont_maximally()
