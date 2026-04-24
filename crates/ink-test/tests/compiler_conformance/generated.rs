@@ -165,3 +165,4 @@ fixture_count_all_visits!(
     "inkfiles/misc/newlines_with_string_eval.ink"
 );
 fixture_count_all_visits!(misc_turns_since, "inkfiles/misc/turns-since.ink");
+fixture!(function_complex_func1, "inkfiles/function/complex-func1.ink");

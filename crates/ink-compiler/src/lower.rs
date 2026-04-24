@@ -396,10 +396,7 @@ fn lower_global_declarations(
     global_labels: &HashMap<String, String>,
 ) -> Option<Container> {
     let mut story_variable_declarations = Vec::new();
-    collect_variable_declarations_in_objects(
-        story.root_weave().content(),
-        &mut story_variable_declarations,
-    );
+    collect_story_variable_declarations(story, &mut story_variable_declarations);
     let declarations = story_variable_declarations
         .iter()
         .copied()
@@ -492,17 +489,35 @@ fn collect_variable_declarations_in_object<'a>(
 }
 
 fn build_global_variable_names(story: &Story) -> HashSet<String> {
-    story
-        .root_weave()
-        .content()
+    let mut declarations = Vec::new();
+    collect_story_variable_declarations(story, &mut declarations);
+    declarations
         .iter()
-        .filter_map(|object| match object {
-            Object::VariableAssignment(assignment) if assignment.is_global() => {
-                Some(assignment.name().to_string())
-            }
+        .filter_map(|assignment| match assignment {
+            assignment if assignment.is_global() => Some(assignment.name().to_string()),
             _ => None,
         })
         .collect()
+}
+
+fn collect_story_variable_declarations<'a>(
+    story: &'a Story,
+    declarations: &mut Vec<&'a crate::parsed::VariableAssignment>,
+) {
+    collect_variable_declarations_in_objects(story.root_weave().content(), declarations);
+    for flow in story.flows() {
+        collect_variable_declarations_in_flow(flow, declarations);
+    }
+}
+
+fn collect_variable_declarations_in_flow<'a>(
+    flow: &'a Flow,
+    declarations: &mut Vec<&'a crate::parsed::VariableAssignment>,
+) {
+    collect_variable_declarations_in_objects(flow.weave().content(), declarations);
+    for child in flow.child_flows() {
+        collect_variable_declarations_in_flow(child, declarations);
+    }
 }
 
 fn build_counted_flow_paths(
