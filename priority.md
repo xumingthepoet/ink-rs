@@ -1,6 +1,6 @@
 # Ink Fixture Priority
 
-通过统计: 67/118
+通过统计: 68/118
 
 Sorted by the latest `WritingWithInk.md` syntax point used by each file.
 
@@ -71,7 +71,7 @@ Sorted by the latest `WritingWithInk.md` syntax point used by each file.
 - [x] `conditional/condtext.ink`
 - [x] `conditional/ifelse-ext-text1.ink`
 - [x] `conditional/ifelse-ext-text2.ink`
-- [ ] `conditional/ifelse-ext-text3.ink`
+- [x] `conditional/ifelse-ext-text3.ink`
 - [ ] `conditional/cycle.ink`
 - [ ] `conditional/multiline-choice.ink`
 - [ ] `conditional/multiline-divert.ink`

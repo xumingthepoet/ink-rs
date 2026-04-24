@@ -121,3 +121,7 @@ fixture!(
     conditional_ifelse_ext_text2,
     "inkfiles/conditional/ifelse-ext-text2.ink"
 );
+fixture!(
+    conditional_ifelse_ext_text3,
+    "inkfiles/conditional/ifelse-ext-text3.ink"
+);
