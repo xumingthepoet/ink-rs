@@ -100,3 +100,4 @@ fixture_count_all_visits!(misc_operations, "inkfiles/misc/operations.ink");
 fixture!(conditional_ifelse, "inkfiles/conditional/ifelse.ink");
 fixture!(conditional_iffalse, "inkfiles/conditional/iffalse.ink");
 fixture!(conditional_iftrue, "inkfiles/conditional/iftrue.ink");
+fixture!(function_test_error, "inkfiles/function/test-error.ink");
