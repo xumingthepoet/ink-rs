@@ -2,12 +2,23 @@
 
 use std::fs;
 
-use ink_compiler::{Compiler, SourceInput};
+use ink_compiler::{Compiler, CompilerOptions, SourceInput};
 use serde_json::Value;
 
 pub fn assert_parse_and_json_match_fixture(filename: &str) {
     assert_parse_matches_fixture(filename);
     assert_json_matches_fixture(filename);
+}
+
+pub fn assert_parse_and_json_match_count_all_visits_fixture(filename: &str) {
+    assert_parse_matches_fixture(filename);
+    assert_json_matches_fixture_with_options(
+        filename,
+        CompilerOptions {
+            count_all_visits: true,
+            ..CompilerOptions::default()
+        },
+    );
 }
 
 pub fn assert_parse_matches_fixture(filename: &str) {
@@ -33,8 +44,12 @@ pub fn assert_parse_matches_fixture(filename: &str) {
 }
 
 pub fn assert_json_matches_fixture(filename: &str) {
+    assert_json_matches_fixture_with_options(filename, CompilerOptions::default());
+}
+
+fn assert_json_matches_fixture_with_options(filename: &str, options: CompilerOptions) {
     let source = get_fixture_text(filename);
-    let compiler = Compiler::default();
+    let compiler = Compiler::with_options(options);
     let output = compiler.compile(SourceInput::named(source, filename));
 
     assert!(

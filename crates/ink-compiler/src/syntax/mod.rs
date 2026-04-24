@@ -9,7 +9,10 @@ mod text;
 use crate::{
     compiler::StageOutput,
     diagnostic::Diagnostic,
-    parsed::{BinaryOperator, Expression, Flow, IncDec, Object, Story, VariableAssignment, Weave},
+    parsed::{
+        BinaryOperator, Expression, FloatLiteral, Flow, IncDec, Object, Story, UnaryOperator,
+        VariableAssignment, Weave,
+    },
     source::{SourceFile, SourceInput, SourceLine},
 };
 
@@ -368,6 +371,24 @@ fn parse_expression(source: &str) -> Option<Expression> {
             right: Box::new(parse_expression(right)?),
         });
     }
+    if let Some((left, operator, right)) =
+        split_top_level_operator(source, &[('/', BinaryOperator::Divide)])
+    {
+        return Some(Expression::Binary {
+            operator,
+            left: Box::new(parse_expression(left)?),
+            right: Box::new(parse_expression(right)?),
+        });
+    }
+    if let Some((left, operator, right)) =
+        split_top_level_operator(source, &[('%', BinaryOperator::Modulo)])
+    {
+        return Some(Expression::Binary {
+            operator,
+            left: Box::new(parse_expression(left)?),
+            right: Box::new(parse_expression(right)?),
+        });
+    }
     if let Some(value) = parse_quoted_string_literal(source) {
         return Some(Expression::String(value));
     }
@@ -379,6 +400,9 @@ fn parse_expression(source: &str) -> Option<Expression> {
             crate::parsed::DivertTarget::from_source(target).to_snapshot_string(),
         ));
     }
+    if let Some((operator, inner)) = parse_unary_prefix(source) {
+        return Some(unary_expression(operator, parse_expression(inner)?));
+    }
     if source == "true" {
         return Some(Expression::NumberBool(true));
     }
@@ -388,7 +412,41 @@ fn parse_expression(source: &str) -> Option<Expression> {
     if let Ok(value) = source.parse::<i32>() {
         return Some(Expression::NumberInt(value));
     }
+    if source.contains('.') {
+        if let Ok(value) = source.parse::<f64>() {
+            return Some(Expression::NumberFloat(FloatLiteral::new(value)));
+        }
+    }
     is_identifier(source).then(|| Expression::VariableReference(source.to_string()))
+}
+
+fn parse_unary_prefix(source: &str) -> Option<(UnaryOperator, &str)> {
+    if let Some(inner) = source.strip_prefix('-') {
+        return Some((UnaryOperator::Negate, inner.trim_start()));
+    }
+    if let Some(inner) = source.strip_prefix('!') {
+        return Some((UnaryOperator::Not, inner.trim_start()));
+    }
+    if let Some(inner) = source.strip_prefix("not") {
+        let next_is_identifier = inner.chars().next().is_some_and(is_identifier_continue);
+        if !next_is_identifier {
+            return Some((UnaryOperator::Not, inner.trim_start()));
+        }
+    }
+    None
+}
+
+fn unary_expression(operator: UnaryOperator, expression: Expression) -> Expression {
+    match (operator, expression) {
+        (UnaryOperator::Negate, Expression::NumberInt(value)) => Expression::NumberInt(-value),
+        (UnaryOperator::Negate, Expression::NumberFloat(value)) => {
+            Expression::NumberFloat(FloatLiteral::new(-value.value()))
+        }
+        (operator, expression) => Expression::Unary {
+            operator,
+            expression: Box::new(expression),
+        },
+    }
 }
 
 fn parse_function_call(source: &str) -> Option<(String, Vec<Expression>)> {
@@ -471,7 +529,10 @@ fn split_top_level_operator<'a>(
                 };
                 let left = &source[..index];
                 let right = &source[index + ch.len_utf8()..];
-                if !left.trim().is_empty() && !right.trim().is_empty() {
+                if !left.trim().is_empty()
+                    && !right.trim().is_empty()
+                    && !is_unary_operator_position(source, index)
+                {
                     return Some((left.trim(), *operator, right.trim()));
                 }
             }
@@ -480,6 +541,17 @@ fn split_top_level_operator<'a>(
     }
 
     None
+}
+
+fn is_unary_operator_position(source: &str, index: usize) -> bool {
+    let left = source[..index].trim_end();
+    let Some(previous) = left.chars().next_back() else {
+        return true;
+    };
+    matches!(
+        previous,
+        '(' | ',' | '+' | '-' | '*' | '/' | '%' | '<' | '>' | '=' | '!' | '?' | '^'
+    )
 }
 
 fn strip_enclosing_parentheses(source: &str) -> &str {
@@ -623,7 +695,11 @@ fn parse_bracketed_identifier(parser: &mut RuleParser<'_>) -> Option<String> {
 fn is_identifier(source: &str) -> bool {
     let mut chars = source.chars();
     matches!(chars.next(), Some(ch) if ch == '_' || ch.is_ascii_alphabetic())
-        && chars.all(|ch| ch == '_' || ch.is_ascii_alphanumeric())
+        && chars.all(is_identifier_continue)
+}
+
+fn is_identifier_continue(ch: char) -> bool {
+    ch == '_' || ch.is_ascii_alphanumeric()
 }
 
 fn divert_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {

@@ -117,6 +117,9 @@ fn runtime_object_to_value(object: &RuntimeObject) -> Value {
         }
         RuntimeObject::Bool(value) => Value::Bool(*value),
         RuntimeObject::Int(value) => Value::Number((*value).into()),
+        RuntimeObject::Float(value) => Value::Number(
+            serde_json::Number::from_f64(value.value()).expect("finite ink float literal"),
+        ),
         RuntimeObject::NativeFunction(name) => Value::String(name.clone()),
         RuntimeObject::ConditionalDivert { target } => {
             let mut obj = Map::new();

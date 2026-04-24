@@ -4,8 +4,8 @@ use crate::{
     analysis::CheckedStory,
     compiler::StageOutput,
     parsed::{
-        BinaryOperator, Choice, ContentList, DivertTarget, Expression, Flow, Object, Sequence,
-        SequenceType, Story, Weave,
+        BinaryOperator, Choice, ContentList, DivertTarget, Expression, FloatLiteral, Flow, Object,
+        Sequence, SequenceType, Story, Weave,
     },
 };
 
@@ -41,6 +41,7 @@ pub enum RuntimeObject {
     Tag { is_start: bool },
     Bool(bool),
     Int(i32),
+    Float(FloatLiteral),
     NativeFunction(String),
 }
 
@@ -236,12 +237,17 @@ impl ChoicePathMode {
     }
 }
 
-pub(crate) fn lower(story: &CheckedStory) -> StageOutput<RuntimeProgram> {
+pub(crate) fn lower(story: &CheckedStory, count_all_visits: bool) -> StageOutput<RuntimeProgram> {
     let global_labels = build_label_index(&story.parsed);
     let global_variables = build_global_variable_names(&story.parsed);
     let counted_flow_paths = build_counted_flow_paths(&story.parsed);
     let root_weave = story.parsed.root_weave();
-    let main_content = lower_root_weave(root_weave, &global_labels, &global_variables);
+    let main_content = lower_root_weave(
+        root_weave,
+        &global_labels,
+        &global_variables,
+        count_all_visits,
+    );
 
     let main_container = RuntimeObject::Container(Container {
         content: main_content,
@@ -259,7 +265,15 @@ pub(crate) fn lower(story: &CheckedStory) -> StageOutput<RuntimeProgram> {
         .parsed
         .flows()
         .iter()
-        .map(|flow| lower_flow(flow, &global_labels, &global_variables, &counted_flow_paths))
+        .map(|flow| {
+            lower_flow(
+                flow,
+                &global_labels,
+                &global_variables,
+                &counted_flow_paths,
+                count_all_visits,
+            )
+        })
         .collect::<Vec<_>>();
     if let Some(global_declarations) = lower_global_declarations(&story.parsed, &global_labels) {
         named_containers.push(global_declarations);
@@ -271,7 +285,7 @@ pub(crate) fn lower(story: &CheckedStory) -> StageOutput<RuntimeProgram> {
     let root = Container {
         content: root_content,
         name: None,
-        flags: None,
+        flags: count_all_visits.then_some(1),
         merge_tail_metadata: true,
     };
 
@@ -434,12 +448,22 @@ fn lower_root_weave(
     weave: &Weave,
     global_labels: &HashMap<String, String>,
     global_variables: &HashSet<String>,
+    count_all_visits: bool,
 ) -> Vec<RuntimeObject> {
     if weave_has_choice(weave) {
-        lower_choice_weave(weave, ChoicePathMode::Root, global_labels, global_variables)
+        lower_choice_weave(
+            weave,
+            ChoicePathMode::Root,
+            global_labels,
+            global_variables,
+            count_all_visits,
+        )
     } else {
         let mut content = lower_linear_weave(weave, global_labels, global_variables);
-        content.push(RuntimeObject::Container(done_container("g-0")));
+        content.push(RuntimeObject::Container(done_container(
+            "g-0",
+            count_all_visits,
+        )));
         content
     }
 }
@@ -449,6 +473,7 @@ fn lower_flow(
     global_labels: &HashMap<String, String>,
     global_variables: &HashSet<String>,
     counted_flow_paths: &HashSet<String>,
+    count_all_visits: bool,
 ) -> Container {
     // Collect child stitch names upfront so knot-level choices can reference them
     let child_stitch_names: Vec<String> = flow
@@ -463,6 +488,7 @@ fn lower_flow(
         global_labels,
         global_variables,
         counted_flow_paths,
+        count_all_visits,
     )
 }
 
@@ -473,6 +499,7 @@ fn lower_flow_with_context(
     global_labels: &HashMap<String, String>,
     global_variables: &HashSet<String>,
     counted_flow_paths: &HashSet<String>,
+    count_all_visits: bool,
 ) -> Container {
     let mut content = Vec::new();
     let flow_path = parent_knot_name
@@ -493,7 +520,13 @@ fn lower_flow_with_context(
             self_target_relative: false,
         };
         content.push(RuntimeObject::Container(Container {
-            content: lower_choice_weave(flow.weave(), path_mode, global_labels, global_variables),
+            content: lower_choice_weave(
+                flow.weave(),
+                path_mode,
+                global_labels,
+                global_variables,
+                count_all_visits,
+            ),
             name: None,
             flags: None,
             merge_tail_metadata: true,
@@ -538,6 +571,7 @@ fn lower_flow_with_context(
                     global_labels,
                     global_variables,
                     counted_flow_paths,
+                    count_all_visits,
                 )
             })
             .collect();
@@ -547,8 +581,17 @@ fn lower_flow_with_context(
     Container {
         content,
         name: Some(flow.name().to_string()),
-        flags: counted_flow_paths.contains(&flow_path).then_some(3),
+        flags: flow_container_flags(counted_flow_paths.contains(&flow_path), count_all_visits),
         merge_tail_metadata: true,
+    }
+}
+
+fn flow_container_flags(count_turns: bool, count_all_visits: bool) -> Option<i32> {
+    match (count_turns, count_all_visits) {
+        (true, true) => Some(3),
+        (true, false) => Some(3),
+        (false, true) => Some(1),
+        (false, false) => None,
     }
 }
 
@@ -583,6 +626,7 @@ fn lower_choice_weave(
     path_mode: ChoicePathMode,
     global_labels: &HashMap<String, String>,
     global_variables: &HashSet<String>,
+    count_all_visits: bool,
 ) -> Vec<RuntimeObject> {
     let mut main_content = Vec::new();
     let mut named_content = Vec::new();
@@ -624,6 +668,7 @@ fn lower_choice_weave(
                     gather_count,
                     &path_mode,
                     has_explicit_gather,
+                    count_all_visits,
                 );
             }
             Object::Gather(_gather) => {
@@ -662,6 +707,7 @@ fn lower_choice_weave(
                     gather_count,
                     &gather_path_mode,
                     has_explicit_gather,
+                    count_all_visits,
                 );
                 if !gather_named_content.is_empty() {
                     gather_content.push(RuntimeObject::NamedContent(gather_named_content));
@@ -681,7 +727,7 @@ fn lower_choice_weave(
                 let gather_container = Container {
                     content: gather_content,
                     name: Some(gather_name),
-                    flags: if gather.identifier().is_some() {
+                    flags: if count_all_visits || gather.identifier().is_some() {
                         Some(5)
                     } else {
                         None
@@ -727,6 +773,7 @@ fn lower_choice_weave(
                     gather_count,
                     &path_mode,
                     has_explicit_gather,
+                    count_all_visits,
                 );
             }
         }
@@ -739,9 +786,10 @@ fn lower_choice_weave(
             {
                 container
                     .content
-                    .push(RuntimeObject::Container(done_container(&format!(
-                        "g-{gather_count}"
-                    ))));
+                    .push(RuntimeObject::Container(done_container(
+                        &format!("g-{gather_count}"),
+                        count_all_visits,
+                    )));
             }
         }
     } else if !matches!(path_mode, ChoicePathMode::NestedRoot { .. })
@@ -749,7 +797,10 @@ fn lower_choice_weave(
         && needs_terminal_gather
     {
         // Add a terminal gather for choices that divert to it.
-        named_content.push(done_container(&format!("g-{gather_count}")));
+        named_content.push(done_container(
+            &format!("g-{gather_count}"),
+            count_all_visits,
+        ));
     }
     if !named_content.is_empty() {
         main_content.push(RuntimeObject::NamedContent(named_content));
@@ -771,6 +822,7 @@ fn lower_weave_section(
     gather_count: usize,
     path_mode: &ChoicePathMode,
     has_explicit_gather: bool,
+    count_all_visits: bool,
 ) -> bool {
     let mut section_has_choice = false;
     while *index < objects.len() {
@@ -812,6 +864,7 @@ fn lower_weave_section(
                     gather_count,
                     path_mode,
                     has_explicit_gather,
+                    count_all_visits,
                 );
             }
         }
@@ -876,6 +929,7 @@ fn lower_choice_in_section(
     gather_count: usize,
     path_mode: &ChoicePathMode,
     has_explicit_gather: bool,
+    count_all_visits: bool,
 ) {
     let Object::Choice(choice) = &objects[*index] else {
         return;
@@ -968,7 +1022,11 @@ fn lower_choice_in_section(
         content: choice_content,
         name: Some(choice_container_name),
         // Only set visitsShouldBeCounted flag (5) for once-only choices.
-        flags: if choice.once_only() { Some(5) } else { None },
+        flags: if count_all_visits || choice.once_only() {
+            Some(5)
+        } else {
+            None
+        },
         merge_tail_metadata: true,
     });
     if let Some(identifier) = choice.identifier() {
@@ -1206,6 +1264,7 @@ fn lower_expression_into(
             content.push(RuntimeObject::ControlCommand(ControlCommand::EndString));
         }
         Expression::NumberInt(value) => content.push(RuntimeObject::Int(*value)),
+        Expression::NumberFloat(value) => content.push(RuntimeObject::Float(*value)),
         Expression::NumberBool(value) => content.push(RuntimeObject::Bool(*value)),
         Expression::DivertTarget(target) => content.push(RuntimeObject::DivertTarget(
             resolve_divert_target(target, path_mode),
@@ -1261,6 +1320,22 @@ fn lower_expression_into(
             );
             content.push(RuntimeObject::NativeFunction(
                 operator_runtime_name(*operator).to_string(),
+            ));
+        }
+        Expression::Unary {
+            operator,
+            expression,
+        } => {
+            lower_expression_into(
+                content,
+                expression,
+                choice_labels,
+                global_labels,
+                path_mode,
+                has_start_content,
+            );
+            content.push(RuntimeObject::NativeFunction(
+                operator.runtime_name().to_string(),
             ));
         }
         Expression::MultipleCondition(expressions) => {
@@ -1506,6 +1581,7 @@ fn lower_object_into(
                 ChoicePathMode::Root,
                 global_labels,
                 global_variables,
+                false,
             ),
             name: None,
             flags: None,
@@ -1585,6 +1661,7 @@ fn lower_object_into_with_context(
                     nested_path_mode,
                     global_labels,
                     global_variables,
+                    false,
                 ),
                 name: None,
                 flags: None,
@@ -1935,11 +2012,11 @@ fn ends_with_flow_terminator(content: &[RuntimeObject]) -> bool {
         })
 }
 
-fn done_container(name: &str) -> Container {
+fn done_container(name: &str, count_all_visits: bool) -> Container {
     Container {
         content: vec![RuntimeObject::ControlCommand(ControlCommand::Done)],
         name: Some(name.to_string()),
-        flags: None,
+        flags: count_all_visits.then_some(5),
         merge_tail_metadata: true,
     }
 }

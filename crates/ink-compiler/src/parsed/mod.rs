@@ -16,7 +16,7 @@ mod weave;
 pub use choice::Choice;
 pub use content_list::ContentList;
 pub use divert::{Divert, DivertTarget};
-pub use expression::{BinaryOperator, Expression};
+pub use expression::{BinaryOperator, Expression, FloatLiteral, UnaryOperator};
 pub use flow::{Flow, FlowArgument, FlowLevel};
 pub use gather::Gather;
 pub use glue::Glue;

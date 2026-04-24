@@ -61,8 +61,7 @@ impl Compiler {
     }
 
     pub fn lower(&self, checked: &CheckedStory) -> StageOutput<RuntimeProgram> {
-        let _ = self.options.count_all_visits;
-        lower::lower(checked)
+        lower::lower(checked, self.options.count_all_visits)
     }
 
     pub fn emit_json(&self, program: RuntimeProgram) -> StageOutput<String> {

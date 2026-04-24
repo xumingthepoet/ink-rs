@@ -1,9 +1,31 @@
 use super::push_indent;
 
+#[derive(Debug, Clone, Copy)]
+pub struct FloatLiteral(f64);
+
+impl FloatLiteral {
+    pub fn new(value: f64) -> Self {
+        Self(value)
+    }
+
+    pub fn value(self) -> f64 {
+        self.0
+    }
+}
+
+impl PartialEq for FloatLiteral {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.to_bits() == other.0.to_bits()
+    }
+}
+
+impl Eq for FloatLiteral {}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expression {
     String(String),
     NumberInt(i32),
+    NumberFloat(FloatLiteral),
     NumberBool(bool),
     DivertTarget(String),
     VariableReference(String),
@@ -16,6 +38,10 @@ pub enum Expression {
         left: Box<Expression>,
         right: Box<Expression>,
     },
+    Unary {
+        operator: UnaryOperator,
+        expression: Box<Expression>,
+    },
     MultipleCondition(Vec<Expression>),
 }
 
@@ -25,6 +51,14 @@ pub enum BinaryOperator {
     Add,
     Subtract,
     Multiply,
+    Divide,
+    Modulo,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UnaryOperator {
+    Negate,
+    Not,
 }
 
 impl Expression {
@@ -39,6 +73,11 @@ impl Expression {
             Expression::NumberInt(value) => {
                 out.push_str("Number(");
                 out.push_str(&value.to_string());
+                out.push(')');
+            }
+            Expression::NumberFloat(value) => {
+                out.push_str("Number(");
+                out.push_str(&format_float(value.value()));
                 out.push(')');
             }
             Expression::NumberBool(value) => {
@@ -76,6 +115,16 @@ impl Expression {
                 right.write_parse_snapshot(out, 0);
                 out.push(')');
             }
+            Expression::Unary {
+                operator,
+                expression,
+            } => {
+                out.push_str("Unary(");
+                out.push_str(operator.snapshot_name());
+                out.push_str(", ");
+                expression.write_parse_snapshot(out, 0);
+                out.push(')');
+            }
             Expression::MultipleCondition(expressions) => {
                 out.push_str("MultipleCondition(");
                 for (index, expression) in expressions.iter().enumerate() {
@@ -105,6 +154,8 @@ impl BinaryOperator {
             BinaryOperator::Add => "+",
             BinaryOperator::Subtract => "-",
             BinaryOperator::Multiply => "*",
+            BinaryOperator::Divide => "/",
+            BinaryOperator::Modulo => "%",
         }
     }
 
@@ -114,6 +165,33 @@ impl BinaryOperator {
             BinaryOperator::Add => "+",
             BinaryOperator::Subtract => "-",
             BinaryOperator::Multiply => "*",
+            BinaryOperator::Divide => "/",
+            BinaryOperator::Modulo => "%",
         }
+    }
+}
+
+impl UnaryOperator {
+    pub fn runtime_name(self) -> &'static str {
+        match self {
+            UnaryOperator::Negate => "_",
+            UnaryOperator::Not => "!",
+        }
+    }
+
+    fn snapshot_name(self) -> &'static str {
+        match self {
+            UnaryOperator::Negate => "-",
+            UnaryOperator::Not => "!",
+        }
+    }
+}
+
+fn format_float(value: f64) -> String {
+    let formatted = value.to_string();
+    if formatted == "-0" {
+        "0".to_string()
+    } else {
+        formatted
     }
 }

@@ -9,6 +9,15 @@ macro_rules! fixture {
     };
 }
 
+macro_rules! fixture_count_all_visits {
+    ($name:ident, $path:literal) => {
+        #[test]
+        fn $name() {
+            common::assert_parse_and_json_match_count_all_visits_fixture($path);
+        }
+    };
+}
+
 fixture!(basictext_oneline, "inkfiles/basictext/oneline.ink");
 fixture!(basictext_twolines, "inkfiles/basictext/twolines.ink");
 fixture!(knot_multi_line, "inkfiles/knot/multi-line.ink");
@@ -87,3 +96,4 @@ fixture!(variable_varstringinc, "inkfiles/variable/varstringinc.ink");
 fixture!(tags_tags_dynamic_content, "inkfiles/tags/tagsDynamicContent.ink");
 fixture!(variable_varcalc, "inkfiles/variable/varcalc.ink");
 fixture!(function_rnd_func, "inkfiles/function/rnd-func.ink");
+fixture_count_all_visits!(misc_operations, "inkfiles/misc/operations.ink");
