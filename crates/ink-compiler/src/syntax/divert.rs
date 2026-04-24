@@ -9,6 +9,15 @@ pub(super) fn parse_divert_objects(parser: &mut RuleParser<'_>) -> Option<Vec<Ob
     parser.skip_horizontal_whitespace();
     let span = parser.current_span();
     let source = parser.line_remainder().to_string();
+    if let Some(after_thread_arrow) = source.trim().strip_prefix("<-") {
+        if after_thread_arrow.trim().is_empty() {
+            parser.error("Expected target for new thread");
+            parser.skip_to_end();
+            return Some(vec![Object::Divert(
+                Divert::new(DivertTarget::Empty, span).with_thread(),
+            )]);
+        }
+    }
     let objects = parse_divert_objects_source(&source, span)?;
     parser.skip_to_end();
     Some(objects)

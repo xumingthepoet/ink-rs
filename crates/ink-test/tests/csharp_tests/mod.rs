@@ -5009,7 +5009,6 @@ VAR val = 5
     //             Assert.IsTrue (HadError ("Expected target for new thread"));
     //         }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestEmptyThreadError() {
         run_in_both_modes(|suite| {
             suite
