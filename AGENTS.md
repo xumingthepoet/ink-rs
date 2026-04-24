@@ -104,7 +104,7 @@ For the continuation workflow above, the minimum required validation before mark
 
 ## Working Note Entries
 
-- [2026-04-24 00:02 CST] [👍36][👎0] First distinguish “queue maintenance” from real compiler work: if a priority fixture already passes under existing generic behavior, just enable it, validate it, update `priority.md`, and commit. Only change compiler code when the fixture exposes a genuine model or export gap.
+- [2026-04-24 00:02 CST] [👍37][👎0] First distinguish “queue maintenance” from real compiler work: if a priority fixture already passes under existing generic behavior, just enable it, validate it, update `priority.md`, and commit. Only change compiler code when the fixture exposes a genuine model or export gap.
 - [2026-04-24 00:22 CST] [👍11][👎0] When a fixture exposes structural data, add it to the parsed model first, then lower JSON from that model. For example, `Divert` carries call arguments while `Flow` carries parameters and emits entry `temp=` assignments. This prevents flow semantics from leaking into ad hoc export logic.
 - [2026-04-24 08:50 CST] [👍3][👎0] Function calls and string expressions are expressions: lower call arguments before the runtime command/user function token. Divert-target arguments used as values count visits and turns unless a direct `TURNS_SINCE`/`READ_COUNT` call gives a narrower purpose. Lower string expressions as `str ... /str` with nested `{...}` emitting `ev ... out /ev`.
 - [2026-04-24 09:34 CST] [👍10][👎0] Weave lowering needs a current runtime-container model. After gathers, content and choices stay in that gather; inside flows, linear weave objects must carry flow/stitch container paths. Branch rejoin diverts should use C#-style compact paths, choosing relative only when shorter than absolute.

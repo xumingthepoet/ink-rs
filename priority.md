@@ -1,6 +1,6 @@
 # Ink Fixture Priority
 
-通过统计: 92/118
+通过统计: 93/118
 
 Sorted by the latest `WritingWithInk.md` syntax point used by each file.
 
@@ -96,7 +96,7 @@ Sorted by the latest `WritingWithInk.md` syntax point used by each file.
 - [x] `misc/turns-since.ink`
 - [x] `function/complex-func1.ink`
 - [x] `function/complex-func2.ink`
-- [ ] `function/complex-func3.ink`
+- [x] `function/complex-func3.ink`
 - [ ] `function/setvar-func.ink`
 - [ ] `function/func-inline.ink`
 - [ ] `runtime/external-function-0-arg.ink`

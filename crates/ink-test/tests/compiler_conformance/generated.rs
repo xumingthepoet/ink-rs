@@ -167,3 +167,4 @@ fixture_count_all_visits!(
 fixture_count_all_visits!(misc_turns_since, "inkfiles/misc/turns-since.ink");
 fixture!(function_complex_func1, "inkfiles/function/complex-func1.ink");
 fixture!(function_complex_func2, "inkfiles/function/complex-func2.ink");
+fixture!(function_complex_func3, "inkfiles/function/complex-func3.ink");
