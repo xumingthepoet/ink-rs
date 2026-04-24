@@ -327,7 +327,14 @@ impl CSharpTestSuite {
             self.record_diagnostics(&compile_result.diagnostics);
         }
 
-        let json = compile_result.artifact?.json;
+        let json = match compile_result.artifact {
+            Some(compiled) => compiled.json,
+            None if self.testing_errors => {
+                let fallback = compiler.compile(SourceInput::new(String::new()));
+                fallback.artifact?.json
+            }
+            None => return None,
+        };
         let mut story = RuntimeStory::new(&json);
         let runtime_handler: Rc<RefCell<dyn ErrorHandler>> =
             Rc::new(RefCell::new(RuntimeErrorHandler {
@@ -5061,7 +5068,6 @@ TODO: b
     //             Assert.IsTrue(HadError("need to explicitly divert"));
     //         }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestNestedChoiceError() {
         run_in_both_modes(|suite| {
             suite

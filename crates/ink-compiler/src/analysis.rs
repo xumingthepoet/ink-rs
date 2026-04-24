@@ -179,6 +179,7 @@ fn name_conflict_diagnostic(
 
 fn flow_diagnostics(story: &Story) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
+    check_nested_choice_termination_in_weave(story.root_weave(), false, &mut diagnostics);
     for flow in story.flows() {
         check_flow(flow, &mut diagnostics);
     }
@@ -876,6 +877,7 @@ fn check_call_targets_in_expression(
 }
 
 fn check_flow(flow: &Flow, diagnostics: &mut Vec<Diagnostic>) {
+    check_nested_choice_termination_in_weave(flow.weave(), false, diagnostics);
     let found_return = find_return_in_flow(flow);
 
     if flow.is_function() {
@@ -898,6 +900,136 @@ fn check_flow(flow: &Flow, diagnostics: &mut Vec<Diagnostic>) {
     for child in flow.child_flows() {
         check_flow(child, diagnostics);
     }
+}
+
+fn check_nested_choice_termination_in_weave(
+    weave: &Weave,
+    inside_sealed_content: bool,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    let objects = weave.content();
+    for (index, object) in objects.iter().enumerate() {
+        match object {
+            Object::Choice(choice) => {
+                if inside_sealed_content && !choice_flow_terminates(choice, &objects[index + 1..]) {
+                    diagnostics.push(Diagnostic::error(
+                        choice.span().clone(),
+                        "Choices nested in conditionals or sequences need to explicitly divert afterwards.",
+                    ));
+                }
+                if let Some(content) = choice.start_content() {
+                    check_nested_choice_termination_in_content_list(
+                        content,
+                        inside_sealed_content,
+                        diagnostics,
+                    );
+                }
+                if let Some(content) = choice.choice_only_content() {
+                    check_nested_choice_termination_in_content_list(
+                        content,
+                        inside_sealed_content,
+                        diagnostics,
+                    );
+                }
+                check_nested_choice_termination_in_content_list(
+                    choice.inner_content(),
+                    inside_sealed_content,
+                    diagnostics,
+                );
+            }
+            Object::ContentList(content) => check_nested_choice_termination_in_content_list(
+                content,
+                inside_sealed_content,
+                diagnostics,
+            ),
+            Object::Conditional(conditional) => {
+                for branch in conditional.branches() {
+                    check_nested_choice_termination_in_weave(branch.content(), true, diagnostics);
+                }
+            }
+            Object::Sequence(sequence) => {
+                for element in sequence.elements() {
+                    check_nested_choice_termination_in_content_list(element, true, diagnostics);
+                }
+            }
+            Object::Weave(weave) => {
+                check_nested_choice_termination_in_weave(weave, inside_sealed_content, diagnostics)
+            }
+            Object::ConstantDeclaration(_)
+            | Object::Divert(_)
+            | Object::Expression(_)
+            | Object::ExternalDeclaration(_)
+            | Object::Gather(_)
+            | Object::Glue(_)
+            | Object::IncDec(_)
+            | Object::LogicLine(_)
+            | Object::Return(_)
+            | Object::Tag(_)
+            | Object::Text(_)
+            | Object::TunnelOnwards(_)
+            | Object::VariableAssignment(_) => {}
+        }
+    }
+}
+
+fn check_nested_choice_termination_in_content_list(
+    content: &ContentList,
+    inside_sealed_content: bool,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    for object in content.objects() {
+        match object {
+            Object::Conditional(conditional) => {
+                for branch in conditional.branches() {
+                    check_nested_choice_termination_in_weave(branch.content(), true, diagnostics);
+                }
+            }
+            Object::Sequence(sequence) => {
+                for element in sequence.elements() {
+                    check_nested_choice_termination_in_content_list(element, true, diagnostics);
+                }
+            }
+            Object::ContentList(content) => check_nested_choice_termination_in_content_list(
+                content,
+                inside_sealed_content,
+                diagnostics,
+            ),
+            Object::Weave(weave) => {
+                check_nested_choice_termination_in_weave(weave, inside_sealed_content, diagnostics)
+            }
+            Object::Choice(_)
+            | Object::ConstantDeclaration(_)
+            | Object::Divert(_)
+            | Object::Expression(_)
+            | Object::ExternalDeclaration(_)
+            | Object::Gather(_)
+            | Object::Glue(_)
+            | Object::IncDec(_)
+            | Object::LogicLine(_)
+            | Object::Return(_)
+            | Object::Tag(_)
+            | Object::Text(_)
+            | Object::TunnelOnwards(_)
+            | Object::VariableAssignment(_) => {}
+        }
+    }
+}
+
+fn choice_flow_terminates(choice: &crate::parsed::Choice, following: &[Object]) -> bool {
+    let mut terminating = last_significant_object(choice.inner_content().objects());
+    for object in following {
+        if matches!(
+            object,
+            Object::Choice(_) | Object::Gather(_) | Object::Weave(_)
+        ) {
+            break;
+        }
+        if !is_termination_ignored_object(object) {
+            terminating = Some(object);
+        }
+    }
+
+    terminating.is_some_and(object_terminates_flow)
 }
 
 fn check_function_flow_control(flow: &Flow, diagnostics: &mut Vec<Diagnostic>) {
