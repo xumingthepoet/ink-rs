@@ -413,6 +413,19 @@ impl Parser {
                 return Some(objects);
             }
 
+            if let Some(content) = parse_default_conditional_branch_content(current_trimmed) {
+                if let Some(nested_objects) =
+                    self.parse_nested_conditional_branch_content(lines, index, content)
+                {
+                    if current_branch.has_content() || !branches.is_empty() {
+                        branches.push(current_branch);
+                    }
+                    current_branch = ConditionalBranchBuilder::content_branch();
+                    current_branch.objects.extend(nested_objects);
+                    continue;
+                }
+            }
+
             if let Some(parsed_branch) = parse_conditional_branch_header(current_trimmed) {
                 if current_branch.has_content() || !branches.is_empty() {
                     branches.push(current_branch);
@@ -450,6 +463,33 @@ impl Parser {
         }
 
         None
+    }
+
+    fn parse_nested_conditional_branch_content(
+        &mut self,
+        lines: &[SourceLine],
+        index: &mut usize,
+        content: &str,
+    ) -> Option<Vec<Object>> {
+        if !content.trim_start().starts_with('{') {
+            return None;
+        }
+
+        let mut nested_lines = Vec::with_capacity(lines.len() - *index);
+        nested_lines.push(SourceLine {
+            text: content.trim_start().to_string(),
+            span: lines[*index].span.clone(),
+        });
+        nested_lines.extend(lines[*index + 1..].iter().cloned());
+
+        let mut nested_index = 0;
+        let nested_objects = self.parse_multiline_conditional(&nested_lines, &mut nested_index)?;
+        if nested_index == 0 {
+            return None;
+        }
+
+        *index += nested_index;
+        Some(nested_objects)
     }
 
     fn append_conditional_branch_inline_content(
