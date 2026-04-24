@@ -169,3 +169,4 @@ fixture!(function_complex_func1, "inkfiles/function/complex-func1.ink");
 fixture!(function_complex_func2, "inkfiles/function/complex-func2.ink");
 fixture!(function_complex_func3, "inkfiles/function/complex-func3.ink");
 fixture!(function_setvar_func, "inkfiles/function/setvar-func.ink");
+fixture!(function_func_inline, "inkfiles/function/func-inline.ink");
