@@ -7,9 +7,7 @@ use crate::{
     control_command::{CommandType, ControlCommand},
     flow::Flow,
     glue::Glue,
-    ink_list::InkList,
     json::{json_read, json_write},
-    list_definitions_origin::ListDefinitionsOrigin,
     object::{Object, RTObject},
     path::Path,
     pointer::{self, Pointer},
@@ -53,14 +51,10 @@ pub(crate) struct StoryState {
     pub story_seed: i32,
     pub previous_random: i32,
     current_tags: Vec<String>,
-    list_definitions: Rc<ListDefinitionsOrigin>,
 }
 
 impl StoryState {
-    pub fn new(
-        main_content_container: Rc<Container>,
-        list_definitions: Rc<ListDefinitionsOrigin>,
-    ) -> StoryState {
+    pub fn new(main_content_container: Rc<Container>) -> StoryState {
         let current_flow = Flow::new(DEFAULT_FLOW_NAME, main_content_container.clone());
         let callstack = current_flow.callstack.clone();
 
@@ -72,7 +66,7 @@ impl StoryState {
             did_safe_exit: false,
             output_stream_text_dirty: true,
             output_stream_tags_dirty: true,
-            variables_state: VariablesState::new(callstack, list_definitions.clone()),
+            variables_state: VariablesState::new(callstack),
             alive_flow_names_dirty: true,
             evaluation_stack: Vec::new(),
             main_content_container,
@@ -88,7 +82,6 @@ impl StoryState {
             story_seed,
             previous_random: 0,
             current_tags: Vec::with_capacity(0),
-            list_definitions,
         };
 
         state.go_to_start();
@@ -363,19 +356,6 @@ impl StoryState {
     }
 
     pub fn push_evaluation_stack(&mut self, obj: Rc<dyn RTObject>) {
-        if let Some(list) = Value::get_value::<&InkList>(obj.as_ref()) {
-            let origin_names = list.get_origin_names();
-
-            list.origins.borrow_mut().clear();
-
-            for name in &origin_names {
-                let def = self.list_definitions.get_list_definition(name).unwrap();
-                if !list.origins.borrow().iter().any(|e| std::ptr::eq(e, def)) {
-                    list.origins.borrow_mut().push(def.clone());
-                }
-            }
-        }
-
         self.evaluation_stack.push(obj);
     }
 
@@ -759,10 +739,7 @@ impl StoryState {
     }
 
     pub fn copy_and_start_patching(&self, for_background_save: bool) -> StoryState {
-        let mut copy = StoryState::new(
-            self.main_content_container.clone(),
-            self.list_definitions.clone(),
-        );
+        let mut copy = StoryState::new(self.main_content_container.clone());
 
         copy.patch = Some(self.patch.clone().unwrap_or_else(StatePatch::new));
 
@@ -1026,11 +1003,10 @@ impl StoryState {
                     ValueType::Bool(v) => Value::new::<bool>(*v),
                     ValueType::Int(v) => Value::new::<i32>(*v),
                     ValueType::Float(v) => Value::new::<f32>(*v),
-                    ValueType::List(v) => Value::new::<InkList>(v.clone()),
                     ValueType::String(v) => Value::new::<&str>(&v.string),
                     _ => {
                         return Err(StoryError::InvalidStoryState("ink arguments when calling EvaluateFunction / ChoosePathStringWithParameters must be \
-                        int, float, string, bool or InkList.".to_owned()));
+                        int, float, string or bool.".to_owned()));
                     }
                 };
 

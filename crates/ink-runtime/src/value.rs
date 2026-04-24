@@ -1,7 +1,6 @@
 use std::fmt;
 
 use crate::{
-    ink_list::InkList,
     object::{Object, RTObject},
     path::Path,
     story_error::StoryError,
@@ -11,10 +10,9 @@ use crate::{
 const CAST_BOOL: u8 = 0;
 const CAST_INT: u8 = 1;
 const CAST_FLOAT: u8 = 2;
-const CAST_LIST: u8 = 3;
-const CAST_STRING: u8 = 4;
-const CAST_DIVERT_TARGET: u8 = 5;
-const CAST_VARIABLE_POINTER: u8 = 6;
+const CAST_STRING: u8 = 3;
+const CAST_DIVERT_TARGET: u8 = 4;
+const CAST_VARIABLE_POINTER: u8 = 5;
 
 pub struct Value {
     obj: Object,
@@ -36,7 +34,6 @@ impl fmt::Display for Value {
             ValueType::String(v) => write!(f, "{}", v.string),
             ValueType::DivertTarget(p) => write!(f, "DivertTargetValue({})", p),
             ValueType::VariablePointer(v) => write!(f, "VariablePointerValue({})", v.variable_name),
-            ValueType::List(l) => write!(f, "{}", l),
         }
     }
 }
@@ -107,31 +104,6 @@ impl TryFrom<&dyn RTObject> for f32 {
         }
     }
 }
-impl<'val> TryFrom<&'val mut dyn RTObject> for &'val mut InkList {
-    type Error = ();
-    fn try_from(o: &mut dyn RTObject) -> Result<&mut InkList, Self::Error> {
-        match o.as_any_mut().downcast_mut::<Value>() {
-            Some(v) => match &mut v.value {
-                ValueType::List(v) => Ok(v),
-                _ => Err(()),
-            },
-            None => Err(()),
-        }
-    }
-}
-impl<'val> TryFrom<&'val dyn RTObject> for &'val InkList {
-    type Error = ();
-    fn try_from(o: &dyn RTObject) -> Result<&InkList, Self::Error> {
-        match o.as_any().downcast_ref::<Value>() {
-            Some(v) => match &v.value {
-                ValueType::List(v) => Ok(v),
-                _ => Err(()),
-            },
-            None => Err(()),
-        }
-    }
-}
-
 impl Value {
     pub fn new_value_type(valuetype: ValueType) -> Self {
         Self {
@@ -183,17 +155,6 @@ impl Value {
             ValueType::VariablePointer(_) => Err(StoryError::InvalidStoryState(
                 "Shouldn't be checking the truthiness of a variable pointer".to_owned(),
             )),
-            ValueType::List(l) => Ok(!l.items.is_empty()),
-        }
-    }
-
-    pub fn retain_list_origins_for_assignment(old_value: &dyn RTObject, new_value: &dyn RTObject) {
-        if let Some(old_list) = Self::get_value::<&InkList>(old_value) {
-            if let Some(new_list) = Self::get_value::<&InkList>(new_value) {
-                if new_list.items.is_empty() {
-                    new_list.set_initial_origin_names(old_list.get_origin_names());
-                }
-            }
         }
     }
 
@@ -274,33 +235,6 @@ impl Value {
                 CAST_STRING => Ok(None),
                 _ => Err(StoryError::InvalidStoryState(
                     "Cast not allowed for string".to_owned(),
-                )),
-            },
-            ValueType::List(l) => match cast_dest_type {
-                CAST_INT => {
-                    let max = l.get_max_item();
-                    match max {
-                        Some(i) => Ok(Some(Self::new::<i32>(i.1))),
-                        None => Ok(Some(Self::new::<i32>(0))),
-                    }
-                }
-                CAST_FLOAT => {
-                    let max = l.get_max_item();
-                    match max {
-                        Some(i) => Ok(Some(Self::new::<f32>(i.1 as f32))),
-                        None => Ok(Some(Self::new::<f32>(0.0))),
-                    }
-                }
-                CAST_LIST => Ok(None),
-                CAST_STRING => {
-                    let max = l.get_max_item();
-                    match max {
-                        Some(i) => Ok(Some(Self::new::<&str>(&i.0.to_string()))),
-                        None => Ok(Some(Self::new::<&str>(""))),
-                    }
-                }
-                _ => Err(StoryError::InvalidStoryState(
-                    "Cast not allowed for list".to_owned(),
                 )),
             },
             ValueType::DivertTarget(_) => match cast_dest_type {

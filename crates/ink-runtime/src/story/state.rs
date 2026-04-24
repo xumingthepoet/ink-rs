@@ -125,10 +125,7 @@ impl Story {
     pub fn reset_state(&mut self) -> Result<(), StoryError> {
         self.if_async_we_cant("ResetState")?;
 
-        self.state = StoryState::new(
-            self.main_content_container.clone(),
-            self.list_definitions.clone(),
-        );
+        self.state = StoryState::new(self.main_content_container.clone());
 
         self.reset_globals()?;
 

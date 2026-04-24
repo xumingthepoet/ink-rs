@@ -1,7 +1,6 @@
 //! [`Story`] is the entry point to load and run an Ink story.
 use crate::{
     container::Container,
-    list_definitions_origin::ListDefinitionsOrigin,
     story::{
         errors::ErrorHandler, external_functions::ExternalFunctionDef,
         variable_observer::VariableObserver,
@@ -33,7 +32,6 @@ pub struct Story {
     async_continue_active: bool,
     async_saving: bool,
     prev_containers: Vec<Rc<Container>>,
-    list_definitions: Rc<ListDefinitionsOrigin>,
     pub(crate) on_error: Option<Rc<RefCell<dyn ErrorHandler>>>,
     pub(crate) state_snapshot_at_last_new_line: Option<StoryState>,
     pub(crate) variable_observers: HashMap<String, Vec<Rc<RefCell<dyn VariableObserver>>>>,
@@ -59,16 +57,15 @@ mod misc {
         /// Construct a `Story` out of a JSON string that was compiled with
         /// `inklecate`.
         pub fn new(json_string: &str) -> Result<Self, StoryError> {
-            let (version, main_content_container, list_definitions) =
-                if cfg!(feature = "stream-json-parser") {
-                    json_read_stream::load_from_string(json_string)?
-                } else {
-                    json_read::load_from_string(json_string)?
-                };
+            let (version, main_content_container) = if cfg!(feature = "stream-json-parser") {
+                json_read_stream::load_from_string(json_string)?
+            } else {
+                json_read::load_from_string(json_string)?
+            };
 
             let mut story = Story {
                 main_content_container: main_content_container.clone(),
-                state: StoryState::new(main_content_container.clone(), list_definitions.clone()),
+                state: StoryState::new(main_content_container.clone()),
                 temporary_evaluation_container: None,
                 recursive_continue_count: 0,
                 async_continue_active: false,
@@ -77,7 +74,6 @@ mod misc {
                 state_snapshot_at_last_new_line: None,
                 on_error: None,
                 prev_containers: Vec::new(),
-                list_definitions,
                 variable_observers: HashMap::with_capacity(0),
                 has_validated_externals: false,
                 allow_external_function_fallbacks: false,

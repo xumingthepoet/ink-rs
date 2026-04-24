@@ -9,7 +9,6 @@ use serde_json::Map;
 use crate::{
     callstack::CallStack,
     json::{json_read, json_write},
-    list_definitions_origin::ListDefinitionsOrigin,
     state_patch::StatePatch,
     story_error::StoryError,
     value::Value,
@@ -25,14 +24,10 @@ pub(crate) struct VariablesState {
     pub callstack: Rc<RefCell<CallStack>>,
     pub changed_variables_for_batch_obs: Option<HashSet<String>>,
     pub patch: Option<StatePatch>,
-    list_defs_origin: Rc<ListDefinitionsOrigin>,
 }
 
 impl VariablesState {
-    pub fn new(
-        callstack: Rc<RefCell<CallStack>>,
-        list_defs_origin: Rc<ListDefinitionsOrigin>,
-    ) -> VariablesState {
+    pub fn new(callstack: Rc<RefCell<CallStack>>) -> VariablesState {
         VariablesState {
             global_variables: HashMap::new(),
             default_global_variables: HashMap::new(),
@@ -40,7 +35,6 @@ impl VariablesState {
             callstack,
             changed_variables_for_batch_obs: None,
             patch: None,
-            list_defs_origin,
         }
     }
 
@@ -253,21 +247,13 @@ impl VariablesState {
                 return Some(global.clone());
             }
 
-            // Getting variables can actually happen during globals set up since you can do
-            // VAR x = A_LIST_ITEM
-            // So _default_global_variables may be None.
+            // Getting variables can happen during globals setup.
             // We need to do this check though in case a new global is added, so we need to
             // revert to the default globals dictionary since an initial value hasn't yet
             // been set.
 
             if let Some(default_global) = self.default_global_variables.get(name) {
                 return Some(default_global.clone());
-            }
-
-            if let Some(list_item_value) =
-                self.list_defs_origin.find_single_item_list_with_name(name)
-            {
-                return Some(list_item_value.clone());
             }
         }
 
@@ -290,10 +276,6 @@ impl VariablesState {
 
         if old_value.is_none() {
             old_value = self.global_variables.get(name).cloned();
-        }
-
-        if let Some(old_value) = &old_value {
-            Value::retain_list_origins_for_assignment(old_value.as_ref(), value.as_ref());
         }
 
         if let Some(patch) = &mut self.patch {
@@ -368,10 +350,6 @@ impl VariablesState {
             },
             ValueType::Float(val) => match default_val.value {
                 ValueType::Float(default_val) => *val == default_val,
-                _ => false,
-            },
-            ValueType::List(val) => match &default_val.value {
-                ValueType::List(default_val) => *val == *default_val,
                 _ => false,
             },
             ValueType::String(val) => match &default_val.value {

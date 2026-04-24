@@ -9,10 +9,6 @@ use crate::{
     control_command::ControlCommand,
     divert::Divert,
     glue::Glue,
-    ink_list::InkList,
-    ink_list_item::InkListItem,
-    list_definition::ListDefinition,
-    list_definitions_origin::ListDefinitionsOrigin,
     native_function_call::NativeFunctionCall,
     object::RTObject,
     path::Path,
@@ -26,9 +22,7 @@ use crate::{
     void::Void,
 };
 
-pub fn load_from_string(
-    s: &str,
-) -> Result<(i32, Rc<Container>, Rc<ListDefinitionsOrigin>), StoryError> {
+pub fn load_from_string(s: &str) -> Result<(i32, Rc<Container>), StoryError> {
     let json: serde_json::Value = match serde_json::from_str(s) {
         Ok(value) => value,
         Err(_) => return Err(StoryError::BadJson("Story not in JSON format.".to_owned())),
@@ -62,14 +56,6 @@ pub fn load_from_string(
         }
     };
 
-    let list_definitions = match json.get("listDefs") {
-        Some(def) => Rc::new(jtoken_to_list_definitions(def)?),
-        None => return Err(StoryError::BadJson(
-            "List Definitions node for ink not found. Are you sure it's a valid .ink.json file?"
-                .to_owned(),
-        )),
-    };
-
     let main_content_container = jtoken_to_runtime_object(root_token, None)?;
 
     let main_content_container = main_content_container.into_any().downcast::<Container>();
@@ -82,7 +68,7 @@ pub fn load_from_string(
 
     let main_content_container = main_content_container.unwrap(); // unwrap: checked for err above
 
-    Ok((version, main_content_container, list_definitions))
+    Ok((version, main_content_container))
 }
 
 pub fn jtoken_to_runtime_object(
@@ -311,32 +297,12 @@ pub fn jtoken_to_runtime_object(
                 return Ok(Rc::new(Tag::new(prop_value.as_str().unwrap())));
             }
 
-            // List value
             prop_value = obj.get("list");
 
-            if let Some(pv) = prop_value {
-                let list_content = pv.as_object().unwrap();
-                let mut raw_list = InkList::new();
-
-                prop_value = obj.get("origins");
-
-                if let Some(o) = prop_value {
-                    let names_as_objs = o.as_array().unwrap();
-
-                    let names = names_as_objs
-                        .iter()
-                        .map(|e| e.as_str().unwrap().to_string())
-                        .collect();
-
-                    raw_list.set_initial_origin_names(names);
-                }
-
-                for (k, v) in list_content {
-                    let item = InkListItem::from_full_name(k);
-                    raw_list.items.insert(item, v.as_i64().unwrap() as i32);
-                }
-
-                return Ok(Rc::new(Value::new::<InkList>(raw_list)));
+            if prop_value.is_some() {
+                return Err(StoryError::BadJson(
+                    "Ink list values are not supported by this runtime.".to_owned(),
+                ));
             }
 
             // Used when serialising save state only
@@ -445,25 +411,6 @@ fn jarray_to_tags(obj: &Map<String, serde_json::Value>) -> Vec<String> {
     }
 
     tags
-}
-
-pub fn jtoken_to_list_definitions(
-    def: &serde_json::Value,
-) -> Result<ListDefinitionsOrigin, StoryError> {
-    let mut all_defs: Vec<ListDefinition> = Vec::with_capacity(0);
-
-    for (name, list_def_json) in def.as_object().unwrap() {
-        // Cast (string, object) to (string, int) for items
-        let mut items: HashMap<String, i32> = HashMap::new();
-        for (k, v) in list_def_json.as_object().unwrap() {
-            items.insert(k.clone(), v.as_u64().unwrap() as i32);
-        }
-
-        let def = ListDefinition::new(name.clone(), items);
-        all_defs.push(def);
-    }
-
-    Ok(ListDefinitionsOrigin::new(&mut all_defs))
 }
 
 pub(crate) fn jobject_to_hashmap_values(

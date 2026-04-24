@@ -9,7 +9,6 @@ mod function_test;
 mod gather_test;
 mod glue_test;
 mod knot_test;
-mod list_test;
 mod misc_test;
 mod multi_flow_test;
 mod runtime_test;

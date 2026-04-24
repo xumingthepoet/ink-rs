@@ -1,5 +1,5 @@
 //! A combination of an Ink value with its type.
-use crate::{ink_list::InkList, path::Path, story_error::StoryError};
+use crate::{path::Path, story_error::StoryError};
 
 /// An Ink value, tagged with its type.
 #[repr(u8)]
@@ -8,8 +8,6 @@ pub enum ValueType {
     Bool(bool),
     Int(i32),
     Float(f32),
-    /// An Ink list value.
-    List(InkList),
     /// Ink string, constructed with [`new_string`](ValueType::new::<&str>)
     String(StringValue),
     /// Reference to an Ink divert.
@@ -45,12 +43,6 @@ impl From<&str> for ValueType {
             is_inline_whitespace: inline_ws,
             is_newline: value.eq("\n"),
         })
-    }
-}
-
-impl From<InkList> for ValueType {
-    fn from(value: InkList) -> ValueType {
-        ValueType::List(value)
     }
 }
 

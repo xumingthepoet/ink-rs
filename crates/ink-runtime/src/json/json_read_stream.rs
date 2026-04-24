@@ -10,10 +10,6 @@ use crate::{
     control_command::ControlCommand,
     divert::Divert,
     glue::Glue,
-    ink_list::InkList,
-    ink_list_item::InkListItem,
-    list_definition::ListDefinition,
-    list_definitions_origin::ListDefinitionsOrigin,
     native_function_call::NativeFunctionCall,
     object::RTObject,
     path::Path,
@@ -29,17 +25,13 @@ use crate::{
 
 use super::json_tokenizer::{JsonTokenizer, JsonValue};
 
-pub fn load_from_string(
-    s: &str,
-) -> Result<(i32, Rc<Container>, Rc<ListDefinitionsOrigin>), StoryError> {
+pub fn load_from_string(s: &str) -> Result<(i32, Rc<Container>), StoryError> {
     let mut tok = JsonTokenizer::new_from_str(s);
 
     parse(&mut tok)
 }
 
-fn parse(
-    tok: &mut JsonTokenizer,
-) -> Result<(i32, Rc<Container>, Rc<ListDefinitionsOrigin>), StoryError> {
+fn parse(tok: &mut JsonTokenizer) -> Result<(i32, Rc<Container>), StoryError> {
     tok.expect('{')?;
 
     let version_key = tok.read_obj_key()?;
@@ -93,21 +85,49 @@ fn parse(
 
     let main_content_container = main_content_container.unwrap(); // unwrap: checked for err above
 
-    tok.expect(',')?;
-    let list_defs_key = tok.read_obj_key()?;
-
-    if list_defs_key != "listDefs" {
-        return Err(StoryError::BadJson(
-            "List Definitions node for ink not found. Are you sure it's a valid .ink.json file?"
-                .to_owned(),
-        ));
+    while tok.peek()? == ',' {
+        tok.expect(',')?;
+        let _ = tok.read_obj_key()?;
+        let value = tok.read_value()?;
+        skip_json_value(tok, value)?;
     }
-
-    let list_defs = Rc::new(jtoken_to_list_definitions(tok)?);
 
     tok.expect('}')?;
 
-    Ok((version, main_content_container, list_defs))
+    Ok((version, main_content_container))
+}
+
+fn skip_json_value(tok: &mut JsonTokenizer, value: JsonValue) -> Result<(), StoryError> {
+    match value {
+        JsonValue::Array => {
+            while tok.peek()? != ']' {
+                let value = tok.read_value()?;
+                skip_json_value(tok, value)?;
+
+                if tok.peek()? != ']' {
+                    tok.expect(',')?;
+                }
+            }
+
+            tok.expect(']')?;
+        }
+        JsonValue::Object => {
+            while tok.peek()? != '}' {
+                let _ = tok.read_obj_key()?;
+                let value = tok.read_value()?;
+                skip_json_value(tok, value)?;
+
+                if tok.peek()? != '}' {
+                    tok.expect(',')?;
+                }
+            }
+
+            tok.expect('}')?;
+        }
+        JsonValue::String(_) | JsonValue::Number(_) | JsonValue::Boolean(_) | JsonValue::Null => {}
+    }
+
+    Ok(())
 }
 
 enum ArrayElement {
@@ -342,42 +362,10 @@ fn jtoken_to_runtime_object(
                 ))));
             }
 
-            // List value
             if prop == "list" {
-                let list_content = parse_list(tok)?;
-                let mut raw_list = InkList::new();
-
-                if tok.peek()? == ',' {
-                    tok.expect(',')?;
-                    tok.expect_obj_key("origins")?;
-
-                    // read array of strings
-                    tok.expect('[')?;
-
-                    let mut names = Vec::new();
-                    while tok.peek()? != ']' {
-                        let name = tok.read_string()?;
-                        names.push(name);
-
-                        if tok.peek()? != ']' {
-                            tok.expect(',')?;
-                        }
-                    }
-
-                    tok.expect(']')?;
-
-                    raw_list.set_initial_origin_names(names);
-                }
-
-                for (k, v) in list_content {
-                    let item = InkListItem::from_full_name(k.as_str());
-                    raw_list.items.insert(item, v);
-                }
-
-                tok.expect('}')?;
-                return Ok(ArrayElement::RTObject(Rc::new(Value::new::<InkList>(
-                    raw_list,
-                ))));
+                return Err(StoryError::BadJson(
+                    "Ink list values are not supported by this runtime.".to_owned(),
+                ));
             }
 
             // Used when serialising save state only
@@ -437,24 +425,6 @@ fn jtoken_to_runtime_object(
             )))
         }
     }
-}
-
-fn parse_list(tok: &mut JsonTokenizer) -> Result<HashMap<String, i32>, StoryError> {
-    let mut list_content: HashMap<String, i32> = HashMap::new();
-
-    while tok.peek()? != '}' {
-        let key = tok.read_obj_key()?;
-        let value = tok.read_number().unwrap().as_integer().unwrap();
-        list_content.insert(key, value);
-
-        if tok.peek()? != '}' {
-            tok.expect(',')?;
-        }
-    }
-
-    tok.expect('}')?;
-
-    Ok(list_content)
 }
 
 fn jarray_to_container(
@@ -523,31 +493,6 @@ fn jarray_to_runtime_obj_list(
     Ok((list, last_element))
 }
 
-fn jtoken_to_list_definitions(
-    tok: &mut JsonTokenizer,
-) -> Result<ListDefinitionsOrigin, StoryError> {
-    let mut all_defs: Vec<ListDefinition> = Vec::with_capacity(0);
-
-    tok.expect('{')?;
-
-    while tok.peek()? != '}' {
-        let name = tok.read_obj_key()?;
-        tok.expect('{')?;
-
-        let items = parse_list(tok)?;
-        let def = ListDefinition::new(name, items);
-        all_defs.push(def);
-
-        if tok.peek()? != '}' {
-            tok.expect(',')?;
-        }
-    }
-
-    tok.expect('}')?;
-
-    Ok(ListDefinitionsOrigin::new(&mut all_defs))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -559,79 +504,9 @@ mod tests {
     }
 
     #[test]
-    fn load_list() {
-        let s = r##"
-        {
-            "inkVersion": 21,
-            "root": [
-                [
-                    "ev",
-                    {
-                        "VAR?": "A"
-                    },
-                    {
-                        "VAR?": "B"
-                    },
-                    "+",
-                    "LIST_ALL",
-                    "out",
-                    "/ev",
-                    "\n",
-                    [
-                        "done",
-                        {
-                            "#f": 5,
-                            "#n": "g-0"
-                        }
-                    ],
-                    null
-                ],
-                "done",
-                {
-                    "global decl": [
-                        "ev",
-                        {
-                            "list": {},
-                            "origins": [
-                                "a"
-                            ]
-                        },
-                        {
-                            "VAR=": "a"
-                        },
-                        {
-                            "list": {},
-                            "origins": [
-                                "b"
-                            ]
-                        },
-                        {
-                            "VAR=": "b"
-                        },
-                        "/ev",
-                        "end",
-                        null
-                    ],
-                    "#f": 1
-                }
-            ],
-            "listDefs": {
-                "a": {
-                    "A": 1
-                },
-                "b": {
-                    "B": 1
-                }
-            }
-        }
-        "##;
-        let _ = load_from_string(s).unwrap();
-    }
-
-    #[test]
     fn load_choice() {
         let s = r##"{"inkVersion":21,"root":[["^Hello world!","\n","ev","str","^Hello back!","/str","/ev",{"*":"0.c-0","flg":20},{"c-0":["\n","done",{"->":"0.g-0"},{"#f":5}],"g-0":["done",null]}],"done",null],"listDefs":{}}"##;
-        let (_, container, _) = load_from_string(s).unwrap();
+        let (_, container) = load_from_string(s).unwrap();
         let mut sb = String::new();
         container.build_string_of_hierarchy(&mut sb, 0, None);
         println!("{}", sb);
@@ -640,7 +515,7 @@ mod tests {
     #[test]
     fn load_iffalse() {
         let s = r##"{"inkVersion":21,"root":[["ev",{"VAR?":"x"},0,">","/ev",[{"->":".^.b","c":true},{"b":["\n","ev",{"VAR?":"x"},1,"-","/ev",{"VAR=":"y","re":true},{"->":"0.6"},null]}],"nop","\n","^The value is ","ev",{"VAR?":"y"},"out","/ev","^. ","end","\n",["done",{"#n":"g-0"}],null],"done",{"global decl":["ev",0,{"VAR=":"x"},3,{"VAR=":"y"},"/ev","end",null]}],"listDefs":{}}"##;
-        let (_, container, _) = load_from_string(s).unwrap();
+        let (_, container) = load_from_string(s).unwrap();
         let mut sb = String::new();
         container.build_string_of_hierarchy(&mut sb, 0, None);
         println!("{}", sb);

@@ -2,8 +2,6 @@ use crate::{
     container::Container,
     control_command::{CommandType, ControlCommand},
     divert::Divert,
-    ink_list::InkList,
-    ink_list_item::InkListItem,
     native_function_call::NativeFunctionCall,
     object::RTObject,
     path::Path,
@@ -448,110 +446,6 @@ impl Story {
                     }
                 }
                 CommandType::End => self.get_state_mut().force_end(),
-                CommandType::ListFromInt => {
-                    let mut int_val: Option<i32> = None;
-                    let mut list_name_val: Option<&String> = None;
-                    let o = self.get_state_mut().pop_evaluation_stack();
-                    if let Some(v) = Value::get_value::<i32>(o.as_ref()) {
-                        int_val = Some(v);
-                    }
-
-                    let o = self.get_state_mut().pop_evaluation_stack();
-                    if let Some(s) = Value::get_value::<&StringValue>(o.as_ref()) {
-                        list_name_val = Some(&s.string);
-                    }
-
-                    if int_val.is_none() {
-                        return Err(StoryError::InvalidStoryState("Passed non-integer when creating a list element from a numerical value.".to_owned()));
-                    }
-
-                    let mut generated_list_value: Option<Value> = None;
-                    if let Some(found_list_def) = self
-                        .list_definitions
-                        .as_ref()
-                        .get_list_definition(list_name_val.as_ref().unwrap())
-                    {
-                        if let Some(found_item) =
-                            found_list_def.get_item_with_value(int_val.unwrap())
-                        {
-                            let l = InkList::from_single_element((
-                                found_item.clone(),
-                                int_val.unwrap(),
-                            ));
-                            generated_list_value = Some(Value::new::<InkList>(l));
-                        }
-                    } else {
-                        return Err(StoryError::InvalidStoryState(format!(
-                            "Failed to find List called {}",
-                            list_name_val.as_ref().unwrap()
-                        )));
-                    }
-
-                    if generated_list_value.is_none() {
-                        generated_list_value = Some(Value::new::<InkList>(InkList::new()));
-                    }
-
-                    self.get_state_mut()
-                        .push_evaluation_stack(Rc::new(generated_list_value.unwrap()));
-                }
-                CommandType::ListRange => {
-                    let mut p = self.get_state_mut().pop_evaluation_stack();
-                    let max = p.into_any().downcast::<Value>();
-                    p = self.get_state_mut().pop_evaluation_stack();
-                    let min = p.into_any().downcast::<Value>();
-                    p = self.get_state_mut().pop_evaluation_stack();
-                    let target_list = Value::get_value::<&InkList>(p.as_ref());
-                    if target_list.is_none() || min.is_err() || max.is_err() {
-                        return Err(StoryError::InvalidStoryState(
-                            "Expected List, minimum and maximum for LIST_RANGE".to_owned(),
-                        ));
-                    }
-
-                    let result = target_list
-                        .unwrap()
-                        .list_with_sub_range(&min.unwrap().value, &max.unwrap().value);
-                    self.get_state_mut()
-                        .push_evaluation_stack(Rc::new(Value::new::<InkList>(result)));
-                }
-                CommandType::ListRandom => {
-                    let o = self.get_state_mut().pop_evaluation_stack();
-                    let list = Value::get_value::<&InkList>(o.as_ref());
-                    if list.is_none() {
-                        return Err(StoryError::InvalidStoryState(
-                            "Expected list for LIST_RANDOM".to_owned(),
-                        ));
-                    }
-
-                    let list = list.unwrap();
-                    let new_list = {
-                        // List was empty: return empty list
-                        if list.items.is_empty() {
-                            InkList::new()
-                        }
-                        // Non-empty source list
-                        else {
-                            // Generate a random index for the element to take
-                            let result_seed =
-                                self.get_state().story_seed + self.get_state().previous_random;
-                            let mut rng = StdRng::seed_from_u64(result_seed as u64);
-                            let next_random = rng.random::<u32>();
-                            let list_item_index = (next_random as usize) % list.items.len(); // Iterate through to get the random element, sorted for
-                                                                                             // predictibility
-                            let mut sorted: Vec<(&InkListItem, &i32)> = list.items.iter().collect();
-                            sorted.sort_by(|a, b| b.1.cmp(a.1));
-                            let random_item = sorted[list_item_index]; // Origin list is simply the origin of the one element
-                            let mut new_list = InkList::from_single_origin(
-                                random_item.0.get_origin_name().unwrap().clone(),
-                                self.list_definitions.as_ref(),
-                            )?;
-                            new_list.items.insert(random_item.0.clone(), *random_item.1);
-                            self.get_state_mut().previous_random = next_random as i32;
-                            new_list
-                        }
-                    };
-                    self.get_state_mut()
-                        .push_evaluation_stack(Rc::new(Value::new::<InkList>(new_list)));
-                }
                 CommandType::BeginTag => self
                     .get_state_mut()
                     .push_to_output_stream(content_obj.clone()),

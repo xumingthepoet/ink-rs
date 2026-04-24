@@ -9,7 +9,6 @@ use crate::{
     control_command::ControlCommand,
     divert::Divert,
     glue::Glue,
-    ink_list::InkList,
     native_function_call::NativeFunctionCall,
     object::RTObject,
     path::Path,
@@ -111,10 +110,6 @@ pub fn write_rtobject(o: Rc<dyn RTObject>) -> Result<serde_json::Value, StoryErr
         }
 
         return Ok(json!(s));
-    }
-
-    if let Some(v) = Value::get_value::<&InkList>(o.as_ref()) {
-        return Ok(write_ink_list(v));
     }
 
     if let Some(v) = Value::get_value::<&Path>(o.as_ref()) {
@@ -244,29 +239,6 @@ pub fn write_rt_container(
     }
 
     Ok(serde_json::Value::Array(c_array))
-}
-
-pub fn write_ink_list(list: &InkList) -> serde_json::Value {
-    let mut jobj: Map<String, serde_json::Value> = Map::new();
-
-    let mut jlist: Map<String, serde_json::Value> = Map::new();
-    for (item, v) in list.items.iter() {
-        let mut name = String::new();
-
-        match item.get_origin_name() {
-            Some(n) => name.push_str(n),
-            None => name.push('?'),
-        }
-
-        name.push('.');
-        name.push_str(item.get_item_name());
-
-        jlist.insert(name, json!(v));
-    }
-
-    jobj.insert("list".to_owned(), serde_json::Value::Object(jlist));
-
-    serde_json::Value::Object(jobj)
 }
 
 pub fn write_choice(choice: &Choice) -> serde_json::Value {

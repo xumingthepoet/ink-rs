@@ -161,30 +161,3 @@ fn empty_elements_test() -> Result<(), StoryError> {
 
     Ok(())
 }
-
-#[test]
-fn list_in_choice_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("inkfiles/variabletext/list-in-choice.ink.json");
-    let mut story = Story::new(&json_string);
-    let mut text: Vec<String> = Vec::new();
-
-    common::next_all(&mut story, &mut text);
-    assert_eq!(1, text.len());
-    assert_eq!("\"Hello, Master!\"", story.get_current_choices()[0].text);
-
-    story.choose_choice_index(0);
-    text.clear();
-    common::next_all(&mut story, &mut text);
-
-    assert_eq!(1, text.len());
-    assert_eq!("\"Hello, Monsieur!\"", story.get_current_choices()[0].text);
-
-    story.choose_choice_index(0);
-    text.clear();
-    common::next_all(&mut story, &mut text);
-
-    assert_eq!(1, text.len());
-    assert_eq!("\"Hello, you!\"", story.get_current_choices()[0].text);
-
-    Ok(())
-}

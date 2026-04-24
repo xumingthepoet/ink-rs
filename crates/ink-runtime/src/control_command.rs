@@ -27,9 +27,6 @@ pub enum CommandType {
     StartThread,
     Done,
     End,
-    ListFromInt,
-    ListRange,
-    ListRandom,
     BeginTag,
     EndTag,
 }
@@ -55,9 +52,6 @@ const SEQUENCE_SHUFFLE_INDEX_NAME: &str = "seq";
 const START_THREAD_NAME: &str = "thread";
 const DONE_NAME: &str = "done";
 const END_NAME: &str = "end";
-const LIST_FROM_INT_NAME: &str = "listInt";
-const LIST_RANGE_NAME: &str = "range";
-const LIST_RANDOM_NAME: &str = "lrnd";
 const BEGIN_TAG_NAME: &str = "#";
 const END_TAG_NAME: &str = "/#";
 
@@ -90,9 +84,6 @@ impl ControlCommand {
             START_THREAD_NAME => Some(Self::new(CommandType::StartThread)),
             DONE_NAME => Some(Self::new(CommandType::Done)),
             END_NAME => Some(Self::new(CommandType::End)),
-            LIST_FROM_INT_NAME => Some(Self::new(CommandType::ListFromInt)),
-            LIST_RANGE_NAME => Some(Self::new(CommandType::ListRange)),
-            LIST_RANDOM_NAME => Some(Self::new(CommandType::ListRandom)),
             BEGIN_TAG_NAME => Some(Self::new(CommandType::BeginTag)),
             END_TAG_NAME => Some(Self::new(CommandType::EndTag)),
             _ => None,
@@ -122,9 +113,6 @@ impl ControlCommand {
             CommandType::StartThread => START_THREAD_NAME.to_owned(),
             CommandType::Done => DONE_NAME.to_owned(),
             CommandType::End => END_NAME.to_owned(),
-            CommandType::ListFromInt => LIST_FROM_INT_NAME.to_owned(),
-            CommandType::ListRange => LIST_RANGE_NAME.to_owned(),
-            CommandType::ListRandom => LIST_RANDOM_NAME.to_owned(),
             CommandType::BeginTag => BEGIN_TAG_NAME.to_owned(),
             CommandType::EndTag => END_TAG_NAME.to_owned(),
         }

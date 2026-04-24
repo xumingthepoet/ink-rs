@@ -33,20 +33,21 @@ The upstream reference lives in `ink-csharp/`.
 - If the existing compiler architecture blocks progress, rewrite the affected area instead of extending a fragile partial port.
 - Match upstream behavior first, then improve Rust-side structure only where it does not change semantics.
 - Avoid broad unrelated edits when working on compiler behavior.
+- Keep `docs/WritingWithInk.md` synchronized with language syntax changes.
 
 ## Continuation Workflow
 
-- If the user sends a continuation prompt such as `continue`, `go on`, `keep going`, `next`, `继续`, `继续吧`, or similar without replacing the task, interpret it as: continue the compiler conformance campaign.
-- `priority.md` is the authoritative queue for that campaign. Always take the first unchecked compiler-conformance fixture from `priority.md`, work in that order, and do not skip ahead.
-- Keep `priority.md` synchronized with reality. When a fixture genuinely passes, update its checkbox and progress count before moving on. If the file has drifted from the actual passing set, fix the drift before resuming the queue.
+- If the user sends a continuation prompt such as `continue`, `go on`, `keep going`, `next`, `继续`, `继续吧`, or similar without replacing the task, interpret it as: continue the C# tests campaign.
+- The current campaign target is `make csharp-gate`.
+- Use the ignored tests in `crates/ink-test/tests/csharp_tests/mod.rs` as the remaining queue. Take the first ignored non-LIST C# test in file order, remove its ignore marker, then fix compiler/runtime behavior until it genuinely passes.
 
-## Compiler Conformance Campaign Rules
+## C# Tests Campaign Rules
 
-- The target suite is `crates/ink-test/tests/compiler_conformance.rs`, which runs as part of `make gate`.
-- Every continuation cycle must end with at least one additional compiler-conformance fixture genuinely passing.
-- After one fixture is genuinely passing, validated, and recorded in `priority.md`, create a git commit before starting the next unchecked fixture.
-- After that commit, continue immediately to the next unchecked fixture in `priority.md`.
-- Repeat until all 107 compiler-conformance fixtures pass, unless the user interrupts or changes the task.
+- The target suite is `crates/ink-test/tests/csharp_tests.rs`, run through `make csharp-gate`.
+- Every continuation cycle must end with at least one additional ignored C# test unignored and genuinely passing.
+- After one C# test is genuinely passing and validated, create a git commit before starting the next ignored test.
+- After that commit, continue immediately to the next ignored test in file order.
+- Repeat until all non-LIST C# tests run by default and pass, unless the user interrupts or changes the task.
 
 ## Architecture Requirements
 
@@ -61,7 +62,7 @@ The upstream reference lives in `ink-csharp/`.
 - Do not hardcode JSON fragments, runtime paths, container names, or snapshot strings purely to satisfy a specific fixture.
 - Do not intentionally narrow accepted syntax to only the exact surface form used by the current fixture.
 - Do not add “temporary” special cases, one-off branches, or test-order-dependent logic just to make a fixture pass.
-- Do not modify tests, fixtures, or `priority.md` to hide failures instead of fixing compiler behavior.
+- Do not add new ignored tests, skip filters, fixture edits, or expected-output edits to hide failures instead of fixing behavior.
 - In short: no “special-case”, “narrowed scope”, or other cheating-style test passes.
 
 ## Validation
@@ -78,8 +79,9 @@ When touching compiler logic, favor focused test runs in `crates/ink-test` befor
 
 For the continuation workflow above, the minimum required validation before marking a fixture done is:
 
-- the focused compiler-conformance test for the current fixture
-- `make gate`
+- the focused C# test for the current case
+- `make csharp-gate`
+- `make gate` when compiler or runtime logic changed
 
 ## Practical Guidance
 
@@ -90,7 +92,7 @@ For the continuation workflow above, the minimum required validation before mark
 
 ## Working Notes
 
-- During fix work, only record notes that are general, reusable, and likely to help later compiler-conformance work.
+- During fix work, only record notes that are general, reusable, and likely to help later C# tests campaign work.
 - Do not record fixture-specific hacks, temporary observations, or narrow one-off facts.
 - Keep this section to at most 10 entries total.
 - If you want to add a new entry when the section already has 10, first delete the least important entry, delete outdated material, or merge overlapping entries.
@@ -103,7 +105,7 @@ For the continuation workflow above, the minimum required validation before mark
 
 ## Working Note Entries
 
-- [2026-04-24 00:02 CST] [👍40][👎0] First distinguish “queue maintenance” from real compiler work: if a priority fixture already passes under existing generic behavior, just enable it, validate it, update `priority.md`, and commit. Only change compiler code when the fixture exposes a genuine model or export gap.
+- [2026-04-25 00:00 CST] [👍0][👎0] The C# tests campaign queue is the ignored non-LIST tests in `crates/ink-test/tests/csharp_tests/mod.rs`. First remove the ignore marker for the next test in file order, run it focused, then fix behavior until it passes; do not add new ignores to hide failures.
 - [2026-04-24 00:22 CST] [👍11][👎0] When a fixture exposes structural data, add it to the parsed model first, then lower JSON from that model. For example, `Divert` carries call arguments while `Flow` carries parameters and emits entry `temp=` assignments. This prevents flow semantics from leaking into ad hoc export logic.
 - [2026-04-24 08:50 CST] [👍8][👎0] Function calls and string expressions are expressions: lower call arguments before the runtime command/user function token. External declarations only register signatures; matching calls lower to `x()` with `exArgs`. Divert-target arguments used as values count visits and turns unless direct `TURNS_SINCE`/`READ_COUNT` gives a narrower purpose. String expressions lower as `str ... /str`.
 - [2026-04-24 09:34 CST] [👍10][👎0] Weave lowering needs a current runtime-container model. After gathers, content and choices stay in that gather; inside flows, linear weave objects must carry flow/stitch container paths. Branch rejoin diverts should use C#-style compact paths, choosing relative only when shorter than absolute.
