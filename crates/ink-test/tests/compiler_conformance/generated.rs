@@ -159,3 +159,4 @@ fixture!(
     "inkfiles/glue/left-right-glue-matching.ink"
 );
 fixture!(glue_testbugfix1, "inkfiles/glue/testbugfix1.ink");
+fixture!(glue_testbugfix2, "inkfiles/glue/testbugfix2.ink");
