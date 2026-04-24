@@ -273,10 +273,15 @@ fn check_call_targets_in_object(
 ) {
     match object {
         Object::Divert(divert) => {
-            if !inside_function {
-                if let DivertTarget::Path(target) = divert.target() {
+            match divert.target() {
+                DivertTarget::Empty => diagnostics.push(Diagnostic::error(
+                    divert.span().clone(),
+                    "Empty diverts (->) are only valid on choices",
+                )),
+                DivertTarget::Path(target) if !inside_function => {
                     check_plain_divert_target(target, divert.span(), flow_symbols, diagnostics);
                 }
+                DivertTarget::Path(_) | DivertTarget::Done | DivertTarget::End => {}
             }
             for argument in divert.arguments() {
                 check_call_targets_in_expression(

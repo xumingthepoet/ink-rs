@@ -1629,7 +1629,6 @@ Hello world
     //             Assert.IsTrue (HadError ("Empty diverts (->) are only valid on choices"));
     //         }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestDisallowEmptyDiverts() {
         run_in_both_modes(|suite| {
             suite

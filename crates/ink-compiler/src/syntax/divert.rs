@@ -40,7 +40,7 @@ pub(super) fn parse_divert_objects_source(source: &str, span: SourceSpan) -> Opt
     let after_arrow = source.strip_prefix("->")?.trim();
     let (segments, has_trailing_tunnel_arrow) = split_multidivert_segments(after_arrow);
     if segments.is_empty() {
-        return None;
+        return Some(vec![Object::Divert(Divert::new(DivertTarget::Empty, span))]);
     }
 
     let last_index = segments.len() - 1;
