@@ -707,6 +707,22 @@ struct VariableScopeIndex {
     locals_by_flow_path: HashMap<String, HashSet<String>>,
 }
 
+impl VariableScopeIndex {
+    fn contains_visible_variable(&self, name: &str, current_flow_path: Option<&str>) -> bool {
+        if let Some(flow_path) = current_flow_path {
+            if self
+                .locals_by_flow_path
+                .get(flow_path)
+                .is_some_and(|locals| locals.contains(name))
+            {
+                return true;
+            }
+        }
+
+        self.globals.contains(name)
+    }
+}
+
 fn build_variable_scope_index(story: &Story) -> VariableScopeIndex {
     let mut index = VariableScopeIndex::default();
     collect_story_scope_variables_in_weave(story.root_weave(), &mut index.globals, true);
@@ -898,17 +914,7 @@ fn check_variable_reference(
         return;
     }
 
-    if let Some(flow_path) = current_flow_path {
-        if variable_scopes
-            .locals_by_flow_path
-            .get(flow_path)
-            .is_some_and(|locals| locals.contains(name))
-        {
-            return;
-        }
-    }
-
-    if variable_scopes.globals.contains(name) {
+    if variable_scopes.contains_visible_variable(name, current_flow_path) {
         return;
     }
 
@@ -1715,8 +1721,14 @@ fn check_call_targets_in_expression(
         Expression::String(_)
         | Expression::NumberInt(_)
         | Expression::NumberFloat(_)
-        | Expression::NumberBool(_)
-        | Expression::DivertTarget(_) => {}
+        | Expression::NumberBool(_) => {}
+        Expression::DivertTarget(target) => check_divert_target_value(
+            target,
+            span,
+            variable_scopes,
+            diagnostics,
+            current_flow_path,
+        ),
         Expression::VariableReference(name) => check_variable_reference(
             name,
             span,
@@ -1725,6 +1737,24 @@ fn check_call_targets_in_expression(
             diagnostics,
             current_flow_path,
         ),
+    }
+}
+
+fn check_divert_target_value(
+    target: &str,
+    span: &SourceSpan,
+    variable_scopes: &VariableScopeIndex,
+    diagnostics: &mut Vec<Diagnostic>,
+    current_flow_path: Option<&str>,
+) {
+    let variable_name = target.split('.').next().unwrap_or(target);
+    if variable_scopes.contains_visible_variable(variable_name, current_flow_path) {
+        diagnostics.push(Diagnostic::error(
+            span.clone(),
+            format!(
+                "Since '{variable_name}' is a variable, it shouldn't be preceded by '->' here."
+            ),
+        ));
     }
 }
 

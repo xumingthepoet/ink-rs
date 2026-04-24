@@ -8904,7 +8904,6 @@ this is the end
     //             Assert.IsTrue (HadError ("it shouldn't be preceded by '->'"));
     //         }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestWrongVariableDivertTargetReference() {
         let mut suite = CSharpTestSuite::new(TestMode::Normal);
         suite.compile_string_without_runtime(
