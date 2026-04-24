@@ -413,6 +413,21 @@ mod tests {
     }
 
     #[test]
+    fn parses_choice_condition_with_dotted_path() {
+        let output = parse(SourceInput::new("* {knot.stitch.label} Text"));
+        assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
+        let story = output.artifact.unwrap();
+
+        let Object::Choice(choice) = &story.root_weave().content()[0] else {
+            panic!("expected choice");
+        };
+        let Some(crate::parsed::Expression::VariableReference(name)) = choice.condition() else {
+            panic!("expected variable reference condition");
+        };
+        assert_eq!(name, "knot.stitch.label");
+    }
+
+    #[test]
     fn parses_empty_inline_choice_brackets_without_choice_only_content() {
         let output = parse(SourceInput::new("* Text[] inner"));
         assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);

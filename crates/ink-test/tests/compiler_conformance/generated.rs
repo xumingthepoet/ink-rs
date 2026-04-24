@@ -67,3 +67,4 @@ fixture!(
     choices_label_scope_error,
     "inkfiles/choices/label-scope-error.ink"
 );
+fixture!(choices_label_scope, "inkfiles/choices/label-scope.ink");

@@ -153,9 +153,13 @@ fn parse_bool_literal(source: &str) -> Option<Expression> {
     match source {
         "true" => Some(Expression::NumberBool(true)),
         "false" => Some(Expression::NumberBool(false)),
-        _ if is_identifier(source) => Some(Expression::VariableReference(source.to_string())),
+        _ if is_path_identifier(source) => Some(Expression::VariableReference(source.to_string())),
         _ => None,
     }
+}
+
+fn is_path_identifier(source: &str) -> bool {
+    source.split('.').all(is_identifier)
 }
 
 fn is_identifier(source: &str) -> bool {
