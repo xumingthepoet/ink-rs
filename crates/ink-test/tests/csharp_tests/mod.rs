@@ -188,6 +188,7 @@ trait RuntimeStoryExt {
     fn get_global_tags(&mut self) -> Vec<String>;
     fn global_tags(&mut self) -> Vec<String>;
     fn can_continue(&mut self) -> bool;
+    fn evaluation_stack_len(&mut self) -> usize;
     fn set_allow_external_function_fallbacks(&mut self, value: bool);
     fn evaluate_function(
         &mut self,
@@ -479,6 +480,15 @@ impl RuntimeStoryExt for RuntimeStory {
 
     fn can_continue(&mut self) -> bool {
         RuntimeStory::can_continue(self)
+    }
+
+    fn evaluation_stack_len(&mut self) -> usize {
+        let state: serde_json::Value =
+            serde_json::from_str(&self.save_state()).expect("save state should be JSON");
+        state
+            .get("evalStack")
+            .and_then(|value| value.as_array())
+            .map_or(0, |stack| stack.len())
     }
 
     fn set_allow_external_function_fallbacks(&mut self, value: bool) {
@@ -806,7 +816,6 @@ mod tests {
     //         	Assert.IsTrue (story.state.evaluationStack.Count == 0);
     //         }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestAllSwitchBranchesFailIsClean() {
         run_in_both_modes(|suite| {
             let mut story = suite
@@ -822,7 +831,7 @@ mod tests {
                 )
                 .expect("compile should succeed");
             story.cont();
-            assert!(!story.can_continue());
+            assert_eq!(0, story.evaluation_stack_len());
         });
     }
 
