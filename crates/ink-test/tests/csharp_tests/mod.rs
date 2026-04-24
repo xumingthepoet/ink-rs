@@ -3968,11 +3968,10 @@ hi
     //             Assert.Throws<TestWarningException>(() => parser.Parse());
     //         }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestReturnTextWarning() {
         let mut suite = CSharpTestSuite::new(TestMode::Normal);
         suite.compile_string_without_runtime("== test ==\n return something", true);
-        assert!(suite.had_warning(None));
+        assert!(suite.had_warning(Some("Do you need a '~' before 'return'?")));
     }
 
     // C#:         [Test()]

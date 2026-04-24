@@ -11,7 +11,6 @@ use super::rule::RuleParser;
 pub(super) fn parse_text_line(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
     let span = parser.current_span();
     let text = parser.line_remainder().trim_start().to_string();
-    parser.skip_to_end();
 
     if text.is_empty() {
         return None;
@@ -23,6 +22,15 @@ pub(super) fn parse_text_line(parser: &mut RuleParser<'_>) -> Option<Vec<Object>
 
     let is_tag_line = text.starts_with('#');
     let mut objects = parse_inline_content(&text, &span)?;
+    if objects.first().is_some_and(
+        |object| matches!(object, Object::Text(text) if text.text().starts_with("return")),
+    ) {
+        parser.warning(
+            "Do you need a '~' before 'return'? If not, perhaps use a glue: <> (since it's lowercase) or rewrite somehow?",
+        );
+    }
+
+    parser.skip_to_end();
 
     if !is_tag_line {
         objects.push(Object::Text(Text::new("\n", span)));
