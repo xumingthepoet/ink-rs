@@ -63,6 +63,7 @@ fn naming_diagnostics(story: &Story) -> Vec<Diagnostic> {
     for flow in story.flows() {
         check_subflow_and_weave_names(flow, &global_variables, &mut diagnostics);
         check_flow_arguments(flow, &top_level_flows, &global_variables, &mut diagnostics);
+        check_temporary_names_against_arguments(flow, &mut diagnostics);
     }
     diagnostics
 }
@@ -181,6 +182,149 @@ fn check_subflow_and_weave_names(
             ));
         }
         check_subflow_and_weave_names(child, global_variables, diagnostics);
+    }
+}
+
+fn check_temporary_names_against_arguments(flow: &Flow, diagnostics: &mut Vec<Diagnostic>) {
+    let argument_names: HashSet<String> = flow
+        .arguments()
+        .iter()
+        .map(|argument| argument.name().to_string())
+        .collect();
+    if !argument_names.is_empty() {
+        check_temporary_names_against_arguments_in_weave(
+            flow.weave(),
+            flow.name(),
+            &argument_names,
+            diagnostics,
+        );
+    }
+
+    for child in flow.child_flows() {
+        check_temporary_names_against_arguments(child, diagnostics);
+    }
+}
+
+fn check_temporary_names_against_arguments_in_weave(
+    weave: &Weave,
+    flow_name: &str,
+    argument_names: &HashSet<String>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    for object in weave.content() {
+        check_temporary_names_against_arguments_in_object(
+            object,
+            flow_name,
+            argument_names,
+            diagnostics,
+        );
+    }
+}
+
+fn check_temporary_names_against_arguments_in_content_list(
+    content: &ContentList,
+    flow_name: &str,
+    argument_names: &HashSet<String>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    for object in content.objects() {
+        check_temporary_names_against_arguments_in_object(
+            object,
+            flow_name,
+            argument_names,
+            diagnostics,
+        );
+    }
+}
+
+fn check_temporary_names_against_arguments_in_object(
+    object: &Object,
+    flow_name: &str,
+    argument_names: &HashSet<String>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    match object {
+        Object::VariableAssignment(assignment)
+            if assignment.is_temporary() && argument_names.contains(assignment.name()) =>
+        {
+            diagnostics.push(Diagnostic::error(
+                assignment.span().clone(),
+                format!(
+                    "temp '{}': name has already been used for an argument to {}",
+                    assignment.name(),
+                    flow_name
+                ),
+            ));
+        }
+        Object::Choice(choice) => {
+            if let Some(content) = choice.start_content() {
+                check_temporary_names_against_arguments_in_content_list(
+                    content,
+                    flow_name,
+                    argument_names,
+                    diagnostics,
+                );
+            }
+            if let Some(content) = choice.choice_only_content() {
+                check_temporary_names_against_arguments_in_content_list(
+                    content,
+                    flow_name,
+                    argument_names,
+                    diagnostics,
+                );
+            }
+            check_temporary_names_against_arguments_in_content_list(
+                choice.inner_content(),
+                flow_name,
+                argument_names,
+                diagnostics,
+            );
+        }
+        Object::Conditional(conditional) => {
+            for branch in conditional.branches() {
+                check_temporary_names_against_arguments_in_weave(
+                    branch.content(),
+                    flow_name,
+                    argument_names,
+                    diagnostics,
+                );
+            }
+        }
+        Object::Sequence(sequence) => {
+            for element in sequence.elements() {
+                check_temporary_names_against_arguments_in_content_list(
+                    element,
+                    flow_name,
+                    argument_names,
+                    diagnostics,
+                );
+            }
+        }
+        Object::ContentList(content) => check_temporary_names_against_arguments_in_content_list(
+            content,
+            flow_name,
+            argument_names,
+            diagnostics,
+        ),
+        Object::Weave(weave) => check_temporary_names_against_arguments_in_weave(
+            weave,
+            flow_name,
+            argument_names,
+            diagnostics,
+        ),
+        Object::ConstantDeclaration(_)
+        | Object::Divert(_)
+        | Object::Expression(_)
+        | Object::ExternalDeclaration(_)
+        | Object::Gather(_)
+        | Object::Glue(_)
+        | Object::IncDec(_)
+        | Object::LogicLine(_)
+        | Object::Return(_)
+        | Object::Tag(_)
+        | Object::Text(_)
+        | Object::TunnelOnwards(_)
+        | Object::VariableAssignment(_) => {}
     }
 }
 

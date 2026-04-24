@@ -5167,7 +5167,6 @@ opts1
     //             Assert.IsTrue (HadError ("has already been used"));
     //         }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestVariableNamingCollisionWithArg() {
         run_in_both_modes(|suite| {
             suite
