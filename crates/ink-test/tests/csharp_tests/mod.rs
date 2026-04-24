@@ -7702,13 +7702,12 @@ This is the {first|second|third} time.
     // C#:     });
     // C#: }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestSetNonExistantVariable() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
                     r#"
-VAR x = ""world""
+VAR x = "world"
 Hello {x}.
 "#,
                     false,
@@ -7716,9 +7715,9 @@ Hello {x}.
                 )
                 .expect("compile should succeed");
             assert_eq!("Hello world.\n", story.cont());
-            // Setting a non-existent variable should cause an error
-            // We don't have a direct way to test this panic in Rust tests
-            // since the Rust API returns Result. Let's just verify the story works.
+            assert!(story
+                .set_variable("y", &ValueType::String("earth".to_string()))
+                .is_err());
         });
     }
 
