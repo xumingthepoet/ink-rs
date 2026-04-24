@@ -147,3 +147,4 @@ fixture!(
     "inkfiles/conditional/shuffle_stopping.ink"
 );
 fixture!(knot_param_floats, "inkfiles/knot/param-floats.ink");
+fixture!(knot_param_ints, "inkfiles/knot/param-ints.ink");
