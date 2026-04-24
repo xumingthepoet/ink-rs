@@ -9,7 +9,7 @@ mod text;
 use crate::{
     compiler::StageOutput,
     diagnostic::Diagnostic,
-    parsed::{Flow, Object, Story, Weave},
+    parsed::{Expression, Flow, Object, Story, VariableAssignment, Weave},
     source::{SourceFile, SourceInput, SourceLine},
 };
 
@@ -78,6 +78,7 @@ impl Parser {
 
         let mut line_parser = RuleParser::new(line);
         let statement_rules: &[StatementRule] = &[
+            variable_declaration_statement,
             choice_statement,
             gather_statement,
             divert_statement,
@@ -273,6 +274,39 @@ fn object_depth(object: &Object) -> Option<usize> {
 
 fn choice_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
     choice::parse_choice(parser).map(|choice| vec![Object::Choice(choice)])
+}
+
+fn variable_declaration_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
+    parser.skip_horizontal_whitespace();
+    let span = parser.current_span();
+    parser.match_string("VAR")?;
+    parser.skip_horizontal_whitespace();
+    let name = parser.take_while(|ch| ch == '_' || ch.is_ascii_alphanumeric())?;
+    if !is_identifier(&name) {
+        return None;
+    }
+    parser.skip_horizontal_whitespace();
+    parser.match_string("=")?;
+    parser.skip_horizontal_whitespace();
+    let expression = parse_initial_expression(parser.line_remainder().trim())?;
+    parser.skip_to_end();
+
+    Some(vec![Object::VariableAssignment(VariableAssignment::new(
+        name, expression, true, false, span,
+    ))])
+}
+
+fn parse_initial_expression(source: &str) -> Option<Expression> {
+    if source == "true" {
+        return Some(Expression::NumberBool(true));
+    }
+    if source == "false" {
+        return Some(Expression::NumberBool(false));
+    }
+    if let Ok(value) = source.parse::<i32>() {
+        return Some(Expression::NumberInt(value));
+    }
+    is_identifier(source).then(|| Expression::VariableReference(source.to_string()))
 }
 
 fn gather_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {

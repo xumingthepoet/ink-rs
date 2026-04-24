@@ -18,15 +18,17 @@ pub(super) fn parse_text_line(parser: &mut RuleParser<'_>) -> Option<Vec<Object>
         return None;
     }
 
+    let is_tag_line = text.starts_with('#');
     let mut objects = parse_inline_content(&text, &span)?;
 
-    objects.push(Object::Text(Text::new("\n", span)));
+    if !is_tag_line {
+        objects.push(Object::Text(Text::new("\n", span)));
+    }
     Some(objects)
 }
 
 fn has_unsupported_text_syntax(text: &str) -> bool {
-    text.starts_with('#')
-        || text.starts_with("INCLUDE ")
+    text.starts_with("INCLUDE ")
         || text.starts_with("VAR ")
         || text.starts_with("LIST ")
         || text.starts_with("CONST ")

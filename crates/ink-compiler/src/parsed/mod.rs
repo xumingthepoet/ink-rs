@@ -9,6 +9,7 @@ mod sequence;
 mod story;
 mod tag;
 mod text;
+mod variable_assignment;
 mod weave;
 
 pub use choice::Choice;
@@ -22,6 +23,7 @@ pub use sequence::{Sequence, SequenceType};
 pub use story::Story;
 pub use tag::Tag;
 pub use text::Text;
+pub use variable_assignment::VariableAssignment;
 pub use weave::Weave;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -34,6 +36,7 @@ pub enum Object {
     Gather(Gather),
     Tag(Tag),
     Sequence(Sequence),
+    VariableAssignment(VariableAssignment),
     Weave(Weave),
 }
 
@@ -53,6 +56,7 @@ impl Object {
             Object::Gather(gather) => gather.write_parse_snapshot(out, indent),
             Object::Tag(tag) => tag.write_parse_snapshot(out, indent),
             Object::Sequence(sequence) => sequence.write_parse_snapshot(out, indent),
+            Object::VariableAssignment(assignment) => assignment.write_parse_snapshot(out, indent),
             Object::Weave(weave) => weave.write_parse_snapshot(out, indent),
         }
     }

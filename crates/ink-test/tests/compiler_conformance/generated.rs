@@ -69,3 +69,4 @@ fixture!(
 );
 fixture!(choices_label_scope, "inkfiles/choices/label-scope.ink");
 fixture!(choices_divert_choice, "inkfiles/choices/divert-choice.ink");
+fixture!(tags_tags, "inkfiles/tags/tags.ink");

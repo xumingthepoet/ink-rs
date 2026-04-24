@@ -33,6 +33,7 @@ pub enum RuntimeObject {
     DivertTarget(String),
     ReadCount(String),
     VariableAssignment(String),
+    GlobalVariableAssignment(String),
     VariableReference(String),
     ChoicePoint { target: String, flags: i32 },
     Glue,
@@ -250,14 +251,17 @@ pub(crate) fn lower(story: &CheckedStory) -> StageOutput<RuntimeProgram> {
         RuntimeObject::ControlCommand(ControlCommand::Done),
     ];
 
-    let flow_containers = story
+    let mut named_containers = story
         .parsed
         .flows()
         .iter()
         .map(|flow| lower_flow(flow, &global_labels))
         .collect::<Vec<_>>();
-    if !flow_containers.is_empty() {
-        root_content.push(RuntimeObject::NamedContent(flow_containers));
+    if let Some(global_declarations) = lower_global_declarations(&story.parsed, &global_labels) {
+        named_containers.push(global_declarations);
+    }
+    if !named_containers.is_empty() {
+        root_content.push(RuntimeObject::NamedContent(named_containers));
     }
 
     let root = Container {
@@ -271,6 +275,50 @@ pub(crate) fn lower(story: &CheckedStory) -> StageOutput<RuntimeProgram> {
         artifact: Some(RuntimeProgram { root }),
         diagnostics: Vec::new(),
     }
+}
+
+fn lower_global_declarations(
+    story: &Story,
+    global_labels: &HashMap<String, String>,
+) -> Option<Container> {
+    let declarations = story
+        .root_weave()
+        .content()
+        .iter()
+        .filter_map(|object| match object {
+            Object::VariableAssignment(assignment) if assignment.is_global() => Some(assignment),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+
+    if declarations.is_empty() {
+        return None;
+    }
+
+    let choice_labels = HashMap::new();
+    let mut content = vec![RuntimeObject::ControlCommand(ControlCommand::EvalStart)];
+    for declaration in declarations {
+        lower_expression_into(
+            &mut content,
+            declaration.expression(),
+            &choice_labels,
+            global_labels,
+            &ChoicePathMode::Root,
+            false,
+        );
+        content.push(RuntimeObject::GlobalVariableAssignment(
+            declaration.name().to_string(),
+        ));
+    }
+    content.push(RuntimeObject::ControlCommand(ControlCommand::EvalEnd));
+    content.push(RuntimeObject::ControlCommand(ControlCommand::End));
+
+    Some(Container {
+        content,
+        name: Some("global decl".to_string()),
+        flags: None,
+        merge_tail_metadata: true,
+    })
 }
 
 fn build_label_index(story: &Story) -> HashMap<String, String> {
@@ -403,7 +451,7 @@ fn lower_flow_with_context(
         // Only add auto-divert to first child flow if the knot's weave doesn't have choices
         // When choices are present, they explicitly divert to stitches
         let weave_has_choices = weave_has_choice(flow.weave());
-        if !weave_has_choices {
+        if !weave_has_choices && !ends_with_flow_terminator(&content) {
             let first_child_name = flow.child_flows()[0].name();
             content.push(RuntimeObject::Divert {
                 target: format!(".^.{}", first_child_name),
@@ -488,6 +536,7 @@ fn lower_choice_weave(
             | Object::Divert(_)
             | Object::Tag(_)
             | Object::Sequence(_)
+            | Object::VariableAssignment(_)
             | Object::Weave(_) => {
                 last_section_had_choice = lower_weave_section(
                     objects,
@@ -656,6 +705,7 @@ fn lower_weave_section(
             | Object::Divert(_)
             | Object::Tag(_)
             | Object::Sequence(_)
+            | Object::VariableAssignment(_)
             | Object::Weave(_) => {
                 lower_object_into_with_context(
                     content,
@@ -1032,6 +1082,7 @@ fn lower_expression_into(
     has_start_content: bool,
 ) {
     match expression {
+        Expression::NumberInt(value) => content.push(RuntimeObject::Int(*value)),
         Expression::NumberBool(value) => content.push(RuntimeObject::Bool(*value)),
         Expression::VariableReference(name) => {
             if let Some(choice_container_name) = choice_labels.get(name) {
@@ -1201,6 +1252,15 @@ fn lower_object_into(
         Object::Divert(divert) => push_divert(content, divert.target()),
         Object::Choice(_) => {}
         Object::Gather(_) => {} // Handled in lower_choice_weave
+        Object::VariableAssignment(assignment) => {
+            lower_variable_assignment_into(
+                content,
+                assignment,
+                &ChoicePathMode::Root,
+                choice_labels,
+                global_labels,
+            );
+        }
         Object::Tag(tag) => content.push(RuntimeObject::Tag {
             is_start: tag.is_start(),
         }),
@@ -1245,6 +1305,15 @@ fn lower_object_into_with_context(
         ),
         Object::Choice(_) => {}
         Object::Gather(_) => {} // Handled in lower_choice_weave
+        Object::VariableAssignment(assignment) => {
+            lower_variable_assignment_into(
+                content,
+                assignment,
+                path_mode,
+                choice_labels,
+                global_labels,
+            );
+        }
         Object::Tag(tag) => content.push(RuntimeObject::Tag {
             is_start: tag.is_start(),
         }),
@@ -1263,6 +1332,30 @@ fn lower_object_into_with_context(
             }));
         }
     }
+}
+
+fn lower_variable_assignment_into(
+    content: &mut Vec<RuntimeObject>,
+    assignment: &crate::parsed::VariableAssignment,
+    path_mode: &ChoicePathMode,
+    choice_labels: &HashMap<String, String>,
+    global_labels: &HashMap<String, String>,
+) {
+    if assignment.is_global() {
+        return;
+    }
+
+    lower_expression_into(
+        content,
+        assignment.expression(),
+        choice_labels,
+        global_labels,
+        path_mode,
+        false,
+    );
+    content.push(RuntimeObject::VariableAssignment(
+        assignment.name().to_string(),
+    ));
 }
 
 fn push_divert_with_context(
