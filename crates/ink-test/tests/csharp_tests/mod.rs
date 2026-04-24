@@ -8437,7 +8437,6 @@ Now in B.
     //             }
     //         }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestTurns() {
         run_in_both_modes(|suite| {
             let mut story = suite
