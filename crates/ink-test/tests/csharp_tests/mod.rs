@@ -5670,7 +5670,6 @@ CONST z = -> elsewhere
     //             Assert.AreEqual ("End\n", story.Continue ());
     //         }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestEvaluatingFunctionVariableStateBug() {
         run_in_both_modes(|suite| {
             let mut story = suite
@@ -5687,9 +5686,9 @@ In tunnel.
 
 === function function_to_evaluate() ===
     { zero_equals_(1):
-        ~ return ""WRONG""
+        ~ return "WRONG"
     - else:
-        ~ return ""RIGHT""
+        ~ return "RIGHT"
     }
 
 === function zero_equals_(k) ===
