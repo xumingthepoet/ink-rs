@@ -5889,7 +5889,6 @@ x = {x}, y = {y}
     //             Assert.IsTrue (story.state.evaluationStack.Count == 0);
     //         }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestEvaluationStackLeaks() {
         run_in_both_modes(|suite| {
             let mut story = suite
