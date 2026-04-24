@@ -127,24 +127,17 @@ fn parse_inline_content_inner(
             break;
         }
 
-        let next_token = [
-            remaining.find("<>"),
-            remaining.find("->"),
-            remaining.find('#'),
-            remaining.find('{'),
-        ]
-        .into_iter()
-        .flatten()
-        .min();
+        let next_token = find_next_unescaped_inline_token(remaining);
 
         match next_token {
             Some(0) => return None,
             Some(index) => {
+                let prefix_text = unescape_content_text(&remaining[..index]);
                 let prefix =
                     if trim_divert_separator_whitespace && remaining[index..].starts_with("->") {
-                        normalize_divert_separator_whitespace(&remaining[..index])
+                        normalize_divert_separator_whitespace(&prefix_text)
                     } else {
-                        remaining[..index].to_string()
+                        prefix_text
                     };
                 if !prefix.is_empty() {
                     objects.push(Object::Text(Text::new(prefix, span.clone())));
@@ -152,7 +145,10 @@ fn parse_inline_content_inner(
                 remaining = &remaining[index..];
             }
             None => {
-                objects.push(Object::Text(Text::new(remaining, span.clone())));
+                objects.push(Object::Text(Text::new(
+                    unescape_content_text(remaining),
+                    span.clone(),
+                )));
                 remaining = "";
             }
         }
@@ -168,6 +164,49 @@ fn parse_inline_content_inner(
     } else {
         Some(objects)
     }
+}
+
+fn find_next_unescaped_inline_token(source: &str) -> Option<usize> {
+    let mut escaped = false;
+
+    for (index, ch) in source.char_indices() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+
+        if ch == '\\' {
+            escaped = true;
+            continue;
+        }
+
+        if ch == '#'
+            || ch == '{'
+            || source[index..].starts_with("<>")
+            || source[index..].starts_with("->")
+        {
+            return Some(index);
+        }
+    }
+
+    None
+}
+
+fn unescape_content_text(source: &str) -> String {
+    let mut output = String::new();
+    let mut chars = source.chars();
+
+    while let Some(ch) = chars.next() {
+        if ch == '\\' {
+            if let Some(next) = chars.next() {
+                output.push(next);
+            }
+        } else {
+            output.push(ch);
+        }
+    }
+
+    output
 }
 
 fn parse_inline_braced_objects(
@@ -349,7 +388,7 @@ fn split_top_level_once(source: &str, needle: char) -> Option<(&str, &str)> {
         }
 
         match ch {
-            '\\' if in_string => escaped = true,
+            '\\' => escaped = true,
             '"' => in_string = !in_string,
             '(' if !in_string => paren_depth += 1,
             ')' if !in_string => paren_depth -= 1,

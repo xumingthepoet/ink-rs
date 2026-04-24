@@ -682,7 +682,7 @@ fn split_top_level_once(source: &str, needle: char) -> Option<(&str, &str)> {
         }
 
         match ch {
-            '\\' if in_string => escaped = true,
+            '\\' => escaped = true,
             '"' => in_string = !in_string,
             '(' if !in_string => paren_depth += 1,
             ')' if !in_string => paren_depth -= 1,

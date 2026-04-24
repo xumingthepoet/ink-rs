@@ -1127,7 +1127,6 @@ VAR x = 3
     //             Assert.AreEqual("this is a '|' character\n", story.ContinueMaximally());
     //         }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestEscapeCharacter() {
         run_in_both_modes(|suite| {
             let mut story = suite
