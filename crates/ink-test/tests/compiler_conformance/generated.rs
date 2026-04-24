@@ -201,3 +201,4 @@ fixture!(
     "inkfiles/runtime/multiflow-saveloadthreads.ink"
 );
 fixture!(threads_thread_bug, "inkfiles/threads/thread-bug.ink");
+fixture_count_all_visits!(misc_i18n, "inkfiles/misc/i18n.ink");
