@@ -31,19 +31,8 @@ pub(super) fn parse_choice(parser: &mut RuleParser<'_>) -> Option<Choice> {
 
     parser.skip_horizontal_whitespace();
 
-    let choice_body = parser.expect(
-        "choice text",
-        |parser| {
-            let text = parser.line_remainder().to_string();
-            parser.skip_to_end();
-            if text.is_empty() {
-                None
-            } else {
-                Some(text)
-            }
-        },
-        |parser| parser.skip_to_end(),
-    )?;
+    let choice_body = parser.line_remainder().to_string();
+    parser.skip_to_end();
 
     let (identifier, choice_body) = parse_choice_identifier(&choice_body);
     let (condition, choice_body) = parse_choice_conditions(&choice_body)?;
@@ -52,6 +41,12 @@ pub(super) fn parse_choice(parser: &mut RuleParser<'_>) -> Option<Choice> {
     // and the -> is a divert to empty (fall through to gather)
     let trimmed_body = choice_body.trim();
     if trimmed_body == "->" || trimmed_body.is_empty() {
+        if trimmed_body.is_empty() {
+            parser.warning(
+                "Choice is completely empty. Interpretting as a default fallback choice. Add a divert arrow to remove this warning: * ->",
+            );
+        }
+
         // Invisible default choice - inner content is just a newline
         let inner = append_newline(ContentList::new(vec![]), span.clone());
         let mut choice = Choice::new_with_inline_brackets(

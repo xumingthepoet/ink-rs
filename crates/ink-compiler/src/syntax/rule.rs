@@ -66,8 +66,15 @@ impl<'source> RuleParser<'source> {
         self.state.note_error_reported();
     }
 
+    pub(super) fn warning(&mut self, message: impl Into<String>) {
+        self.diagnostics
+            .push(Diagnostic::warning(self.current_span(), message.into()));
+    }
+
     pub(super) fn had_error(&self) -> bool {
-        !self.diagnostics.is_empty()
+        self.diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.severity == crate::diagnostic::DiagnosticSeverity::Error)
     }
 
     pub(super) fn finish(self) -> Vec<Diagnostic> {

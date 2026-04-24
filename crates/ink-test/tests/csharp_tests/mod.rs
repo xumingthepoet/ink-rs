@@ -3207,7 +3207,6 @@ Knot.
     //             Assert.AreEqual(1, warningCount);
     //         }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestEmptyChoice() {
         let mut suite = CSharpTestSuite::new(TestMode::Normal);
         suite.compile_string_without_runtime("*", true);
