@@ -6415,7 +6415,6 @@ VAR x = 5
     //             Assert.AreEqual("g\n", story.Continue());
     //         }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestKnotDotGather() {
         run_in_both_modes(|suite| {
             let mut story = suite
