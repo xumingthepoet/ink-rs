@@ -4,8 +4,8 @@ use crate::{
     analysis::CheckedStory,
     compiler::StageOutput,
     parsed::{
-        BinaryOperator, Choice, Conditional, ContentList, DivertTarget, Expression, FloatLiteral,
-        Flow, Object, Sequence, SequenceType, Story, Weave,
+        BinaryOperator, Choice, Conditional, ContentList, Divert, DivertTarget, Expression,
+        FloatLiteral, Flow, Object, Sequence, SequenceType, Story, Weave,
     },
 };
 
@@ -496,6 +496,11 @@ fn collect_counted_paths_in_object(
             }
             collect_counted_paths_in_content_list(choice.inner_content(), global_labels, paths);
         }
+        Object::Divert(divert) => {
+            for argument in divert.arguments() {
+                collect_counted_paths_in_expression(argument, global_labels, paths);
+            }
+        }
         Object::Sequence(sequence) => {
             for element in sequence.elements() {
                 collect_counted_paths_in_content_list(element, global_labels, paths);
@@ -511,7 +516,6 @@ fn collect_counted_paths_in_object(
         Object::Text(_)
         | Object::Glue(_)
         | Object::IncDec(_)
-        | Object::Divert(_)
         | Object::Gather(_)
         | Object::Tag(_) => {}
     }
@@ -703,6 +707,8 @@ fn lower_flow_with_context(
         .map(|parent| format!("{parent}.{}", flow.name()))
         .unwrap_or_else(|| flow.name().to_string());
 
+    lower_flow_arguments_into(&mut content, flow);
+
     // Lower any content in the flow's own weave
     if weave_has_choice(flow.weave()) {
         // For stitches inside a knot, pass the parent knot name and sibling stitch names
@@ -804,6 +810,14 @@ fn flow_container_flags(
         (true, _) => Some(3),
         (false, true) => Some(1),
         (false, false) => None,
+    }
+}
+
+fn lower_flow_arguments_into(content: &mut Vec<RuntimeObject>, flow: &Flow) {
+    for argument in flow.arguments().iter().rev() {
+        content.push(RuntimeObject::VariableAssignment(
+            argument.name().to_string(),
+        ));
     }
 }
 
@@ -1982,7 +1996,7 @@ fn lower_object_into_with_context(
         Object::Glue(_) => content.push(RuntimeObject::Glue),
         Object::Divert(divert) => push_divert_with_context(
             content,
-            divert.target(),
+            divert,
             path_mode,
             choice_labels,
             global_labels,
@@ -2092,13 +2106,28 @@ fn lower_inc_dec_into(
 
 fn push_divert_with_context(
     content: &mut Vec<RuntimeObject>,
-    target: &DivertTarget,
+    divert: &Divert,
     path_mode: &ChoicePathMode,
     choice_labels: &HashMap<String, String>,
     global_labels: &HashMap<String, String>,
     global_variables: &HashSet<String>,
 ) {
-    match target {
+    if !divert.arguments().is_empty() {
+        content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
+        for argument in divert.arguments() {
+            lower_expression_into(
+                content,
+                argument,
+                choice_labels,
+                global_labels,
+                path_mode,
+                false,
+            );
+        }
+        content.push(RuntimeObject::ControlCommand(ControlCommand::EvalEnd));
+    }
+
+    match divert.target() {
         DivertTarget::Done => content.push(RuntimeObject::ControlCommand(ControlCommand::Done)),
         DivertTarget::End => content.push(RuntimeObject::ControlCommand(ControlCommand::End)),
         DivertTarget::Path(target) => {

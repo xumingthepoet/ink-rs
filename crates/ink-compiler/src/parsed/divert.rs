@@ -1,10 +1,11 @@
 use crate::source::SourceSpan;
 
-use super::{escape_snapshot_text, push_indent};
+use super::{escape_snapshot_text, push_indent, Expression};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Divert {
     target: DivertTarget,
+    arguments: Vec<Expression>,
     span: SourceSpan,
     is_tunnel: bool,
     is_thread: bool,
@@ -22,6 +23,21 @@ impl Divert {
     pub fn new(target: DivertTarget, span: SourceSpan) -> Self {
         Self {
             target,
+            arguments: Vec::new(),
+            span,
+            is_tunnel: false,
+            is_thread: false,
+        }
+    }
+
+    pub fn with_arguments(
+        target: DivertTarget,
+        arguments: Vec<Expression>,
+        span: SourceSpan,
+    ) -> Self {
+        Self {
+            target,
+            arguments,
             span,
             is_tunnel: false,
             is_thread: false,
@@ -30,6 +46,10 @@ impl Divert {
 
     pub fn target(&self) -> &DivertTarget {
         &self.target
+    }
+
+    pub fn arguments(&self) -> &[Expression] {
+        &self.arguments
     }
 
     pub fn span(&self) -> &SourceSpan {

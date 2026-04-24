@@ -1,5 +1,5 @@
 use crate::{
-    parsed::{ContentList, Divert, DivertTarget, Glue, Object, Sequence, SequenceType, Tag, Text},
+    parsed::{ContentList, Glue, Object, Sequence, SequenceType, Tag, Text},
     source::SourceSpan,
 };
 
@@ -100,10 +100,10 @@ fn parse_inline_content_with_options(
                 objects.push(Object::Tag(Tag::new(false, false)));
                 tag_active = false;
             }
-            objects.push(Object::Divert(Divert::new(
-                DivertTarget::from_source(target),
+            objects.push(Object::Divert(super::divert::parse_divert_source(
+                target,
                 span.clone(),
-            )));
+            )?));
             break;
         }
 

@@ -721,7 +721,7 @@ fn parse_function_call(source: &str) -> Option<(String, Vec<Expression>)> {
     Some((name.to_string(), args))
 }
 
-fn split_top_level_args(source: &str) -> Vec<&str> {
+pub(super) fn split_top_level_args(source: &str) -> Vec<&str> {
     let mut args = Vec::new();
     let mut start = 0;
     let mut in_string = false;
@@ -984,7 +984,7 @@ fn parse_bracketed_identifier(parser: &mut RuleParser<'_>) -> Option<String> {
     })
 }
 
-fn is_identifier(source: &str) -> bool {
+pub(super) fn is_identifier(source: &str) -> bool {
     let mut chars = source.chars();
     matches!(chars.next(), Some(ch) if ch == '_' || ch.is_ascii_alphabetic())
         && chars.all(is_identifier_continue)
