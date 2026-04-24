@@ -4,7 +4,8 @@ use crate::{
     compiler::StageOutput,
     diagnostic::Diagnostic,
     parsed::{
-        ContentList, DivertTarget, Expression, Flow, FlowLevel, Object, Return, Story, Weave,
+        ContentList, DivertTarget, Expression, Flow, FlowArgument, FlowLevel, Object, Return,
+        Story, Weave,
     },
     source::SourceSpan,
 };
@@ -716,6 +717,7 @@ fn call_target_diagnostics(story: &Story) -> Vec<Diagnostic> {
         &variable_targets,
         &mut diagnostics,
         None,
+        None,
         false,
     );
     for flow in story.flows() {
@@ -1003,6 +1005,7 @@ fn check_call_targets_in_flow(
         variable_targets,
         diagnostics,
         Some(&flow_path),
+        Some(flow),
         flow.is_function(),
     );
     for child in flow.child_flows() {
@@ -1022,6 +1025,7 @@ fn check_call_targets_in_weave(
     variable_targets: &HashSet<String>,
     diagnostics: &mut Vec<Diagnostic>,
     current_flow_path: Option<&str>,
+    current_flow: Option<&Flow>,
     inside_function: bool,
 ) {
     for object in weave.content() {
@@ -1031,6 +1035,7 @@ fn check_call_targets_in_weave(
             variable_targets,
             diagnostics,
             current_flow_path,
+            current_flow,
             inside_function,
         );
     }
@@ -1042,6 +1047,7 @@ fn check_call_targets_in_content_list(
     variable_targets: &HashSet<String>,
     diagnostics: &mut Vec<Diagnostic>,
     current_flow_path: Option<&str>,
+    current_flow: Option<&Flow>,
     inside_function: bool,
 ) {
     for object in content.objects() {
@@ -1051,6 +1057,7 @@ fn check_call_targets_in_content_list(
             variable_targets,
             diagnostics,
             current_flow_path,
+            current_flow,
             inside_function,
         );
     }
@@ -1062,6 +1069,7 @@ fn check_call_targets_in_object(
     variable_targets: &HashSet<String>,
     diagnostics: &mut Vec<Diagnostic>,
     current_flow_path: Option<&str>,
+    current_flow: Option<&Flow>,
     inside_function: bool,
 ) {
     match object {
@@ -1079,6 +1087,7 @@ fn check_call_targets_in_object(
                         variable_targets,
                         diagnostics,
                         current_flow_path,
+                        current_flow,
                     );
                 }
                 DivertTarget::Path(_) | DivertTarget::Done | DivertTarget::End => {}
@@ -1091,6 +1100,7 @@ fn check_call_targets_in_object(
                     variable_targets,
                     diagnostics,
                     current_flow_path,
+                    current_flow,
                     inside_function,
                 );
             }
@@ -1103,6 +1113,7 @@ fn check_call_targets_in_object(
                 variable_targets,
                 diagnostics,
                 current_flow_path,
+                current_flow,
                 inside_function,
             );
         }
@@ -1113,6 +1124,7 @@ fn check_call_targets_in_object(
             variable_targets,
             diagnostics,
             current_flow_path,
+            current_flow,
             inside_function,
         ),
         Object::IncDec(inc_dec) => check_call_targets_in_expression(
@@ -1122,6 +1134,7 @@ fn check_call_targets_in_object(
             variable_targets,
             diagnostics,
             current_flow_path,
+            current_flow,
             inside_function,
         ),
         Object::Return(ret) => {
@@ -1133,6 +1146,7 @@ fn check_call_targets_in_object(
                     variable_targets,
                     diagnostics,
                     current_flow_path,
+                    current_flow,
                     inside_function,
                 );
             }
@@ -1143,6 +1157,7 @@ fn check_call_targets_in_object(
             variable_targets,
             diagnostics,
             current_flow_path,
+            current_flow,
             inside_function,
         ),
         Object::Conditional(conditional) => {
@@ -1154,6 +1169,7 @@ fn check_call_targets_in_object(
                     variable_targets,
                     diagnostics,
                     current_flow_path,
+                    current_flow,
                     inside_function,
                 );
             }
@@ -1166,6 +1182,7 @@ fn check_call_targets_in_object(
                         variable_targets,
                         diagnostics,
                         current_flow_path,
+                        current_flow,
                         inside_function,
                     );
                 }
@@ -1175,6 +1192,7 @@ fn check_call_targets_in_object(
                     variable_targets,
                     diagnostics,
                     current_flow_path,
+                    current_flow,
                     inside_function,
                 );
             }
@@ -1188,6 +1206,7 @@ fn check_call_targets_in_object(
                     variable_targets,
                     diagnostics,
                     current_flow_path,
+                    current_flow,
                     inside_function,
                 );
             }
@@ -1198,6 +1217,7 @@ fn check_call_targets_in_object(
                     variable_targets,
                     diagnostics,
                     current_flow_path,
+                    current_flow,
                     inside_function,
                 );
             }
@@ -1208,6 +1228,7 @@ fn check_call_targets_in_object(
                     variable_targets,
                     diagnostics,
                     current_flow_path,
+                    current_flow,
                     inside_function,
                 );
             }
@@ -1217,6 +1238,7 @@ fn check_call_targets_in_object(
                 variable_targets,
                 diagnostics,
                 current_flow_path,
+                current_flow,
                 inside_function,
             );
         }
@@ -1228,6 +1250,7 @@ fn check_call_targets_in_object(
                     variable_targets,
                     diagnostics,
                     current_flow_path,
+                    current_flow,
                     inside_function,
                 );
             }
@@ -1238,6 +1261,7 @@ fn check_call_targets_in_object(
             variable_targets,
             diagnostics,
             current_flow_path,
+            current_flow,
             inside_function,
         ),
         Object::AuthorWarning(_)
@@ -1258,6 +1282,7 @@ fn check_plain_divert_target(
     variable_targets: &HashSet<String>,
     diagnostics: &mut Vec<Diagnostic>,
     current_flow_path: Option<&str>,
+    current_flow: Option<&Flow>,
 ) {
     if let Some(symbol) = resolve_target_symbol(target, current_flow_path, target_symbols) {
         if symbol.is_function {
@@ -1268,12 +1293,34 @@ fn check_plain_divert_target(
                 ),
             ));
         }
+    } else if let Some(argument) = resolve_current_flow_argument(target, current_flow) {
+        if !argument.is_divert_target() {
+            diagnostics.push(Diagnostic::error(
+                span.clone(),
+                format!(
+                    "Since '{}' is used as a variable divert target, it should be marked as: -> {}",
+                    argument.name(),
+                    argument.name()
+                ),
+            ));
+        }
     } else if !variable_targets.contains(target) {
         diagnostics.push(Diagnostic::error(
             span.clone(),
             format!("target not found: '{target}'"),
         ));
     }
+}
+
+fn resolve_current_flow_argument<'a>(
+    target: &str,
+    current_flow: Option<&'a Flow>,
+) -> Option<&'a FlowArgument> {
+    let variable_target_name = target.split('.').next()?;
+    current_flow?
+        .arguments()
+        .iter()
+        .find(|argument| argument.name() == variable_target_name)
 }
 
 fn resolve_target_symbol<'a>(
@@ -1306,6 +1353,7 @@ fn check_call_targets_in_expression(
     variable_targets: &HashSet<String>,
     diagnostics: &mut Vec<Diagnostic>,
     current_flow_path: Option<&str>,
+    current_flow: Option<&Flow>,
     inside_function: bool,
 ) {
     match expression {
@@ -1328,6 +1376,7 @@ fn check_call_targets_in_expression(
                     variable_targets,
                     diagnostics,
                     current_flow_path,
+                    current_flow,
                     inside_function,
                 );
             }
@@ -1338,6 +1387,7 @@ fn check_call_targets_in_expression(
             variable_targets,
             diagnostics,
             current_flow_path,
+            current_flow,
             inside_function,
         ),
         Expression::Binary { left, right, .. } => {
@@ -1348,6 +1398,7 @@ fn check_call_targets_in_expression(
                 variable_targets,
                 diagnostics,
                 current_flow_path,
+                current_flow,
                 inside_function,
             );
             check_call_targets_in_expression(
@@ -1357,6 +1408,7 @@ fn check_call_targets_in_expression(
                 variable_targets,
                 diagnostics,
                 current_flow_path,
+                current_flow,
                 inside_function,
             );
         }
@@ -1368,6 +1420,7 @@ fn check_call_targets_in_expression(
                 variable_targets,
                 diagnostics,
                 current_flow_path,
+                current_flow,
                 inside_function,
             );
         }
@@ -1380,6 +1433,7 @@ fn check_call_targets_in_expression(
                     variable_targets,
                     diagnostics,
                     current_flow_path,
+                    current_flow,
                     inside_function,
                 );
             }

@@ -7668,7 +7668,6 @@ This is the {first|second|third} time.
     // C#:     Assert.IsTrue(HadError("it should be marked as: ->"));
     // C#: }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestRequireVariableTargetsTyped() {
         let mut suite = CSharpTestSuite::new(TestMode::Normal);
         suite.compile_string_without_runtime(
