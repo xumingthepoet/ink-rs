@@ -365,17 +365,18 @@ impl ChoicePathMode {
 }
 
 pub(crate) fn lower(story: &CheckedStory, count_all_visits: bool) -> StageOutput<RuntimeProgram> {
-    let global_labels = build_label_index(&story.parsed);
+    let constants = build_constant_values(&story.parsed);
+    let global_labels = build_label_index(&story.parsed, &constants);
     let global_variables = build_global_variable_names(&story.parsed);
     let external_signatures = build_external_signatures(&story.parsed);
-    let constants = build_constant_values(&story.parsed);
-    let counted_flow_paths = build_counted_flow_paths(&story.parsed, &global_labels);
+    let counted_flow_paths = build_counted_flow_paths(&story.parsed, &global_labels, &constants);
     let root_weave = story.parsed.root_weave();
     let main_content = lower_root_weave(
         root_weave,
         &global_labels,
         &global_variables,
         &external_signatures,
+        &constants,
         count_all_visits,
     );
 
@@ -401,14 +402,18 @@ pub(crate) fn lower(story: &CheckedStory, count_all_visits: bool) -> StageOutput
                 &global_labels,
                 &global_variables,
                 &external_signatures,
+                &constants,
                 &counted_flow_paths,
                 count_all_visits,
             )
         })
         .collect::<Vec<_>>();
-    if let Some(global_declarations) =
-        lower_global_declarations(&story.parsed, &global_labels, &external_signatures)
-    {
+    if let Some(global_declarations) = lower_global_declarations(
+        &story.parsed,
+        &global_labels,
+        &external_signatures,
+        &constants,
+    ) {
         named_containers.push(global_declarations);
     }
     if !named_containers.is_empty() {
@@ -421,7 +426,6 @@ pub(crate) fn lower(story: &CheckedStory, count_all_visits: bool) -> StageOutput
         flags: count_all_visits.then_some(1),
         merge_tail_metadata: true,
     };
-    resolve_constant_references_in_container(&mut root, &constants);
     compact_path_strings_in_container(&mut root);
 
     StageOutput {
@@ -434,6 +438,7 @@ fn lower_global_declarations(
     story: &Story,
     global_labels: &HashMap<String, String>,
     external_signatures: &ExternalSignatures,
+    constants: &HashMap<String, Expression>,
 ) -> Option<Container> {
     let mut story_variable_declarations = Vec::new();
     collect_story_variable_declarations(story, &mut story_variable_declarations);
@@ -456,6 +461,7 @@ fn lower_global_declarations(
             &choice_labels,
             global_labels,
             external_signatures,
+            constants,
             &ChoicePathMode::Root,
             false,
         );
@@ -722,11 +728,13 @@ fn collect_external_signatures_in_object(object: &Object, signatures: &mut Exter
 fn build_counted_flow_paths(
     story: &Story,
     global_labels: &HashMap<String, String>,
+    constants: &HashMap<String, Expression>,
 ) -> CountedFlowPaths {
     let mut paths = CountedFlowPaths::default();
     collect_counted_paths_in_weave(
         story.root_weave(),
         global_labels,
+        constants,
         &ChoicePathMode::Root,
         &mut paths,
     );
@@ -736,7 +744,14 @@ fn build_counted_flow_paths(
             .iter()
             .map(|child| child.name().to_string())
             .collect::<Vec<_>>();
-        collect_counted_paths_in_flow(flow, None, &child_stitch_names, global_labels, &mut paths);
+        collect_counted_paths_in_flow(
+            flow,
+            None,
+            &child_stitch_names,
+            global_labels,
+            constants,
+            &mut paths,
+        );
     }
     paths
 }
@@ -746,6 +761,7 @@ fn collect_counted_paths_in_flow(
     parent_flow_name: Option<&str>,
     sibling_stitch_names: &[String],
     global_labels: &HashMap<String, String>,
+    constants: &HashMap<String, Expression>,
     paths: &mut CountedFlowPaths,
 ) {
     let flow_path = parent_flow_name
@@ -765,7 +781,7 @@ fn collect_counted_paths_in_flow(
         self_target_relative: false,
         fallback_gather_target: None,
     };
-    collect_counted_paths_in_weave(flow.weave(), global_labels, &path_mode, paths);
+    collect_counted_paths_in_weave(flow.weave(), global_labels, constants, &path_mode, paths);
 
     let child_stitch_names = flow
         .child_flows()
@@ -778,6 +794,7 @@ fn collect_counted_paths_in_flow(
             Some(&flow_path),
             &child_stitch_names,
             global_labels,
+            constants,
             paths,
         );
     }
@@ -786,91 +803,165 @@ fn collect_counted_paths_in_flow(
 fn collect_counted_paths_in_weave(
     weave: &Weave,
     global_labels: &HashMap<String, String>,
+    constants: &HashMap<String, Expression>,
     path_mode: &ChoicePathMode,
     paths: &mut CountedFlowPaths,
 ) {
     for object in weave.content() {
-        collect_counted_paths_in_object(object, global_labels, path_mode, paths);
+        collect_counted_paths_in_object(object, global_labels, constants, path_mode, paths);
     }
 }
 
 fn collect_counted_paths_in_content_list(
     content_list: &ContentList,
     global_labels: &HashMap<String, String>,
+    constants: &HashMap<String, Expression>,
     path_mode: &ChoicePathMode,
     paths: &mut CountedFlowPaths,
 ) {
     for object in content_list.objects() {
-        collect_counted_paths_in_object(object, global_labels, path_mode, paths);
+        collect_counted_paths_in_object(object, global_labels, constants, path_mode, paths);
     }
 }
 
 fn collect_counted_paths_in_object(
     object: &Object,
     global_labels: &HashMap<String, String>,
+    constants: &HashMap<String, Expression>,
     path_mode: &ChoicePathMode,
     paths: &mut CountedFlowPaths,
 ) {
     match object {
         Object::ContentList(content_list) => {
-            collect_counted_paths_in_content_list(content_list, global_labels, path_mode, paths);
+            collect_counted_paths_in_content_list(
+                content_list,
+                global_labels,
+                constants,
+                path_mode,
+                paths,
+            );
         }
         Object::Expression(expression) | Object::LogicLine(expression) => {
-            collect_counted_paths_in_expression(expression, global_labels, path_mode, paths);
+            collect_counted_paths_in_expression(
+                expression,
+                global_labels,
+                constants,
+                path_mode,
+                paths,
+            );
         }
         Object::Conditional(conditional) => {
             if let Some(condition) = conditional.initial_condition() {
-                collect_counted_paths_in_expression(condition, global_labels, path_mode, paths);
+                collect_counted_paths_in_expression(
+                    condition,
+                    global_labels,
+                    constants,
+                    path_mode,
+                    paths,
+                );
             }
             for branch in conditional.branches() {
                 if let Some(condition) = branch.own_condition() {
-                    collect_counted_paths_in_expression(condition, global_labels, path_mode, paths);
+                    collect_counted_paths_in_expression(
+                        condition,
+                        global_labels,
+                        constants,
+                        path_mode,
+                        paths,
+                    );
                 }
-                collect_counted_paths_in_weave(branch.content(), global_labels, path_mode, paths);
+                collect_counted_paths_in_weave(
+                    branch.content(),
+                    global_labels,
+                    constants,
+                    path_mode,
+                    paths,
+                );
             }
         }
         Object::Choice(choice) => {
             if let Some(condition) = choice.condition() {
-                collect_counted_paths_in_expression(condition, global_labels, path_mode, paths);
+                collect_counted_paths_in_expression(
+                    condition,
+                    global_labels,
+                    constants,
+                    path_mode,
+                    paths,
+                );
             }
             if let Some(content) = choice.start_content() {
-                collect_counted_paths_in_content_list(content, global_labels, path_mode, paths);
+                collect_counted_paths_in_content_list(
+                    content,
+                    global_labels,
+                    constants,
+                    path_mode,
+                    paths,
+                );
             }
             if let Some(content) = choice.choice_only_content() {
-                collect_counted_paths_in_content_list(content, global_labels, path_mode, paths);
+                collect_counted_paths_in_content_list(
+                    content,
+                    global_labels,
+                    constants,
+                    path_mode,
+                    paths,
+                );
             }
             collect_counted_paths_in_content_list(
                 choice.inner_content(),
                 global_labels,
+                constants,
                 path_mode,
                 paths,
             );
         }
         Object::Divert(divert) => {
             for argument in divert.arguments() {
-                collect_counted_paths_in_expression(argument, global_labels, path_mode, paths);
+                collect_counted_paths_in_expression(
+                    argument,
+                    global_labels,
+                    constants,
+                    path_mode,
+                    paths,
+                );
             }
         }
         Object::Sequence(sequence) => {
             for element in sequence.elements() {
-                collect_counted_paths_in_content_list(element, global_labels, path_mode, paths);
+                collect_counted_paths_in_content_list(
+                    element,
+                    global_labels,
+                    constants,
+                    path_mode,
+                    paths,
+                );
             }
         }
         Object::VariableAssignment(assignment) => match assignment.expression() {
             Expression::DivertTarget(target) if assignment.is_global() => {
                 insert_counted_divert_target(target, global_labels, path_mode, paths, true, true);
             }
-            expression => {
-                collect_counted_paths_in_expression(expression, global_labels, path_mode, paths)
-            }
+            expression => collect_counted_paths_in_expression(
+                expression,
+                global_labels,
+                constants,
+                path_mode,
+                paths,
+            ),
         },
         Object::Return(ret) => {
             if let Some(expr) = ret.returned_expression() {
-                collect_counted_paths_in_expression(expr, global_labels, path_mode, paths);
+                collect_counted_paths_in_expression(
+                    expr,
+                    global_labels,
+                    constants,
+                    path_mode,
+                    paths,
+                );
             }
         }
         Object::Weave(weave) => {
-            collect_counted_paths_in_weave(weave, global_labels, path_mode, paths)
+            collect_counted_paths_in_weave(weave, global_labels, constants, path_mode, paths)
         }
         Object::AuthorWarning(_)
         | Object::Text(_)
@@ -887,12 +978,21 @@ fn collect_counted_paths_in_object(
 fn collect_counted_paths_in_expression(
     expression: &Expression,
     global_labels: &HashMap<String, String>,
+    constants: &HashMap<String, Expression>,
     path_mode: &ChoicePathMode,
     paths: &mut CountedFlowPaths,
 ) {
     match expression {
         Expression::VariableReference(name) => {
-            if let Some(target) = scoped_label_target(name, global_labels, path_mode) {
+            if let Some(constant) = constants.get(name) {
+                collect_counted_paths_in_expression(
+                    constant,
+                    global_labels,
+                    constants,
+                    path_mode,
+                    paths,
+                );
+            } else if let Some(target) = scoped_label_target(name, global_labels, path_mode) {
                 paths.visits.insert(target.clone());
             } else if is_flow_sibling_stitch(name, path_mode) {
                 paths
@@ -901,7 +1001,13 @@ fn collect_counted_paths_in_expression(
             }
         }
         Expression::StringContent(content) => {
-            collect_counted_paths_in_content_list(content, global_labels, path_mode, paths);
+            collect_counted_paths_in_content_list(
+                content,
+                global_labels,
+                constants,
+                path_mode,
+                paths,
+            );
         }
         Expression::FunctionCall { name, args } => {
             let count_turns = name == "TURNS_SINCE";
@@ -928,21 +1034,39 @@ fn collect_counted_paths_in_expression(
                             false,
                         );
                     }
-                    _ => collect_counted_paths_in_expression(arg, global_labels, path_mode, paths),
+                    _ => collect_counted_paths_in_expression(
+                        arg,
+                        global_labels,
+                        constants,
+                        path_mode,
+                        paths,
+                    ),
                 }
             }
         }
         Expression::MultipleCondition(args) => {
             for arg in args {
-                collect_counted_paths_in_expression(arg, global_labels, path_mode, paths);
+                collect_counted_paths_in_expression(
+                    arg,
+                    global_labels,
+                    constants,
+                    path_mode,
+                    paths,
+                );
             }
         }
         Expression::Binary { left, right, .. } => {
-            collect_counted_paths_in_expression(left, global_labels, path_mode, paths);
-            collect_counted_paths_in_expression(right, global_labels, path_mode, paths);
+            collect_counted_paths_in_expression(left, global_labels, constants, path_mode, paths);
+            collect_counted_paths_in_expression(right, global_labels, constants, path_mode, paths);
         }
         Expression::Unary { expression, .. } => {
-            collect_counted_paths_in_expression(expression, global_labels, path_mode, paths);
+            collect_counted_paths_in_expression(
+                expression,
+                global_labels,
+                constants,
+                path_mode,
+                paths,
+            );
         }
         Expression::DivertTarget(target) => {
             insert_counted_divert_target(target, global_labels, path_mode, paths, true, true);
@@ -977,11 +1101,14 @@ fn insert_counted_divert_target(
     }
 }
 
-fn build_label_index(story: &Story) -> HashMap<String, String> {
+fn build_label_index(
+    story: &Story,
+    constants: &HashMap<String, Expression>,
+) -> HashMap<String, String> {
     let mut labels = HashMap::new();
-    collect_weave_labels(story.root_weave(), "0", None, &mut labels);
+    collect_weave_labels(story.root_weave(), "0", None, constants, &mut labels);
     for flow in story.flows() {
-        collect_flow_labels(flow, None, &mut labels);
+        collect_flow_labels(flow, None, constants, &mut labels);
     }
     labels
 }
@@ -989,6 +1116,7 @@ fn build_label_index(story: &Story) -> HashMap<String, String> {
 fn collect_flow_labels(
     flow: &Flow,
     parent_flow_name: Option<&str>,
+    constants: &HashMap<String, Expression>,
     labels: &mut HashMap<String, String>,
 ) {
     let flow_path = parent_flow_name
@@ -1007,10 +1135,11 @@ fn collect_flow_labels(
         flow.weave(),
         &weave_container_path,
         Some(&flow_path),
+        constants,
         labels,
     );
     for child in flow.child_flows() {
-        collect_flow_labels(child, Some(&flow_path), labels);
+        collect_flow_labels(child, Some(&flow_path), constants, labels);
     }
 }
 
@@ -1018,6 +1147,7 @@ fn collect_weave_labels(
     weave: &Weave,
     container_path: &str,
     flow_alias_prefix: Option<&str>,
+    constants: &HashMap<String, Expression>,
     labels: &mut HashMap<String, String>,
 ) {
     let mut choice_count = 0;
@@ -1039,7 +1169,8 @@ fn collect_weave_labels(
                     );
                 }
                 let choice_path = format!("{current_container_path}.c-{choice_count}");
-                previous_choice_content = Some((choice_path, estimated_choice_content_len(choice)));
+                previous_choice_content =
+                    Some((choice_path, estimated_choice_content_len(choice, constants)));
                 choice_count += 1;
                 last_section_had_choice = true;
             }
@@ -1070,22 +1201,34 @@ fn collect_weave_labels(
             Object::Weave(weave) => {
                 if let Some((choice_path, next_index)) = previous_choice_content.as_mut() {
                     let nested_container_path = child_path(choice_path, &next_index.to_string());
-                    collect_weave_labels(weave, &nested_container_path, flow_alias_prefix, labels);
+                    collect_weave_labels(
+                        weave,
+                        &nested_container_path,
+                        flow_alias_prefix,
+                        constants,
+                        labels,
+                    );
                     *next_index += 1;
                 } else {
-                    collect_weave_labels(weave, &current_container_path, flow_alias_prefix, labels);
+                    collect_weave_labels(
+                        weave,
+                        &current_container_path,
+                        flow_alias_prefix,
+                        constants,
+                        labels,
+                    );
                 }
             }
             _ => {
                 if let Some((_, next_index)) = previous_choice_content.as_mut() {
-                    *next_index += estimated_runtime_len_for_label_collection(object);
+                    *next_index += estimated_runtime_len_for_label_collection(object, constants);
                 }
             }
         }
     }
 }
 
-fn estimated_choice_content_len(choice: &Choice) -> usize {
+fn estimated_choice_content_len(choice: &Choice, constants: &HashMap<String, Expression>) -> usize {
     let mut content = Vec::new();
     if choice.has_start_content() {
         content.extend(choice_container_prefix(&ChoicePathMode::Root, "c-0", 0, 2));
@@ -1098,11 +1241,15 @@ fn estimated_choice_content_len(choice: &Choice) -> usize {
         &HashMap::new(),
         &HashSet::new(),
         &HashMap::new(),
+        constants,
     );
     content.len()
 }
 
-fn estimated_runtime_len_for_label_collection(object: &Object) -> usize {
+fn estimated_runtime_len_for_label_collection(
+    object: &Object,
+    constants: &HashMap<String, Expression>,
+) -> usize {
     if matches!(object, Object::Weave(_)) {
         return 1;
     }
@@ -1116,6 +1263,7 @@ fn estimated_runtime_len_for_label_collection(object: &Object) -> usize {
         &HashMap::new(),
         &HashSet::new(),
         &HashMap::new(),
+        constants,
         false,
     );
     content.len()
@@ -1142,6 +1290,7 @@ fn lower_root_weave(
     global_labels: &HashMap<String, String>,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
+    constants: &HashMap<String, Expression>,
     count_all_visits: bool,
 ) -> Vec<RuntimeObject> {
     if weave_has_weave_points(weave) {
@@ -1151,11 +1300,17 @@ fn lower_root_weave(
             global_labels,
             global_variables,
             external_signatures,
+            constants,
             count_all_visits,
         )
     } else {
-        let mut content =
-            lower_linear_weave(weave, global_labels, global_variables, external_signatures);
+        let mut content = lower_linear_weave(
+            weave,
+            global_labels,
+            global_variables,
+            external_signatures,
+            constants,
+        );
         content.push(RuntimeObject::Container(done_container(
             "g-0",
             count_all_visits,
@@ -1169,6 +1324,7 @@ fn lower_flow(
     global_labels: &HashMap<String, String>,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
+    constants: &HashMap<String, Expression>,
     counted_flow_paths: &CountedFlowPaths,
     count_all_visits: bool,
 ) -> Container {
@@ -1185,6 +1341,7 @@ fn lower_flow(
         global_labels,
         global_variables,
         external_signatures,
+        constants,
         counted_flow_paths,
         count_all_visits,
     )
@@ -1197,6 +1354,7 @@ fn lower_flow_with_context(
     global_labels: &HashMap<String, String>,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
+    constants: &HashMap<String, Expression>,
     counted_flow_paths: &CountedFlowPaths,
     count_all_visits: bool,
 ) -> Container {
@@ -1230,6 +1388,7 @@ fn lower_flow_with_context(
                 global_labels,
                 global_variables,
                 external_signatures,
+                constants,
                 count_all_visits,
             ),
             name: None,
@@ -1252,6 +1411,7 @@ fn lower_flow_with_context(
             global_labels,
             global_variables,
             external_signatures,
+            constants,
             &path_mode,
         );
     }
@@ -1288,6 +1448,7 @@ fn lower_flow_with_context(
                     global_labels,
                     global_variables,
                     external_signatures,
+                    constants,
                     counted_flow_paths,
                     count_all_visits,
                 )
@@ -1430,12 +1591,14 @@ fn lower_linear_weave(
     global_labels: &HashMap<String, String>,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
+    constants: &HashMap<String, Expression>,
 ) -> Vec<RuntimeObject> {
     lower_linear_weave_with_context(
         weave,
         global_labels,
         global_variables,
         external_signatures,
+        constants,
         &ChoicePathMode::Root,
     )
 }
@@ -1445,6 +1608,7 @@ fn lower_linear_weave_with_context(
     global_labels: &HashMap<String, String>,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
+    constants: &HashMap<String, Expression>,
     path_mode: &ChoicePathMode,
 ) -> Vec<RuntimeObject> {
     let mut content = Vec::new();
@@ -1454,6 +1618,7 @@ fn lower_linear_weave_with_context(
         global_labels,
         global_variables,
         external_signatures,
+        constants,
         path_mode,
     );
     content
@@ -1465,6 +1630,7 @@ fn lower_linear_weave_into_context(
     global_labels: &HashMap<String, String>,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
+    constants: &HashMap<String, Expression>,
     path_mode: &ChoicePathMode,
 ) {
     let choice_labels = HashMap::new();
@@ -1477,6 +1643,7 @@ fn lower_linear_weave_into_context(
             global_labels,
             global_variables,
             external_signatures,
+            constants,
         );
     }
 }
@@ -1487,6 +1654,7 @@ fn lower_choice_weave(
     global_labels: &HashMap<String, String>,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
+    constants: &HashMap<String, Expression>,
     count_all_visits: bool,
 ) -> Vec<RuntimeObject> {
     lower_choice_weave_with_initial_content(
@@ -1495,6 +1663,7 @@ fn lower_choice_weave(
         global_labels,
         global_variables,
         external_signatures,
+        constants,
         count_all_visits,
         Vec::new(),
     )
@@ -1506,6 +1675,7 @@ fn lower_choice_weave_with_initial_content(
     global_labels: &HashMap<String, String>,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
+    constants: &HashMap<String, Expression>,
     count_all_visits: bool,
     initial_content: Vec<RuntimeObject>,
 ) -> Vec<RuntimeObject> {
@@ -1521,7 +1691,13 @@ fn lower_choice_weave_with_initial_content(
     let objects = weave.content();
     let mut choice_labels = collect_local_weave_labels(objects, &path_mode);
     let mut counted_paths = CountedFlowPaths::default();
-    collect_counted_paths_in_weave(weave, global_labels, &path_mode, &mut counted_paths);
+    collect_counted_paths_in_weave(
+        weave,
+        global_labels,
+        constants,
+        &path_mode,
+        &mut counted_paths,
+    );
 
     // Check if there's an explicit gather anywhere in the weave
     let has_explicit_gather = objects.iter().any(|o| matches!(o, Object::Gather(_)));
@@ -1556,6 +1732,7 @@ fn lower_choice_weave_with_initial_content(
                     global_labels,
                     global_variables,
                     external_signatures,
+                    constants,
                     gather_count,
                     &current_path_mode,
                     &path_mode,
@@ -1606,6 +1783,7 @@ fn lower_choice_weave_with_initial_content(
                     global_labels,
                     global_variables,
                     external_signatures,
+                    constants,
                     gather_count,
                     &gather_path_mode,
                     &path_mode,
@@ -1680,6 +1858,7 @@ fn lower_choice_weave_with_initial_content(
                     global_labels,
                     global_variables,
                     external_signatures,
+                    constants,
                     gather_count,
                     &current_path_mode,
                     &path_mode,
@@ -1742,6 +1921,7 @@ fn lower_weave_section(
     global_labels: &HashMap<String, String>,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
+    constants: &HashMap<String, Expression>,
     gather_count: usize,
     path_mode: &ChoicePathMode,
     weave_path_mode: &ChoicePathMode,
@@ -1778,6 +1958,7 @@ fn lower_weave_section(
                     global_labels,
                     global_variables,
                     external_signatures,
+                    constants,
                     count_all_visits,
                 );
                 *index += 1;
@@ -1795,6 +1976,7 @@ fn lower_weave_section(
                     global_labels,
                     global_variables,
                     external_signatures,
+                    constants,
                     gather_count,
                     path_mode,
                     weave_path_mode,
@@ -1869,6 +2051,7 @@ fn lower_choice_in_section(
     global_labels: &HashMap<String, String>,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
+    constants: &HashMap<String, Expression>,
     gather_count: usize,
     path_mode: &ChoicePathMode,
     weave_path_mode: &ChoicePathMode,
@@ -1899,6 +2082,7 @@ fn lower_choice_in_section(
         global_labels,
         global_variables,
         external_signatures,
+        constants,
     ) {
         ChoiceOuter::Inline(objects) => content.extend(objects),
         ChoiceOuter::Nested(container) => content.push(RuntimeObject::Container(container)),
@@ -1932,6 +2116,7 @@ fn lower_choice_in_section(
         global_labels,
         global_variables,
         external_signatures,
+        constants,
     );
     let mut has_nested_weave_content = false;
 
@@ -1951,6 +2136,7 @@ fn lower_choice_in_section(
             global_labels,
             global_variables,
             external_signatures,
+            constants,
             count_all_visits,
         );
         *index += 1;
@@ -2069,6 +2255,7 @@ fn choice_outer(
     global_labels: &HashMap<String, String>,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
+    constants: &HashMap<String, Expression>,
 ) -> ChoiceOuter {
     let mut outer_content = Vec::new();
     let has_eval_content = choice.has_start_content()
@@ -2109,6 +2296,7 @@ fn choice_outer(
             global_labels,
             global_variables,
             external_signatures,
+            constants,
         );
         outer_content.push(RuntimeObject::ControlCommand(ControlCommand::EndString));
     }
@@ -2120,6 +2308,7 @@ fn choice_outer(
             choice_labels,
             global_labels,
             external_signatures,
+            constants,
             path_mode,
             choice.has_start_content(),
         );
@@ -2148,6 +2337,7 @@ fn choice_outer(
                 global_labels,
                 global_variables,
                 external_signatures,
+                constants,
             )
         })
         .unwrap_or_default();
@@ -2204,6 +2394,7 @@ fn lower_content_list_with_context(
     global_labels: &HashMap<String, String>,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
+    constants: &HashMap<String, Expression>,
 ) -> Vec<RuntimeObject> {
     let mut content = Vec::new();
     lower_content_list_into_context(
@@ -2214,6 +2405,7 @@ fn lower_content_list_with_context(
         global_labels,
         global_variables,
         external_signatures,
+        constants,
     );
     content
 }
@@ -2226,6 +2418,7 @@ fn lower_content_list_into_context(
     global_labels: &HashMap<String, String>,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
+    constants: &HashMap<String, Expression>,
 ) {
     for object in content_list.objects() {
         lower_object_into_with_context(
@@ -2236,6 +2429,7 @@ fn lower_content_list_into_context(
             global_labels,
             global_variables,
             external_signatures,
+            constants,
         );
     }
 }
@@ -2246,8 +2440,34 @@ fn lower_expression_into(
     choice_labels: &HashMap<String, String>,
     global_labels: &HashMap<String, String>,
     external_signatures: &ExternalSignatures,
+    constants: &HashMap<String, Expression>,
     path_mode: &ChoicePathMode,
     has_start_content: bool,
+) {
+    let mut visiting_constants = HashSet::new();
+    lower_expression_into_with_constants(
+        content,
+        expression,
+        choice_labels,
+        global_labels,
+        external_signatures,
+        constants,
+        path_mode,
+        has_start_content,
+        &mut visiting_constants,
+    );
+}
+
+fn lower_expression_into_with_constants(
+    content: &mut Vec<RuntimeObject>,
+    expression: &Expression,
+    choice_labels: &HashMap<String, String>,
+    global_labels: &HashMap<String, String>,
+    external_signatures: &ExternalSignatures,
+    constants: &HashMap<String, Expression>,
+    path_mode: &ChoicePathMode,
+    has_start_content: bool,
+    visiting_constants: &mut HashSet<String>,
 ) {
     match expression {
         Expression::String(value) => {
@@ -2265,6 +2485,7 @@ fn lower_expression_into(
                 global_labels,
                 &HashSet::new(),
                 external_signatures,
+                constants,
             );
             content.push(RuntimeObject::ControlCommand(ControlCommand::EndString));
         }
@@ -2284,6 +2505,24 @@ fn lower_expression_into(
             content.push(RuntimeObject::DivertTarget(resolved_target));
         }
         Expression::VariableReference(name) => {
+            if let Some(constant) = constants.get(name) {
+                if visiting_constants.insert(name.clone()) {
+                    lower_expression_into_with_constants(
+                        content,
+                        constant,
+                        choice_labels,
+                        global_labels,
+                        external_signatures,
+                        constants,
+                        path_mode,
+                        has_start_content,
+                        visiting_constants,
+                    );
+                    visiting_constants.remove(name);
+                    return;
+                }
+            }
+
             if let Some(choice_target) = choice_labels.get(name) {
                 let _ = has_start_content;
                 content.push(RuntimeObject::ReadCount(choice_target.clone()));
@@ -2308,8 +2547,10 @@ fn lower_expression_into(
                 choice_labels,
                 global_labels,
                 external_signatures,
+                constants,
                 path_mode,
                 has_start_content,
+                visiting_constants,
             );
         }
         Expression::Binary {
@@ -2317,23 +2558,27 @@ fn lower_expression_into(
             left,
             right,
         } => {
-            lower_expression_into(
+            lower_expression_into_with_constants(
                 content,
                 left,
                 choice_labels,
                 global_labels,
                 external_signatures,
+                constants,
                 path_mode,
                 has_start_content,
+                visiting_constants,
             );
-            lower_expression_into(
+            lower_expression_into_with_constants(
                 content,
                 right,
                 choice_labels,
                 global_labels,
                 external_signatures,
+                constants,
                 path_mode,
                 has_start_content,
+                visiting_constants,
             );
             content.push(RuntimeObject::NativeFunction(
                 operator_runtime_name(*operator).to_string(),
@@ -2343,14 +2588,16 @@ fn lower_expression_into(
             operator,
             expression,
         } => {
-            lower_expression_into(
+            lower_expression_into_with_constants(
                 content,
                 expression,
                 choice_labels,
                 global_labels,
                 external_signatures,
+                constants,
                 path_mode,
                 has_start_content,
+                visiting_constants,
             );
             content.push(RuntimeObject::NativeFunction(
                 operator.runtime_name().to_string(),
@@ -2358,14 +2605,16 @@ fn lower_expression_into(
         }
         Expression::MultipleCondition(expressions) => {
             for (index, expression) in expressions.iter().enumerate() {
-                lower_expression_into(
+                lower_expression_into_with_constants(
                     content,
                     expression,
                     choice_labels,
                     global_labels,
                     external_signatures,
+                    constants,
                     path_mode,
                     has_start_content,
+                    visiting_constants,
                 );
                 if index > 0 {
                     content.push(RuntimeObject::NativeFunction("&&".to_string()));
@@ -2382,8 +2631,10 @@ fn lower_function_call_into(
     choice_labels: &HashMap<String, String>,
     global_labels: &HashMap<String, String>,
     external_signatures: &ExternalSignatures,
+    constants: &HashMap<String, Expression>,
     path_mode: &ChoicePathMode,
     has_start_content: bool,
+    visiting_constants: &mut HashSet<String>,
 ) {
     match name {
         "CHOICE_COUNT" => content.push(RuntimeObject::ControlCommand(ControlCommand::ChoiceCount)),
@@ -2397,8 +2648,10 @@ fn lower_function_call_into(
                     choice_labels,
                     global_labels,
                     external_signatures,
+                    constants,
                     path_mode,
                     has_start_content,
+                    visiting_constants,
                 );
             }
             content.push(RuntimeObject::ControlCommand(ControlCommand::TurnsSince));
@@ -2412,8 +2665,10 @@ fn lower_function_call_into(
                     choice_labels,
                     global_labels,
                     external_signatures,
+                    constants,
                     path_mode,
                     has_start_content,
+                    visiting_constants,
                 );
             }
             content.push(RuntimeObject::ControlCommand(ControlCommand::ReadCount));
@@ -2427,8 +2682,10 @@ fn lower_function_call_into(
                     choice_labels,
                     global_labels,
                     external_signatures,
+                    constants,
                     path_mode,
                     has_start_content,
+                    visiting_constants,
                 );
             }
             content.push(RuntimeObject::ControlCommand(ControlCommand::Random));
@@ -2442,8 +2699,10 @@ fn lower_function_call_into(
                     choice_labels,
                     global_labels,
                     external_signatures,
+                    constants,
                     path_mode,
                     has_start_content,
+                    visiting_constants,
                 );
             }
             content.push(RuntimeObject::ControlCommand(ControlCommand::SeedRandom));
@@ -2457,8 +2716,10 @@ fn lower_function_call_into(
                     choice_labels,
                     global_labels,
                     external_signatures,
+                    constants,
                     path_mode,
                     has_start_content,
+                    visiting_constants,
                 );
             }
             content.push(RuntimeObject::ControlCommand(ControlCommand::ListRange));
@@ -2472,8 +2733,10 @@ fn lower_function_call_into(
                     choice_labels,
                     global_labels,
                     external_signatures,
+                    constants,
                     path_mode,
                     has_start_content,
+                    visiting_constants,
                 );
             }
             content.push(RuntimeObject::ControlCommand(ControlCommand::ListRandom));
@@ -2487,8 +2750,10 @@ fn lower_function_call_into(
                     choice_labels,
                     global_labels,
                     external_signatures,
+                    constants,
                     path_mode,
                     has_start_content,
+                    visiting_constants,
                 );
             }
             content.push(RuntimeObject::NativeFunction(name.to_string()));
@@ -2506,8 +2771,10 @@ fn lower_function_call_into(
                     choice_labels,
                     global_labels,
                     external_signatures,
+                    constants,
                     path_mode,
                     has_start_content,
+                    visiting_constants,
                 );
             }
             content.push(RuntimeObject::ExternalFunction {
@@ -2532,8 +2799,10 @@ fn lower_function_call_into(
                     choice_labels,
                     global_labels,
                     external_signatures,
+                    constants,
                     path_mode,
                     has_start_content,
+                    visiting_constants,
                 );
             }
             content.push(RuntimeObject::FunctionDivert {
@@ -2549,8 +2818,10 @@ fn lower_function_call_into(
                     choice_labels,
                     global_labels,
                     external_signatures,
+                    constants,
                     path_mode,
                     has_start_content,
+                    visiting_constants,
                 );
             }
             content.push(RuntimeObject::FunctionDivert {
@@ -2567,8 +2838,10 @@ fn lower_function_arg_into(
     choice_labels: &HashMap<String, String>,
     global_labels: &HashMap<String, String>,
     external_signatures: &ExternalSignatures,
+    constants: &HashMap<String, Expression>,
     path_mode: &ChoicePathMode,
     has_start_content: bool,
+    visiting_constants: &mut HashSet<String>,
 ) {
     if expected_arg.is_some_and(FlowArgument::is_by_reference) {
         if let Expression::VariableReference(name) = arg {
@@ -2580,53 +2853,17 @@ fn lower_function_arg_into(
         }
     }
 
-    lower_expression_into(
+    lower_expression_into_with_constants(
         content,
         arg,
         choice_labels,
         global_labels,
         external_signatures,
+        constants,
         path_mode,
         has_start_content,
+        visiting_constants,
     );
-}
-
-fn resolve_constant_references_in_container(
-    container: &mut Container,
-    constants: &HashMap<String, Expression>,
-) {
-    container.content =
-        resolve_constant_references_in_content(std::mem::take(&mut container.content), constants);
-}
-
-fn resolve_constant_references_in_content(
-    content: Vec<RuntimeObject>,
-    constants: &HashMap<String, Expression>,
-) -> Vec<RuntimeObject> {
-    let mut resolved = Vec::new();
-    for object in content {
-        match object {
-            RuntimeObject::VariableReference(name) => {
-                if let Some(objects) = constant_runtime_objects(&name, constants) {
-                    resolved.extend(objects);
-                } else {
-                    resolved.push(RuntimeObject::VariableReference(name));
-                }
-            }
-            RuntimeObject::Container(mut container) => {
-                resolve_constant_references_in_container(&mut container, constants);
-                resolved.push(RuntimeObject::Container(container));
-            }
-            RuntimeObject::NamedContent(mut containers) => {
-                for container in &mut containers {
-                    resolve_constant_references_in_container(container, constants);
-                }
-                resolved.push(RuntimeObject::NamedContent(containers));
-            }
-            other => resolved.push(other),
-        }
-    }
-    resolved
 }
 
 fn compact_path_strings_in_container(container: &mut Container) {
@@ -2880,92 +3117,13 @@ fn is_user_named_path_component(component: &str) -> bool {
         && !component.starts_with('$')
 }
 
-fn constant_runtime_objects(
-    name: &str,
-    constants: &HashMap<String, Expression>,
-) -> Option<Vec<RuntimeObject>> {
-    let mut visiting = HashSet::new();
-    constant_runtime_objects_inner(name, constants, &mut visiting)
-}
-
-fn constant_runtime_objects_inner(
-    name: &str,
-    constants: &HashMap<String, Expression>,
-    visiting: &mut HashSet<String>,
-) -> Option<Vec<RuntimeObject>> {
-    if !visiting.insert(name.to_string()) {
-        return None;
-    }
-    let expression = constants.get(name)?;
-    let objects = constant_expression_runtime_objects(expression, constants, visiting)?;
-    visiting.remove(name);
-    Some(objects)
-}
-
-fn constant_expression_runtime_objects(
-    expression: &Expression,
-    constants: &HashMap<String, Expression>,
-    visiting: &mut HashSet<String>,
-) -> Option<Vec<RuntimeObject>> {
-    match expression {
-        Expression::NumberInt(value) => Some(vec![RuntimeObject::Int(*value)]),
-        Expression::NumberFloat(value) => Some(vec![RuntimeObject::Float(*value)]),
-        Expression::NumberBool(value) => Some(vec![RuntimeObject::Bool(*value)]),
-        Expression::String(value) => Some(vec![
-            RuntimeObject::ControlCommand(ControlCommand::BeginString),
-            RuntimeObject::String(value.clone()),
-            RuntimeObject::ControlCommand(ControlCommand::EndString),
-        ]),
-        Expression::DivertTarget(target) => Some(vec![RuntimeObject::DivertTarget(target.clone())]),
-        Expression::VariableReference(name) => {
-            constant_runtime_objects_inner(name, constants, visiting)
-        }
-        Expression::Unary {
-            operator,
-            expression,
-        } => {
-            let mut objects = constant_expression_runtime_objects(expression, constants, visiting)?;
-            objects.push(RuntimeObject::NativeFunction(
-                operator.runtime_name().to_string(),
-            ));
-            Some(objects)
-        }
-        Expression::Binary {
-            operator,
-            left,
-            right,
-        } => {
-            let mut objects = constant_expression_runtime_objects(left, constants, visiting)?;
-            objects.extend(constant_expression_runtime_objects(
-                right, constants, visiting,
-            )?);
-            objects.push(RuntimeObject::NativeFunction(
-                operator_runtime_name(*operator).to_string(),
-            ));
-            Some(objects)
-        }
-        Expression::MultipleCondition(expressions) => {
-            let mut objects = Vec::new();
-            for (index, expression) in expressions.iter().enumerate() {
-                objects.extend(constant_expression_runtime_objects(
-                    expression, constants, visiting,
-                )?);
-                if index > 0 {
-                    objects.push(RuntimeObject::NativeFunction("&&".to_string()));
-                }
-            }
-            Some(objects)
-        }
-        Expression::StringContent(_) | Expression::FunctionCall { .. } => None,
-    }
-}
-
 fn lower_output_expression_into(
     content: &mut Vec<RuntimeObject>,
     expression: &Expression,
     choice_labels: &HashMap<String, String>,
     global_labels: &HashMap<String, String>,
     external_signatures: &ExternalSignatures,
+    constants: &HashMap<String, Expression>,
     path_mode: &ChoicePathMode,
 ) {
     content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
@@ -2975,6 +3133,7 @@ fn lower_output_expression_into(
         choice_labels,
         global_labels,
         external_signatures,
+        constants,
         path_mode,
         false,
     );
@@ -2988,6 +3147,7 @@ fn lower_logic_line_into(
     choice_labels: &HashMap<String, String>,
     global_labels: &HashMap<String, String>,
     external_signatures: &ExternalSignatures,
+    constants: &HashMap<String, Expression>,
     path_mode: &ChoicePathMode,
 ) {
     content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
@@ -2997,6 +3157,7 @@ fn lower_logic_line_into(
         choice_labels,
         global_labels,
         external_signatures,
+        constants,
         path_mode,
         false,
     );
@@ -3034,6 +3195,7 @@ fn lower_sequence(
     global_labels: &HashMap<String, String>,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
+    constants: &HashMap<String, Expression>,
     path_mode: &ChoicePathMode,
     sequence_container_path: &str,
 ) -> Container {
@@ -3123,6 +3285,7 @@ fn lower_sequence(
                         global_labels,
                         global_variables,
                         external_signatures,
+                        constants,
                         false,
                         branch_content,
                     );
@@ -3135,6 +3298,7 @@ fn lower_sequence(
                         global_labels,
                         global_variables,
                         external_signatures,
+                        constants,
                     );
                 }
             }
@@ -3178,6 +3342,7 @@ fn lower_conditional_into(
     global_labels: &HashMap<String, String>,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
+    constants: &HashMap<String, Expression>,
     path_mode: &ChoicePathMode,
 ) {
     if let Some(condition) = conditional.initial_condition() {
@@ -3188,6 +3353,7 @@ fn lower_conditional_into(
             choice_labels,
             global_labels,
             external_signatures,
+            constants,
             path_mode,
             false,
         );
@@ -3230,6 +3396,7 @@ fn lower_conditional_into(
                     choice_labels,
                     global_labels,
                     external_signatures,
+                    constants,
                     path_mode,
                     false,
                 );
@@ -3275,6 +3442,7 @@ fn lower_conditional_into(
                 global_labels,
                 global_variables,
                 external_signatures,
+                constants,
                 false,
                 initial_content,
             );
@@ -3315,6 +3483,7 @@ fn lower_conditional_into(
                     global_labels,
                     global_variables,
                     external_signatures,
+                    constants,
                 );
             }
             content_container.push(RuntimeObject::Divert {
@@ -3360,6 +3529,7 @@ fn lower_object_into_with_context(
     global_labels: &HashMap<String, String>,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
+    constants: &HashMap<String, Expression>,
 ) {
     lower_object_into_with_context_count(
         content,
@@ -3369,6 +3539,7 @@ fn lower_object_into_with_context(
         global_labels,
         global_variables,
         external_signatures,
+        constants,
         false,
     );
 }
@@ -3381,6 +3552,7 @@ fn lower_object_into_with_context_count(
     global_labels: &HashMap<String, String>,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
+    constants: &HashMap<String, Expression>,
     count_all_visits: bool,
 ) {
     match object {
@@ -3395,6 +3567,7 @@ fn lower_object_into_with_context_count(
                 global_labels,
                 global_variables,
                 external_signatures,
+                constants,
             );
         }
         Object::Expression(expression) => lower_output_expression_into(
@@ -3403,6 +3576,7 @@ fn lower_object_into_with_context_count(
             choice_labels,
             global_labels,
             external_signatures,
+            constants,
             path_mode,
         ),
         Object::Conditional(conditional) => lower_conditional_into(
@@ -3412,6 +3586,7 @@ fn lower_object_into_with_context_count(
             global_labels,
             global_variables,
             external_signatures,
+            constants,
             path_mode,
         ),
         Object::LogicLine(expression) => {
@@ -3421,6 +3596,7 @@ fn lower_object_into_with_context_count(
                 choice_labels,
                 global_labels,
                 external_signatures,
+                constants,
                 path_mode,
             );
         }
@@ -3433,6 +3609,7 @@ fn lower_object_into_with_context_count(
             global_labels,
             global_variables,
             external_signatures,
+            constants,
         ),
         Object::TunnelOnwards(tunnel_onwards) => {
             lower_tunnel_onwards_into(
@@ -3443,6 +3620,7 @@ fn lower_object_into_with_context_count(
                 global_labels,
                 global_variables,
                 external_signatures,
+                constants,
             );
         }
         Object::Choice(_) => {}
@@ -3456,6 +3634,7 @@ fn lower_object_into_with_context_count(
                 choice_labels,
                 global_labels,
                 external_signatures,
+                constants,
             );
         }
         Object::IncDec(inc_dec) => {
@@ -3466,6 +3645,7 @@ fn lower_object_into_with_context_count(
                 choice_labels,
                 global_labels,
                 external_signatures,
+                constants,
             );
         }
         Object::Return(ret) => {
@@ -3477,6 +3657,7 @@ fn lower_object_into_with_context_count(
                     choice_labels,
                     global_labels,
                     external_signatures,
+                    constants,
                     path_mode,
                     false,
                 );
@@ -3495,6 +3676,7 @@ fn lower_object_into_with_context_count(
             global_labels,
             global_variables,
             external_signatures,
+            constants,
             path_mode,
             &sequence_container_path_for(path_mode, content.len()),
         ))),
@@ -3507,6 +3689,7 @@ fn lower_object_into_with_context_count(
                     global_labels,
                     global_variables,
                     external_signatures,
+                    constants,
                     count_all_visits,
                 ),
                 name: None,
@@ -3525,6 +3708,7 @@ fn lower_variable_assignment_into(
     choice_labels: &HashMap<String, String>,
     global_labels: &HashMap<String, String>,
     external_signatures: &ExternalSignatures,
+    constants: &HashMap<String, Expression>,
 ) {
     if assignment.is_global() {
         return;
@@ -3537,6 +3721,7 @@ fn lower_variable_assignment_into(
         choice_labels,
         global_labels,
         external_signatures,
+        constants,
         path_mode,
         false,
     );
@@ -3564,6 +3749,7 @@ fn lower_inc_dec_into(
     choice_labels: &HashMap<String, String>,
     global_labels: &HashMap<String, String>,
     external_signatures: &ExternalSignatures,
+    constants: &HashMap<String, Expression>,
 ) {
     content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
     content.push(RuntimeObject::VariableReference(inc_dec.name().to_string()));
@@ -3573,6 +3759,7 @@ fn lower_inc_dec_into(
         choice_labels,
         global_labels,
         external_signatures,
+        constants,
         path_mode,
         false,
     );
@@ -3599,6 +3786,7 @@ fn push_divert_with_context(
     global_labels: &HashMap<String, String>,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
+    constants: &HashMap<String, Expression>,
 ) {
     if !divert.arguments().is_empty() {
         content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
@@ -3609,6 +3797,7 @@ fn push_divert_with_context(
                 choice_labels,
                 global_labels,
                 external_signatures,
+                constants,
                 path_mode,
                 false,
             );
@@ -3667,6 +3856,7 @@ fn lower_tunnel_onwards_into(
     global_labels: &HashMap<String, String>,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
+    constants: &HashMap<String, Expression>,
 ) {
     content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
     for argument in tunnel_onwards.arguments() {
@@ -3676,6 +3866,7 @@ fn lower_tunnel_onwards_into(
             choice_labels,
             global_labels,
             external_signatures,
+            constants,
             path_mode,
             false,
         );

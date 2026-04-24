@@ -7131,13 +7131,12 @@ This is place 2.
     //             Assert.AreEqual("success\n", story.Continue());
     //         }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestMultipleConstantReferences() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
                     r#"
-CONST CONST_STR = ""ConstantString""
+CONST CONST_STR = "ConstantString"
 VAR varStr = CONST_STR
 {varStr == CONST_STR:success}
 "#,
