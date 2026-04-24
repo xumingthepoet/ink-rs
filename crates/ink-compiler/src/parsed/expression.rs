@@ -1,4 +1,4 @@
-use super::push_indent;
+use super::{push_indent, ContentList, Object};
 
 #[derive(Debug, Clone, Copy)]
 pub struct FloatLiteral(f64);
@@ -24,6 +24,7 @@ impl Eq for FloatLiteral {}
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expression {
     String(String),
+    StringContent(ContentList),
     NumberInt(i32),
     NumberFloat(FloatLiteral),
     NumberBool(bool),
@@ -74,6 +75,11 @@ impl Expression {
             Expression::String(value) => {
                 out.push_str("String(\"");
                 out.push_str(&super::escape_snapshot_text(value));
+                out.push_str("\")");
+            }
+            Expression::StringContent(content) => {
+                out.push_str("String(\"");
+                out.push_str(&super::escape_snapshot_text(&content_list_display(content)));
                 out.push_str("\")");
             }
             Expression::NumberInt(value) => {
@@ -150,6 +156,81 @@ impl Expression {
             1 => expressions.into_iter().next(),
             _ => Some(Self::MultipleCondition(expressions)),
         }
+    }
+}
+
+fn content_list_display(content: &ContentList) -> String {
+    let mut output = String::from("ContentList(");
+    for (index, object) in content.objects().iter().enumerate() {
+        if index > 0 {
+            output.push_str(", ");
+        }
+        output.push_str(&object_display(object));
+    }
+    output.push(')');
+    output
+}
+
+fn object_display(object: &Object) -> String {
+    match object {
+        Object::Text(text) => text.text().to_string(),
+        Object::Expression(expression) => expression_display(expression),
+        Object::ContentList(content) => content_list_display(content),
+        Object::Divert(divert) => divert.target().to_snapshot_string(),
+        Object::Glue(_) => "<>".to_string(),
+        Object::Tag(_) => "#".to_string(),
+        Object::Return(_) => "Return".to_string(),
+        Object::Conditional(_) => "Conditional".to_string(),
+        Object::LogicLine(expression) => expression_display(expression),
+        Object::IncDec(_) => "IncDec".to_string(),
+        Object::Choice(_) => "Choice".to_string(),
+        Object::Gather(_) => "Gather".to_string(),
+        Object::Sequence(_) => "Sequence".to_string(),
+        Object::VariableAssignment(assignment) => assignment.name().to_string(),
+        Object::Weave(_) => "Weave".to_string(),
+    }
+}
+
+fn expression_display(expression: &Expression) -> String {
+    match expression {
+        Expression::String(value) => value.clone(),
+        Expression::StringContent(content) => content_list_display(content),
+        Expression::NumberInt(value) => value.to_string(),
+        Expression::NumberFloat(value) => format_float(value.value()),
+        Expression::NumberBool(value) => value.to_string(),
+        Expression::DivertTarget(target) => format!("-> {target}"),
+        Expression::VariableReference(name) => name.clone(),
+        Expression::FunctionCall { name, args } => {
+            let args = args
+                .iter()
+                .map(expression_display)
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!("{name}({args})")
+        }
+        Expression::Binary {
+            operator,
+            left,
+            right,
+        } => format!(
+            "({} {} {})",
+            expression_display(left),
+            operator.snapshot_name(),
+            expression_display(right)
+        ),
+        Expression::Unary {
+            operator,
+            expression,
+        } => format!(
+            "{}{}",
+            operator.snapshot_name(),
+            expression_display(expression)
+        ),
+        Expression::MultipleCondition(expressions) => expressions
+            .iter()
+            .map(expression_display)
+            .collect::<Vec<_>>()
+            .join(", "),
     }
 }
 

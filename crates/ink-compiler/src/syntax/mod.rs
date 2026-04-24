@@ -59,6 +59,11 @@ impl Parser {
                 continue;
             }
 
+            if line.text.trim() == "}" {
+                index += 1;
+                continue;
+            }
+
             if knot::is_knot_declaration_line(&line.text) {
                 if let Some(flow) = self.parse_flow(&lines, &mut index) {
                     flows.push(flow);
@@ -101,6 +106,7 @@ impl Parser {
         let statement_rules: &[StatementRule] = &[
             variable_declaration_statement,
             return_statement,
+            temp_declaration_statement,
             variable_assignment_statement,
             logic_line_statement,
             choice_statement,
@@ -188,6 +194,11 @@ impl Parser {
                 continue;
             }
 
+            if next_line.text.trim() == "}" {
+                *index += 1;
+                continue;
+            }
+
             if knot::is_knot_declaration_line(&next_line.text) {
                 break;
             }
@@ -246,6 +257,11 @@ impl Parser {
         while *index < lines.len() {
             let next_line = &lines[*index];
             if next_line.text.trim().is_empty() {
+                *index += 1;
+                continue;
+            }
+
+            if next_line.text.trim() == "}" {
                 *index += 1;
                 continue;
             }
@@ -552,6 +568,9 @@ fn return_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
 fn expression_contains_function_call(expr: &Expression) -> bool {
     match expr {
         Expression::FunctionCall { .. } => true,
+        Expression::StringContent(content) => {
+            content.objects().iter().any(object_contains_function_call)
+        }
         Expression::Binary { left, right, .. } => {
             expression_contains_function_call(left) || expression_contains_function_call(right)
         }
@@ -560,6 +579,94 @@ fn expression_contains_function_call(expr: &Expression) -> bool {
             expressions.iter().any(expression_contains_function_call)
         }
         _ => false,
+    }
+}
+
+fn object_contains_function_call(object: &Object) -> bool {
+    match object {
+        Object::Expression(expression) | Object::LogicLine(expression) => {
+            expression_contains_function_call(expression)
+        }
+        Object::ContentList(content) => content.objects().iter().any(object_contains_function_call),
+        Object::Conditional(conditional) => {
+            conditional
+                .initial_condition()
+                .is_some_and(expression_contains_function_call)
+                || conditional.branches().iter().any(|branch| {
+                    branch
+                        .own_condition()
+                        .is_some_and(expression_contains_function_call)
+                        || branch
+                            .content()
+                            .content()
+                            .iter()
+                            .any(object_contains_function_call)
+                })
+        }
+        Object::Choice(choice) => {
+            choice
+                .condition()
+                .is_some_and(expression_contains_function_call)
+                || choice.start_content().is_some_and(|content| {
+                    content.objects().iter().any(object_contains_function_call)
+                })
+                || choice.choice_only_content().is_some_and(|content| {
+                    content.objects().iter().any(object_contains_function_call)
+                })
+                || choice
+                    .inner_content()
+                    .objects()
+                    .iter()
+                    .any(object_contains_function_call)
+        }
+        Object::Sequence(sequence) => sequence
+            .elements()
+            .iter()
+            .any(|content| content.objects().iter().any(object_contains_function_call)),
+        Object::VariableAssignment(assignment) => {
+            expression_contains_function_call(assignment.expression())
+        }
+        Object::IncDec(inc_dec) => expression_contains_function_call(inc_dec.expression()),
+        Object::Return(ret) => ret
+            .returned_expression()
+            .is_some_and(expression_contains_function_call),
+        Object::Weave(weave) => weave.content().iter().any(object_contains_function_call),
+        Object::Text(_)
+        | Object::Glue(_)
+        | Object::Divert(_)
+        | Object::Gather(_)
+        | Object::Tag(_) => false,
+    }
+}
+
+fn temp_declaration_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
+    parser.skip_horizontal_whitespace();
+    let span = parser.current_span();
+    parser.match_string("~")?;
+    parser.skip_horizontal_whitespace();
+    let keyword = parser.take_while(is_identifier_continue)?;
+    if keyword != "temp" {
+        return None;
+    }
+    parser.skip_horizontal_whitespace();
+    let name = parser.take_while(|ch| ch == '_' || ch.is_ascii_alphanumeric())?;
+    if !is_identifier(&name) {
+        return None;
+    }
+    parser.skip_horizontal_whitespace();
+    parser.match_string("=")?;
+    parser.skip_horizontal_whitespace();
+    let expression = parse_initial_expression(parser.line_remainder().trim())?;
+    parser.skip_to_end();
+
+    let assignment = VariableAssignment::new(name, expression, false, true, span.clone());
+    if expression_contains_function_call(assignment.expression()) {
+        Some(vec![Object::ContentList(ContentList::new(vec![
+            Object::VariableAssignment(assignment),
+            Object::Text(Text::new("\n", span)),
+        ]))])
+    } else {
+        Some(vec![Object::VariableAssignment(assignment)])
     }
 }
 
@@ -685,7 +792,7 @@ fn parse_expression(source: &str) -> Option<Expression> {
         });
     }
     if let Some(value) = parse_quoted_string_literal(source) {
-        return Some(Expression::String(value));
+        return Some(parse_string_expression(&value));
     }
     if let Some((name, args)) = parse_function_call(source) {
         return Some(Expression::FunctionCall { name, args });
@@ -765,6 +872,35 @@ fn parse_function_call(source: &str) -> Option<(String, Vec<Expression>)> {
             .collect::<Option<Vec<_>>>()?
     };
     Some((name.to_string(), args))
+}
+
+fn parse_string_expression(value: &str) -> Expression {
+    let span = crate::source::SourceSpan::new(None, 1, 1);
+    let Some(objects) = text::parse_inline_content(value, &span) else {
+        return Expression::String(value.to_string());
+    };
+    let objects = flatten_string_expression_content(objects);
+
+    if objects.len() == 1 {
+        if let Object::Text(text) = &objects[0] {
+            if text.text() == value {
+                return Expression::String(value.to_string());
+            }
+        }
+    }
+
+    Expression::StringContent(ContentList::new(objects))
+}
+
+fn flatten_string_expression_content(objects: Vec<Object>) -> Vec<Object> {
+    let mut flattened = Vec::new();
+    for object in objects {
+        match object {
+            Object::ContentList(content) => flattened.extend(content.objects().iter().cloned()),
+            other => flattened.push(other),
+        }
+    }
+    flattened
 }
 
 pub(super) fn split_top_level_args(source: &str) -> Vec<&str> {

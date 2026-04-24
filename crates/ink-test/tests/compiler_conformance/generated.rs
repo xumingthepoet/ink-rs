@@ -160,3 +160,7 @@ fixture!(
 );
 fixture!(glue_testbugfix1, "inkfiles/glue/testbugfix1.ink");
 fixture!(glue_testbugfix2, "inkfiles/glue/testbugfix2.ink");
+fixture_count_all_visits!(
+    misc_newlines_with_string_eval,
+    "inkfiles/misc/newlines_with_string_eval.ink"
+);

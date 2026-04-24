@@ -387,17 +387,18 @@ fn lower_global_declarations(
     story: &Story,
     global_labels: &HashMap<String, String>,
 ) -> Option<Container> {
-    let declarations = story
-        .root_weave()
-        .content()
+    let mut story_variable_declarations = Vec::new();
+    collect_variable_declarations_in_objects(
+        story.root_weave().content(),
+        &mut story_variable_declarations,
+    );
+    let declarations = story_variable_declarations
         .iter()
-        .filter_map(|object| match object {
-            Object::VariableAssignment(assignment) if assignment.is_global() => Some(assignment),
-            _ => None,
-        })
+        .copied()
+        .filter(|assignment| assignment.is_global())
         .collect::<Vec<_>>();
 
-    if declarations.is_empty() {
+    if story_variable_declarations.is_empty() {
         return None;
     }
 
@@ -425,6 +426,61 @@ fn lower_global_declarations(
         flags: None,
         merge_tail_metadata: true,
     })
+}
+
+fn collect_variable_declarations_in_objects<'a>(
+    objects: &'a [Object],
+    declarations: &mut Vec<&'a crate::parsed::VariableAssignment>,
+) {
+    for object in objects {
+        collect_variable_declarations_in_object(object, declarations);
+    }
+}
+
+fn collect_variable_declarations_in_content_list<'a>(
+    content_list: &'a ContentList,
+    declarations: &mut Vec<&'a crate::parsed::VariableAssignment>,
+) {
+    collect_variable_declarations_in_objects(content_list.objects(), declarations);
+}
+
+fn collect_variable_declarations_in_object<'a>(
+    object: &'a Object,
+    declarations: &mut Vec<&'a crate::parsed::VariableAssignment>,
+) {
+    match object {
+        Object::VariableAssignment(assignment)
+            if assignment.is_global() || assignment.is_temporary() =>
+        {
+            declarations.push(assignment);
+        }
+        Object::ContentList(content_list) => {
+            collect_variable_declarations_in_content_list(content_list, declarations);
+        }
+        Object::Conditional(conditional) => {
+            for branch in conditional.branches() {
+                collect_variable_declarations_in_objects(branch.content().content(), declarations);
+            }
+        }
+        Object::Choice(choice) => {
+            if let Some(content) = choice.start_content() {
+                collect_variable_declarations_in_content_list(content, declarations);
+            }
+            if let Some(content) = choice.choice_only_content() {
+                collect_variable_declarations_in_content_list(content, declarations);
+            }
+            collect_variable_declarations_in_content_list(choice.inner_content(), declarations);
+        }
+        Object::Sequence(sequence) => {
+            for element in sequence.elements() {
+                collect_variable_declarations_in_content_list(element, declarations);
+            }
+        }
+        Object::Weave(weave) => {
+            collect_variable_declarations_in_objects(weave.content(), declarations);
+        }
+        _ => {}
+    }
 }
 
 fn build_global_variable_names(story: &Story) -> HashSet<String> {
@@ -559,6 +615,9 @@ fn collect_counted_paths_in_expression(
             if let Some(target) = global_labels.get(name) {
                 paths.visits.insert(target.clone());
             }
+        }
+        Expression::StringContent(content) => {
+            collect_counted_paths_in_content_list(content, global_labels, paths);
         }
         Expression::FunctionCall { name, args } => {
             let count_turns = name == "TURNS_SINCE";
@@ -1636,6 +1695,18 @@ fn lower_expression_into(
         Expression::String(value) => {
             content.push(RuntimeObject::ControlCommand(ControlCommand::BeginString));
             content.push(RuntimeObject::String(value.clone()));
+            content.push(RuntimeObject::ControlCommand(ControlCommand::EndString));
+        }
+        Expression::StringContent(string_content) => {
+            content.push(RuntimeObject::ControlCommand(ControlCommand::BeginString));
+            lower_content_list_into_context(
+                content,
+                string_content,
+                path_mode,
+                choice_labels,
+                global_labels,
+                &HashSet::new(),
+            );
             content.push(RuntimeObject::ControlCommand(ControlCommand::EndString));
         }
         Expression::NumberInt(value) => content.push(RuntimeObject::Int(*value)),
