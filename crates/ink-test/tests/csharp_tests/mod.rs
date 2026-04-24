@@ -8350,7 +8350,6 @@ Limes
     //             Assert.AreEqual ("8\n", story.ContinueMaximally ());
     //         }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestTunnelOnwardsDivertAfterWithArg() {
         run_in_both_modes(|suite| {
             let mut story = suite
