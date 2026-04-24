@@ -130,3 +130,7 @@ fixture!(
     conditional_multiline_choice,
     "inkfiles/conditional/multiline-choice.ink"
 );
+fixture!(
+    conditional_multiline_divert,
+    "inkfiles/conditional/multiline-divert.ink"
+);
