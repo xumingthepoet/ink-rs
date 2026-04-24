@@ -18,4 +18,4 @@ pub use diagnostic::{Diagnostic, DiagnosticSeverity};
 pub use parsed::{
     Choice, ContentList, Divert, DivertTarget, Object, Story as ParsedStory, Text, Weave,
 };
-pub use source::{FileHandler, SourceInput, SourceSpan};
+pub use source::{eliminate_comments, FileHandler, SourceInput, SourceSpan};

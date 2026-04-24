@@ -12,8 +12,8 @@ use crate::api::{
     value_type::ValueType,
 };
 use ink_compiler::{
-    Compiler, CompilerOptions, Diagnostic, DiagnosticSeverity, FileHandler, ParsedStory,
-    SourceInput,
+    eliminate_comments, Compiler, CompilerOptions, Diagnostic, DiagnosticSeverity, FileHandler,
+    ParsedStory, SourceInput,
 };
 use ink_runtime::{
     choice::Choice,
@@ -3233,14 +3233,9 @@ Knot.
     //             Assert.AreEqual(expected.Replace("\r", ""), result.Replace("\r", "")); //Windows perculiarity
     //         }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestCommentEliminator() {
         let test_content = "A// C\nA /* C */ A\n\nA * A * /* * C *// A/*\nC C C\n\n*/";
-        let mut suite = CSharpTestSuite::new(TestMode::Normal);
-        let mut story = suite
-            .compile_string(test_content, false, false)
-            .expect("compile should succeed");
-        let processed = story.cont_maximally();
+        let processed = eliminate_comments(test_content);
         let expected = "A\nA  A\n\nA * A * / A\n\n\n";
         assert_eq!(expected.replace("\r", ""), processed.replace("\r", ""));
     }
