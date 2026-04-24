@@ -135,3 +135,4 @@ fixture!(
     "inkfiles/conditional/multiline-divert.ink"
 );
 fixture!(conditional_multiline, "inkfiles/conditional/multiline.ink");
+fixture!(conditional_once, "inkfiles/conditional/once.ink");
