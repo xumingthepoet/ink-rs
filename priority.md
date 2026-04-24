@@ -1,6 +1,6 @@
 # Ink Fixture Priority
 
-通过统计: 63/118
+通过统计: 64/118
 
 Sorted by the latest `WritingWithInk.md` syntax point used by each file.
 
@@ -67,7 +67,7 @@ Sorted by the latest `WritingWithInk.md` syntax point used by each file.
 - [x] `runtime/set-get-variables.ink`
 - [x] `conditional/ifelse-ext.ink`
 - [x] `misc/issue15.ink`
-- [ ] `conditional/condopt.ink`
+- [x] `conditional/condopt.ink`
 - [ ] `conditional/condtext.ink`
 - [ ] `conditional/ifelse-ext-text1.ink`
 - [ ] `conditional/ifelse-ext-text2.ink`

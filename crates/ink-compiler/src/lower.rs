@@ -65,6 +65,12 @@ enum ChoiceOuter {
     Nested(Container),
 }
 
+#[derive(Debug, Default)]
+struct CountedFlowPaths {
+    visits: HashSet<String>,
+    turns: HashSet<String>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum ChoicePathMode {
     Root,
@@ -229,6 +235,35 @@ impl ChoicePathMode {
         }
     }
 
+    fn for_conditional_branch(&self, branch_index: usize) -> Self {
+        let container_path = format!("{}.b", runtime_index_path(self, branch_index));
+        match self {
+            ChoicePathMode::Root | ChoicePathMode::RootGather { .. } => {
+                ChoicePathMode::NestedRoot {
+                    container_path,
+                    gather_target: "0.g-0".to_string(),
+                }
+            }
+            ChoicePathMode::NestedRoot { gather_target, .. } => ChoicePathMode::NestedRoot {
+                container_path,
+                gather_target: gather_target.clone(),
+            },
+            ChoicePathMode::Flow {
+                flow_name,
+                parent_flow_name,
+                sibling_stitch_names,
+                self_target_relative,
+                ..
+            } => ChoicePathMode::Flow {
+                flow_name: flow_name.clone(),
+                container_path,
+                parent_flow_name: parent_flow_name.clone(),
+                sibling_stitch_names: sibling_stitch_names.clone(),
+                self_target_relative: *self_target_relative,
+            },
+        }
+    }
+
     fn fallback_gather_target(&self) -> Option<String> {
         match self {
             ChoicePathMode::NestedRoot { gather_target, .. } => Some(gather_target.clone()),
@@ -240,7 +275,7 @@ impl ChoicePathMode {
 pub(crate) fn lower(story: &CheckedStory, count_all_visits: bool) -> StageOutput<RuntimeProgram> {
     let global_labels = build_label_index(&story.parsed);
     let global_variables = build_global_variable_names(&story.parsed);
-    let counted_flow_paths = build_counted_flow_paths(&story.parsed);
+    let counted_flow_paths = build_counted_flow_paths(&story.parsed, &global_labels);
     let root_weave = story.parsed.root_weave();
     let main_content = lower_root_weave(
         root_weave,
@@ -353,21 +388,149 @@ fn build_global_variable_names(story: &Story) -> HashSet<String> {
         .collect()
 }
 
-fn build_counted_flow_paths(story: &Story) -> HashSet<String> {
-    story
-        .root_weave()
-        .content()
-        .iter()
-        .filter_map(|object| match object {
-            Object::VariableAssignment(assignment) if assignment.is_global() => {
-                match assignment.expression() {
-                    Expression::DivertTarget(target) => Some(target.clone()),
-                    _ => None,
+fn build_counted_flow_paths(
+    story: &Story,
+    global_labels: &HashMap<String, String>,
+) -> CountedFlowPaths {
+    let mut paths = CountedFlowPaths::default();
+    collect_counted_paths_in_weave(story.root_weave(), global_labels, &mut paths);
+    for flow in story.flows() {
+        collect_counted_paths_in_flow(flow, global_labels, &mut paths);
+    }
+    paths
+}
+
+fn collect_counted_paths_in_flow(
+    flow: &Flow,
+    global_labels: &HashMap<String, String>,
+    paths: &mut CountedFlowPaths,
+) {
+    collect_counted_paths_in_weave(flow.weave(), global_labels, paths);
+    for child in flow.child_flows() {
+        collect_counted_paths_in_flow(child, global_labels, paths);
+    }
+}
+
+fn collect_counted_paths_in_weave(
+    weave: &Weave,
+    global_labels: &HashMap<String, String>,
+    paths: &mut CountedFlowPaths,
+) {
+    for object in weave.content() {
+        collect_counted_paths_in_object(object, global_labels, paths);
+    }
+}
+
+fn collect_counted_paths_in_content_list(
+    content_list: &ContentList,
+    global_labels: &HashMap<String, String>,
+    paths: &mut CountedFlowPaths,
+) {
+    for object in content_list.objects() {
+        collect_counted_paths_in_object(object, global_labels, paths);
+    }
+}
+
+fn collect_counted_paths_in_object(
+    object: &Object,
+    global_labels: &HashMap<String, String>,
+    paths: &mut CountedFlowPaths,
+) {
+    match object {
+        Object::ContentList(content_list) => {
+            collect_counted_paths_in_content_list(content_list, global_labels, paths);
+        }
+        Object::Expression(expression) | Object::LogicLine(expression) => {
+            collect_counted_paths_in_expression(expression, global_labels, paths);
+        }
+        Object::Conditional(conditional) => {
+            if let Some(condition) = conditional.initial_condition() {
+                collect_counted_paths_in_expression(condition, global_labels, paths);
+            }
+            for branch in conditional.branches() {
+                if let Some(condition) = branch.own_condition() {
+                    collect_counted_paths_in_expression(condition, global_labels, paths);
+                }
+                collect_counted_paths_in_weave(branch.content(), global_labels, paths);
+            }
+        }
+        Object::Choice(choice) => {
+            if let Some(condition) = choice.condition() {
+                collect_counted_paths_in_expression(condition, global_labels, paths);
+            }
+            if let Some(content) = choice.start_content() {
+                collect_counted_paths_in_content_list(content, global_labels, paths);
+            }
+            if let Some(content) = choice.choice_only_content() {
+                collect_counted_paths_in_content_list(content, global_labels, paths);
+            }
+            collect_counted_paths_in_content_list(choice.inner_content(), global_labels, paths);
+        }
+        Object::Sequence(sequence) => {
+            for element in sequence.elements() {
+                collect_counted_paths_in_content_list(element, global_labels, paths);
+            }
+        }
+        Object::VariableAssignment(assignment) => match assignment.expression() {
+            Expression::DivertTarget(target) if assignment.is_global() => {
+                paths.turns.insert(target.clone());
+            }
+            expression => collect_counted_paths_in_expression(expression, global_labels, paths),
+        },
+        Object::Weave(weave) => collect_counted_paths_in_weave(weave, global_labels, paths),
+        Object::Text(_)
+        | Object::Glue(_)
+        | Object::IncDec(_)
+        | Object::Divert(_)
+        | Object::Gather(_)
+        | Object::Tag(_) => {}
+    }
+}
+
+fn collect_counted_paths_in_expression(
+    expression: &Expression,
+    global_labels: &HashMap<String, String>,
+    paths: &mut CountedFlowPaths,
+) {
+    match expression {
+        Expression::VariableReference(name) => {
+            if let Some(target) = global_labels.get(name) {
+                paths.visits.insert(target.clone());
+            }
+        }
+        Expression::FunctionCall { name, args } => {
+            let count_turns = name == "TURNS_SINCE";
+            let count_visits = name == "READ_COUNT";
+            for arg in args {
+                match arg {
+                    Expression::DivertTarget(target) if count_turns => {
+                        paths.turns.insert(target.clone());
+                    }
+                    Expression::DivertTarget(target) if count_visits => {
+                        paths.visits.insert(target.clone());
+                    }
+                    _ => collect_counted_paths_in_expression(arg, global_labels, paths),
                 }
             }
-            _ => None,
-        })
-        .collect()
+        }
+        Expression::MultipleCondition(args) => {
+            for arg in args {
+                collect_counted_paths_in_expression(arg, global_labels, paths);
+            }
+        }
+        Expression::Binary { left, right, .. } => {
+            collect_counted_paths_in_expression(left, global_labels, paths);
+            collect_counted_paths_in_expression(right, global_labels, paths);
+        }
+        Expression::Unary { expression, .. } => {
+            collect_counted_paths_in_expression(expression, global_labels, paths);
+        }
+        Expression::String(_)
+        | Expression::NumberInt(_)
+        | Expression::NumberFloat(_)
+        | Expression::NumberBool(_)
+        | Expression::DivertTarget(_) => {}
+    }
 }
 
 fn build_label_index(story: &Story) -> HashMap<String, String> {
@@ -387,6 +550,10 @@ fn collect_flow_labels(
     let flow_path = parent_flow_name
         .map(|parent| format!("{parent}.{}", flow.name()))
         .unwrap_or_else(|| flow.name().to_string());
+    labels.insert(flow_path.clone(), flow_path.clone());
+    if parent_flow_name.is_none() {
+        labels.insert(flow.name().to_string(), flow_path.clone());
+    }
     collect_weave_labels(flow.weave(), &format!("{flow_path}.0"), labels);
     for child in flow.child_flows() {
         collect_flow_labels(child, Some(&flow_path), labels);
@@ -472,7 +639,7 @@ fn lower_flow(
     flow: &Flow,
     global_labels: &HashMap<String, String>,
     global_variables: &HashSet<String>,
-    counted_flow_paths: &HashSet<String>,
+    counted_flow_paths: &CountedFlowPaths,
     count_all_visits: bool,
 ) -> Container {
     // Collect child stitch names upfront so knot-level choices can reference them
@@ -498,7 +665,7 @@ fn lower_flow_with_context(
     sibling_stitch_names: &[String],
     global_labels: &HashMap<String, String>,
     global_variables: &HashSet<String>,
-    counted_flow_paths: &HashSet<String>,
+    counted_flow_paths: &CountedFlowPaths,
     count_all_visits: bool,
 ) -> Container {
     let mut content = Vec::new();
@@ -589,15 +756,22 @@ fn lower_flow_with_context(
     Container {
         content,
         name: Some(flow.name().to_string()),
-        flags: flow_container_flags(counted_flow_paths.contains(&flow_path), count_all_visits),
+        flags: flow_container_flags(
+            counted_flow_paths.turns.contains(&flow_path),
+            counted_flow_paths.visits.contains(&flow_path),
+            count_all_visits,
+        ),
         merge_tail_metadata: true,
     }
 }
 
-fn flow_container_flags(count_turns: bool, count_all_visits: bool) -> Option<i32> {
-    match (count_turns, count_all_visits) {
-        (true, true) => Some(3),
-        (true, false) => Some(3),
+fn flow_container_flags(
+    count_turns: bool,
+    count_visits: bool,
+    count_all_visits: bool,
+) -> Option<i32> {
+    match (count_turns, count_visits || count_all_visits) {
+        (true, _) => Some(3),
         (false, true) => Some(1),
         (false, false) => None,
     }
@@ -651,7 +825,25 @@ fn lower_choice_weave(
     global_variables: &HashSet<String>,
     count_all_visits: bool,
 ) -> Vec<RuntimeObject> {
-    let mut main_content = Vec::new();
+    lower_choice_weave_with_initial_content(
+        weave,
+        path_mode,
+        global_labels,
+        global_variables,
+        count_all_visits,
+        Vec::new(),
+    )
+}
+
+fn lower_choice_weave_with_initial_content(
+    weave: &Weave,
+    path_mode: ChoicePathMode,
+    global_labels: &HashMap<String, String>,
+    global_variables: &HashSet<String>,
+    count_all_visits: bool,
+    initial_content: Vec<RuntimeObject>,
+) -> Vec<RuntimeObject> {
+    let mut main_content = initial_content;
     let mut named_content = Vec::new();
     let mut index = 0;
     let mut gather_count = 0;
@@ -1581,31 +1773,68 @@ fn lower_conditional_into(
             });
         }
 
-        let mut content_container = Vec::new();
-        if !branch.is_inline() {
-            content_container.push(RuntimeObject::String("\n".to_string()));
-        }
-        for object in branch.content().content() {
-            lower_object_into_with_context(
-                &mut content_container,
-                object,
-                path_mode,
-                choice_labels,
+        if weave_has_choice(branch.content()) {
+            let branch_path_mode = path_mode.for_conditional_branch(content.len());
+            let initial_content = if branch.is_inline() {
+                Vec::new()
+            } else {
+                vec![RuntimeObject::String("\n".to_string())]
+            };
+            let mut content_container = Vec::new();
+            let mut lowered_branch = lower_choice_weave_with_initial_content(
+                branch.content(),
+                branch_path_mode,
                 global_labels,
                 global_variables,
+                false,
+                initial_content,
             );
+            let trailing_named_content =
+                if matches!(lowered_branch.last(), Some(RuntimeObject::NamedContent(_))) {
+                    lowered_branch.pop()
+                } else {
+                    None
+                };
+            content_container.extend(lowered_branch);
+            content_container.push(RuntimeObject::Divert {
+                target: rejoin_target.clone(),
+                variable: false,
+            });
+            if let Some(named_content) = trailing_named_content {
+                content_container.push(named_content);
+            }
+            branch_content.push(RuntimeObject::NamedContent(vec![Container {
+                content: content_container,
+                name: Some("b".to_string()),
+                flags: None,
+                merge_tail_metadata: true,
+            }]));
+        } else {
+            let mut content_container = Vec::new();
+            if !branch.is_inline() {
+                content_container.push(RuntimeObject::String("\n".to_string()));
+            }
+            for object in branch.content().content() {
+                lower_object_into_with_context(
+                    &mut content_container,
+                    object,
+                    path_mode,
+                    choice_labels,
+                    global_labels,
+                    global_variables,
+                );
+            }
+            content_container.push(RuntimeObject::Divert {
+                target: rejoin_target.clone(),
+                variable: false,
+            });
+            branch_content.push(RuntimeObject::NamedContent(vec![Container {
+                content: content_container,
+                name: Some("b".to_string()),
+                flags: None,
+                merge_tail_metadata: true,
+            }]));
         }
-        content_container.push(RuntimeObject::Divert {
-            target: rejoin_target.clone(),
-            variable: false,
-        });
-
-        branch_content.push(RuntimeObject::NamedContent(vec![Container {
-            content: content_container,
-            name: Some("b".to_string()),
-            flags: None,
-            merge_tail_metadata: true,
-        }]));
 
         content.push(RuntimeObject::Container(Container {
             content: branch_content,
@@ -1792,7 +2021,10 @@ fn push_divert_with_context(
                     target: choice_label_divert_target(path_mode, choice_container_name),
                     variable: false,
                 }
-            } else if let Some(label_target) = global_labels.get(target) {
+            } else if let Some(label_target) = global_labels
+                .get(target)
+                .filter(|label_target| label_target.as_str() != target)
+            {
                 RuntimeObject::Divert {
                     target: label_target.clone(),
                     variable: false,
