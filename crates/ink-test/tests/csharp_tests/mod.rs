@@ -1284,7 +1284,6 @@ EXTERNAL times(i,str)
     //             Assert.AreEqual("One\nTwo\n", result);
     //         }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestLookupSafeOrNot() {
         run_in_both_modes(|suite| {
             let mut story = suite
@@ -1349,7 +1348,7 @@ One
             story_with_post_glue.bind_external_function(
                 "myAction",
                 boxed_external_function(|_func, _args| None),
-                true,
+                false,
             );
             let result = story_with_post_glue.continue_maximally();
             assert_eq!("One\nTwo\n", result);
