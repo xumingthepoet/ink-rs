@@ -75,3 +75,7 @@ fixture!(
     tags_tags_in_choice_dynamic,
     "inkfiles/tags/tagsInChoiceDynamic.ink"
 );
+fixture!(
+    variable_variable_declaration,
+    "inkfiles/variable/variable-declaration.ink"
+);
