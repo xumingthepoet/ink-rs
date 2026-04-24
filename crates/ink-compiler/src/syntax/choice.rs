@@ -74,12 +74,12 @@ pub(super) fn parse_choice(parser: &mut RuleParser<'_>) -> Option<Choice> {
         .ok()?;
 
     let mut choice = Choice::new_with_inline_brackets(
-        content_list_from_segment(segments.start, span.clone(), false),
+        content_list_from_segment(segments.start, span.clone(), false, false),
         segments.choice_only.map(|segment| {
-            content_list_from_segment(segment, span.clone(), true).unwrap_or_default()
+            content_list_from_segment(segment, span.clone(), true, true).unwrap_or_default()
         }),
         append_newline(
-            content_list_from_segment(segments.inner, span.clone(), true).unwrap_or_default(),
+            content_list_from_segment(segments.inner, span.clone(), true, true).unwrap_or_default(),
             span.clone(),
         ),
         span,
@@ -218,12 +218,18 @@ fn content_list_from_segment(
     segment: String,
     span: crate::source::SourceSpan,
     keep_empty: bool,
+    preserve_divert_whitespace: bool,
 ) -> Option<ContentList> {
     if segment.is_empty() && !keep_empty {
         return None;
     }
 
-    let objects = text::parse_inline_content(&segment, &span).unwrap_or_default();
+    let objects = if preserve_divert_whitespace {
+        text::parse_inline_content_preserving_divert_whitespace(&segment, &span)
+    } else {
+        text::parse_inline_content(&segment, &span)
+    }
+    .unwrap_or_default();
     Some(ContentList::new(objects))
 }
 

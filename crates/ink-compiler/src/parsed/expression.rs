@@ -4,6 +4,7 @@ use super::push_indent;
 pub enum Expression {
     NumberInt(i32),
     NumberBool(bool),
+    DivertTarget(String),
     VariableReference(String),
     Binary {
         operator: BinaryOperator,
@@ -30,6 +31,11 @@ impl Expression {
             Expression::NumberBool(value) => {
                 out.push_str("Number(");
                 out.push_str(if *value { "true" } else { "false" });
+                out.push(')');
+            }
+            Expression::DivertTarget(target) => {
+                out.push_str("DivertTarget(-> ");
+                out.push_str(target);
                 out.push(')');
             }
             Expression::VariableReference(name) => {

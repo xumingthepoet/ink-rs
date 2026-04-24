@@ -297,6 +297,11 @@ fn variable_declaration_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Obj
 }
 
 fn parse_initial_expression(source: &str) -> Option<Expression> {
+    if let Some(target) = source.strip_prefix("->") {
+        return Some(Expression::DivertTarget(
+            crate::parsed::DivertTarget::from_source(target).to_snapshot_string(),
+        ));
+    }
     if source == "true" {
         return Some(Expression::NumberBool(true));
     }

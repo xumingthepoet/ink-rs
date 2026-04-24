@@ -43,6 +43,21 @@ fn has_unsupported_text_syntax(text: &str) -> bool {
 }
 
 pub(super) fn parse_inline_content(text: &str, span: &SourceSpan) -> Option<Vec<Object>> {
+    parse_inline_content_with_options(text, span, true)
+}
+
+pub(super) fn parse_inline_content_preserving_divert_whitespace(
+    text: &str,
+    span: &SourceSpan,
+) -> Option<Vec<Object>> {
+    parse_inline_content_with_options(text, span, false)
+}
+
+fn parse_inline_content_with_options(
+    text: &str,
+    span: &SourceSpan,
+    trim_divert_separator_whitespace: bool,
+) -> Option<Vec<Object>> {
     let mut remaining = text;
     let mut objects = Vec::new();
     let mut tag_active = false;
@@ -102,11 +117,12 @@ pub(super) fn parse_inline_content(text: &str, span: &SourceSpan) -> Option<Vec<
         match next_token {
             Some(0) => return None,
             Some(index) => {
-                let prefix = if remaining[index..].starts_with("->") {
-                    trim_separator_whitespace(&remaining[..index])
-                } else {
-                    &remaining[..index]
-                };
+                let prefix =
+                    if trim_divert_separator_whitespace && remaining[index..].starts_with("->") {
+                        trim_separator_whitespace(&remaining[..index])
+                    } else {
+                        &remaining[..index]
+                    };
                 if !prefix.is_empty() {
                     objects.push(Object::Text(Text::new(prefix, span.clone())));
                 }
