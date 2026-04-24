@@ -7164,7 +7164,6 @@ VAR varStr = CONST_STR
     //             Assert.AreEqual("The value of a variable in test file 2 is 5.\nThis is the main file\nThe value when accessed from knot_in_2 is 5.\n", story.ContinueMaximally());
     //         }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestNestedInclude() {
         run_in_both_modes(|suite| {
             let mut story = suite
