@@ -106,6 +106,7 @@ fn runtime_object_to_value(object: &RuntimeObject) -> Value {
                 ControlCommand::BeginString => "str",
                 ControlCommand::EndString => "/str",
                 ControlCommand::VisitIndex => "visit",
+                ControlCommand::SequenceShuffleIndex => "seq",
                 ControlCommand::Duplicate => "du",
                 ControlCommand::NoOp => "nop",
                 ControlCommand::Pop => "pop",

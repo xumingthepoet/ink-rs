@@ -55,6 +55,7 @@ pub enum ControlCommand {
     BeginString,
     EndString,
     VisitIndex,
+    SequenceShuffleIndex,
     Duplicate,
     NoOp,
     Pop,
@@ -1675,29 +1676,50 @@ fn lower_sequence(
         RuntimeObject::ControlCommand(ControlCommand::VisitIndex),
     ];
 
-    match sequence.sequence_type() {
-        SequenceType::Cycle => {
-            content.push(RuntimeObject::Int(sequence.elements().len() as i32));
-            content.push(RuntimeObject::NativeFunction("%".to_string()));
+    let sequence_type = sequence.sequence_type();
+    let once = sequence_type.contains(SequenceType::ONCE);
+    let cycle = sequence_type.contains(SequenceType::CYCLE);
+    let stopping = sequence_type.contains(SequenceType::STOPPING);
+    let shuffle = sequence_type.contains(SequenceType::SHUFFLE);
+    let branch_count = sequence.elements().len() + usize::from(once);
+
+    if stopping || once {
+        content.push(RuntimeObject::Int(branch_count.saturating_sub(1) as i32));
+        content.push(RuntimeObject::NativeFunction("MIN".to_string()));
+    } else if cycle {
+        content.push(RuntimeObject::Int(sequence.elements().len() as i32));
+        content.push(RuntimeObject::NativeFunction("%".to_string()));
+    }
+
+    if shuffle {
+        if once || stopping {
+            let last_index = if stopping {
+                sequence.elements().len().saturating_sub(1)
+            } else {
+                sequence.elements().len()
+            };
+            let post_shuffle_noop_index = content.len() + 6;
+            content.extend([
+                RuntimeObject::ControlCommand(ControlCommand::Duplicate),
+                RuntimeObject::Int(last_index as i32),
+                RuntimeObject::NativeFunction("==".to_string()),
+                RuntimeObject::ConditionalDivert {
+                    target: format!(".^.{post_shuffle_noop_index}"),
+                },
+            ]);
         }
-        SequenceType::Stopping => {
-            content.push(RuntimeObject::Int(
-                sequence.elements().len().saturating_sub(1) as i32,
-            ));
-            content.push(RuntimeObject::NativeFunction("MIN".to_string()));
-        }
-        SequenceType::Once => {
-            content.push(RuntimeObject::Int(sequence.elements().len() as i32));
-            content.push(RuntimeObject::NativeFunction("MIN".to_string()));
+
+        let element_count_to_shuffle = sequence.elements().len() - usize::from(stopping);
+        content.push(RuntimeObject::Int(element_count_to_shuffle as i32));
+        content.push(RuntimeObject::ControlCommand(
+            ControlCommand::SequenceShuffleIndex,
+        ));
+        if once || stopping {
+            content.push(RuntimeObject::ControlCommand(ControlCommand::NoOp));
         }
     }
 
     content.push(RuntimeObject::ControlCommand(ControlCommand::EvalEnd));
-
-    let branch_count = match sequence.sequence_type() {
-        SequenceType::Once => sequence.elements().len() + 1,
-        SequenceType::Cycle | SequenceType::Stopping => sequence.elements().len(),
-    };
 
     for index in 0..branch_count {
         content.extend([

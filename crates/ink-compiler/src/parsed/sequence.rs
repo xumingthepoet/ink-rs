@@ -1,10 +1,21 @@
 use super::{push_indent, ContentList};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SequenceType {
-    Stopping,
-    Cycle,
-    Once,
+pub struct SequenceType(u8);
+
+impl SequenceType {
+    pub const STOPPING: Self = Self(1);
+    pub const CYCLE: Self = Self(1 << 1);
+    pub const SHUFFLE: Self = Self(1 << 2);
+    pub const ONCE: Self = Self(1 << 3);
+
+    pub fn union(self, other: Self) -> Self {
+        Self(self.0 | other.0)
+    }
+
+    pub fn contains(self, other: Self) -> bool {
+        self.0 & other.0 != 0
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -33,11 +44,7 @@ impl Sequence {
         out.push('\n');
         push_indent(out, indent);
         out.push_str("Sequence(type=");
-        out.push_str(match self.sequence_type {
-            SequenceType::Stopping => "Stopping",
-            SequenceType::Cycle => "Cycle",
-            SequenceType::Once => "Once",
-        });
+        out.push_str(&self.sequence_type.display_name());
         out.push(')');
 
         for element in &self.elements {
@@ -50,5 +57,22 @@ impl Sequence {
                 element.write_parse_snapshot(out, indent + 4);
             }
         }
+    }
+}
+
+impl SequenceType {
+    fn display_name(self) -> String {
+        let mut parts = Vec::new();
+        for (flag, name) in [
+            (Self::STOPPING, "Stopping"),
+            (Self::CYCLE, "Cycle"),
+            (Self::SHUFFLE, "Shuffle"),
+            (Self::ONCE, "Once"),
+        ] {
+            if self.contains(flag) {
+                parts.push(name);
+            }
+        }
+        parts.join(", ")
     }
 }

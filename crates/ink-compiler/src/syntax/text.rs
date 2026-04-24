@@ -166,41 +166,43 @@ pub(super) fn parse_sequence_type_annotation(source: &str) -> Option<(SequenceTy
     let source = source.trim_start();
     let first = source.chars().next()?;
 
-    let explicit_type = match first {
-        '&' => Some((SequenceType::Cycle, &source[first.len_utf8()..])),
-        '!' => Some((SequenceType::Once, &source[first.len_utf8()..])),
-        '$' => Some((SequenceType::Stopping, &source[first.len_utf8()..])),
-        _ => None,
-    };
-    if explicit_type.is_some() {
-        return explicit_type;
-    }
-
-    for (word, sequence_type) in [
-        ("stopping", SequenceType::Stopping),
-        ("cycle", SequenceType::Cycle),
-        ("once", SequenceType::Once),
-    ] {
-        let Some(rest) = source.strip_prefix(word) else {
-            continue;
-        };
-        if rest
-            .chars()
-            .next()
-            .is_some_and(|ch| ch == '_' || ch.is_ascii_alphanumeric())
-        {
-            continue;
+    if matches!(first, '&' | '!' | '$' | '~') {
+        let mut sequence_type: Option<SequenceType> = None;
+        let mut rest_start = 0;
+        for (index, ch) in source.char_indices() {
+            let flag = match ch {
+                '&' => Some(SequenceType::CYCLE),
+                '!' => Some(SequenceType::ONCE),
+                '$' => Some(SequenceType::STOPPING),
+                '~' => Some(SequenceType::SHUFFLE),
+                ' ' | '\t' => None,
+                _ => break,
+            };
+            rest_start = index + ch.len_utf8();
+            if let Some(flag) = flag {
+                sequence_type = Some(sequence_type.map_or(flag, |current| current.union(flag)));
+            }
         }
-        let rest = rest.trim_start();
-        let rest = rest.strip_prefix(':')?;
-        return Some((sequence_type, rest));
+        return sequence_type.map(|sequence_type| (sequence_type, &source[rest_start..]));
     }
 
-    None
+    let (words, rest) = source.split_once(':')?;
+    let mut sequence_type: Option<SequenceType> = None;
+    for word in words.split_whitespace() {
+        let flag = match word {
+            "stopping" => SequenceType::STOPPING,
+            "cycle" => SequenceType::CYCLE,
+            "shuffle" => SequenceType::SHUFFLE,
+            "once" => SequenceType::ONCE,
+            _ => return None,
+        };
+        sequence_type = Some(sequence_type.map_or(flag, |current| current.union(flag)));
+    }
+    sequence_type.map(|sequence_type| (sequence_type, rest))
 }
 
 fn parse_sequence_type(source: &str) -> (SequenceType, &str) {
-    parse_sequence_type_annotation(source).unwrap_or((SequenceType::Stopping, source))
+    parse_sequence_type_annotation(source).unwrap_or((SequenceType::STOPPING, source))
 }
 
 fn trim_separator_whitespace(text: &str) -> &str {
