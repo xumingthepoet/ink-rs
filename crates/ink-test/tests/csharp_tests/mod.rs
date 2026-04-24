@@ -3809,11 +3809,10 @@ world
     //             Assert.AreEqual("My name is \"Joe\"\n", story.ContinueMaximally());
     //         }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestQuoteCharacterSignificance() {
         run_in_both_modes(|suite| {
             let mut story = suite
-                .compile_string(r#"My name is ""{""J{""o""}e""}"""#, false, false)
+                .compile_string(r##"My name is "{"J{"o"}e"}""##, false, false)
                 .expect("compile should succeed");
             assert_eq!("My name is \"Joe\"\n", story.cont_maximally());
         });

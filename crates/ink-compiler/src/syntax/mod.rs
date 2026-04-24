@@ -1655,15 +1655,22 @@ fn parse_quoted_string_literal(source: &str) -> Option<String> {
 
     let mut value = String::new();
     let mut escaped = false;
+    let mut brace_depth = 0;
+    let mut in_nested_string = false;
     for ch in chars.by_ref() {
         if escaped {
-            match ch {
-                'n' => value.push('\n'),
-                'r' => value.push('\r'),
-                't' => value.push('\t'),
-                '"' => value.push('"'),
-                '\\' => value.push('\\'),
-                other => value.push(other),
+            if brace_depth == 0 {
+                match ch {
+                    'n' => value.push('\n'),
+                    'r' => value.push('\r'),
+                    't' => value.push('\t'),
+                    '"' => value.push('"'),
+                    '\\' => value.push('\\'),
+                    other => value.push(other),
+                }
+            } else {
+                value.push('\\');
+                value.push(ch);
             }
             escaped = false;
             continue;
@@ -1671,12 +1678,24 @@ fn parse_quoted_string_literal(source: &str) -> Option<String> {
 
         match ch {
             '\\' => escaped = true,
-            '"' => {
+            '"' if brace_depth == 0 => {
                 return if chars.as_str().trim().is_empty() {
                     Some(value)
                 } else {
                     None
                 };
+            }
+            '"' => {
+                in_nested_string = !in_nested_string;
+                value.push(ch);
+            }
+            '{' if !in_nested_string => {
+                brace_depth += 1;
+                value.push(ch);
+            }
+            '}' if !in_nested_string && brace_depth > 0 => {
+                brace_depth -= 1;
+                value.push(ch);
             }
             other => value.push(other),
         }
