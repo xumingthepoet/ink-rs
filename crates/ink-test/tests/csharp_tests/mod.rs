@@ -5232,7 +5232,6 @@ Unreachable
     //             Assert.IsTrue (HadWarning ("Blank choice"));
     //         }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestVariousBlankChoiceWarning() {
         run_in_both_modes(|suite| {
             suite

@@ -71,11 +71,19 @@ pub(super) fn parse_choice(parser: &mut RuleParser<'_>) -> Option<Choice> {
         })
         .ok()?;
 
+    let start_content = content_list_from_segment(segments.start, span.clone(), false, false);
+    let choice_only_content = segments.choice_only.map(|segment| {
+        content_list_from_segment(segment, span.clone(), true, true).unwrap_or_default()
+    });
+    if start_content.is_none() && segments.has_inline_brackets && choice_only_content.is_none() {
+        parser.warning(
+            "Blank choice - if you intended a default fallback choice, use the `* ->` syntax",
+        );
+    }
+
     let mut choice = Choice::new_with_inline_brackets(
-        content_list_from_segment(segments.start, span.clone(), false, false),
-        segments.choice_only.map(|segment| {
-            content_list_from_segment(segment, span.clone(), true, true).unwrap_or_default()
-        }),
+        start_content,
+        choice_only_content,
         append_newline(
             content_list_from_segment(segments.inner, span.clone(), true, true).unwrap_or_default(),
             span.clone(),
