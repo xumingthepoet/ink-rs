@@ -37,17 +37,15 @@ The upstream reference lives in `ink-csharp/`.
 
 ## Continuation Workflow
 
-- If the user sends a continuation prompt such as `continue`, `go on`, `keep going`, `next`, `继续`, `继续吧`, or similar without replacing the task, interpret it as: continue the C# tests campaign.
-- The current campaign target is `make csharp-gate`.
-- Use the ignored tests in `crates/ink-test/tests/csharp_tests/mod.rs` as the remaining queue. Take the first ignored non-LIST C# test in file order, remove its ignore marker, then fix compiler/runtime behavior until it genuinely passes.
+- If the user sends a continuation prompt such as `continue`, `go on`, `keep going`, `next`, `继续`, `继续吧`, or similar without replacing the task, interpret it as: continue C# parity work under `make gate`.
+- The C# tests now run as part of `make gate`; there is no separate `make csharp-gate`.
+- No ignored non-LIST C# tests should remain. If new C# tests are ported, keep them enabled and fix compiler/runtime behavior until `make gate` genuinely passes.
 
 ## C# Tests Campaign Rules
 
-- The target suite is `crates/ink-test/tests/csharp_tests.rs`, run through `make csharp-gate`.
-- Every continuation cycle must end with at least one additional ignored C# test unignored and genuinely passing.
-- After one C# test is genuinely passing and validated, create a git commit before starting the next ignored test.
-- After that commit, continue immediately to the next ignored test in file order.
-- Repeat until all non-LIST C# tests run by default and pass, unless the user interrupts or changes the task.
+- The target suite is `crates/ink-test/tests/csharp_tests.rs`, run through `make gate`.
+- Do not add ignored C# tests, skip filters, or fixture exclusions to hide failures.
+- When adding or fixing C# coverage, validate the focused case first, then run `make gate`.
 
 ## Architecture Requirements
 
@@ -73,15 +71,13 @@ Use the smallest relevant validation first, then widen coverage:
 - `cargo check --workspace`
 - `cargo test --workspace`
 - `make gate`
-- `make csharp-gate`
 
 When touching compiler logic, favor focused test runs in `crates/ink-test` before running the full workspace.
 
 For the continuation workflow above, the minimum required validation before marking a fixture done is:
 
 - the focused C# test for the current case
-- `make csharp-gate`
-- `make gate` when compiler or runtime logic changed
+- `make gate`
 
 ## Practical Guidance
 
@@ -105,7 +101,7 @@ For the continuation workflow above, the minimum required validation before mark
 
 ## Working Note Entries
 
-- [2026-04-25 00:00 CST] [👍26][👎0] The C# tests campaign queue is ignored non-LIST tests in `csharp_tests/mod.rs`: unignore the next test and run it focused. If it already passes, enable and commit without compiler churn. When port input/API differs, match actual C# semantics, including verbatim-string escapes and default arguments.
+- [2026-04-25 00:00 CST] [👍27][👎0] The C# tests campaign queue was ignored non-LIST tests in `csharp_tests/mod.rs`; that queue is now clear and C# tests run through `make gate`. When port input/API differs, match actual C# semantics, including verbatim-string escapes and default arguments.
 - [2026-04-24 00:22 CST] [👍14][👎0] When a fixture exposes structural data, add it to the parsed model first, then lower JSON from that model. `Divert` carries call arguments, `Flow` carries parameters, and `TunnelOnwards` preserves override targets plus arguments. This prevents flow semantics from leaking into ad hoc export logic.
 - [2026-04-24 08:50 CST] [👍9][👎0] Function calls and string expressions are expressions: lower call arguments before the runtime command/user function token. External declarations only register signatures; matching calls lower to `x()` with `exArgs`. Divert-target arguments used as values count visits and turns unless direct `TURNS_SINCE`/`READ_COUNT` gives a narrower purpose. String expressions lower as `str ... /str` and can contain nested mixed text/logic.
 - [2026-04-24 09:34 CST] [👍13][👎0] Weave handling needs a current runtime-container model. Grouping derives base indentation from the first weave point, not always depth 1. Gathers are structural weave points even without choices. Root weave participates in weave-point naming before flow weaves. After gathers, content and choices stay in that gather; inside flows, linear weave objects carry flow/stitch container paths. Branch rejoin diverts use C#-style compact paths. Named content metadata must stay as the container tail.

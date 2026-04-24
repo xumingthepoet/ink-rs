@@ -1,7 +1,6 @@
-.PHONY: fmt check test gate csharp-gate
+.PHONY: fmt check test gate
 
 TIMEOUT ?= timeout
-CSHARP_TEST ?=
 
 fmt:
 	cargo fmt --all --check
@@ -10,10 +9,9 @@ check:
 	cargo check --workspace
 
 test:
-	$(TIMEOUT) 30s cargo test --workspace
-
-csharp-gate:
-	$(TIMEOUT) 30s cargo test -p ink-test --features csharp-tests --test csharp_tests $(CSHARP_TEST)
+	$(TIMEOUT) 30s cargo test --workspace --exclude ink-test
+	$(TIMEOUT) 30s cargo test -p ink-test --test conformance
+	$(TIMEOUT) 30s cargo test -p ink-test --test compiler_conformance
+	$(TIMEOUT) 30s cargo test -p ink-test --features csharp-tests --test csharp_tests
 
 gate: fmt check test
-	$(TIMEOUT) 30s cargo test -p ink-test --features compiler-conformance --test compiler_conformance
