@@ -1611,12 +1611,13 @@ fn lower_choice_weave_with_initial_content(
             if let Some(container) =
                 gather_container_at_location_mut(&mut main_content, &mut named_content, &location)
             {
-                container
-                    .content
-                    .push(RuntimeObject::Container(done_container(
+                push_before_trailing_named_content(
+                    &mut container.content,
+                    RuntimeObject::Container(done_container(
                         &format!("g-{gather_count}"),
                         count_all_visits,
-                    )));
+                    )),
+                );
             }
         }
     } else if !matches!(path_mode, ChoicePathMode::NestedRoot { .. })
@@ -1635,6 +1636,14 @@ fn lower_choice_weave_with_initial_content(
     }
 
     main_content
+}
+
+fn push_before_trailing_named_content(content: &mut Vec<RuntimeObject>, object: RuntimeObject) {
+    if matches!(content.last(), Some(RuntimeObject::NamedContent(_))) {
+        content.insert(content.len() - 1, object);
+    } else {
+        content.push(object);
+    }
 }
 
 fn lower_weave_section(

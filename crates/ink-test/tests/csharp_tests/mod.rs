@@ -6097,7 +6097,6 @@ In top external
     //             Assert.AreEqual("world", story.currentChoices[0].text);
     //         }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestGatherChoiceSameLine() {
         run_in_both_modes(|suite| {
             let mut story = suite

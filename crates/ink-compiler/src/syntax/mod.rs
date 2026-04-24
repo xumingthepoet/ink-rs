@@ -107,6 +107,10 @@ impl Parser {
             return Vec::new();
         }
 
+        if let Some(objects) = self.parse_gather_line(line) {
+            return objects;
+        }
+
         let mut line_parser = RuleParser::new(line);
         let statement_rules: &[StatementRule] = &[
             variable_declaration_statement,
@@ -117,7 +121,6 @@ impl Parser {
             variable_assignment_statement,
             logic_line_statement,
             choice_statement,
-            gather_statement,
             divert_statement,
             text_statement,
         ];
@@ -141,6 +144,31 @@ impl Parser {
             self.diagnostics.push(diagnostic);
         }
         Vec::new()
+    }
+
+    fn parse_gather_line(&mut self, line: &SourceLine) -> Option<Vec<Object>> {
+        let mut line_parser = RuleParser::new(line);
+        let mut objects = line_parser.parse_rule(gather_statement)?;
+        let had_error = line_parser.had_error();
+        line_parser.skip_horizontal_whitespace();
+
+        let remaining = line_parser.line_remainder().to_string();
+        let remaining_span = line_parser.current_span();
+        self.diagnostics.extend(line_parser.finish());
+
+        if had_error {
+            return Some(Vec::new());
+        }
+
+        if !remaining.trim().is_empty() {
+            let remaining_line = SourceLine {
+                text: remaining,
+                span: remaining_span,
+            };
+            objects.extend(self.parse_statement(&remaining_line));
+        }
+
+        Some(objects)
     }
 
     fn try_unsupported_statement(&self, line: &SourceLine) -> Option<Diagnostic> {
@@ -1745,23 +1773,8 @@ fn gather_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
 
     let mut gather = crate::parsed::Gather::new(span.clone(), indentation_depth);
     gather.set_identifier(identifier);
-    let mut objects = vec![Object::Gather(gather)];
 
-    // Parse any remaining content on the line
-    let remaining = parser.line_remainder().trim();
-    if !remaining.is_empty() {
-        let parsed = text::parse_inline_content(remaining, &span).unwrap_or_default();
-        let add_trailing_newline = !remaining.starts_with('#') && !remaining.starts_with("->");
-        objects.extend(parsed);
-        parser.skip_to_end();
-        if add_trailing_newline {
-            objects.push(Object::Text(crate::parsed::Text::new("\n", span)));
-        }
-    } else {
-        parser.skip_to_end();
-    }
-
-    Some(objects)
+    Some(vec![Object::Gather(gather)])
 }
 
 fn parse_bracketed_identifier(parser: &mut RuleParser<'_>) -> Option<String> {
@@ -1842,6 +1855,15 @@ mod tests {
         assert!(output.diagnostics.is_empty());
         let story = output.artifact.unwrap();
         assert_eq!(story.root_weave().content().len(), 1);
+    }
+
+    #[test]
+    fn parses_choice_after_same_line_gather() {
+        let output = parse(SourceInput::new("- * Choice"));
+        assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
+        let story = output.artifact.unwrap();
+        assert!(matches!(story.root_weave().content()[0], Object::Gather(_)));
+        assert!(matches!(story.root_weave().content()[1], Object::Choice(_)));
     }
 
     #[test]
