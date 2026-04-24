@@ -29,6 +29,7 @@ pub enum RuntimeObject {
     String(String),
     ControlCommand(ControlCommand),
     Divert { target: String, variable: bool },
+    FunctionDivert { target: String },
     ConditionalDivert { target: String },
     DivertTarget(String),
     ReadCount(String),
@@ -60,6 +61,7 @@ pub enum ControlCommand {
     Duplicate,
     NoOp,
     Pop,
+    PopFunction,
 }
 
 enum ChoiceOuter {
@@ -532,6 +534,11 @@ fn collect_counted_paths_in_object(
             }
             expression => collect_counted_paths_in_expression(expression, global_labels, paths),
         },
+        Object::Return(ret) => {
+            if let Some(expr) = ret.returned_expression() {
+                collect_counted_paths_in_expression(expr, global_labels, paths);
+            }
+        }
         Object::Weave(weave) => collect_counted_paths_in_weave(weave, global_labels, paths),
         Object::Text(_)
         | Object::Glue(_)
@@ -1018,6 +1025,7 @@ fn lower_choice_weave_with_initial_content(
             | Object::Sequence(_)
             | Object::IncDec(_)
             | Object::VariableAssignment(_)
+            | Object::Return(_)
             | Object::Weave(_) => {
                 last_section_had_choice = lower_weave_section(
                     objects,
@@ -1203,6 +1211,7 @@ fn lower_weave_section(
             | Object::Sequence(_)
             | Object::IncDec(_)
             | Object::VariableAssignment(_)
+            | Object::Return(_)
             | Object::Weave(_) => {
                 lower_object_into_with_context(
                     content,
@@ -1658,9 +1667,15 @@ fn lower_expression_into(
                     has_start_content,
                 );
             }
-            content.push(RuntimeObject::NativeFunction(
-                function_runtime_name(name).to_string(),
-            ));
+            if is_builtin_function(name) {
+                content.push(RuntimeObject::NativeFunction(
+                    function_runtime_name(name).to_string(),
+                ));
+            } else {
+                content.push(RuntimeObject::FunctionDivert {
+                    target: name.clone(),
+                });
+            }
         }
         Expression::Binary {
             operator,
@@ -1772,6 +1787,33 @@ fn function_runtime_name(name: &str) -> &str {
         "SEED_RANDOM" => "srnd",
         other => other,
     }
+}
+
+fn is_builtin_function(name: &str) -> bool {
+    matches!(
+        name,
+        "RANDOM"
+            | "SEED_RANDOM"
+            | "CHOICE_COUNT"
+            | "TURNS"
+            | "TURNS_SINCE"
+            | "READ_COUNT"
+            | "LIST_RANGE"
+            | "LIST_RANDOM"
+            | "LIST_VALUE"
+            | "MIN"
+            | "MAX"
+            | "POW"
+            | "FLOOR"
+            | "CEILING"
+            | "INT"
+            | "FLOAT"
+            | "LIST_MIN"
+            | "LIST_MAX"
+            | "LIST_ALL"
+            | "LIST_COUNT"
+            | "LIST_INVERT"
+    )
 }
 
 fn lower_sequence(
@@ -2112,6 +2154,21 @@ fn lower_object_into_with_context(
         }
         Object::IncDec(inc_dec) => {
             lower_inc_dec_into(content, inc_dec, path_mode, choice_labels, global_labels);
+        }
+        Object::Return(ret) => {
+            content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
+            if let Some(expr) = ret.returned_expression() {
+                lower_expression_into(
+                    content,
+                    expr,
+                    choice_labels,
+                    global_labels,
+                    path_mode,
+                    false,
+                );
+            }
+            content.push(RuntimeObject::ControlCommand(ControlCommand::EvalEnd));
+            content.push(RuntimeObject::ControlCommand(ControlCommand::PopFunction));
         }
         Object::Tag(tag) => content.push(RuntimeObject::Tag {
             is_start: tag.is_start(),

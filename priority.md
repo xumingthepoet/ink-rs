@@ -1,6 +1,6 @@
 # Ink Fixture Priority
 
-通过统计: 83/118
+通过统计: 84/118
 
 Sorted by the latest `WritingWithInk.md` syntax point used by each file.
 
@@ -87,7 +87,7 @@ Sorted by the latest `WritingWithInk.md` syntax point used by each file.
 - [x] `knot/param-strings.ink`
 - [x] `knot/param-vars.ink`
 - [x] `knot/param-recurse.ink`
-- [ ] `function/func-basic.ink`
+- [x] `function/func-basic.ink`
 - [ ] `function/func-none.ink`
 - [ ] `glue/left-right-glue-matching.ink`
 - [ ] `glue/testbugfix1.ink`

@@ -110,6 +110,7 @@ fn runtime_object_to_value(object: &RuntimeObject) -> Value {
                 ControlCommand::Duplicate => "du",
                 ControlCommand::NoOp => "nop",
                 ControlCommand::Pop => "pop",
+                ControlCommand::PopFunction => "~ret",
             }
             .to_string(),
         ),
@@ -134,6 +135,11 @@ fn runtime_object_to_value(object: &RuntimeObject) -> Value {
             if *variable {
                 obj.insert("var".to_string(), Value::Bool(true));
             }
+            Value::Object(obj)
+        }
+        RuntimeObject::FunctionDivert { target } => {
+            let mut obj = Map::new();
+            obj.insert("f()".to_string(), Value::String(target.clone()));
             Value::Object(obj)
         }
         RuntimeObject::DivertTarget(target) => json!({ "^->": target }),

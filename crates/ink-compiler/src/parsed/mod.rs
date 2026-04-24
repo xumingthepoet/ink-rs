@@ -7,6 +7,7 @@ mod flow;
 mod gather;
 mod glue;
 mod inc_dec;
+mod return_node;
 mod sequence;
 mod story;
 mod tag;
@@ -23,6 +24,7 @@ pub use flow::{Flow, FlowArgument, FlowLevel};
 pub use gather::Gather;
 pub use glue::Glue;
 pub use inc_dec::IncDec;
+pub use return_node::Return;
 pub use sequence::{Sequence, SequenceType};
 pub use story::Story;
 pub use tag::Tag;
@@ -44,6 +46,7 @@ pub enum Object {
     Gather(Gather),
     Tag(Tag),
     Sequence(Sequence),
+    Return(Return),
     VariableAssignment(VariableAssignment),
     Weave(Weave),
 }
@@ -77,6 +80,7 @@ impl Object {
             }
             Object::Glue(glue) => glue.write_parse_snapshot(out, indent),
             Object::IncDec(inc_dec) => inc_dec.write_parse_snapshot(out, indent),
+            Object::Return(ret) => ret.write_parse_snapshot(out, indent),
             Object::Choice(choice) => choice.write_parse_snapshot(out, indent),
             Object::Divert(divert) => divert.write_parse_snapshot(out, indent),
             Object::Gather(gather) => gather.write_parse_snapshot(out, indent),

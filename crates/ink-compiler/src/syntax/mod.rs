@@ -11,7 +11,8 @@ use crate::{
     diagnostic::Diagnostic,
     parsed::{
         BinaryOperator, Conditional, ConditionalBranch, ContentList, Expression, FloatLiteral,
-        Flow, IncDec, Object, Sequence, Story, Text, UnaryOperator, VariableAssignment, Weave,
+        Flow, IncDec, Object, Return, Sequence, Story, Text, UnaryOperator, VariableAssignment,
+        Weave,
     },
     source::{SourceFile, SourceInput, SourceLine},
 };
@@ -99,6 +100,7 @@ impl Parser {
         let mut line_parser = RuleParser::new(line);
         let statement_rules: &[StatementRule] = &[
             variable_declaration_statement,
+            return_statement,
             variable_assignment_statement,
             logic_line_statement,
             choice_statement,
@@ -533,6 +535,28 @@ fn variable_declaration_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Obj
     ))])
 }
 
+fn return_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
+    parser.skip_horizontal_whitespace();
+    parser.match_string("~")?;
+    parser.skip_horizontal_whitespace();
+    parser.match_string("return")?;
+    parser.skip_horizontal_whitespace();
+    let expression = parse_initial_expression(parser.line_remainder().trim())?;
+    parser.skip_to_end();
+    Some(vec![Object::Return(Return::new(Some(expression)))])
+}
+
+fn expression_contains_function_call(expr: &Expression) -> bool {
+    match expr {
+        Expression::FunctionCall { .. } => true,
+        Expression::Binary { left, right, .. } => {
+            expression_contains_function_call(left) || expression_contains_function_call(right)
+        }
+        Expression::Unary { expression, .. } => expression_contains_function_call(expression),
+        _ => false,
+    }
+}
+
 fn variable_assignment_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
     parser.skip_horizontal_whitespace();
     let span = parser.current_span();
@@ -547,26 +571,42 @@ fn variable_assignment_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Obje
         parser.skip_horizontal_whitespace();
         let expression = parse_initial_expression(parser.line_remainder().trim())?;
         parser.skip_to_end();
-        return Some(vec![Object::IncDec(IncDec::new(
-            name, expression, true, span,
-        ))]);
+        let inc = IncDec::new(name, expression, true, span.clone());
+        if expression_contains_function_call(inc.expression()) {
+            return Some(vec![Object::ContentList(ContentList::new(vec![
+                Object::IncDec(inc),
+                Object::Text(Text::new("\n", span)),
+            ]))]);
+        }
+        return Some(vec![Object::IncDec(inc)]);
     }
     if parser.match_string("-=").is_some() {
         parser.skip_horizontal_whitespace();
         let expression = parse_initial_expression(parser.line_remainder().trim())?;
         parser.skip_to_end();
-        return Some(vec![Object::IncDec(IncDec::new(
-            name, expression, false, span,
-        ))]);
+        let dec = IncDec::new(name, expression, false, span.clone());
+        if expression_contains_function_call(dec.expression()) {
+            return Some(vec![Object::ContentList(ContentList::new(vec![
+                Object::IncDec(dec),
+                Object::Text(Text::new("\n", span)),
+            ]))]);
+        }
+        return Some(vec![Object::IncDec(dec)]);
     }
     parser.match_string("=")?;
     parser.skip_horizontal_whitespace();
     let expression = parse_initial_expression(parser.line_remainder().trim())?;
     parser.skip_to_end();
 
-    Some(vec![Object::VariableAssignment(VariableAssignment::new(
-        name, expression, false, false, span,
-    ))])
+    let assignment = VariableAssignment::new(name, expression, false, false, span.clone());
+    if expression_contains_function_call(assignment.expression()) {
+        Some(vec![Object::ContentList(ContentList::new(vec![
+            Object::VariableAssignment(assignment),
+            Object::Text(Text::new("\n", span)),
+        ]))])
+    } else {
+        Some(vec![Object::VariableAssignment(assignment)])
+    }
 }
 
 fn logic_line_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
