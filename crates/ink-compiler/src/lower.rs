@@ -106,6 +106,7 @@ enum ChoicePathMode {
     NestedRoot {
         container_path: String,
         gather_target: String,
+        allow_ancestor_fallback: bool,
     },
     Flow {
         flow_name: String,
@@ -152,14 +153,17 @@ impl ChoicePathMode {
             ChoicePathMode::Root => ChoicePathMode::NestedRoot {
                 container_path: format!("0.{choice_container_name}"),
                 gather_target: format!("0.{gather_container_name}"),
+                allow_ancestor_fallback: true,
             },
             ChoicePathMode::RootGather { gather_name } => ChoicePathMode::NestedRoot {
                 container_path: format!("0.{gather_name}.{choice_container_name}"),
                 gather_target: format!("0.{gather_container_name}"),
+                allow_ancestor_fallback: true,
             },
             ChoicePathMode::NestedRoot {
                 container_path,
                 gather_target,
+                allow_ancestor_fallback,
             } => ChoicePathMode::NestedRoot {
                 container_path: format!("{container_path}.{choice_container_name}"),
                 gather_target: if has_following_gather {
@@ -167,6 +171,7 @@ impl ChoicePathMode {
                 } else {
                     gather_target.clone()
                 },
+                allow_ancestor_fallback: *allow_ancestor_fallback,
             },
             ChoicePathMode::Flow {
                 flow_name,
@@ -196,17 +201,21 @@ impl ChoicePathMode {
             ChoicePathMode::NestedRoot {
                 container_path,
                 gather_target,
+                allow_ancestor_fallback,
             } => ChoicePathMode::NestedRoot {
                 container_path: format!("{container_path}.{container_index}"),
                 gather_target: gather_target.clone(),
+                allow_ancestor_fallback: *allow_ancestor_fallback,
             },
             ChoicePathMode::Root => ChoicePathMode::NestedRoot {
                 container_path: format!("0.{container_index}"),
                 gather_target: "0.g-0".to_string(),
+                allow_ancestor_fallback: true,
             },
             ChoicePathMode::RootGather { gather_name } => ChoicePathMode::NestedRoot {
                 container_path: format!("0.{gather_name}.{container_index}"),
                 gather_target: "0.g-0".to_string(),
+                allow_ancestor_fallback: true,
             },
             ChoicePathMode::Flow {
                 flow_name,
@@ -236,9 +245,11 @@ impl ChoicePathMode {
             ChoicePathMode::NestedRoot {
                 container_path,
                 gather_target,
+                allow_ancestor_fallback,
             } => ChoicePathMode::NestedRoot {
                 container_path: format!("{container_path}.{gather_name}"),
                 gather_target: gather_target.clone(),
+                allow_ancestor_fallback: *allow_ancestor_fallback,
             },
             ChoicePathMode::Flow {
                 flow_name,
@@ -268,18 +279,19 @@ impl ChoicePathMode {
                 ChoicePathMode::NestedRoot {
                     container_path,
                     gather_target: "0.g-0".to_string(),
+                    allow_ancestor_fallback: false,
                 }
             }
             ChoicePathMode::NestedRoot { gather_target, .. } => ChoicePathMode::NestedRoot {
                 container_path,
                 gather_target: gather_target.clone(),
+                allow_ancestor_fallback: false,
             },
             ChoicePathMode::Flow {
                 flow_name,
                 parent_flow_name,
                 sibling_stitch_names,
                 local_variables,
-                fallback_gather_target,
                 ..
             } => ChoicePathMode::Flow {
                 flow_name: flow_name.clone(),
@@ -288,7 +300,7 @@ impl ChoicePathMode {
                 sibling_stitch_names: sibling_stitch_names.clone(),
                 local_variables: local_variables.clone(),
                 self_target_relative: true,
-                fallback_gather_target: fallback_gather_target.clone(),
+                fallback_gather_target: None,
             },
         }
     }
@@ -300,11 +312,13 @@ impl ChoicePathMode {
                 ChoicePathMode::NestedRoot {
                     container_path,
                     gather_target: "0.g-0".to_string(),
+                    allow_ancestor_fallback: false,
                 }
             }
             ChoicePathMode::NestedRoot { gather_target, .. } => ChoicePathMode::NestedRoot {
                 container_path,
                 gather_target: gather_target.clone(),
+                allow_ancestor_fallback: false,
             },
             ChoicePathMode::Flow {
                 flow_name,
@@ -312,7 +326,6 @@ impl ChoicePathMode {
                 sibling_stitch_names,
                 local_variables,
                 self_target_relative,
-                fallback_gather_target,
                 ..
             } => ChoicePathMode::Flow {
                 flow_name: flow_name.clone(),
@@ -321,14 +334,18 @@ impl ChoicePathMode {
                 sibling_stitch_names: sibling_stitch_names.clone(),
                 local_variables: local_variables.clone(),
                 self_target_relative: *self_target_relative,
-                fallback_gather_target: fallback_gather_target.clone(),
+                fallback_gather_target: None,
             },
         }
     }
 
     fn fallback_gather_target(&self) -> Option<String> {
         match self {
-            ChoicePathMode::NestedRoot { gather_target, .. } => Some(gather_target.clone()),
+            ChoicePathMode::NestedRoot {
+                gather_target,
+                allow_ancestor_fallback,
+                ..
+            } => allow_ancestor_fallback.then(|| gather_target.clone()),
             ChoicePathMode::Flow {
                 fallback_gather_target,
                 ..
@@ -885,7 +902,7 @@ fn insert_counted_divert_target(
 
 fn build_label_index(story: &Story) -> HashMap<String, String> {
     let mut labels = HashMap::new();
-    collect_weave_labels(story.root_weave(), "0", &mut labels);
+    collect_weave_labels(story.root_weave(), "0", None, &mut labels);
     for flow in story.flows() {
         collect_flow_labels(flow, None, &mut labels);
     }
@@ -909,28 +926,48 @@ fn collect_flow_labels(
     } else {
         format!("{flow_path}.0")
     };
-    collect_weave_labels(flow.weave(), &weave_container_path, labels);
+    collect_weave_labels(
+        flow.weave(),
+        &weave_container_path,
+        Some(&flow_path),
+        labels,
+    );
     for child in flow.child_flows() {
         collect_flow_labels(child, Some(&flow_path), labels);
     }
 }
 
-fn collect_weave_labels(weave: &Weave, container_path: &str, labels: &mut HashMap<String, String>) {
+fn collect_weave_labels(
+    weave: &Weave,
+    container_path: &str,
+    flow_alias_prefix: Option<&str>,
+    labels: &mut HashMap<String, String>,
+) {
     let mut choice_count = 0;
     let mut gather_count = 0;
     let mut current_container_path = container_path.to_string();
     let mut last_section_had_choice = false;
+    let mut previous_choice_content: Option<(String, usize)> = None;
     for object in weave.content() {
         match object {
             Object::Choice(choice) => {
                 if let Some(identifier) = choice.identifier() {
                     let target_path = format!("{current_container_path}.c-{choice_count}");
-                    insert_label_aliases(labels, identifier, container_path, &target_path);
+                    insert_label_aliases(
+                        labels,
+                        identifier,
+                        container_path,
+                        flow_alias_prefix,
+                        &target_path,
+                    );
                 }
+                let choice_path = format!("{current_container_path}.c-{choice_count}");
+                previous_choice_content = Some((choice_path, estimated_choice_content_len(choice)));
                 choice_count += 1;
                 last_section_had_choice = true;
             }
             Object::Gather(gather) => {
+                previous_choice_content = None;
                 let gather_name = gather.identifier().map(str::to_string).unwrap_or_else(|| {
                     let name = format!("g-{gather_count}");
                     gather_count += 1;
@@ -942,26 +979,82 @@ fn collect_weave_labels(weave: &Weave, container_path: &str, labels: &mut HashMa
                     format!("{current_container_path}.{gather_name}")
                 };
                 if let Some(identifier) = gather.identifier() {
-                    insert_label_aliases(labels, identifier, container_path, &gather_path);
+                    insert_label_aliases(
+                        labels,
+                        identifier,
+                        container_path,
+                        flow_alias_prefix,
+                        &gather_path,
+                    );
                 }
                 current_container_path = gather_path;
                 last_section_had_choice = false;
             }
             Object::Weave(weave) => {
-                collect_weave_labels(weave, &current_container_path, labels);
+                if let Some((choice_path, next_index)) = previous_choice_content.as_mut() {
+                    let nested_container_path = child_path(choice_path, &next_index.to_string());
+                    collect_weave_labels(weave, &nested_container_path, flow_alias_prefix, labels);
+                    *next_index += 1;
+                } else {
+                    collect_weave_labels(weave, &current_container_path, flow_alias_prefix, labels);
+                }
             }
-            _ => {}
+            _ => {
+                if let Some((_, next_index)) = previous_choice_content.as_mut() {
+                    *next_index += estimated_runtime_len_for_label_collection(object);
+                }
+            }
         }
     }
+}
+
+fn estimated_choice_content_len(choice: &Choice) -> usize {
+    let mut content = Vec::new();
+    if choice.has_start_content() {
+        content.extend(choice_container_prefix(&ChoicePathMode::Root, "c-0", 0, 2));
+    }
+    lower_content_list_into_context(
+        &mut content,
+        choice.inner_content(),
+        &ChoicePathMode::Root,
+        &HashMap::new(),
+        &HashMap::new(),
+        &HashSet::new(),
+        &HashMap::new(),
+    );
+    content.len()
+}
+
+fn estimated_runtime_len_for_label_collection(object: &Object) -> usize {
+    if matches!(object, Object::Weave(_)) {
+        return 1;
+    }
+
+    let mut content = Vec::new();
+    lower_object_into_with_context_count(
+        &mut content,
+        object,
+        &ChoicePathMode::Root,
+        &HashMap::new(),
+        &HashMap::new(),
+        &HashSet::new(),
+        &HashMap::new(),
+        false,
+    );
+    content.len()
 }
 
 fn insert_label_aliases(
     labels: &mut HashMap<String, String>,
     identifier: &str,
     container_path: &str,
+    flow_alias_prefix: Option<&str>,
     target_path: &str,
 ) {
     labels.insert(identifier.to_string(), target_path.to_string());
+    if let Some(flow_path) = flow_alias_prefix {
+        labels.insert(format!("{flow_path}.{identifier}"), target_path.to_string());
+    }
     if let Some(flow_path) = container_path.strip_suffix(".0") {
         labels.insert(format!("{flow_path}.{identifier}"), target_path.to_string());
     }
@@ -1248,46 +1341,6 @@ fn content_list_has_choice(content_list: &ContentList) -> bool {
         .any(|object| matches!(object, Object::Choice(_)))
 }
 
-fn content_list_contains_nonreturning_divert(
-    content_list: &ContentList,
-    choice_labels: &HashMap<String, String>,
-) -> bool {
-    content_list.objects().iter().any(|object| match object {
-        Object::Divert(divert) => {
-            !divert.is_tunnel()
-                && match divert.target() {
-                    DivertTarget::Path(target) => choice_labels
-                        .get(target)
-                        .is_none_or(|path| local_label_target_is_choice(path)),
-                    _ => true,
-                }
-        }
-        Object::ContentList(content) => {
-            content_list_contains_nonreturning_divert(content, choice_labels)
-        }
-        _ => false,
-    })
-}
-
-fn local_label_target_is_choice(target_path: &str) -> bool {
-    target_path
-        .rsplit('.')
-        .next()
-        .is_some_and(|component| component.starts_with("c-"))
-}
-
-fn path_mode_is_flow_before_gather(path_mode: &ChoicePathMode) -> bool {
-    let ChoicePathMode::Flow {
-        flow_name,
-        container_path,
-        ..
-    } = path_mode
-    else {
-        return false;
-    };
-    container_path == &format!("{flow_name}.0")
-}
-
 fn lower_linear_weave(
     weave: &Weave,
     global_labels: &HashMap<String, String>,
@@ -1476,7 +1529,7 @@ fn lower_choice_weave_with_initial_content(
                 if !gather_named_content.is_empty() {
                     gather_content.push(RuntimeObject::NamedContent(gather_named_content));
                 }
-                if !gather_has_choice && !ends_with_flow_terminator(&gather_content) {
+                if !gather_has_choice && !ends_with_end_or_done(&gather_content) {
                     if let Some(target) = gather_path_mode.fallback_gather_target() {
                         gather_content.push(RuntimeObject::Divert {
                             target,
@@ -1802,27 +1855,17 @@ fn lower_choice_in_section(
         *index += 1;
     }
 
-    let include_gather = if has_nested_weave_content {
-        false
-    } else if has_explicit_gather {
-        true
-    } else {
-        match path_mode {
-            ChoicePathMode::Root
-            | ChoicePathMode::RootGather { .. }
-            | ChoicePathMode::NestedRoot { .. } => true,
-            ChoicePathMode::Flow {
-                fallback_gather_target,
-                ..
-            } => fallback_gather_target.is_some(),
-        }
-    };
-    let suppress_rejoin_for_nonreturning_flow_divert =
-        matches!(path_mode, ChoicePathMode::Flow { .. })
-            && !path_mode_is_flow_before_gather(path_mode)
-            && content_list_contains_nonreturning_divert(choice.inner_content(), choice_labels);
+    let include_gather = !has_nested_weave_content
+        && (has_following_gather
+            || match path_mode {
+                ChoicePathMode::Root | ChoicePathMode::RootGather { .. } => true,
+                ChoicePathMode::NestedRoot { .. } => path_mode.fallback_gather_target().is_some(),
+                ChoicePathMode::Flow {
+                    fallback_gather_target,
+                    ..
+                } => fallback_gather_target.is_some(),
+            });
     if include_gather
-        && !suppress_rejoin_for_nonreturning_flow_divert
         && !(has_explicit_gather && !has_following_gather && ends_with_end_or_done(&choice_content))
     {
         choice_content.push(RuntimeObject::Divert {
@@ -2129,8 +2172,7 @@ fn lower_expression_into(
         Expression::DivertTarget(target) => {
             let resolved_target = if let Some(choice_target) = choice_labels.get(target) {
                 choice_target.clone()
-            } else if let Some(label_target) = global_labels
-                .get(target)
+            } else if let Some(label_target) = scoped_label_target(target, global_labels, path_mode)
                 .filter(|label_target| label_target.as_str() != target)
             {
                 resolve_label_target(label_target, path_mode)
@@ -2143,7 +2185,7 @@ fn lower_expression_into(
             if let Some(choice_target) = choice_labels.get(name) {
                 let _ = has_start_content;
                 content.push(RuntimeObject::ReadCount(choice_target.clone()));
-            } else if let Some(label_target) = global_labels.get(name) {
+            } else if let Some(label_target) = scoped_label_target(name, global_labels, path_mode) {
                 content.push(RuntimeObject::ReadCount(resolve_label_target(
                     label_target,
                     path_mode,
@@ -3434,8 +3476,7 @@ fn push_divert_with_context(
         DivertTarget::Path(target) => {
             let resolved_target = if let Some(choice_target) = choice_labels.get(target) {
                 runtime_divert(choice_target.clone(), false, divert.is_tunnel())
-            } else if let Some(label_target) = global_labels
-                .get(target)
+            } else if let Some(label_target) = scoped_label_target(target, global_labels, path_mode)
                 .filter(|label_target| label_target.as_str() != target)
             {
                 runtime_divert(
@@ -3522,6 +3563,36 @@ fn resolve_divert_target(target: &str, path_mode: &ChoicePathMode) -> String {
 fn resolve_label_target(label_target: &str, path_mode: &ChoicePathMode) -> String {
     let _ = path_mode;
     label_target.to_string()
+}
+
+fn scoped_label_target<'a>(
+    target: &str,
+    global_labels: &'a HashMap<String, String>,
+    path_mode: &ChoicePathMode,
+) -> Option<&'a String> {
+    if target.contains('.') {
+        return global_labels.get(target);
+    }
+
+    current_flow_path(path_mode)
+        .and_then(|flow_path| global_labels.get(&format!("{flow_path}.{target}")))
+        .or_else(|| global_labels.get(target))
+}
+
+fn current_flow_path(path_mode: &ChoicePathMode) -> Option<String> {
+    match path_mode {
+        ChoicePathMode::Flow {
+            flow_name,
+            parent_flow_name,
+            ..
+        } => Some(
+            parent_flow_name
+                .as_ref()
+                .map(|parent| format!("{parent}.{flow_name}"))
+                .unwrap_or_else(|| flow_name.clone()),
+        ),
+        _ => None,
+    }
 }
 
 fn is_flow_sibling_stitch(name: &str, path_mode: &ChoicePathMode) -> bool {

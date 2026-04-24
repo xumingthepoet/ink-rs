@@ -202,3 +202,4 @@ fixture!(
 );
 fixture!(threads_thread_bug, "inkfiles/threads/thread-bug.ink");
 fixture_count_all_visits!(misc_i18n, "inkfiles/misc/i18n.ink");
+fixture_count_all_visits!(the_intercept, "inkfiles/TheIntercept.ink");

@@ -1,6 +1,6 @@
 # Ink Fixture Priority
 
-通过统计: 106/107
+通过统计: 107/107
 
 Uppercase `LIST` fixtures are intentionally excluded from the compiler-conformance queue.
 
@@ -112,4 +112,4 @@ Sorted by the latest `WritingWithInk.md` syntax point used by each file.
 - [x] `runtime/multiflow-saveloadthreads.ink`
 - [x] `threads/thread-bug.ink`
 - [x] `misc/i18n.ink`
-- [ ] `TheIntercept.ink`
+- [x] `TheIntercept.ink`

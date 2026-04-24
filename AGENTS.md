@@ -42,11 +42,11 @@ The upstream reference lives in `ink-csharp/`.
 
 ## Compiler Conformance Campaign Rules
 
-- The target suite is `crates/ink-test/tests/compiler_conformance.rs` and the corresponding `make compiler-gate` target.
+- The target suite is `crates/ink-test/tests/compiler_conformance.rs`, which runs as part of `make gate`.
 - Every continuation cycle must end with at least one additional compiler-conformance fixture genuinely passing.
 - After one fixture is genuinely passing, validated, and recorded in `priority.md`, create a git commit before starting the next unchecked fixture.
 - After that commit, continue immediately to the next unchecked fixture in `priority.md`.
-- Repeat until all 118 fixtures pass, unless the user interrupts or changes the task.
+- Repeat until all 107 compiler-conformance fixtures pass, unless the user interrupts or changes the task.
 
 ## Architecture Requirements
 
@@ -71,7 +71,7 @@ Use the smallest relevant validation first, then widen coverage:
 - `cargo fmt --all --check`
 - `cargo check --workspace`
 - `cargo test --workspace`
-- `make compiler-gate`
+- `make gate`
 - `make csharp-gate`
 
 When touching compiler logic, favor focused test runs in `crates/ink-test` before running the full workspace.
@@ -80,7 +80,6 @@ For the continuation workflow above, the minimum required validation before mark
 
 - the focused compiler-conformance test for the current fixture
 - `make gate`
-- `make compiler-gate`
 
 ## Practical Guidance
 
