@@ -456,6 +456,20 @@ impl Parser {
                 continue;
             }
 
+            if current_trimmed.starts_with('{') {
+                let nested_start = *index;
+                if let Some(nested_objects) = self.parse_multiline_sequence(lines, index) {
+                    current_branch.objects.extend(nested_objects);
+                    continue;
+                }
+                *index = nested_start;
+                if let Some(nested_objects) = self.parse_multiline_conditional(lines, index) {
+                    current_branch.objects.extend(nested_objects);
+                    continue;
+                }
+                *index = nested_start;
+            }
+
             current_branch
                 .objects
                 .extend(self.parse_statement(current_line));
@@ -1158,16 +1172,17 @@ pub(super) fn parse_initial_expression(source: &str) -> Option<Expression> {
 
 fn parse_expression(source: &str) -> Option<Expression> {
     let source = strip_enclosing_parentheses(source.trim());
-    if let Some((left, right)) = split_top_level_text_operator(source, "&&") {
+    if let Some((left, operator, right)) = split_top_level_text_operators(
+        source,
+        &[
+            TextOperator::symbol("&&", BinaryOperator::AndSymbol),
+            TextOperator::symbol("||", BinaryOperator::OrSymbol),
+            TextOperator::word("and", BinaryOperator::And),
+            TextOperator::word("or", BinaryOperator::Or),
+        ],
+    ) {
         return Some(Expression::Binary {
-            operator: BinaryOperator::AndSymbol,
-            left: Box::new(parse_expression(left)?),
-            right: Box::new(parse_expression(right)?),
-        });
-    }
-    if let Some((left, right)) = split_top_level_word_text_operator(source, "and") {
-        return Some(Expression::Binary {
-            operator: BinaryOperator::And,
+            operator,
             left: Box::new(parse_expression(left)?),
             right: Box::new(parse_expression(right)?),
         });
@@ -1459,18 +1474,80 @@ fn split_top_level_word_operator<'a>(
     None
 }
 
-fn split_top_level_text_operator<'a>(
-    source: &'a str,
-    operator: &str,
-) -> Option<(&'a str, &'a str)> {
-    split_top_level_text_operator_with_boundaries(source, operator, false)
-}
-
 fn split_top_level_word_text_operator<'a>(
     source: &'a str,
     operator: &str,
 ) -> Option<(&'a str, &'a str)> {
     split_top_level_text_operator_with_boundaries(source, operator, true)
+}
+
+#[derive(Clone, Copy)]
+struct TextOperator {
+    text: &'static str,
+    operator: BinaryOperator,
+    require_word_boundaries: bool,
+}
+
+impl TextOperator {
+    fn symbol(text: &'static str, operator: BinaryOperator) -> Self {
+        Self {
+            text,
+            operator,
+            require_word_boundaries: false,
+        }
+    }
+
+    fn word(text: &'static str, operator: BinaryOperator) -> Self {
+        Self {
+            text,
+            operator,
+            require_word_boundaries: true,
+        }
+    }
+}
+
+fn split_top_level_text_operators<'a>(
+    source: &'a str,
+    operators: &[TextOperator],
+) -> Option<(&'a str, BinaryOperator, &'a str)> {
+    let mut in_string = false;
+    let mut escaped = false;
+    let mut paren_depth = 0;
+
+    for (index, ch) in source.char_indices().rev() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+
+        match ch {
+            '\\' if in_string => escaped = true,
+            '"' => in_string = !in_string,
+            ')' if !in_string => paren_depth += 1,
+            '(' if !in_string => paren_depth -= 1,
+            _ if !in_string && paren_depth == 0 => {
+                let Some(operator) = operators
+                    .iter()
+                    .find(|operator| source[index..].starts_with(operator.text))
+                else {
+                    continue;
+                };
+                if operator.require_word_boundaries
+                    && !has_word_boundaries(source, index, operator.text.len())
+                {
+                    continue;
+                }
+                let left = source[..index].trim();
+                let right = source[index + operator.text.len()..].trim();
+                if !left.is_empty() && !right.is_empty() {
+                    return Some((left, operator.operator, right));
+                }
+            }
+            _ => {}
+        }
+    }
+
+    None
 }
 
 fn split_top_level_text_operator_with_boundaries<'a>(
@@ -1494,14 +1571,8 @@ fn split_top_level_text_operator_with_boundaries<'a>(
             ')' if !in_string => paren_depth += 1,
             '(' if !in_string => paren_depth -= 1,
             _ if !in_string && paren_depth == 0 && source[index..].starts_with(operator) => {
-                if require_word_boundaries {
-                    let before = source[..index].chars().next_back();
-                    let after = source[index + operator.len()..].chars().next();
-                    let has_word_boundaries = before.is_none_or(|ch| !is_identifier_continue(ch))
-                        && after.is_none_or(|ch| !is_identifier_continue(ch));
-                    if !has_word_boundaries {
-                        continue;
-                    }
+                if require_word_boundaries && !has_word_boundaries(source, index, operator.len()) {
+                    continue;
                 }
                 let left = source[..index].trim();
                 let right = source[index + operator.len()..].trim();
@@ -1514,6 +1585,13 @@ fn split_top_level_text_operator_with_boundaries<'a>(
     }
 
     None
+}
+
+fn has_word_boundaries(source: &str, index: usize, length: usize) -> bool {
+    let before = source[..index].chars().next_back();
+    let after = source[index + length..].chars().next();
+    before.is_none_or(|ch| !is_identifier_continue(ch))
+        && after.is_none_or(|ch| !is_identifier_continue(ch))
 }
 
 fn is_unary_operator_position(source: &str, index: usize) -> bool {

@@ -3724,7 +3724,6 @@ world
     // ".Replace("\r", ""), story.ContinueMaximally().Replace("\r", ""));
     //         }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestPrintNum() {
         run_in_both_modes(|suite| {
             let mut story = suite

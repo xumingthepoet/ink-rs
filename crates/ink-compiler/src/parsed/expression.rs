@@ -50,6 +50,8 @@ pub enum Expression {
 pub enum BinaryOperator {
     And,
     AndSymbol,
+    Or,
+    OrSymbol,
     Equals,
     NotEquals,
     GreaterThan,
@@ -243,6 +245,8 @@ impl BinaryOperator {
         match self {
             BinaryOperator::And => "&&",
             BinaryOperator::AndSymbol => "&&",
+            BinaryOperator::Or => "||",
+            BinaryOperator::OrSymbol => "||",
             BinaryOperator::Equals => "==",
             BinaryOperator::NotEquals => "!=",
             BinaryOperator::GreaterThan => ">",
@@ -261,6 +265,8 @@ impl BinaryOperator {
         match self {
             BinaryOperator::And => "and",
             BinaryOperator::AndSymbol => "&&",
+            BinaryOperator::Or => "or",
+            BinaryOperator::OrSymbol => "||",
             BinaryOperator::Equals => "==",
             BinaryOperator::NotEquals => "!=",
             BinaryOperator::GreaterThan => ">",
