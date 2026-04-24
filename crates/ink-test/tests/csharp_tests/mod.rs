@@ -5311,7 +5311,6 @@ Unreachable
     //             Assert.AreEqual ("This is outer\nThis is the_esc\n", story.ContinueMaximally ());
     //         }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestTunnelOnwardsToVariableDivertTarget() {
         run_in_both_modes(|suite| {
             let mut story = suite
