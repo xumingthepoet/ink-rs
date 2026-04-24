@@ -14,6 +14,20 @@ pub(super) struct RuleParser<'source> {
     diagnostics: Vec<Diagnostic>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct RuleMetadata {
+    start_byte_index: usize,
+    end_byte_index: usize,
+    start_character_in_line: usize,
+    end_character_in_line: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct RuleMatch<T> {
+    pub(super) value: T,
+    pub(super) metadata: RuleMetadata,
+}
+
 impl<'source> RuleParser<'source> {
     pub(super) fn new(line: &'source SourceLine) -> Self {
         Self {
@@ -27,13 +41,32 @@ impl<'source> RuleParser<'source> {
     }
 
     pub(super) fn parse_rule<T>(&mut self, rule: impl FnOnce(&mut Self) -> Option<T>) -> Option<T> {
+        self.parse_rule_with_metadata(rule)
+            .map(|rule_match| rule_match.value)
+    }
+
+    pub(super) fn parse_rule_with_metadata<T>(
+        &mut self,
+        rule: impl FnOnce(&mut Self) -> Option<T>,
+    ) -> Option<RuleMatch<T>> {
+        let start_byte_index = self.state.byte_index();
+        let start_character_in_line = self.state.character_in_line();
         let rule_id = self.state.begin_rule();
         let result = rule(self);
 
         match result {
             Some(result) => {
+                let metadata = RuleMetadata {
+                    start_byte_index,
+                    end_byte_index: self.state.byte_index(),
+                    start_character_in_line,
+                    end_character_in_line: self.state.character_in_line(),
+                };
                 self.state.succeed_rule(rule_id);
-                Some(result)
+                Some(RuleMatch {
+                    value: result,
+                    metadata,
+                })
             }
             None => {
                 self.state.fail_rule(rule_id);
@@ -147,11 +180,16 @@ impl<'source> RuleParser<'source> {
     }
 
     pub(super) fn skip_to_end(&mut self) {
-        let character_count = self.line_remainder().chars().count();
-        self.state.set_position(
-            self.input.len(),
-            self.state.character_in_line() + character_count,
-        );
+        self.skip_until(|_| false);
+    }
+
+    pub(super) fn skip_until(&mut self, stop: impl Fn(char) -> bool) {
+        while let Some(ch) = self.current_char() {
+            if stop(ch) {
+                break;
+            }
+            self.advance_char();
+        }
     }
 
     pub(super) fn line_remainder(&self) -> &str {
@@ -176,6 +214,13 @@ impl<'source> RuleParser<'source> {
         if let Some(ch) = self.current_char() {
             self.state.advance(ch.len_utf8());
         }
+    }
+}
+
+impl RuleMetadata {
+    pub(super) fn is_forward(self) -> bool {
+        self.end_byte_index >= self.start_byte_index
+            && self.end_character_in_line >= self.start_character_in_line
     }
 }
 
@@ -210,6 +255,22 @@ mod tests {
             Some("*".to_string())
         );
         assert_eq!(parser.line_remainder(), " choice");
+    }
+
+    #[test]
+    fn successful_rule_returns_metadata() {
+        let mut parser = parser_for("* choice");
+
+        let rule_match = parser
+            .parse_rule_with_metadata(|parser| parser.match_string("*"))
+            .expect("rule should match");
+
+        assert_eq!(rule_match.value, "*".to_string());
+        assert_eq!(rule_match.metadata.start_byte_index, 0);
+        assert_eq!(rule_match.metadata.end_byte_index, 1);
+        assert_eq!(rule_match.metadata.start_character_in_line, 0);
+        assert_eq!(rule_match.metadata.end_character_in_line, 1);
+        assert!(rule_match.metadata.is_forward());
     }
 
     #[test]
@@ -252,5 +313,14 @@ mod tests {
 
         assert_eq!(parser.take_while(|ch| ch == '='), Some("===".to_string()));
         assert_eq!(parser.line_remainder(), " knot");
+    }
+
+    #[test]
+    fn skip_until_stops_before_boundary() {
+        let mut parser = parser_for("abc, def");
+
+        parser.skip_until(|ch| ch == ',');
+
+        assert_eq!(parser.line_remainder(), ", def");
     }
 }

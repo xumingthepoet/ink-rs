@@ -80,17 +80,7 @@ impl Parser {
                 }
             }
 
-            if let Some(parsed) = self.parse_choice_with_continuation(&lines, &mut index) {
-                objects.extend(parsed);
-                continue;
-            }
-
-            if let Some(parsed) = self.parse_multiline_sequence(&lines, &mut index) {
-                objects.extend(parsed);
-                continue;
-            }
-
-            if let Some(parsed) = self.parse_multiline_conditional(&lines, &mut index) {
+            if let Some(parsed) = self.parse_compound_statement(&lines, &mut index) {
                 objects.extend(parsed);
                 continue;
             }
@@ -127,9 +117,10 @@ impl Parser {
         ];
 
         for rule in statement_rules {
-            if let Some(objects) = line_parser.parse_rule(*rule) {
+            if let Some(rule_match) = line_parser.parse_rule_with_metadata(*rule) {
+                debug_assert!(rule_match.metadata.is_forward());
                 self.diagnostics.extend(line_parser.finish());
-                return objects;
+                return rule_match.value;
             }
 
             if line_parser.had_error() {
@@ -248,17 +239,7 @@ impl Parser {
                 continue;
             }
 
-            if let Some(parsed) = self.parse_choice_with_continuation(lines, index) {
-                content.extend(parsed);
-                continue;
-            }
-
-            if let Some(parsed) = self.parse_multiline_sequence(lines, index) {
-                content.extend(parsed);
-                continue;
-            }
-
-            if let Some(parsed) = self.parse_multiline_conditional(lines, index) {
+            if let Some(parsed) = self.parse_compound_statement(lines, index) {
                 content.extend(parsed);
                 continue;
             }
@@ -313,17 +294,7 @@ impl Parser {
                 break;
             }
 
-            if let Some(parsed) = self.parse_choice_with_continuation(lines, index) {
-                content.extend(parsed);
-                continue;
-            }
-
-            if let Some(parsed) = self.parse_multiline_sequence(lines, index) {
-                content.extend(parsed);
-                continue;
-            }
-
-            if let Some(parsed) = self.parse_multiline_conditional(lines, index) {
+            if let Some(parsed) = self.parse_compound_statement(lines, index) {
                 content.extend(parsed);
                 continue;
             }
@@ -340,6 +311,45 @@ impl Parser {
             declaration.arguments,
             declaration.is_function,
         ))
+    }
+
+    fn parse_compound_statement(
+        &mut self,
+        lines: &[SourceLine],
+        index: &mut usize,
+    ) -> Option<Vec<Object>> {
+        if let Some(parsed) = self.parse_multiline_rule(index, |parser, index| {
+            parser.parse_choice_with_continuation(lines, index)
+        }) {
+            return Some(parsed);
+        }
+
+        if let Some(parsed) = self.parse_multiline_rule(index, |parser, index| {
+            parser.parse_multiline_sequence(lines, index)
+        }) {
+            return Some(parsed);
+        }
+
+        self.parse_multiline_rule(index, |parser, index| {
+            parser.parse_multiline_conditional(lines, index)
+        })
+    }
+
+    fn parse_multiline_rule<T>(
+        &mut self,
+        index: &mut usize,
+        rule: impl FnOnce(&mut Self, &mut usize) -> Option<T>,
+    ) -> Option<T> {
+        let start_index = *index;
+        let diagnostic_count = self.diagnostics.len();
+
+        let result = rule(self, index);
+        if result.is_none() {
+            *index = start_index;
+            self.diagnostics.truncate(diagnostic_count);
+        }
+
+        result
     }
 
     fn parse_choice_with_continuation(
@@ -502,17 +512,10 @@ impl Parser {
             }
 
             if current_trimmed.starts_with('{') {
-                let nested_start = *index;
-                if let Some(nested_objects) = self.parse_multiline_sequence(lines, index) {
+                if let Some(nested_objects) = self.parse_compound_statement(lines, index) {
                     current_branch.objects.extend(nested_objects);
                     continue;
                 }
-                *index = nested_start;
-                if let Some(nested_objects) = self.parse_multiline_conditional(lines, index) {
-                    current_branch.objects.extend(nested_objects);
-                    continue;
-                }
-                *index = nested_start;
             }
 
             current_branch
@@ -542,8 +545,10 @@ impl Parser {
             nested_lines.extend(lines[*index + 1..].iter().cloned());
 
             let mut nested_index = 0;
-            let nested_objects =
-                self.parse_multiline_conditional(&nested_lines, &mut nested_index)?;
+            let nested_objects = self
+                .parse_multiline_rule(&mut nested_index, |parser, index| {
+                    parser.parse_multiline_conditional(&nested_lines, index)
+                })?;
             if nested_index == 0 {
                 continue;
             }
@@ -581,7 +586,9 @@ impl Parser {
         nested_lines.extend(lines[*index + 1..].iter().cloned());
 
         let mut nested_index = 0;
-        let nested_objects = self.parse_multiline_conditional(&nested_lines, &mut nested_index)?;
+        let nested_objects = self.parse_multiline_rule(&mut nested_index, |parser, index| {
+            parser.parse_multiline_conditional(&nested_lines, index)
+        })?;
         if nested_index == 0 {
             return None;
         }
@@ -2166,6 +2173,21 @@ mod tests {
         };
         assert_eq!(name, "returnValue");
         assert!(args.is_empty());
+    }
+
+    #[test]
+    fn failed_multiline_compound_rule_rewinds_index() {
+        let source = SourceFile::from_input(SourceInput::new("{ once\n- A"));
+        let lines = source.lines.clone();
+        let mut parser = Parser::new(source);
+        let mut index = 0;
+
+        assert!(parser
+            .parse_compound_statement(&lines, &mut index)
+            .is_none());
+
+        assert_eq!(index, 0);
+        assert!(parser.diagnostics.is_empty(), "{:#?}", parser.diagnostics);
     }
 
     #[test]
