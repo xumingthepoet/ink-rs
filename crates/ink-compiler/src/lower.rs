@@ -1743,6 +1743,8 @@ fn lower_conditional_into(
 
     let rejoin_index = content.len() + conditional.branches().len();
     let rejoin_target = runtime_index_path(path_mode, rejoin_index);
+    let branch_rejoin_target =
+        compact_relative_path(&format!(".^.^.^.{rejoin_index}"), &rejoin_target);
     let has_initial_condition = conditional.initial_condition().is_some();
 
     for branch in conditional.branches() {
@@ -1797,7 +1799,7 @@ fn lower_conditional_into(
                 };
             content_container.extend(lowered_branch);
             content_container.push(RuntimeObject::Divert {
-                target: rejoin_target.clone(),
+                target: branch_rejoin_target.clone(),
                 variable: false,
             });
             if let Some(named_content) = trailing_named_content {
@@ -1825,7 +1827,7 @@ fn lower_conditional_into(
                 );
             }
             content_container.push(RuntimeObject::Divert {
-                target: rejoin_target.clone(),
+                target: branch_rejoin_target.clone(),
                 variable: false,
             });
             branch_content.push(RuntimeObject::NamedContent(vec![Container {

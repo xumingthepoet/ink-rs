@@ -112,3 +112,4 @@ fixture!(
 fixture!(conditional_ifelse_ext, "inkfiles/conditional/ifelse-ext.ink");
 fixture!(misc_issue15, "inkfiles/misc/issue15.ink");
 fixture!(conditional_condopt, "inkfiles/conditional/condopt.ink");
+fixture!(conditional_condtext, "inkfiles/conditional/condtext.ink");
