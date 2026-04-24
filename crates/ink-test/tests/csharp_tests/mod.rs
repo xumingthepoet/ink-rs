@@ -5600,7 +5600,6 @@ The second line.
     //             Assert.IsTrue (HadError ("'z' has been redefined"));
     //         }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestConstRedefinition() {
         let mut suite = CSharpTestSuite::new(TestMode::Normal);
         suite.compile_string_without_runtime(
@@ -5608,8 +5607,8 @@ The second line.
 CONST pi = 3.1415
 CONST pi = 3.1415
 
-CONST x = ""Hello""
-CONST x = ""World""
+CONST x = "Hello"
+CONST x = "World"
 
 CONST y = 3
 CONST y = 3.0
