@@ -748,7 +748,7 @@ fn variable_declaration_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Obj
     let span = parser.current_span();
     parser.match_string("VAR")?;
     parser.skip_horizontal_whitespace();
-    let name = parser.take_while(|ch| ch == '_' || ch.is_ascii_alphanumeric())?;
+    let name = parser.take_while(is_identifier_continue)?;
     if !is_identifier(&name) {
         return None;
     }
@@ -768,7 +768,7 @@ fn constant_declaration_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Obj
     let span = parser.current_span();
     parser.match_string("CONST")?;
     parser.skip_horizontal_whitespace();
-    let name = parser.take_while(|ch| ch == '_' || ch.is_ascii_alphanumeric())?;
+    let name = parser.take_while(is_identifier_continue)?;
     if !is_identifier(&name) {
         return None;
     }
@@ -787,7 +787,7 @@ fn external_declaration_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Obj
     parser.skip_horizontal_whitespace();
     parser.match_string("EXTERNAL")?;
     parser.skip_horizontal_whitespace();
-    let name = parser.take_while(|ch| ch == '_' || ch.is_ascii_alphanumeric())?;
+    let name = parser.take_while(is_identifier_continue)?;
     if !is_identifier(&name) {
         return None;
     }
@@ -799,7 +799,7 @@ fn external_declaration_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Obj
     if parser.match_string(")").is_none() {
         loop {
             parser.skip_horizontal_whitespace();
-            let argument = parser.take_while(|ch| ch == '_' || ch.is_ascii_alphanumeric())?;
+            let argument = parser.take_while(is_identifier_continue)?;
             if !is_identifier(&argument) {
                 return None;
             }
@@ -933,7 +933,7 @@ fn temp_declaration_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>
         return None;
     }
     parser.skip_horizontal_whitespace();
-    let name = parser.take_while(|ch| ch == '_' || ch.is_ascii_alphanumeric())?;
+    let name = parser.take_while(is_identifier_continue)?;
     if !is_identifier(&name) {
         return None;
     }
@@ -959,7 +959,7 @@ fn variable_assignment_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Obje
     let span = parser.current_span();
     parser.match_string("~")?;
     parser.skip_horizontal_whitespace();
-    let name = parser.take_while(|ch| ch == '_' || ch.is_ascii_alphanumeric())?;
+    let name = parser.take_while(is_identifier_continue)?;
     if !is_identifier(&name) {
         return None;
     }
@@ -1518,7 +1518,7 @@ fn parse_bracketed_identifier(parser: &mut RuleParser<'_>) -> Option<String> {
         parser.skip_horizontal_whitespace();
         parser.match_string("(")?;
         parser.skip_horizontal_whitespace();
-        let name = parser.take_while(|ch| ch == '_' || ch.is_ascii_alphanumeric())?;
+        let name = parser.take_while(is_identifier_continue)?;
         if !is_identifier(&name) {
             return None;
         }
@@ -1530,16 +1530,38 @@ fn parse_bracketed_identifier(parser: &mut RuleParser<'_>) -> Option<String> {
 
 pub(super) fn is_identifier(source: &str) -> bool {
     let mut chars = source.chars();
-    matches!(chars.next(), Some(ch) if ch == '_' || ch.is_ascii_alphabetic())
-        && chars.all(is_identifier_continue)
+    matches!(chars.next(), Some(ch) if is_identifier_start(ch)) && chars.all(is_identifier_continue)
 }
 
 fn is_path_identifier(source: &str) -> bool {
     source.split('.').all(is_identifier)
 }
 
-fn is_identifier_continue(ch: char) -> bool {
-    ch == '_' || ch.is_ascii_alphanumeric()
+pub(super) fn is_identifier_start(ch: char) -> bool {
+    ch == '_' || ch.is_ascii_alphabetic() || is_supported_unicode_identifier(ch)
+}
+
+pub(super) fn is_identifier_continue(ch: char) -> bool {
+    ch == '_' || ch.is_ascii_alphanumeric() || is_supported_unicode_identifier(ch)
+}
+
+fn is_supported_unicode_identifier(ch: char) -> bool {
+    matches!(
+        ch,
+        '\u{0080}'..='\u{00ff}'
+            | '\u{0100}'..='\u{017f}'
+            | '\u{0180}'..='\u{024f}'
+            | '\u{0370}'..='\u{03ff}'
+            | '\u{0400}'..='\u{04ff}'
+            | '\u{0531}'..='\u{0556}'
+            | '\u{0561}'..='\u{0587}'
+            | '\u{0590}'..='\u{05ff}'
+            | '\u{0600}'..='\u{06ff}'
+            | '\u{3041}'..='\u{3096}'
+            | '\u{30a0}'..='\u{30fc}'
+            | '\u{4e00}'..='\u{9fff}'
+            | '\u{ac00}'..='\u{d7af}'
+    ) && !matches!(ch, '\u{0374}' | '\u{0375}' | '\u{0378}'..='\u{0385}' | '\u{0387}' | '\u{038b}' | '\u{038d}' | '\u{03a2}' | '\u{0482}'..='\u{0489}')
 }
 
 fn divert_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {

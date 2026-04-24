@@ -1,6 +1,6 @@
 use crate::parsed::{FlowArgument, FlowLevel};
 
-use super::rule::RuleParser;
+use super::{is_identifier_continue, is_identifier_start, rule::RuleParser};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct FlowDecl {
@@ -194,9 +194,9 @@ fn parse_argument(parser: &mut RuleParser<'_>) -> Option<FlowArgument> {
 }
 
 fn parse_identifier(parser: &mut RuleParser<'_>) -> Option<String> {
-    let first = parser.take_while(|ch| ch == '_' || ch.is_ascii_alphabetic())?;
+    let first = parser.take_while(is_identifier_start)?;
     let rest = parser
-        .take_while(|ch| ch == '_' || ch.is_ascii_alphanumeric())
+        .take_while(is_identifier_continue)
         .unwrap_or_default();
     Some(format!("{first}{rest}"))
 }

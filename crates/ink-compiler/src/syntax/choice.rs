@@ -1,6 +1,6 @@
 use crate::parsed::{Choice, ContentList, Expression};
 
-use super::{rule::RuleParser, text};
+use super::{is_identifier, rule::RuleParser, text};
 
 pub(super) fn parse_choice(parser: &mut RuleParser<'_>) -> Option<Choice> {
     parser.skip_horizontal_whitespace();
@@ -136,12 +136,6 @@ fn parse_choice_conditions(choice_body: &str) -> Option<(Option<Expression>, Str
 
 fn parse_condition_expression(source: &str) -> Option<Expression> {
     super::parse_initial_expression(source)
-}
-
-fn is_identifier(source: &str) -> bool {
-    let mut chars = source.chars();
-    matches!(chars.next(), Some(ch) if ch == '_' || ch.is_ascii_alphabetic())
-        && chars.all(|ch| ch == '_' || ch.is_ascii_alphanumeric())
 }
 
 struct ChoiceSegments {
