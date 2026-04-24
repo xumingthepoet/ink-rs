@@ -105,3 +105,7 @@ fixture_count_all_visits!(
     runtime_read_visit_counts,
     "inkfiles/runtime/read-visit-counts.ink"
 );
+fixture!(
+    runtime_set_get_variables,
+    "inkfiles/runtime/set-get-variables.ink"
+);
