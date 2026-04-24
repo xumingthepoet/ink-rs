@@ -1,6 +1,6 @@
 # Ink Fixture Priority
 
-通过统计: 84/118
+通过统计: 85/118
 
 Sorted by the latest `WritingWithInk.md` syntax point used by each file.
 
