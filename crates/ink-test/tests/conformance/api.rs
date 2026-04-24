@@ -231,6 +231,12 @@ impl Story {
             .expect("expected choice index to be valid");
     }
 
+    pub fn try_choose_choice_index(&mut self, idx: usize) -> Result<(), StoryError> {
+        self.inner
+            .choose_choice_index(idx)
+            .map_err(StoryError::from)
+    }
+
     pub fn choose_path_string(
         &mut self,
         path: &str,
