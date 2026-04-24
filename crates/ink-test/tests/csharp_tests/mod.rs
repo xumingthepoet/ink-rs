@@ -8202,7 +8202,6 @@ hello
     // C#:     Assert.AreEqual(0, story.currentChoices.Count);
     // C#: }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestTempUsageInOptions() {
         run_in_both_modes(|suite| {
             let mut story = suite
