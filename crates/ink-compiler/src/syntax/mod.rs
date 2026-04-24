@@ -1733,11 +1733,10 @@ fn gather_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
     let remaining = parser.line_remainder().trim();
     if !remaining.is_empty() {
         let parsed = text::parse_inline_content(remaining, &span).unwrap_or_default();
-        let has_text = parsed.iter().any(|o| matches!(o, Object::Text(_)));
+        let add_trailing_newline = !remaining.starts_with('#') && !remaining.starts_with("->");
         objects.extend(parsed);
         parser.skip_to_end();
-        // Add trailing newline only when there's actual text content
-        if has_text {
+        if add_trailing_newline {
             objects.push(Object::Text(crate::parsed::Text::new("\n", span)));
         }
     } else {
