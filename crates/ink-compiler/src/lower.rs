@@ -906,13 +906,14 @@ fn lower_choice_in_section(
         choice_content =
             choice_container_prefix(path_mode, &choice_container_name, content.len() - 1, 2);
     }
-    choice_content.extend(lower_content_list_with_context(
+    lower_content_list_into_context(
+        &mut choice_content,
         choice.inner_content(),
         &choice_content_path_mode,
         choice_labels,
         global_labels,
         global_variables,
-    ));
+    );
     let nested_choice_content_path_mode = path_mode.for_choice_nested_content(
         &choice_container_name,
         &gather_container_name,
@@ -1054,13 +1055,14 @@ fn choice_outer(
 
     if let Some(choice_only_content) = choice.choice_only_content() {
         outer_content.push(RuntimeObject::ControlCommand(ControlCommand::BeginString));
-        outer_content.extend(lower_content_list_with_context(
+        lower_content_list_into_context(
+            &mut outer_content,
             choice_only_content,
             path_mode,
             choice_labels,
             global_labels,
             global_variables,
-        ));
+        );
         outer_content.push(RuntimeObject::ControlCommand(ControlCommand::EndString));
     }
 
@@ -1154,9 +1156,28 @@ fn lower_content_list_with_context(
     global_variables: &HashSet<String>,
 ) -> Vec<RuntimeObject> {
     let mut content = Vec::new();
+    lower_content_list_into_context(
+        &mut content,
+        content_list,
+        path_mode,
+        choice_labels,
+        global_labels,
+        global_variables,
+    );
+    content
+}
+
+fn lower_content_list_into_context(
+    content: &mut Vec<RuntimeObject>,
+    content_list: &ContentList,
+    path_mode: &ChoicePathMode,
+    choice_labels: &HashMap<String, String>,
+    global_labels: &HashMap<String, String>,
+    global_variables: &HashSet<String>,
+) {
     for object in content_list.objects() {
         lower_object_into_with_context(
-            &mut content,
+            content,
             object,
             path_mode,
             choice_labels,
@@ -1164,7 +1185,6 @@ fn lower_content_list_with_context(
             global_variables,
         );
     }
-    content
 }
 
 fn lower_expression_into(
@@ -1271,6 +1291,7 @@ fn lower_sequence(
     choice_labels: &HashMap<String, String>,
     global_labels: &HashMap<String, String>,
     global_variables: &HashSet<String>,
+    sequence_container_path: &str,
 ) -> Container {
     let mut content = vec![
         RuntimeObject::ControlCommand(ControlCommand::EvalStart),
@@ -1326,16 +1347,19 @@ fn lower_sequence(
         .map(|(index, element)| {
             let mut branch_content = vec![RuntimeObject::ControlCommand(ControlCommand::Pop)];
             if let Some(element) = element {
-                branch_content.extend(lower_content_list_with_context(
+                lower_content_list_into_context(
+                    &mut branch_content,
                     element,
                     &ChoicePathMode::Root,
                     choice_labels,
                     global_labels,
                     global_variables,
-                ));
+                );
             }
+            let relative_return_target = format!(".^.^.{post_sequence_index}");
+            let global_return_target = format!("{sequence_container_path}.{post_sequence_index}");
             branch_content.push(RuntimeObject::Divert {
-                target: format!(".^.^.{post_sequence_index}"),
+                target: compact_relative_path(&relative_return_target, &global_return_target),
                 variable: false,
             });
             Container {
@@ -1366,13 +1390,14 @@ fn lower_object_into(
     match object {
         Object::Text(text) => content.push(RuntimeObject::String(text.text().to_string())),
         Object::ContentList(content_list) => {
-            content.extend(lower_content_list_with_context(
+            lower_content_list_into_context(
+                content,
                 content_list,
                 &ChoicePathMode::Root,
                 choice_labels,
                 global_labels,
                 global_variables,
-            ));
+            );
         }
         Object::Expression(expression) => lower_output_expression_into(
             content,
@@ -1409,6 +1434,7 @@ fn lower_object_into(
             choice_labels,
             global_labels,
             global_variables,
+            &sequence_container_path_for(&ChoicePathMode::Root, content.len()),
         ))),
         Object::Weave(weave) => content.push(RuntimeObject::Container(Container {
             content: lower_choice_weave(
@@ -1435,13 +1461,14 @@ fn lower_object_into_with_context(
     match object {
         Object::Text(text) => content.push(RuntimeObject::String(text.text().to_string())),
         Object::ContentList(content_list) => {
-            content.extend(lower_content_list_with_context(
+            lower_content_list_into_context(
+                content,
                 content_list,
                 path_mode,
                 choice_labels,
                 global_labels,
                 global_variables,
-            ));
+            );
         }
         Object::Expression(expression) => lower_output_expression_into(
             content,
@@ -1478,6 +1505,7 @@ fn lower_object_into_with_context(
             choice_labels,
             global_labels,
             global_variables,
+            &sequence_container_path_for(path_mode, content.len()),
         ))),
         Object::Weave(weave) => {
             let nested_path_mode = path_mode.for_nested_weave(content.len());
@@ -1653,6 +1681,19 @@ fn compact_relative_path(relative: &str, global: &str) -> String {
         relative.to_string()
     } else {
         global.to_string()
+    }
+}
+
+fn sequence_container_path_for(path_mode: &ChoicePathMode, content_index: usize) -> String {
+    match path_mode {
+        ChoicePathMode::Root => format!("0.{content_index}"),
+        ChoicePathMode::RootGather { gather_name } => {
+            format!("0.{gather_name}.{content_index}")
+        }
+        ChoicePathMode::NestedRoot { container_path, .. }
+        | ChoicePathMode::Flow { container_path, .. } => {
+            format!("{container_path}.{content_index}")
+        }
     }
 }
 
