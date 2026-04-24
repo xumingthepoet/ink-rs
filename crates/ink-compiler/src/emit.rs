@@ -140,6 +140,7 @@ fn runtime_object_to_value(object: &RuntimeObject) -> Value {
         RuntimeObject::ReadCount(target) => json!({ "CNT?": target }),
         RuntimeObject::VariableAssignment(name) => json!({ "temp=": name }),
         RuntimeObject::GlobalVariableAssignment(name) => json!({ "VAR=": name }),
+        RuntimeObject::TempVariableReassignment(name) => json!({ "temp=": name, "re": true }),
         RuntimeObject::VariableReassignment(name) => json!({ "VAR=": name, "re": true }),
         RuntimeObject::VariableReference(name) => json!({ "VAR?": name }),
         RuntimeObject::ChoicePoint { target, flags } => json!({ "*": target, "flg": flags }),

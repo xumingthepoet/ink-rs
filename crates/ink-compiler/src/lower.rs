@@ -34,6 +34,7 @@ pub enum RuntimeObject {
     ReadCount(String),
     VariableAssignment(String),
     GlobalVariableAssignment(String),
+    TempVariableReassignment(String),
     VariableReassignment(String),
     VariableReference(String),
     ChoicePoint { target: String, flags: i32 },
@@ -87,6 +88,7 @@ enum ChoicePathMode {
         container_path: String,
         parent_flow_name: Option<String>,
         sibling_stitch_names: Vec<String>,
+        local_variables: HashSet<String>,
         self_target_relative: bool,
     },
 }
@@ -133,12 +135,14 @@ impl ChoicePathMode {
                 container_path,
                 parent_flow_name,
                 sibling_stitch_names,
+                local_variables,
                 ..
             } => ChoicePathMode::Flow {
                 flow_name: flow_name.clone(),
                 container_path: container_path.clone(),
                 parent_flow_name: parent_flow_name.clone(),
                 sibling_stitch_names: sibling_stitch_names.clone(),
+                local_variables: local_variables.clone(),
                 self_target_relative,
             },
         }
@@ -196,12 +200,14 @@ impl ChoicePathMode {
                 container_path,
                 parent_flow_name,
                 sibling_stitch_names,
+                local_variables,
                 self_target_relative,
             } => ChoicePathMode::Flow {
                 flow_name: flow_name.clone(),
                 container_path: format!("{container_path}.{container_index}"),
                 parent_flow_name: parent_flow_name.clone(),
                 sibling_stitch_names: sibling_stitch_names.clone(),
+                local_variables: local_variables.clone(),
                 self_target_relative: *self_target_relative,
             },
         }
@@ -224,12 +230,14 @@ impl ChoicePathMode {
                 container_path,
                 parent_flow_name,
                 sibling_stitch_names,
+                local_variables,
                 self_target_relative,
             } => ChoicePathMode::Flow {
                 flow_name: flow_name.clone(),
                 container_path: format!("{container_path}.{gather_name}"),
                 parent_flow_name: parent_flow_name.clone(),
                 sibling_stitch_names: sibling_stitch_names.clone(),
+                local_variables: local_variables.clone(),
                 self_target_relative: *self_target_relative,
             },
             other => other.clone(),
@@ -253,14 +261,15 @@ impl ChoicePathMode {
                 flow_name,
                 parent_flow_name,
                 sibling_stitch_names,
-                self_target_relative,
+                local_variables,
                 ..
             } => ChoicePathMode::Flow {
                 flow_name: flow_name.clone(),
                 container_path,
                 parent_flow_name: parent_flow_name.clone(),
                 sibling_stitch_names: sibling_stitch_names.clone(),
-                self_target_relative: *self_target_relative,
+                local_variables: local_variables.clone(),
+                self_target_relative: true,
             },
         }
     }
@@ -282,6 +291,7 @@ impl ChoicePathMode {
                 flow_name,
                 parent_flow_name,
                 sibling_stitch_names,
+                local_variables,
                 self_target_relative,
                 ..
             } => ChoicePathMode::Flow {
@@ -289,6 +299,7 @@ impl ChoicePathMode {
                 container_path,
                 parent_flow_name: parent_flow_name.clone(),
                 sibling_stitch_names: sibling_stitch_names.clone(),
+                local_variables: local_variables.clone(),
                 self_target_relative: *self_target_relative,
             },
         }
@@ -298,6 +309,15 @@ impl ChoicePathMode {
         match self {
             ChoicePathMode::NestedRoot { gather_target, .. } => Some(gather_target.clone()),
             _ => None,
+        }
+    }
+
+    fn is_local_variable(&self, name: &str) -> bool {
+        match self {
+            ChoicePathMode::Flow {
+                local_variables, ..
+            } => local_variables.contains(name),
+            _ => false,
         }
     }
 }
@@ -706,6 +726,7 @@ fn lower_flow_with_context(
     let flow_path = parent_knot_name
         .map(|parent| format!("{parent}.{}", flow.name()))
         .unwrap_or_else(|| flow.name().to_string());
+    let local_variables = collect_flow_local_variables(flow);
 
     lower_flow_arguments_into(&mut content, flow);
 
@@ -720,6 +741,7 @@ fn lower_flow_with_context(
             container_path: flow_container_path,
             parent_flow_name: parent_knot_name.map(|s| s.to_string()),
             sibling_stitch_names: sibling_stitch_names.to_vec(),
+            local_variables: local_variables.clone(),
             self_target_relative: false,
         };
         content.push(RuntimeObject::Container(Container {
@@ -740,14 +762,16 @@ fn lower_flow_with_context(
             container_path: flow_path.clone(),
             parent_flow_name: parent_knot_name.map(str::to_string),
             sibling_stitch_names: sibling_stitch_names.to_vec(),
+            local_variables,
             self_target_relative: false,
         };
-        content.extend(lower_linear_weave_with_context(
+        lower_linear_weave_into_context(
+            &mut content,
             flow.weave(),
             global_labels,
             global_variables,
             &path_mode,
-        ));
+        );
     }
 
     // Lower child flows (stitches)
@@ -821,6 +845,63 @@ fn lower_flow_arguments_into(content: &mut Vec<RuntimeObject>, flow: &Flow) {
     }
 }
 
+fn collect_flow_local_variables(flow: &Flow) -> HashSet<String> {
+    let mut local_variables = flow
+        .arguments()
+        .iter()
+        .map(|argument| argument.name().to_string())
+        .collect::<HashSet<_>>();
+    collect_local_variables_in_weave(flow.weave(), &mut local_variables);
+    local_variables
+}
+
+fn collect_local_variables_in_weave(weave: &Weave, local_variables: &mut HashSet<String>) {
+    for object in weave.content() {
+        collect_local_variables_in_object(object, local_variables);
+    }
+}
+
+fn collect_local_variables_in_content_list(
+    content_list: &ContentList,
+    local_variables: &mut HashSet<String>,
+) {
+    for object in content_list.objects() {
+        collect_local_variables_in_object(object, local_variables);
+    }
+}
+
+fn collect_local_variables_in_object(object: &Object, local_variables: &mut HashSet<String>) {
+    match object {
+        Object::VariableAssignment(assignment) if assignment.is_temporary() => {
+            local_variables.insert(assignment.name().to_string());
+        }
+        Object::ContentList(content_list) => {
+            collect_local_variables_in_content_list(content_list, local_variables);
+        }
+        Object::Conditional(conditional) => {
+            for branch in conditional.branches() {
+                collect_local_variables_in_weave(branch.content(), local_variables);
+            }
+        }
+        Object::Choice(choice) => {
+            if let Some(content) = choice.start_content() {
+                collect_local_variables_in_content_list(content, local_variables);
+            }
+            if let Some(content) = choice.choice_only_content() {
+                collect_local_variables_in_content_list(content, local_variables);
+            }
+            collect_local_variables_in_content_list(choice.inner_content(), local_variables);
+        }
+        Object::Sequence(sequence) => {
+            for element in sequence.elements() {
+                collect_local_variables_in_content_list(element, local_variables);
+            }
+        }
+        Object::Weave(weave) => collect_local_variables_in_weave(weave, local_variables),
+        _ => {}
+    }
+}
+
 fn weave_has_choice(weave: &Weave) -> bool {
     weave
         .content()
@@ -855,10 +936,27 @@ fn lower_linear_weave_with_context(
     path_mode: &ChoicePathMode,
 ) -> Vec<RuntimeObject> {
     let mut content = Vec::new();
+    lower_linear_weave_into_context(
+        &mut content,
+        weave,
+        global_labels,
+        global_variables,
+        path_mode,
+    );
+    content
+}
+
+fn lower_linear_weave_into_context(
+    content: &mut Vec<RuntimeObject>,
+    weave: &Weave,
+    global_labels: &HashMap<String, String>,
+    global_variables: &HashSet<String>,
+    path_mode: &ChoicePathMode,
+) {
     let choice_labels = HashMap::new();
     for object in weave.content() {
         lower_object_into_with_context(
-            &mut content,
+            content,
             object,
             path_mode,
             &choice_labels,
@@ -866,7 +964,6 @@ fn lower_linear_weave_with_context(
             global_variables,
         );
     }
-    content
 }
 
 fn lower_choice_weave(
@@ -1845,6 +1942,7 @@ fn lower_conditional_into(
     let has_initial_condition = conditional.initial_condition().is_some();
 
     for branch in conditional.branches() {
+        let branch_path_mode = path_mode.for_conditional_branch(content.len());
         let mut branch_content = Vec::new();
         if !has_initial_condition {
             if let Some(condition) = branch.own_condition() {
@@ -1873,7 +1971,6 @@ fn lower_conditional_into(
         }
 
         if weave_has_choice(branch.content()) {
-            let branch_path_mode = path_mode.for_conditional_branch(content.len());
             let initial_content = if branch.is_inline() {
                 Vec::new()
             } else {
@@ -1917,7 +2014,7 @@ fn lower_conditional_into(
                 lower_object_into_with_context(
                     &mut content_container,
                     object,
-                    path_mode,
+                    &branch_path_mode,
                     choice_labels,
                     global_labels,
                     global_variables,
@@ -2071,6 +2168,10 @@ fn lower_variable_assignment_into(
         content.push(RuntimeObject::VariableAssignment(
             assignment.name().to_string(),
         ));
+    } else if path_mode.is_local_variable(assignment.name()) {
+        content.push(RuntimeObject::TempVariableReassignment(
+            assignment.name().to_string(),
+        ));
     } else {
         content.push(RuntimeObject::VariableReassignment(
             assignment.name().to_string(),
@@ -2098,9 +2199,15 @@ fn lower_inc_dec_into(
     content.push(RuntimeObject::NativeFunction(
         if inc_dec.is_increment() { "+" } else { "-" }.to_string(),
     ));
-    content.push(RuntimeObject::VariableReassignment(
-        inc_dec.name().to_string(),
-    ));
+    if path_mode.is_local_variable(inc_dec.name()) {
+        content.push(RuntimeObject::TempVariableReassignment(
+            inc_dec.name().to_string(),
+        ));
+    } else {
+        content.push(RuntimeObject::VariableReassignment(
+            inc_dec.name().to_string(),
+        ));
+    }
     content.push(RuntimeObject::ControlCommand(ControlCommand::EvalEnd));
 }
 
