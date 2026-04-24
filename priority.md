@@ -88,7 +88,7 @@ Sorted by the latest `WritingWithInk.md` syntax point used by each file.
 - [x] `knot/param-vars.ink`
 - [x] `knot/param-recurse.ink`
 - [x] `function/func-basic.ink`
-- [ ] `function/func-none.ink`
+- [x] `function/func-none.ink`
 - [ ] `glue/left-right-glue-matching.ink`
 - [ ] `glue/testbugfix1.ink`
 - [ ] `glue/testbugfix2.ink`

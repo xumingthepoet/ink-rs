@@ -153,3 +153,4 @@ fixture!(knot_param_strings, "inkfiles/knot/param-strings.ink");
 fixture!(knot_param_vars, "inkfiles/knot/param-vars.ink");
 fixture!(knot_param_recurse, "inkfiles/knot/param-recurse.ink");
 fixture!(function_func_basic, "inkfiles/function/func-basic.ink");
+fixture!(function_func_none, "inkfiles/function/func-none.ink");
