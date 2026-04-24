@@ -2979,7 +2979,6 @@ CONST c = 5
     //             Assert.AreEqual("After choice\nThis is default.\n", story.ContinueMaximally());
     //         }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestDefaultChoices() {
         run_in_both_modes(|suite| {
             let mut story = suite

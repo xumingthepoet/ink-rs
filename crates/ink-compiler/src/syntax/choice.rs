@@ -67,6 +67,9 @@ pub(super) fn parse_choice(parser: &mut RuleParser<'_>) -> Option<Choice> {
         return Some(choice);
     }
 
+    let is_divert_only_choice = find_top_level_divert(&choice_body)
+        .is_some_and(|divert_index| choice_body[..divert_index].trim().is_empty());
+
     let segments = parse_choice_segments(&choice_body)
         .map_err(|message| {
             parser.error(message);
@@ -91,9 +94,10 @@ pub(super) fn parse_choice(parser: &mut RuleParser<'_>) -> Option<Choice> {
     choice.set_indentation_depth(indentation_depth);
 
     // Check if this is an invisible default (empty content)
-    let is_invisible_default = !choice.has_start_content()
-        && !choice.has_choice_only_content()
-        && choice.inner_content().objects().len() <= 1; // Only newline
+    let is_invisible_default = is_divert_only_choice
+        || (!choice.has_start_content()
+            && !choice.has_choice_only_content()
+            && choice.inner_content().objects().len() <= 1); // Only newline
     choice.set_is_invisible_default(is_invisible_default);
 
     Some(choice)
