@@ -85,3 +85,4 @@ fixture!(
 );
 fixture!(variable_varstringinc, "inkfiles/variable/varstringinc.ink");
 fixture!(tags_tags_dynamic_content, "inkfiles/tags/tagsDynamicContent.ink");
+fixture!(variable_varcalc, "inkfiles/variable/varcalc.ink");

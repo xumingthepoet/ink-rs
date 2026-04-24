@@ -19,6 +19,8 @@ pub enum Expression {
 pub enum BinaryOperator {
     And,
     Add,
+    Subtract,
+    Multiply,
 }
 
 impl Expression {
@@ -90,6 +92,8 @@ impl BinaryOperator {
         match self {
             BinaryOperator::And => "&&",
             BinaryOperator::Add => "+",
+            BinaryOperator::Subtract => "-",
+            BinaryOperator::Multiply => "*",
         }
     }
 
@@ -97,6 +101,8 @@ impl BinaryOperator {
         match self {
             BinaryOperator::And => "and",
             BinaryOperator::Add => "+",
+            BinaryOperator::Subtract => "-",
+            BinaryOperator::Multiply => "*",
         }
     }
 }

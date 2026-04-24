@@ -607,6 +607,7 @@ fn lower_choice_weave(
             | Object::Divert(_)
             | Object::Tag(_)
             | Object::Sequence(_)
+            | Object::IncDec(_)
             | Object::VariableAssignment(_)
             | Object::Weave(_) => {
                 last_section_had_choice = lower_weave_section(
@@ -781,6 +782,7 @@ fn lower_weave_section(
             | Object::Divert(_)
             | Object::Tag(_)
             | Object::Sequence(_)
+            | Object::IncDec(_)
             | Object::VariableAssignment(_)
             | Object::Weave(_) => {
                 lower_object_into_with_context(
@@ -1426,6 +1428,15 @@ fn lower_object_into(
                 global_labels,
             );
         }
+        Object::IncDec(inc_dec) => {
+            lower_inc_dec_into(
+                content,
+                inc_dec,
+                &ChoicePathMode::Root,
+                choice_labels,
+                global_labels,
+            );
+        }
         Object::Tag(tag) => content.push(RuntimeObject::Tag {
             is_start: tag.is_start(),
         }),
@@ -1497,6 +1508,9 @@ fn lower_object_into_with_context(
                 global_labels,
             );
         }
+        Object::IncDec(inc_dec) => {
+            lower_inc_dec_into(content, inc_dec, path_mode, choice_labels, global_labels);
+        }
         Object::Tag(tag) => content.push(RuntimeObject::Tag {
             is_start: tag.is_start(),
         }),
@@ -1555,6 +1569,32 @@ fn lower_variable_assignment_into(
             assignment.name().to_string(),
         ));
     }
+}
+
+fn lower_inc_dec_into(
+    content: &mut Vec<RuntimeObject>,
+    inc_dec: &crate::parsed::IncDec,
+    path_mode: &ChoicePathMode,
+    choice_labels: &HashMap<String, String>,
+    global_labels: &HashMap<String, String>,
+) {
+    content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
+    content.push(RuntimeObject::VariableReference(inc_dec.name().to_string()));
+    lower_expression_into(
+        content,
+        inc_dec.expression(),
+        choice_labels,
+        global_labels,
+        path_mode,
+        false,
+    );
+    content.push(RuntimeObject::NativeFunction(
+        if inc_dec.is_increment() { "+" } else { "-" }.to_string(),
+    ));
+    content.push(RuntimeObject::VariableReassignment(
+        inc_dec.name().to_string(),
+    ));
+    content.push(RuntimeObject::ControlCommand(ControlCommand::EvalEnd));
 }
 
 fn push_divert_with_context(

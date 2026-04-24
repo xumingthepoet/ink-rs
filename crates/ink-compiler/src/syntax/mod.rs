@@ -9,7 +9,7 @@ mod text;
 use crate::{
     compiler::StageOutput,
     diagnostic::Diagnostic,
-    parsed::{Expression, Flow, Object, Story, VariableAssignment, Weave},
+    parsed::{BinaryOperator, Expression, Flow, IncDec, Object, Story, VariableAssignment, Weave},
     source::{SourceFile, SourceInput, SourceLine},
 };
 
@@ -307,6 +307,22 @@ fn variable_assignment_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Obje
         return None;
     }
     parser.skip_horizontal_whitespace();
+    if parser.match_string("+=").is_some() {
+        parser.skip_horizontal_whitespace();
+        let expression = parse_initial_expression(parser.line_remainder().trim())?;
+        parser.skip_to_end();
+        return Some(vec![Object::IncDec(IncDec::new(
+            name, expression, true, span,
+        ))]);
+    }
+    if parser.match_string("-=").is_some() {
+        parser.skip_horizontal_whitespace();
+        let expression = parse_initial_expression(parser.line_remainder().trim())?;
+        parser.skip_to_end();
+        return Some(vec![Object::IncDec(IncDec::new(
+            name, expression, false, span,
+        ))]);
+    }
     parser.match_string("=")?;
     parser.skip_horizontal_whitespace();
     let expression = parse_initial_expression(parser.line_remainder().trim())?;
@@ -318,11 +334,28 @@ fn variable_assignment_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Obje
 }
 
 pub(super) fn parse_initial_expression(source: &str) -> Option<Expression> {
-    if let Some((left, right)) = split_top_level_operator(source, '+') {
+    parse_expression(source.trim())
+}
+
+fn parse_expression(source: &str) -> Option<Expression> {
+    let source = strip_enclosing_parentheses(source.trim());
+    if let Some((left, operator, right)) = split_top_level_operator(
+        source,
+        &[('+', BinaryOperator::Add), ('-', BinaryOperator::Subtract)],
+    ) {
         return Some(Expression::Binary {
-            operator: crate::parsed::BinaryOperator::Add,
-            left: Box::new(parse_initial_expression(left.trim())?),
-            right: Box::new(parse_initial_expression(right.trim())?),
+            operator,
+            left: Box::new(parse_expression(left)?),
+            right: Box::new(parse_expression(right)?),
+        });
+    }
+    if let Some((left, operator, right)) =
+        split_top_level_operator(source, &[('*', BinaryOperator::Multiply)])
+    {
+        return Some(Expression::Binary {
+            operator,
+            left: Box::new(parse_expression(left)?),
+            right: Box::new(parse_expression(right)?),
         });
     }
     if let Some(value) = parse_quoted_string_literal(source) {
@@ -345,10 +378,65 @@ pub(super) fn parse_initial_expression(source: &str) -> Option<Expression> {
     is_identifier(source).then(|| Expression::VariableReference(source.to_string()))
 }
 
-fn split_top_level_operator(source: &str, operator: char) -> Option<(&str, &str)> {
+fn split_top_level_operator<'a>(
+    source: &'a str,
+    operators: &[(char, BinaryOperator)],
+) -> Option<(&'a str, BinaryOperator, &'a str)> {
     let mut in_string = false;
     let mut escaped = false;
+    let mut paren_depth = 0;
 
+    for (index, ch) in source.char_indices().rev() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+
+        match ch {
+            '\\' if in_string => escaped = true,
+            '"' => in_string = !in_string,
+            ')' if !in_string => paren_depth += 1,
+            '(' if !in_string => paren_depth -= 1,
+            _ if !in_string && paren_depth == 0 => {
+                let Some((_, operator)) = operators
+                    .iter()
+                    .find(|(operator_char, _)| *operator_char == ch)
+                else {
+                    continue;
+                };
+                let left = &source[..index];
+                let right = &source[index + ch.len_utf8()..];
+                if !left.trim().is_empty() && !right.trim().is_empty() {
+                    return Some((left.trim(), *operator, right.trim()));
+                }
+            }
+            _ => {}
+        }
+    }
+
+    None
+}
+
+fn strip_enclosing_parentheses(source: &str) -> &str {
+    let mut current = source.trim();
+    loop {
+        let Some(inner) = current
+            .strip_prefix('(')
+            .and_then(|value| value.strip_suffix(')'))
+        else {
+            return current;
+        };
+        if !parentheses_wrap_entire_expression(current) {
+            return current;
+        }
+        current = inner.trim();
+    }
+}
+
+fn parentheses_wrap_entire_expression(source: &str) -> bool {
+    let mut in_string = false;
+    let mut escaped = false;
+    let mut depth = 0;
     for (index, ch) in source.char_indices() {
         if escaped {
             escaped = false;
@@ -358,18 +446,17 @@ fn split_top_level_operator(source: &str, operator: char) -> Option<(&str, &str)
         match ch {
             '\\' if in_string => escaped = true,
             '"' => in_string = !in_string,
-            _ if !in_string && ch == operator => {
-                let left = &source[..index];
-                let right = &source[index + ch.len_utf8()..];
-                if !left.trim().is_empty() && !right.trim().is_empty() {
-                    return Some((left, right));
+            '(' if !in_string => depth += 1,
+            ')' if !in_string => {
+                depth -= 1;
+                if depth == 0 && index + ch.len_utf8() != source.len() {
+                    return false;
                 }
             }
             _ => {}
         }
     }
-
-    None
+    depth == 0
 }
 
 fn parse_quoted_string_literal(source: &str) -> Option<String> {

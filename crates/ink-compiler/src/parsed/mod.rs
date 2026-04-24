@@ -5,6 +5,7 @@ mod expression;
 mod flow;
 mod gather;
 mod glue;
+mod inc_dec;
 mod sequence;
 mod story;
 mod tag;
@@ -19,6 +20,7 @@ pub use expression::{BinaryOperator, Expression};
 pub use flow::{Flow, FlowArgument, FlowLevel};
 pub use gather::Gather;
 pub use glue::Glue;
+pub use inc_dec::IncDec;
 pub use sequence::{Sequence, SequenceType};
 pub use story::Story;
 pub use tag::Tag;
@@ -32,6 +34,7 @@ pub enum Object {
     ContentList(ContentList),
     Expression(Expression),
     Glue(Glue),
+    IncDec(IncDec),
     Choice(Choice),
     Divert(Divert),
     Gather(Gather),
@@ -56,6 +59,7 @@ impl Object {
                 expression.write_parse_snapshot(out, indent);
             }
             Object::Glue(glue) => glue.write_parse_snapshot(out, indent),
+            Object::IncDec(inc_dec) => inc_dec.write_parse_snapshot(out, indent),
             Object::Choice(choice) => choice.write_parse_snapshot(out, indent),
             Object::Divert(divert) => divert.write_parse_snapshot(out, indent),
             Object::Gather(gather) => gather.write_parse_snapshot(out, indent),
