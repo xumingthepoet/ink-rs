@@ -701,6 +701,223 @@ fn flow_diagnostics(story: &Story) -> Vec<Diagnostic> {
     diagnostics
 }
 
+#[derive(Debug, Default)]
+struct VariableScopeIndex {
+    globals: HashSet<String>,
+    locals_by_flow_path: HashMap<String, HashSet<String>>,
+}
+
+fn build_variable_scope_index(story: &Story) -> VariableScopeIndex {
+    let mut index = VariableScopeIndex::default();
+    collect_story_scope_variables_in_weave(story.root_weave(), &mut index.globals, true);
+    for flow in story.flows() {
+        collect_story_scope_variables_in_flow(flow, &mut index.globals);
+        collect_flow_variable_scope(flow, None, &mut index);
+    }
+    index
+}
+
+fn collect_story_scope_variables_in_flow(flow: &Flow, globals: &mut HashSet<String>) {
+    collect_story_scope_variables_in_weave(flow.weave(), globals, false);
+    for child in flow.child_flows() {
+        collect_story_scope_variables_in_flow(child, globals);
+    }
+}
+
+fn collect_story_scope_variables_in_weave(
+    weave: &Weave,
+    globals: &mut HashSet<String>,
+    include_temps: bool,
+) {
+    for object in weave.content() {
+        collect_story_scope_variables_in_object(object, globals, include_temps);
+    }
+}
+
+fn collect_story_scope_variables_in_content_list(
+    content: &ContentList,
+    globals: &mut HashSet<String>,
+    include_temps: bool,
+) {
+    for object in content.objects() {
+        collect_story_scope_variables_in_object(object, globals, include_temps);
+    }
+}
+
+fn collect_story_scope_variables_in_object(
+    object: &Object,
+    globals: &mut HashSet<String>,
+    include_temps: bool,
+) {
+    match object {
+        Object::ConstantDeclaration(declaration) => {
+            globals.insert(declaration.name().to_string());
+        }
+        Object::VariableAssignment(assignment)
+            if assignment.is_global() || (include_temps && assignment.is_temporary()) =>
+        {
+            globals.insert(assignment.name().to_string());
+        }
+        Object::Choice(choice) => {
+            if let Some(content) = choice.start_content() {
+                collect_story_scope_variables_in_content_list(content, globals, include_temps);
+            }
+            if let Some(content) = choice.choice_only_content() {
+                collect_story_scope_variables_in_content_list(content, globals, include_temps);
+            }
+            collect_story_scope_variables_in_content_list(
+                choice.inner_content(),
+                globals,
+                include_temps,
+            );
+        }
+        Object::Conditional(conditional) => {
+            for branch in conditional.branches() {
+                collect_story_scope_variables_in_weave(branch.content(), globals, include_temps);
+            }
+        }
+        Object::ContentList(content) => {
+            collect_story_scope_variables_in_content_list(content, globals, include_temps)
+        }
+        Object::Sequence(sequence) => {
+            for element in sequence.elements() {
+                collect_story_scope_variables_in_content_list(element, globals, include_temps);
+            }
+        }
+        Object::Weave(weave) => {
+            collect_story_scope_variables_in_weave(weave, globals, include_temps)
+        }
+        Object::AuthorWarning(_)
+        | Object::Divert(_)
+        | Object::Expression(_)
+        | Object::ExternalDeclaration(_)
+        | Object::Gather(_)
+        | Object::Glue(_)
+        | Object::IncDec(_)
+        | Object::LogicLine(_)
+        | Object::Return(_)
+        | Object::Tag(_)
+        | Object::Text(_)
+        | Object::TunnelOnwards(_)
+        | Object::VariableAssignment(_) => {}
+    }
+}
+
+fn collect_flow_variable_scope(
+    flow: &Flow,
+    parent_path: Option<&str>,
+    index: &mut VariableScopeIndex,
+) {
+    let flow_path = parent_path
+        .map(|parent| format!("{parent}.{}", flow.name()))
+        .unwrap_or_else(|| flow.name().to_string());
+    let mut locals = flow
+        .arguments()
+        .iter()
+        .map(|argument| argument.name().to_string())
+        .collect::<HashSet<_>>();
+    collect_temporary_variables_in_weave(flow.weave(), &mut locals);
+    index.locals_by_flow_path.insert(flow_path.clone(), locals);
+
+    for child in flow.child_flows() {
+        collect_flow_variable_scope(child, Some(&flow_path), index);
+    }
+}
+
+fn collect_temporary_variables_in_weave(weave: &Weave, locals: &mut HashSet<String>) {
+    for object in weave.content() {
+        collect_temporary_variables_in_object(object, locals);
+    }
+}
+
+fn collect_temporary_variables_in_content_list(
+    content: &ContentList,
+    locals: &mut HashSet<String>,
+) {
+    for object in content.objects() {
+        collect_temporary_variables_in_object(object, locals);
+    }
+}
+
+fn collect_temporary_variables_in_object(object: &Object, locals: &mut HashSet<String>) {
+    match object {
+        Object::VariableAssignment(assignment) if assignment.is_temporary() => {
+            locals.insert(assignment.name().to_string());
+        }
+        Object::Choice(choice) => {
+            if let Some(content) = choice.start_content() {
+                collect_temporary_variables_in_content_list(content, locals);
+            }
+            if let Some(content) = choice.choice_only_content() {
+                collect_temporary_variables_in_content_list(content, locals);
+            }
+            collect_temporary_variables_in_content_list(choice.inner_content(), locals);
+        }
+        Object::Conditional(conditional) => {
+            for branch in conditional.branches() {
+                collect_temporary_variables_in_weave(branch.content(), locals);
+            }
+        }
+        Object::ContentList(content) => {
+            collect_temporary_variables_in_content_list(content, locals)
+        }
+        Object::Sequence(sequence) => {
+            for element in sequence.elements() {
+                collect_temporary_variables_in_content_list(element, locals);
+            }
+        }
+        Object::Weave(weave) => collect_temporary_variables_in_weave(weave, locals),
+        Object::AuthorWarning(_)
+        | Object::ConstantDeclaration(_)
+        | Object::Divert(_)
+        | Object::Expression(_)
+        | Object::ExternalDeclaration(_)
+        | Object::Gather(_)
+        | Object::Glue(_)
+        | Object::IncDec(_)
+        | Object::LogicLine(_)
+        | Object::Return(_)
+        | Object::Tag(_)
+        | Object::Text(_)
+        | Object::TunnelOnwards(_)
+        | Object::VariableAssignment(_) => {}
+    }
+}
+
+fn check_variable_reference(
+    name: &str,
+    span: &SourceSpan,
+    target_symbols: &HashMap<String, FlowSymbol>,
+    variable_scopes: &VariableScopeIndex,
+    diagnostics: &mut Vec<Diagnostic>,
+    current_flow_path: Option<&str>,
+) {
+    if name.contains('.')
+        || resolve_target_symbol(name, current_flow_path, target_symbols).is_some()
+    {
+        return;
+    }
+
+    if let Some(flow_path) = current_flow_path {
+        if variable_scopes
+            .locals_by_flow_path
+            .get(flow_path)
+            .is_some_and(|locals| locals.contains(name))
+        {
+            return;
+        }
+    }
+
+    if variable_scopes.globals.contains(name) {
+        return;
+    }
+
+    diagnostics.push(Diagnostic::error(
+        span.clone(),
+        format!("Unresolved variable: {name}"),
+    ));
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct FlowSymbol {
     is_function: bool,
@@ -709,12 +926,14 @@ struct FlowSymbol {
 fn call_target_diagnostics(story: &Story) -> Vec<Diagnostic> {
     let target_symbols = build_target_symbol_index(story);
     let variable_targets = build_variable_target_index(story);
+    let variable_scopes = build_variable_scope_index(story);
     let mut diagnostics = Vec::new();
 
     check_call_targets_in_weave(
         story.root_weave(),
         &target_symbols,
         &variable_targets,
+        &variable_scopes,
         &mut diagnostics,
         None,
         None,
@@ -726,6 +945,7 @@ fn call_target_diagnostics(story: &Story) -> Vec<Diagnostic> {
             None,
             &target_symbols,
             &variable_targets,
+            &variable_scopes,
             &mut diagnostics,
         );
     }
@@ -994,6 +1214,7 @@ fn check_call_targets_in_flow(
     parent_path: Option<&str>,
     target_symbols: &HashMap<String, FlowSymbol>,
     variable_targets: &HashSet<String>,
+    variable_scopes: &VariableScopeIndex,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     let flow_path = parent_path
@@ -1003,6 +1224,7 @@ fn check_call_targets_in_flow(
         flow.weave(),
         target_symbols,
         variable_targets,
+        variable_scopes,
         diagnostics,
         Some(&flow_path),
         Some(flow),
@@ -1014,6 +1236,7 @@ fn check_call_targets_in_flow(
             Some(&flow_path),
             target_symbols,
             variable_targets,
+            variable_scopes,
             diagnostics,
         );
     }
@@ -1023,6 +1246,7 @@ fn check_call_targets_in_weave(
     weave: &Weave,
     target_symbols: &HashMap<String, FlowSymbol>,
     variable_targets: &HashSet<String>,
+    variable_scopes: &VariableScopeIndex,
     diagnostics: &mut Vec<Diagnostic>,
     current_flow_path: Option<&str>,
     current_flow: Option<&Flow>,
@@ -1033,6 +1257,7 @@ fn check_call_targets_in_weave(
             object,
             target_symbols,
             variable_targets,
+            variable_scopes,
             diagnostics,
             current_flow_path,
             current_flow,
@@ -1045,6 +1270,7 @@ fn check_call_targets_in_content_list(
     content: &ContentList,
     target_symbols: &HashMap<String, FlowSymbol>,
     variable_targets: &HashSet<String>,
+    variable_scopes: &VariableScopeIndex,
     diagnostics: &mut Vec<Diagnostic>,
     current_flow_path: Option<&str>,
     current_flow: Option<&Flow>,
@@ -1055,6 +1281,7 @@ fn check_call_targets_in_content_list(
             object,
             target_symbols,
             variable_targets,
+            variable_scopes,
             diagnostics,
             current_flow_path,
             current_flow,
@@ -1067,6 +1294,7 @@ fn check_call_targets_in_object(
     object: &Object,
     target_symbols: &HashMap<String, FlowSymbol>,
     variable_targets: &HashSet<String>,
+    variable_scopes: &VariableScopeIndex,
     diagnostics: &mut Vec<Diagnostic>,
     current_flow_path: Option<&str>,
     current_flow: Option<&Flow>,
@@ -1098,6 +1326,7 @@ fn check_call_targets_in_object(
                     divert.span(),
                     target_symbols,
                     variable_targets,
+                    variable_scopes,
                     diagnostics,
                     current_flow_path,
                     current_flow,
@@ -1105,12 +1334,24 @@ fn check_call_targets_in_object(
                 );
             }
         }
+        Object::ConstantDeclaration(declaration) => check_call_targets_in_expression(
+            declaration.expression(),
+            declaration.span(),
+            target_symbols,
+            variable_targets,
+            variable_scopes,
+            diagnostics,
+            current_flow_path,
+            current_flow,
+            inside_function,
+        ),
         Object::Expression(expression) | Object::LogicLine(expression) => {
             check_call_targets_in_expression(
                 expression,
                 &object_span(object),
                 target_symbols,
                 variable_targets,
+                variable_scopes,
                 diagnostics,
                 current_flow_path,
                 current_flow,
@@ -1122,6 +1363,7 @@ fn check_call_targets_in_object(
             assignment.span(),
             target_symbols,
             variable_targets,
+            variable_scopes,
             diagnostics,
             current_flow_path,
             current_flow,
@@ -1132,6 +1374,7 @@ fn check_call_targets_in_object(
             inc_dec.span(),
             target_symbols,
             variable_targets,
+            variable_scopes,
             diagnostics,
             current_flow_path,
             current_flow,
@@ -1144,6 +1387,7 @@ fn check_call_targets_in_object(
                     ret.span(),
                     target_symbols,
                     variable_targets,
+                    variable_scopes,
                     diagnostics,
                     current_flow_path,
                     current_flow,
@@ -1155,6 +1399,7 @@ fn check_call_targets_in_object(
             content,
             target_symbols,
             variable_targets,
+            variable_scopes,
             diagnostics,
             current_flow_path,
             current_flow,
@@ -1167,6 +1412,7 @@ fn check_call_targets_in_object(
                     &object_span(object),
                     target_symbols,
                     variable_targets,
+                    variable_scopes,
                     diagnostics,
                     current_flow_path,
                     current_flow,
@@ -1180,6 +1426,7 @@ fn check_call_targets_in_object(
                         &object_span(object),
                         target_symbols,
                         variable_targets,
+                        variable_scopes,
                         diagnostics,
                         current_flow_path,
                         current_flow,
@@ -1190,6 +1437,7 @@ fn check_call_targets_in_object(
                     branch.content(),
                     target_symbols,
                     variable_targets,
+                    variable_scopes,
                     diagnostics,
                     current_flow_path,
                     current_flow,
@@ -1204,6 +1452,7 @@ fn check_call_targets_in_object(
                     choice.span(),
                     target_symbols,
                     variable_targets,
+                    variable_scopes,
                     diagnostics,
                     current_flow_path,
                     current_flow,
@@ -1215,6 +1464,7 @@ fn check_call_targets_in_object(
                     content,
                     target_symbols,
                     variable_targets,
+                    variable_scopes,
                     diagnostics,
                     current_flow_path,
                     current_flow,
@@ -1226,6 +1476,7 @@ fn check_call_targets_in_object(
                     content,
                     target_symbols,
                     variable_targets,
+                    variable_scopes,
                     diagnostics,
                     current_flow_path,
                     current_flow,
@@ -1236,6 +1487,7 @@ fn check_call_targets_in_object(
                 choice.inner_content(),
                 target_symbols,
                 variable_targets,
+                variable_scopes,
                 diagnostics,
                 current_flow_path,
                 current_flow,
@@ -1248,6 +1500,22 @@ fn check_call_targets_in_object(
                     element,
                     target_symbols,
                     variable_targets,
+                    variable_scopes,
+                    diagnostics,
+                    current_flow_path,
+                    current_flow,
+                    inside_function,
+                );
+            }
+        }
+        Object::TunnelOnwards(tunnel_onwards) => {
+            for argument in tunnel_onwards.arguments() {
+                check_call_targets_in_expression(
+                    argument,
+                    tunnel_onwards.span(),
+                    target_symbols,
+                    variable_targets,
+                    variable_scopes,
                     diagnostics,
                     current_flow_path,
                     current_flow,
@@ -1259,19 +1527,18 @@ fn check_call_targets_in_object(
             weave,
             target_symbols,
             variable_targets,
+            variable_scopes,
             diagnostics,
             current_flow_path,
             current_flow,
             inside_function,
         ),
         Object::AuthorWarning(_)
-        | Object::ConstantDeclaration(_)
         | Object::ExternalDeclaration(_)
         | Object::Gather(_)
         | Object::Glue(_)
         | Object::Tag(_)
-        | Object::Text(_)
-        | Object::TunnelOnwards(_) => {}
+        | Object::Text(_) => {}
     }
 }
 
@@ -1351,6 +1618,7 @@ fn check_call_targets_in_expression(
     span: &SourceSpan,
     target_symbols: &HashMap<String, FlowSymbol>,
     variable_targets: &HashSet<String>,
+    variable_scopes: &VariableScopeIndex,
     diagnostics: &mut Vec<Diagnostic>,
     current_flow_path: Option<&str>,
     current_flow: Option<&Flow>,
@@ -1374,6 +1642,7 @@ fn check_call_targets_in_expression(
                     span,
                     target_symbols,
                     variable_targets,
+                    variable_scopes,
                     diagnostics,
                     current_flow_path,
                     current_flow,
@@ -1385,6 +1654,7 @@ fn check_call_targets_in_expression(
             content,
             target_symbols,
             variable_targets,
+            variable_scopes,
             diagnostics,
             current_flow_path,
             current_flow,
@@ -1396,6 +1666,7 @@ fn check_call_targets_in_expression(
                 span,
                 target_symbols,
                 variable_targets,
+                variable_scopes,
                 diagnostics,
                 current_flow_path,
                 current_flow,
@@ -1406,6 +1677,7 @@ fn check_call_targets_in_expression(
                 span,
                 target_symbols,
                 variable_targets,
+                variable_scopes,
                 diagnostics,
                 current_flow_path,
                 current_flow,
@@ -1418,6 +1690,7 @@ fn check_call_targets_in_expression(
                 span,
                 target_symbols,
                 variable_targets,
+                variable_scopes,
                 diagnostics,
                 current_flow_path,
                 current_flow,
@@ -1431,6 +1704,7 @@ fn check_call_targets_in_expression(
                     span,
                     target_symbols,
                     variable_targets,
+                    variable_scopes,
                     diagnostics,
                     current_flow_path,
                     current_flow,
@@ -1442,8 +1716,15 @@ fn check_call_targets_in_expression(
         | Expression::NumberInt(_)
         | Expression::NumberFloat(_)
         | Expression::NumberBool(_)
-        | Expression::DivertTarget(_)
-        | Expression::VariableReference(_) => {}
+        | Expression::DivertTarget(_) => {}
+        Expression::VariableReference(name) => check_variable_reference(
+            name,
+            span,
+            target_symbols,
+            variable_scopes,
+            diagnostics,
+            current_flow_path,
+        ),
     }
 }
 
