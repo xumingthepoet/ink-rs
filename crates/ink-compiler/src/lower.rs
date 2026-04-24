@@ -921,7 +921,7 @@ fn collect_flow_labels(
     if parent_flow_name.is_none() {
         labels.insert(flow.name().to_string(), flow_path.clone());
     }
-    let weave_container_path = if weave_has_choice(flow.weave()) {
+    let weave_container_path = if weave_has_weave_points(flow.weave()) {
         format!("{}.{}", flow_path, flow.arguments().len())
     } else {
         format!("{flow_path}.0")
@@ -1067,7 +1067,7 @@ fn lower_root_weave(
     external_signatures: &ExternalSignatures,
     count_all_visits: bool,
 ) -> Vec<RuntimeObject> {
-    if weave_has_choice(weave) {
+    if weave_has_weave_points(weave) {
         lower_choice_weave(
             weave,
             ChoicePathMode::Root,
@@ -1132,7 +1132,7 @@ fn lower_flow_with_context(
     lower_flow_arguments_into(&mut content, flow);
 
     // Lower any content in the flow's own weave
-    if weave_has_choice(flow.weave()) {
+    if weave_has_weave_points(flow.weave()) {
         // For stitches inside a knot, pass the parent knot name and sibling stitch names
         let flow_container_path = parent_knot_name
             .map(|parent| format!("{parent}.{}.{}", flow.name(), content.len()))
@@ -1332,6 +1332,13 @@ fn weave_has_choice(weave: &Weave) -> bool {
         .content()
         .iter()
         .any(|object| matches!(object, Object::Choice(_)))
+}
+
+fn weave_has_weave_points(weave: &Weave) -> bool {
+    weave
+        .content()
+        .iter()
+        .any(|object| matches!(object, Object::Choice(_) | Object::Gather(_)))
 }
 
 fn content_list_has_choice(content_list: &ContentList) -> bool {
