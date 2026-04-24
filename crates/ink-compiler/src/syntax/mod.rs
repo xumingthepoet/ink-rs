@@ -1161,6 +1161,32 @@ fn variable_assignment_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Obje
         return None;
     }
     parser.skip_horizontal_whitespace();
+    if parser.match_string("++").is_some() {
+        parser.skip_horizontal_whitespace();
+        if !parser.line_remainder().is_empty() {
+            return None;
+        }
+        parser.skip_to_end();
+        return Some(vec![Object::IncDec(IncDec::new(
+            name,
+            Expression::NumberInt(1),
+            true,
+            span,
+        ))]);
+    }
+    if parser.match_string("--").is_some() {
+        parser.skip_horizontal_whitespace();
+        if !parser.line_remainder().is_empty() {
+            return None;
+        }
+        parser.skip_to_end();
+        return Some(vec![Object::IncDec(IncDec::new(
+            name,
+            Expression::NumberInt(1),
+            false,
+            span,
+        ))]);
+    }
     if parser.match_string("+=").is_some() {
         parser.skip_horizontal_whitespace();
         let expression = parse_initial_expression(parser.line_remainder().trim())?;
@@ -1997,6 +2023,25 @@ mod tests {
         assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
         let story = output.artifact.unwrap();
         assert_eq!(story.flows()[0].name(), "2tests");
+    }
+
+    #[test]
+    fn parses_postfix_increment_logic_line() {
+        let output = parse(SourceInput::new("~ x++\n~ x--"));
+        assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
+        let story = output.artifact.unwrap();
+
+        let Object::IncDec(increment) = &story.root_weave().content()[0] else {
+            panic!("expected increment");
+        };
+        assert_eq!(increment.name(), "x");
+        assert!(increment.is_increment());
+
+        let Object::IncDec(decrement) = &story.root_weave().content()[1] else {
+            panic!("expected decrement");
+        };
+        assert_eq!(decrement.name(), "x");
+        assert!(!decrement.is_increment());
     }
 
     #[test]
