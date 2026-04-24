@@ -88,9 +88,27 @@ pub(super) fn parse_stitch_declaration(parser: &mut RuleParser<'_>) -> Option<Fl
 
     parser.skip_horizontal_whitespace();
 
-    let name = parser.expect("stitch name", parse_identifier, |parser| {
+    let first_identifier = parser.expect("stitch name", parse_identifier, |parser| {
         parser.skip_to_end()
     })?;
+
+    let (name, is_function) = if first_identifier == "function" {
+        parser.expect(
+            "whitespace after 'function'",
+            parse_horizontal_whitespace,
+            |_| {},
+        )?;
+        let name = parser.expect("function name", parse_identifier, |parser| {
+            parser.skip_to_end();
+        })?;
+        (name, true)
+    } else {
+        (first_identifier, false)
+    };
+
+    parser.skip_horizontal_whitespace();
+
+    let arguments = parse_arguments(parser).unwrap_or_default();
 
     parser.skip_horizontal_whitespace();
 
@@ -105,8 +123,8 @@ pub(super) fn parse_stitch_declaration(parser: &mut RuleParser<'_>) -> Option<Fl
     Some(FlowDecl {
         level: FlowLevel::Stitch,
         name,
-        arguments: Vec::new(),
-        is_function: false,
+        arguments,
+        is_function,
     })
 }
 

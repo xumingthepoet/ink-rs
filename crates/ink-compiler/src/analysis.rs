@@ -3,7 +3,9 @@ use std::collections::{HashMap, HashSet};
 use crate::{
     compiler::StageOutput,
     diagnostic::Diagnostic,
-    parsed::{ContentList, DivertTarget, Expression, Flow, Object, Return, Story, Weave},
+    parsed::{
+        ContentList, DivertTarget, Expression, Flow, FlowLevel, Object, Return, Story, Weave,
+    },
     source::SourceSpan,
 };
 
@@ -192,7 +194,7 @@ fn call_target_diagnostics(story: &Story) -> Vec<Diagnostic> {
     let flow_symbols = build_flow_symbol_index(story);
     let mut diagnostics = Vec::new();
 
-    check_call_targets_in_weave(story.root_weave(), &flow_symbols, &mut diagnostics);
+    check_call_targets_in_weave(story.root_weave(), &flow_symbols, &mut diagnostics, false);
     for flow in story.flows() {
         check_call_targets_in_flow(flow, &flow_symbols, &mut diagnostics);
     }
@@ -235,7 +237,7 @@ fn check_call_targets_in_flow(
     flow_symbols: &HashMap<String, FlowSymbol>,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    check_call_targets_in_weave(flow.weave(), flow_symbols, diagnostics);
+    check_call_targets_in_weave(flow.weave(), flow_symbols, diagnostics, flow.is_function());
     for child in flow.child_flows() {
         check_call_targets_in_flow(child, flow_symbols, diagnostics);
     }
@@ -245,9 +247,10 @@ fn check_call_targets_in_weave(
     weave: &Weave,
     flow_symbols: &HashMap<String, FlowSymbol>,
     diagnostics: &mut Vec<Diagnostic>,
+    inside_function: bool,
 ) {
     for object in weave.content() {
-        check_call_targets_in_object(object, flow_symbols, diagnostics);
+        check_call_targets_in_object(object, flow_symbols, diagnostics, inside_function);
     }
 }
 
@@ -255,9 +258,10 @@ fn check_call_targets_in_content_list(
     content: &ContentList,
     flow_symbols: &HashMap<String, FlowSymbol>,
     diagnostics: &mut Vec<Diagnostic>,
+    inside_function: bool,
 ) {
     for object in content.objects() {
-        check_call_targets_in_object(object, flow_symbols, diagnostics);
+        check_call_targets_in_object(object, flow_symbols, diagnostics, inside_function);
     }
 }
 
@@ -265,11 +269,14 @@ fn check_call_targets_in_object(
     object: &Object,
     flow_symbols: &HashMap<String, FlowSymbol>,
     diagnostics: &mut Vec<Diagnostic>,
+    inside_function: bool,
 ) {
     match object {
         Object::Divert(divert) => {
-            if let DivertTarget::Path(target) = divert.target() {
-                check_plain_divert_target(target, divert.span(), flow_symbols, diagnostics);
+            if !inside_function {
+                if let DivertTarget::Path(target) = divert.target() {
+                    check_plain_divert_target(target, divert.span(), flow_symbols, diagnostics);
+                }
             }
             for argument in divert.arguments() {
                 check_call_targets_in_expression(
@@ -277,6 +284,7 @@ fn check_call_targets_in_object(
                     divert.span(),
                     flow_symbols,
                     diagnostics,
+                    inside_function,
                 );
             }
         }
@@ -286,6 +294,7 @@ fn check_call_targets_in_object(
                 &object_span(object),
                 flow_symbols,
                 diagnostics,
+                inside_function,
             );
         }
         Object::VariableAssignment(assignment) => check_call_targets_in_expression(
@@ -293,20 +302,28 @@ fn check_call_targets_in_object(
             assignment.span(),
             flow_symbols,
             diagnostics,
+            inside_function,
         ),
         Object::IncDec(inc_dec) => check_call_targets_in_expression(
             inc_dec.expression(),
             inc_dec.span(),
             flow_symbols,
             diagnostics,
+            inside_function,
         ),
         Object::Return(ret) => {
             if let Some(expression) = ret.returned_expression() {
-                check_call_targets_in_expression(expression, ret.span(), flow_symbols, diagnostics);
+                check_call_targets_in_expression(
+                    expression,
+                    ret.span(),
+                    flow_symbols,
+                    diagnostics,
+                    inside_function,
+                );
             }
         }
         Object::ContentList(content) => {
-            check_call_targets_in_content_list(content, flow_symbols, diagnostics)
+            check_call_targets_in_content_list(content, flow_symbols, diagnostics, inside_function)
         }
         Object::Conditional(conditional) => {
             if let Some(condition) = conditional.initial_condition() {
@@ -315,6 +332,7 @@ fn check_call_targets_in_object(
                     &object_span(object),
                     flow_symbols,
                     diagnostics,
+                    inside_function,
                 );
             }
             for branch in conditional.branches() {
@@ -324,9 +342,15 @@ fn check_call_targets_in_object(
                         &object_span(object),
                         flow_symbols,
                         diagnostics,
+                        inside_function,
                     );
                 }
-                check_call_targets_in_weave(branch.content(), flow_symbols, diagnostics);
+                check_call_targets_in_weave(
+                    branch.content(),
+                    flow_symbols,
+                    diagnostics,
+                    inside_function,
+                );
             }
         }
         Object::Choice(choice) => {
@@ -336,22 +360,45 @@ fn check_call_targets_in_object(
                     choice.span(),
                     flow_symbols,
                     diagnostics,
+                    inside_function,
                 );
             }
             if let Some(content) = choice.start_content() {
-                check_call_targets_in_content_list(content, flow_symbols, diagnostics);
+                check_call_targets_in_content_list(
+                    content,
+                    flow_symbols,
+                    diagnostics,
+                    inside_function,
+                );
             }
             if let Some(content) = choice.choice_only_content() {
-                check_call_targets_in_content_list(content, flow_symbols, diagnostics);
+                check_call_targets_in_content_list(
+                    content,
+                    flow_symbols,
+                    diagnostics,
+                    inside_function,
+                );
             }
-            check_call_targets_in_content_list(choice.inner_content(), flow_symbols, diagnostics);
+            check_call_targets_in_content_list(
+                choice.inner_content(),
+                flow_symbols,
+                diagnostics,
+                inside_function,
+            );
         }
         Object::Sequence(sequence) => {
             for element in sequence.elements() {
-                check_call_targets_in_content_list(element, flow_symbols, diagnostics);
+                check_call_targets_in_content_list(
+                    element,
+                    flow_symbols,
+                    diagnostics,
+                    inside_function,
+                );
             }
         }
-        Object::Weave(weave) => check_call_targets_in_weave(weave, flow_symbols, diagnostics),
+        Object::Weave(weave) => {
+            check_call_targets_in_weave(weave, flow_symbols, diagnostics, inside_function)
+        }
         Object::ConstantDeclaration(_)
         | Object::ExternalDeclaration(_)
         | Object::Gather(_)
@@ -385,6 +432,7 @@ fn check_call_targets_in_expression(
     span: &SourceSpan,
     flow_symbols: &HashMap<String, FlowSymbol>,
     diagnostics: &mut Vec<Diagnostic>,
+    inside_function: bool,
 ) {
     match expression {
         Expression::FunctionCall { name, args } => {
@@ -399,22 +447,52 @@ fn check_call_targets_in_expression(
                 }
             }
             for arg in args {
-                check_call_targets_in_expression(arg, span, flow_symbols, diagnostics);
+                check_call_targets_in_expression(
+                    arg,
+                    span,
+                    flow_symbols,
+                    diagnostics,
+                    inside_function,
+                );
             }
         }
         Expression::StringContent(content) => {
-            check_call_targets_in_content_list(content, flow_symbols, diagnostics)
+            check_call_targets_in_content_list(content, flow_symbols, diagnostics, inside_function)
         }
         Expression::Binary { left, right, .. } => {
-            check_call_targets_in_expression(left, span, flow_symbols, diagnostics);
-            check_call_targets_in_expression(right, span, flow_symbols, diagnostics);
+            check_call_targets_in_expression(
+                left,
+                span,
+                flow_symbols,
+                diagnostics,
+                inside_function,
+            );
+            check_call_targets_in_expression(
+                right,
+                span,
+                flow_symbols,
+                diagnostics,
+                inside_function,
+            );
         }
         Expression::Unary { expression, .. } => {
-            check_call_targets_in_expression(expression, span, flow_symbols, diagnostics);
+            check_call_targets_in_expression(
+                expression,
+                span,
+                flow_symbols,
+                diagnostics,
+                inside_function,
+            );
         }
         Expression::MultipleCondition(expressions) => {
             for expression in expressions {
-                check_call_targets_in_expression(expression, span, flow_symbols, diagnostics);
+                check_call_targets_in_expression(
+                    expression,
+                    span,
+                    flow_symbols,
+                    diagnostics,
+                    inside_function,
+                );
             }
         }
         Expression::String(_)
@@ -427,7 +505,7 @@ fn check_call_targets_in_expression(
 }
 
 fn check_flow(flow: &Flow, diagnostics: &mut Vec<Diagnostic>) {
-    let found_return = find_return_in_weave(flow.weave());
+    let found_return = find_return_in_flow(flow);
 
     if flow.is_function() {
         check_function_flow_control(flow, diagnostics);
@@ -452,6 +530,13 @@ fn check_flow(flow: &Flow, diagnostics: &mut Vec<Diagnostic>) {
 }
 
 fn check_function_flow_control(flow: &Flow, diagnostics: &mut Vec<Diagnostic>) {
+    if flow.level() != FlowLevel::Knot {
+        diagnostics.push(Diagnostic::error(
+            first_span_in_weave(flow.weave()),
+            "Functions cannot be stitches - i.e. they should be defined as '== function myFunc ==' rather than public to another knot.",
+        ));
+    }
+
     for child in flow.child_flows() {
         diagnostics.push(Diagnostic::error(
             first_span_in_weave(child.weave()),
@@ -520,6 +605,11 @@ fn check_function_flow_control_in_object(object: &Object, diagnostics: &mut Vec<
         | Object::TunnelOnwards(_)
         | Object::VariableAssignment(_) => {}
     }
+}
+
+fn find_return_in_flow(flow: &Flow) -> Option<&Return> {
+    find_return_in_weave(flow.weave())
+        .or_else(|| flow.child_flows().iter().find_map(find_return_in_flow))
 }
 
 fn find_return_in_weave(weave: &Weave) -> Option<&Return> {

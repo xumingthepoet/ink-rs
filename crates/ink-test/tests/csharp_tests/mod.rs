@@ -1571,7 +1571,6 @@ This is a normal knot.
     //             Assert.IsTrue(_errorMessages[6].Contains("Return statements can only be used in knots that"));
     //         }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestFunctionPurityChecks() {
         run_in_both_modes(|suite| {
             suite
