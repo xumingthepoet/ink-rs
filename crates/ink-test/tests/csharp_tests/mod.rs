@@ -1978,7 +1978,6 @@ After thread 2 choice ({name})
     //             }
     //         }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestCharacterRangeIdentifiersForConstNamesWithAsciiSuffix() {
         run_in_both_modes(|suite| {
             let mut ranges = CharacterRangeParser::ListAllCharacterRanges();
