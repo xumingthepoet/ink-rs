@@ -723,101 +723,154 @@ fn build_counted_flow_paths(
     global_labels: &HashMap<String, String>,
 ) -> CountedFlowPaths {
     let mut paths = CountedFlowPaths::default();
-    collect_counted_paths_in_weave(story.root_weave(), global_labels, &mut paths);
+    collect_counted_paths_in_weave(
+        story.root_weave(),
+        global_labels,
+        &ChoicePathMode::Root,
+        &mut paths,
+    );
     for flow in story.flows() {
-        collect_counted_paths_in_flow(flow, global_labels, &mut paths);
+        let child_stitch_names = flow
+            .child_flows()
+            .iter()
+            .map(|child| child.name().to_string())
+            .collect::<Vec<_>>();
+        collect_counted_paths_in_flow(flow, None, &child_stitch_names, global_labels, &mut paths);
     }
     paths
 }
 
 fn collect_counted_paths_in_flow(
     flow: &Flow,
+    parent_flow_name: Option<&str>,
+    sibling_stitch_names: &[String],
     global_labels: &HashMap<String, String>,
     paths: &mut CountedFlowPaths,
 ) {
-    collect_counted_paths_in_weave(flow.weave(), global_labels, paths);
+    let flow_path = parent_flow_name
+        .map(|parent| format!("{parent}.{}", flow.name()))
+        .unwrap_or_else(|| flow.name().to_string());
+    let container_path = if weave_has_weave_points(flow.weave()) {
+        format!("{}.{}", flow_path, flow.arguments().len())
+    } else {
+        flow_path.clone()
+    };
+    let path_mode = ChoicePathMode::Flow {
+        flow_name: flow.name().to_string(),
+        container_path,
+        parent_flow_name: parent_flow_name.map(str::to_string),
+        sibling_stitch_names: sibling_stitch_names.to_vec(),
+        local_variables: collect_flow_local_variables(flow),
+        self_target_relative: false,
+        fallback_gather_target: None,
+    };
+    collect_counted_paths_in_weave(flow.weave(), global_labels, &path_mode, paths);
+
+    let child_stitch_names = flow
+        .child_flows()
+        .iter()
+        .map(|child| child.name().to_string())
+        .collect::<Vec<_>>();
     for child in flow.child_flows() {
-        collect_counted_paths_in_flow(child, global_labels, paths);
+        collect_counted_paths_in_flow(
+            child,
+            Some(&flow_path),
+            &child_stitch_names,
+            global_labels,
+            paths,
+        );
     }
 }
 
 fn collect_counted_paths_in_weave(
     weave: &Weave,
     global_labels: &HashMap<String, String>,
+    path_mode: &ChoicePathMode,
     paths: &mut CountedFlowPaths,
 ) {
     for object in weave.content() {
-        collect_counted_paths_in_object(object, global_labels, paths);
+        collect_counted_paths_in_object(object, global_labels, path_mode, paths);
     }
 }
 
 fn collect_counted_paths_in_content_list(
     content_list: &ContentList,
     global_labels: &HashMap<String, String>,
+    path_mode: &ChoicePathMode,
     paths: &mut CountedFlowPaths,
 ) {
     for object in content_list.objects() {
-        collect_counted_paths_in_object(object, global_labels, paths);
+        collect_counted_paths_in_object(object, global_labels, path_mode, paths);
     }
 }
 
 fn collect_counted_paths_in_object(
     object: &Object,
     global_labels: &HashMap<String, String>,
+    path_mode: &ChoicePathMode,
     paths: &mut CountedFlowPaths,
 ) {
     match object {
         Object::ContentList(content_list) => {
-            collect_counted_paths_in_content_list(content_list, global_labels, paths);
+            collect_counted_paths_in_content_list(content_list, global_labels, path_mode, paths);
         }
         Object::Expression(expression) | Object::LogicLine(expression) => {
-            collect_counted_paths_in_expression(expression, global_labels, paths);
+            collect_counted_paths_in_expression(expression, global_labels, path_mode, paths);
         }
         Object::Conditional(conditional) => {
             if let Some(condition) = conditional.initial_condition() {
-                collect_counted_paths_in_expression(condition, global_labels, paths);
+                collect_counted_paths_in_expression(condition, global_labels, path_mode, paths);
             }
             for branch in conditional.branches() {
                 if let Some(condition) = branch.own_condition() {
-                    collect_counted_paths_in_expression(condition, global_labels, paths);
+                    collect_counted_paths_in_expression(condition, global_labels, path_mode, paths);
                 }
-                collect_counted_paths_in_weave(branch.content(), global_labels, paths);
+                collect_counted_paths_in_weave(branch.content(), global_labels, path_mode, paths);
             }
         }
         Object::Choice(choice) => {
             if let Some(condition) = choice.condition() {
-                collect_counted_paths_in_expression(condition, global_labels, paths);
+                collect_counted_paths_in_expression(condition, global_labels, path_mode, paths);
             }
             if let Some(content) = choice.start_content() {
-                collect_counted_paths_in_content_list(content, global_labels, paths);
+                collect_counted_paths_in_content_list(content, global_labels, path_mode, paths);
             }
             if let Some(content) = choice.choice_only_content() {
-                collect_counted_paths_in_content_list(content, global_labels, paths);
+                collect_counted_paths_in_content_list(content, global_labels, path_mode, paths);
             }
-            collect_counted_paths_in_content_list(choice.inner_content(), global_labels, paths);
+            collect_counted_paths_in_content_list(
+                choice.inner_content(),
+                global_labels,
+                path_mode,
+                paths,
+            );
         }
         Object::Divert(divert) => {
             for argument in divert.arguments() {
-                collect_counted_paths_in_expression(argument, global_labels, paths);
+                collect_counted_paths_in_expression(argument, global_labels, path_mode, paths);
             }
         }
         Object::Sequence(sequence) => {
             for element in sequence.elements() {
-                collect_counted_paths_in_content_list(element, global_labels, paths);
+                collect_counted_paths_in_content_list(element, global_labels, path_mode, paths);
             }
         }
         Object::VariableAssignment(assignment) => match assignment.expression() {
             Expression::DivertTarget(target) if assignment.is_global() => {
-                insert_counted_divert_target(target, global_labels, paths, true, true);
+                insert_counted_divert_target(target, global_labels, path_mode, paths, true, true);
             }
-            expression => collect_counted_paths_in_expression(expression, global_labels, paths),
+            expression => {
+                collect_counted_paths_in_expression(expression, global_labels, path_mode, paths)
+            }
         },
         Object::Return(ret) => {
             if let Some(expr) = ret.returned_expression() {
-                collect_counted_paths_in_expression(expr, global_labels, paths);
+                collect_counted_paths_in_expression(expr, global_labels, path_mode, paths);
             }
         }
-        Object::Weave(weave) => collect_counted_paths_in_weave(weave, global_labels, paths),
+        Object::Weave(weave) => {
+            collect_counted_paths_in_weave(weave, global_labels, path_mode, paths)
+        }
         Object::Text(_)
         | Object::ConstantDeclaration(_)
         | Object::Glue(_)
@@ -832,16 +885,21 @@ fn collect_counted_paths_in_object(
 fn collect_counted_paths_in_expression(
     expression: &Expression,
     global_labels: &HashMap<String, String>,
+    path_mode: &ChoicePathMode,
     paths: &mut CountedFlowPaths,
 ) {
     match expression {
         Expression::VariableReference(name) => {
-            if let Some(target) = global_labels.get(name) {
+            if let Some(target) = scoped_label_target(name, global_labels, path_mode) {
                 paths.visits.insert(target.clone());
+            } else if is_flow_sibling_stitch(name, path_mode) {
+                paths
+                    .visits
+                    .insert(resolve_single_stitch_target(name, path_mode));
             }
         }
         Expression::StringContent(content) => {
-            collect_counted_paths_in_content_list(content, global_labels, paths);
+            collect_counted_paths_in_content_list(content, global_labels, path_mode, paths);
         }
         Expression::FunctionCall { name, args } => {
             let count_turns = name == "TURNS_SINCE";
@@ -849,29 +907,43 @@ fn collect_counted_paths_in_expression(
             for arg in args {
                 match arg {
                     Expression::DivertTarget(target) if count_turns => {
-                        insert_counted_divert_target(target, global_labels, paths, false, true);
+                        insert_counted_divert_target(
+                            target,
+                            global_labels,
+                            path_mode,
+                            paths,
+                            false,
+                            true,
+                        );
                     }
                     Expression::DivertTarget(target) if count_visits => {
-                        insert_counted_divert_target(target, global_labels, paths, true, false);
+                        insert_counted_divert_target(
+                            target,
+                            global_labels,
+                            path_mode,
+                            paths,
+                            true,
+                            false,
+                        );
                     }
-                    _ => collect_counted_paths_in_expression(arg, global_labels, paths),
+                    _ => collect_counted_paths_in_expression(arg, global_labels, path_mode, paths),
                 }
             }
         }
         Expression::MultipleCondition(args) => {
             for arg in args {
-                collect_counted_paths_in_expression(arg, global_labels, paths);
+                collect_counted_paths_in_expression(arg, global_labels, path_mode, paths);
             }
         }
         Expression::Binary { left, right, .. } => {
-            collect_counted_paths_in_expression(left, global_labels, paths);
-            collect_counted_paths_in_expression(right, global_labels, paths);
+            collect_counted_paths_in_expression(left, global_labels, path_mode, paths);
+            collect_counted_paths_in_expression(right, global_labels, path_mode, paths);
         }
         Expression::Unary { expression, .. } => {
-            collect_counted_paths_in_expression(expression, global_labels, paths);
+            collect_counted_paths_in_expression(expression, global_labels, path_mode, paths);
         }
         Expression::DivertTarget(target) => {
-            insert_counted_divert_target(target, global_labels, paths, true, true);
+            insert_counted_divert_target(target, global_labels, path_mode, paths, true, true);
         }
         Expression::String(_)
         | Expression::NumberInt(_)
@@ -883,15 +955,18 @@ fn collect_counted_paths_in_expression(
 fn insert_counted_divert_target(
     target: &str,
     global_labels: &HashMap<String, String>,
+    path_mode: &ChoicePathMode,
     paths: &mut CountedFlowPaths,
     count_visits: bool,
     count_turns: bool,
 ) {
-    let counted_target = global_labels
-        .get(target)
-        .map(String::as_str)
-        .unwrap_or(target)
-        .to_string();
+    let counted_target = scoped_label_target(target, global_labels, path_mode)
+        .cloned()
+        .or_else(|| {
+            is_flow_sibling_stitch(target, path_mode)
+                .then(|| resolve_single_stitch_target(target, path_mode))
+        })
+        .unwrap_or_else(|| target.to_string());
     if count_visits {
         paths.visits.insert(counted_target.clone());
     }
@@ -1444,7 +1519,7 @@ fn lower_choice_weave_with_initial_content(
     let objects = weave.content();
     let mut choice_labels = collect_local_weave_labels(objects, &path_mode);
     let mut counted_paths = CountedFlowPaths::default();
-    collect_counted_paths_in_weave(weave, global_labels, &mut counted_paths);
+    collect_counted_paths_in_weave(weave, global_labels, &path_mode, &mut counted_paths);
 
     // Check if there's an explicit gather anywhere in the weave
     let has_explicit_gather = objects.iter().any(|o| matches!(o, Object::Gather(_)));

@@ -6502,7 +6502,6 @@ VAR x = 5
     // ".Replace(Environment.NewLine, "\n"), story.ContinueMaximally());
     //         }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestKnotStitchGatherCounts() {
         run_in_both_modes(|suite| {
             let mut story = suite
@@ -6526,7 +6525,7 @@ VAR gatherCount = 0
 - (loop)
 ~ gatherCount++
 {gatherCount} {loop}
- собра_countCount<3:->loop}
+{gatherCount<3:->loop}
 ->->
 
 == knot_count_test ==
@@ -6554,7 +6553,7 @@ VAR gatherCount = 0
                 )
                 .expect("compile should succeed");
             assert_eq!(
-                "1 1\n2 2\n3 3\n1 1\n2 1\n3 1\n1 2\n2 2\n3 2\n1 1\n2 1\n3 1\n",
+                "1 1\n2 2\n3 3\n1 1\n2 1\n3 1\n1 2\n2 2\n3 2\n1 1\n2 1\n3 1\n1 2\n2 2\n3 2\n",
                 story.cont_maximally()
             );
         });
