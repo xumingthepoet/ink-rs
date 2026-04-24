@@ -40,6 +40,82 @@ pub struct Story {
     pub(crate) saw_lookahead_unsafe_function_after_new_line: bool,
     pub(crate) externals: HashMap<String, ExternalFunctionDef>,
 }
+
+struct CSharpRandom {
+    seed_array: [i32; 56],
+    inext: usize,
+    inextp: usize,
+}
+
+impl CSharpRandom {
+    const MBIG: i32 = i32::MAX;
+    const MSEED: i32 = 161_803_398;
+
+    fn new(seed: i32) -> Self {
+        // Matches legacy System.Random(seed), which ink JSON relies on for deterministic output.
+        let subtraction = if seed == i32::MIN {
+            i32::MAX
+        } else {
+            seed.abs()
+        };
+        let mut seed_array = [0_i32; 56];
+        let mut mj = Self::MSEED.wrapping_sub(subtraction);
+        seed_array[55] = mj;
+        let mut mk = 1;
+
+        for i in 1..55 {
+            let ii = (21 * i) % 55;
+            seed_array[ii] = mk;
+            mk = mj.wrapping_sub(mk);
+            if mk < 0 {
+                mk = mk.wrapping_add(Self::MBIG);
+            }
+            mj = seed_array[ii];
+        }
+
+        for _ in 1..5 {
+            for i in 1..56 {
+                seed_array[i] = seed_array[i].wrapping_sub(seed_array[1 + (i + 30) % 55]);
+                if seed_array[i] < 0 {
+                    seed_array[i] = seed_array[i].wrapping_add(Self::MBIG);
+                }
+            }
+        }
+
+        Self {
+            seed_array,
+            inext: 0,
+            inextp: 21,
+        }
+    }
+
+    fn next(&mut self) -> i32 {
+        self.inext += 1;
+        if self.inext >= 56 {
+            self.inext = 1;
+        }
+        self.inextp += 1;
+        if self.inextp >= 56 {
+            self.inextp = 1;
+        }
+
+        let mut result = self.seed_array[self.inext].wrapping_sub(self.seed_array[self.inextp]);
+        if result == Self::MBIG {
+            result -= 1;
+        }
+        if result < 0 {
+            result = result.wrapping_add(Self::MBIG);
+        }
+
+        self.seed_array[self.inext] = result;
+        result
+    }
+}
+
+pub(crate) fn csharp_random_next(seed: i32) -> i32 {
+    CSharpRandom::new(seed).next()
+}
+
 mod misc {
     use crate::{
         json::{json_read, json_read_stream},
@@ -50,7 +126,6 @@ mod misc {
         story_state::StoryState,
         value::Value,
     };
-    use rand::{rngs::StdRng, Rng, SeedableRng};
     use std::{collections::HashMap, rc::Rc};
 
     impl Story {
@@ -150,18 +225,17 @@ mod misc {
             // - How many times the runtime has looped around this full shuffle
             let seq_path_str = Object::get_path(seq_container.as_ref()).to_string();
             let sequence_hash: i32 = seq_path_str.chars().map(|c| c as i32).sum();
-            let random_seed = sequence_hash + loop_index + self.get_state().story_seed;
+            let random_seed = sequence_hash
+                .wrapping_add(loop_index)
+                .wrapping_add(self.get_state().story_seed);
 
-            let mut rng = StdRng::seed_from_u64(random_seed as u64);
-
+            let mut random = super::CSharpRandom::new(random_seed);
             let mut unpicked_indices: Vec<i32> = (0..num_elements).collect();
 
             for i in 0..=iteration_index {
-                let chosen = rng
-                    .random::<i32>()
-                    .rem_euclid(unpicked_indices.len() as i32);
-                let chosen_index = unpicked_indices[chosen as usize];
-                unpicked_indices.retain(|&x| x != chosen_index);
+                let next_random = random.next();
+                let chosen = next_random % unpicked_indices.len() as i32;
+                let chosen_index = unpicked_indices.remove(chosen as usize);
 
                 if i == iteration_index {
                     return Ok(chosen_index);

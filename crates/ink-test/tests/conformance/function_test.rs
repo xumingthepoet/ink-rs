@@ -102,10 +102,10 @@ fn rnd() -> Result<(), StoryError> {
     common::next_all(&mut story, &mut text);
 
     assert_eq!(4, text.len());
-    assert_eq!("Rolling dice 1: 1.", text[0]);
-    assert_eq!("Rolling dice 2: 4.", text[1]);
+    assert_eq!("Rolling dice 1: 6.", text[0]);
+    assert_eq!("Rolling dice 2: 6.", text[1]);
     assert_eq!("Rolling dice 3: 4.", text[2]);
-    assert_eq!("Rolling dice 4: 1.", text[3]);
+    assert_eq!("Rolling dice 4: 2.", text[3]);
 
     Ok(())
 }

@@ -17,7 +17,6 @@ use crate::{
     variable_reference::VariableReference,
     void::Void,
 };
-use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::{
     collections::{HashMap, VecDeque},
     rc::Rc,
@@ -385,14 +384,15 @@ impl Story {
                         )));
                     }
 
-                    let result_seed =
-                        self.get_state().story_seed + self.get_state().previous_random;
-                    let mut rng = StdRng::seed_from_u64(result_seed as u64);
-                    let next_random = rng.random::<u32>();
-                    let chosen_value = (next_random % random_range as u32) as i32 + min_value;
+                    let result_seed = self
+                        .get_state()
+                        .story_seed
+                        .wrapping_add(self.get_state().previous_random);
+                    let next_random = super::csharp_random_next(result_seed);
+                    let chosen_value = (next_random % random_range) + min_value;
                     self.get_state_mut()
                         .push_evaluation_stack(Rc::new(Value::new::<i32>(chosen_value)));
-                    self.get_state_mut().previous_random = self.get_state().previous_random + 1;
+                    self.get_state_mut().previous_random = next_random;
                 }
                 CommandType::SeedRandom => {
                     let mut seed: Option<i32> = None;
