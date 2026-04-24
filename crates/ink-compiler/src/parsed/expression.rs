@@ -18,6 +18,7 @@ pub enum Expression {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BinaryOperator {
     And,
+    Add,
 }
 
 impl Expression {
@@ -88,12 +89,14 @@ impl BinaryOperator {
     pub fn runtime_name(self) -> &'static str {
         match self {
             BinaryOperator::And => "&&",
+            BinaryOperator::Add => "+",
         }
     }
 
     fn snapshot_name(self) -> &'static str {
         match self {
             BinaryOperator::And => "and",
+            BinaryOperator::Add => "+",
         }
     }
 }

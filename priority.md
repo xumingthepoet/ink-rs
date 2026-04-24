@@ -1,6 +1,6 @@
 # Ink Fixture Priority
 
-通过统计: 50/118
+通过统计: 51/118
 
 Sorted by the latest `WritingWithInk.md` syntax point used by each file.
 
@@ -54,7 +54,7 @@ Sorted by the latest `WritingWithInk.md` syntax point used by each file.
 - [x] `tags/tagsInChoiceDynamic.ink`
 - [x] `variable/variable-declaration.ink`
 - [x] `runtime/variable-observers.ink`
-- [ ] `variable/varstringinc.ink`
+- [x] `variable/varstringinc.ink`
 - [ ] `tags/tagsDynamicContent.ink`
 - [ ] `variable/varcalc.ink`
 - [ ] `function/rnd-func.ink`

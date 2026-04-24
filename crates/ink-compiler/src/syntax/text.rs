@@ -39,7 +39,6 @@ fn has_unsupported_text_syntax(text: &str) -> bool {
         || text.starts_with('+')
         || (text.starts_with('-') && !text.starts_with("->"))
         || text.starts_with('~')
-        || text.trim_start().starts_with('{')
 }
 
 pub(super) fn parse_inline_content(text: &str, span: &SourceSpan) -> Option<Vec<Object>> {

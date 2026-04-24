@@ -318,6 +318,13 @@ fn variable_assignment_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Obje
 }
 
 pub(super) fn parse_initial_expression(source: &str) -> Option<Expression> {
+    if let Some((left, right)) = split_top_level_operator(source, '+') {
+        return Some(Expression::Binary {
+            operator: crate::parsed::BinaryOperator::Add,
+            left: Box::new(parse_initial_expression(left.trim())?),
+            right: Box::new(parse_initial_expression(right.trim())?),
+        });
+    }
     if let Some(value) = parse_quoted_string_literal(source) {
         return Some(Expression::String(value));
     }
@@ -336,6 +343,33 @@ pub(super) fn parse_initial_expression(source: &str) -> Option<Expression> {
         return Some(Expression::NumberInt(value));
     }
     is_identifier(source).then(|| Expression::VariableReference(source.to_string()))
+}
+
+fn split_top_level_operator(source: &str, operator: char) -> Option<(&str, &str)> {
+    let mut in_string = false;
+    let mut escaped = false;
+
+    for (index, ch) in source.char_indices() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+
+        match ch {
+            '\\' if in_string => escaped = true,
+            '"' => in_string = !in_string,
+            _ if !in_string && ch == operator => {
+                let left = &source[..index];
+                let right = &source[index + ch.len_utf8()..];
+                if !left.trim().is_empty() && !right.trim().is_empty() {
+                    return Some((left, right));
+                }
+            }
+            _ => {}
+        }
+    }
+
+    None
 }
 
 fn parse_quoted_string_literal(source: &str) -> Option<String> {

@@ -83,3 +83,4 @@ fixture!(
     runtime_variable_observers,
     "inkfiles/runtime/variable-observers.ink"
 );
+fixture!(variable_varstringinc, "inkfiles/variable/varstringinc.ink");
