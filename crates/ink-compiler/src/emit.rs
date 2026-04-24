@@ -151,6 +151,14 @@ fn runtime_object_to_value(object: &RuntimeObject) -> Value {
             obj.insert("f()".to_string(), Value::String(target.clone()));
             Value::Object(obj)
         }
+        RuntimeObject::ExternalFunction { target, args } => {
+            let mut obj = Map::new();
+            obj.insert("x()".to_string(), Value::String(target.clone()));
+            if *args > 0 {
+                obj.insert("exArgs".to_string(), Value::Number((*args).into()));
+            }
+            Value::Object(obj)
+        }
         RuntimeObject::DivertTarget(target) => json!({ "^->": target }),
         RuntimeObject::ReadCount(target) => json!({ "CNT?": target }),
         RuntimeObject::VariableAssignment(name) => json!({ "temp=": name }),

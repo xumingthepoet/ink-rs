@@ -10,9 +10,9 @@ use crate::{
     compiler::StageOutput,
     diagnostic::Diagnostic,
     parsed::{
-        BinaryOperator, Conditional, ConditionalBranch, ContentList, Expression, FloatLiteral,
-        Flow, IncDec, Object, Return, Sequence, Story, Text, UnaryOperator, VariableAssignment,
-        Weave,
+        BinaryOperator, Conditional, ConditionalBranch, ContentList, Expression,
+        ExternalDeclaration, FloatLiteral, Flow, IncDec, Object, Return, Sequence, Story, Text,
+        UnaryOperator, VariableAssignment, Weave,
     },
     source::{SourceFile, SourceInput, SourceLine},
 };
@@ -105,6 +105,7 @@ impl Parser {
         let mut line_parser = RuleParser::new(line);
         let statement_rules: &[StatementRule] = &[
             variable_declaration_statement,
+            external_declaration_statement,
             return_statement,
             temp_declaration_statement,
             variable_assignment_statement,
@@ -551,6 +552,46 @@ fn variable_declaration_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Obj
     ))])
 }
 
+fn external_declaration_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
+    parser.skip_horizontal_whitespace();
+    parser.match_string("EXTERNAL")?;
+    parser.skip_horizontal_whitespace();
+    let name = parser.take_while(|ch| ch == '_' || ch.is_ascii_alphanumeric())?;
+    if !is_identifier(&name) {
+        return None;
+    }
+    parser.skip_horizontal_whitespace();
+    parser.match_string("(")?;
+    parser.skip_horizontal_whitespace();
+
+    let mut arguments = Vec::new();
+    if parser.match_string(")").is_none() {
+        loop {
+            parser.skip_horizontal_whitespace();
+            let argument = parser.take_while(|ch| ch == '_' || ch.is_ascii_alphanumeric())?;
+            if !is_identifier(&argument) {
+                return None;
+            }
+            arguments.push(argument);
+            parser.skip_horizontal_whitespace();
+
+            if parser.match_string(")").is_some() {
+                break;
+            }
+            parser.match_string(",")?;
+        }
+    }
+    parser.skip_horizontal_whitespace();
+    if !parser.line_remainder().is_empty() {
+        return None;
+    }
+    parser.skip_to_end();
+
+    Some(vec![Object::ExternalDeclaration(ExternalDeclaration::new(
+        name, arguments,
+    ))])
+}
+
 fn return_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
     parser.skip_horizontal_whitespace();
     let span = parser.current_span();
@@ -644,6 +685,7 @@ fn object_contains_function_call(object: &Object) -> bool {
         | Object::Glue(_)
         | Object::Divert(_)
         | Object::Gather(_)
+        | Object::ExternalDeclaration(_)
         | Object::Tag(_) => false,
     }
 }

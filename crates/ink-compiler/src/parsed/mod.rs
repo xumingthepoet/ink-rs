@@ -3,6 +3,7 @@ mod conditional;
 mod content_list;
 mod divert;
 mod expression;
+mod external_declaration;
 mod flow;
 mod gather;
 mod glue;
@@ -20,6 +21,7 @@ pub use conditional::{Conditional, ConditionalBranch};
 pub use content_list::ContentList;
 pub use divert::{Divert, DivertTarget};
 pub use expression::{BinaryOperator, Expression, FloatLiteral, UnaryOperator};
+pub use external_declaration::ExternalDeclaration;
 pub use flow::{Flow, FlowArgument, FlowLevel};
 pub use gather::Gather;
 pub use glue::Glue;
@@ -48,6 +50,7 @@ pub enum Object {
     Sequence(Sequence),
     Return(Return),
     VariableAssignment(VariableAssignment),
+    ExternalDeclaration(ExternalDeclaration),
     Weave(Weave),
 }
 
@@ -87,6 +90,7 @@ impl Object {
             Object::Tag(tag) => tag.write_parse_snapshot(out, indent),
             Object::Sequence(sequence) => sequence.write_parse_snapshot(out, indent),
             Object::VariableAssignment(assignment) => assignment.write_parse_snapshot(out, indent),
+            Object::ExternalDeclaration(external) => external.write_parse_snapshot(out, indent),
             Object::Weave(weave) => weave.write_parse_snapshot(out, indent),
         }
     }

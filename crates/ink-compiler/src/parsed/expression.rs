@@ -187,6 +187,7 @@ fn object_display(object: &Object) -> String {
         Object::Gather(_) => "Gather".to_string(),
         Object::Sequence(_) => "Sequence".to_string(),
         Object::VariableAssignment(assignment) => assignment.name().to_string(),
+        Object::ExternalDeclaration(external) => external.name().to_string(),
         Object::Weave(_) => "Weave".to_string(),
     }
 }
