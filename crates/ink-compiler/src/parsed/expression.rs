@@ -177,6 +177,7 @@ fn content_list_display(content: &ContentList) -> String {
 fn object_display(object: &Object) -> String {
     match object {
         Object::Text(text) => text.text().to_string(),
+        Object::AuthorWarning(author_warning) => author_warning.message().to_string(),
         Object::Expression(expression) => expression_display(expression),
         Object::ContentList(content) => content_list_display(content),
         Object::Divert(divert) => divert.target().to_snapshot_string(),

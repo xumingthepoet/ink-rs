@@ -10,9 +10,9 @@ use crate::{
     compiler::StageOutput,
     diagnostic::Diagnostic,
     parsed::{
-        BinaryOperator, Choice, Conditional, ConditionalBranch, ConstantDeclaration, ContentList,
-        Expression, ExternalDeclaration, FloatLiteral, Flow, IncDec, Object, Return, Sequence,
-        Story, Text, UnaryOperator, VariableAssignment, Weave,
+        AuthorWarning, BinaryOperator, Choice, Conditional, ConditionalBranch, ConstantDeclaration,
+        ContentList, Expression, ExternalDeclaration, FloatLiteral, Flow, IncDec, Object, Return,
+        Sequence, Story, Text, UnaryOperator, VariableAssignment, Weave,
     },
     source::{SourceFile, SourceInput, SourceLine},
 };
@@ -121,6 +121,7 @@ impl Parser {
             variable_assignment_statement,
             logic_line_statement,
             choice_statement,
+            author_warning_statement,
             divert_statement,
             text_statement,
         ];
@@ -923,6 +924,23 @@ fn choice_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
     choice::parse_choice(parser).map(|choice| vec![Object::Choice(choice)])
 }
 
+fn author_warning_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
+    parser.skip_horizontal_whitespace();
+    let span = parser.current_span();
+    let identifier = parser.take_while(is_identifier_continue)?;
+    if identifier != "TODO" {
+        return None;
+    }
+    parser.skip_horizontal_whitespace();
+    let _ = parser.match_string(":");
+    parser.skip_horizontal_whitespace();
+    let message = parser.line_remainder().trim_end().to_string();
+    parser.skip_to_end();
+    Some(vec![Object::AuthorWarning(AuthorWarning::new(
+        message, span,
+    ))])
+}
+
 fn leading_whitespace_count(source: &str) -> usize {
     source
         .chars()
@@ -1110,6 +1128,7 @@ fn object_contains_function_call(object: &Object) -> bool {
             .is_some_and(expression_contains_function_call),
         Object::Weave(weave) => weave.content().iter().any(object_contains_function_call),
         Object::Text(_)
+        | Object::AuthorWarning(_)
         | Object::ConstantDeclaration(_)
         | Object::Glue(_)
         | Object::Divert(_)

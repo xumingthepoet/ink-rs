@@ -16,12 +16,89 @@ pub struct CheckedStory {
 
 pub(crate) fn analyze(parsed: Story) -> StageOutput<CheckedStory> {
     let mut diagnostics = constant_redefinition_diagnostics(&parsed);
+    diagnostics.extend(author_warning_diagnostics(&parsed));
     diagnostics.extend(naming_diagnostics(&parsed));
     diagnostics.extend(flow_diagnostics(&parsed));
     diagnostics.extend(call_target_diagnostics(&parsed));
     StageOutput {
         artifact: Some(CheckedStory { parsed }),
         diagnostics,
+    }
+}
+
+fn author_warning_diagnostics(story: &Story) -> Vec<Diagnostic> {
+    let mut diagnostics = Vec::new();
+    collect_author_warnings_in_weave(story.root_weave(), &mut diagnostics);
+    for flow in story.flows() {
+        collect_author_warnings_in_flow(flow, &mut diagnostics);
+    }
+    diagnostics
+}
+
+fn collect_author_warnings_in_flow(flow: &Flow, diagnostics: &mut Vec<Diagnostic>) {
+    collect_author_warnings_in_weave(flow.weave(), diagnostics);
+    for child in flow.child_flows() {
+        collect_author_warnings_in_flow(child, diagnostics);
+    }
+}
+
+fn collect_author_warnings_in_weave(weave: &Weave, diagnostics: &mut Vec<Diagnostic>) {
+    for object in weave.content() {
+        collect_author_warnings_in_object(object, diagnostics);
+    }
+}
+
+fn collect_author_warnings_in_content_list(
+    content: &ContentList,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    for object in content.objects() {
+        collect_author_warnings_in_object(object, diagnostics);
+    }
+}
+
+fn collect_author_warnings_in_object(object: &Object, diagnostics: &mut Vec<Diagnostic>) {
+    match object {
+        Object::AuthorWarning(author_warning) => diagnostics.push(Diagnostic::author(
+            author_warning.span().clone(),
+            author_warning.message().to_string(),
+        )),
+        Object::ContentList(content) => {
+            collect_author_warnings_in_content_list(content, diagnostics)
+        }
+        Object::Conditional(conditional) => {
+            for branch in conditional.branches() {
+                collect_author_warnings_in_weave(branch.content(), diagnostics);
+            }
+        }
+        Object::Choice(choice) => {
+            if let Some(content) = choice.start_content() {
+                collect_author_warnings_in_content_list(content, diagnostics);
+            }
+            if let Some(content) = choice.choice_only_content() {
+                collect_author_warnings_in_content_list(content, diagnostics);
+            }
+            collect_author_warnings_in_content_list(choice.inner_content(), diagnostics);
+        }
+        Object::Sequence(sequence) => {
+            for element in sequence.elements() {
+                collect_author_warnings_in_content_list(element, diagnostics);
+            }
+        }
+        Object::Weave(weave) => collect_author_warnings_in_weave(weave, diagnostics),
+        Object::ConstantDeclaration(_)
+        | Object::Divert(_)
+        | Object::Expression(_)
+        | Object::ExternalDeclaration(_)
+        | Object::Gather(_)
+        | Object::Glue(_)
+        | Object::IncDec(_)
+        | Object::LogicLine(_)
+        | Object::Return(_)
+        | Object::Tag(_)
+        | Object::Text(_)
+        | Object::TunnelOnwards(_)
+        | Object::VariableAssignment(_) => {}
     }
 }
 
@@ -157,7 +234,8 @@ fn collect_constant_redefinition_diagnostics_in_object(
         Object::Weave(weave) => {
             collect_constant_redefinition_diagnostics_in_weave(weave, constants, diagnostics)
         }
-        Object::Divert(_)
+        Object::AuthorWarning(_)
+        | Object::Divert(_)
         | Object::Expression(_)
         | Object::ExternalDeclaration(_)
         | Object::Gather(_)
@@ -240,7 +318,8 @@ fn collect_global_variables_in_object(object: &Object, global_variables: &mut Ha
             }
         }
         Object::Weave(weave) => collect_global_variables(weave, global_variables),
-        Object::Choice(_)
+        Object::AuthorWarning(_)
+        | Object::Choice(_)
         | Object::Divert(_)
         | Object::Expression(_)
         | Object::ExternalDeclaration(_)
@@ -443,7 +522,8 @@ fn check_temporary_names_against_arguments_in_object(
             argument_names,
             diagnostics,
         ),
-        Object::ConstantDeclaration(_)
+        Object::AuthorWarning(_)
+        | Object::ConstantDeclaration(_)
         | Object::Divert(_)
         | Object::Expression(_)
         | Object::ExternalDeclaration(_)
@@ -516,7 +596,8 @@ fn check_weave_point_names(
                 check_weave_point_names_in_content_list(content, global_variables, diagnostics)
             }
             Object::Weave(weave) => check_weave_point_names(weave, global_variables, diagnostics),
-            Object::ConstantDeclaration(_)
+            Object::AuthorWarning(_)
+            | Object::ConstantDeclaration(_)
             | Object::Divert(_)
             | Object::Expression(_)
             | Object::ExternalDeclaration(_)
@@ -553,7 +634,8 @@ fn check_weave_point_names_in_content_list(
                 check_weave_point_names_in_content_list(content, global_variables, diagnostics)
             }
             Object::Weave(weave) => check_weave_point_names(weave, global_variables, diagnostics),
-            Object::Choice(_)
+            Object::AuthorWarning(_)
+            | Object::Choice(_)
             | Object::ConstantDeclaration(_)
             | Object::Divert(_)
             | Object::Expression(_)
@@ -754,7 +836,8 @@ fn collect_target_symbols_in_object(
             }
         }
         Object::Weave(weave) => collect_target_symbols_in_weave(weave, flow_path, symbols),
-        Object::ConstantDeclaration(_)
+        Object::AuthorWarning(_)
+        | Object::ConstantDeclaration(_)
         | Object::Divert(_)
         | Object::Expression(_)
         | Object::ExternalDeclaration(_)
@@ -861,7 +944,8 @@ fn collect_variable_targets_in_object(object: &Object, names: &mut HashSet<Strin
             }
         }
         Object::Weave(weave) => collect_variable_targets_in_weave(weave, names),
-        Object::ConstantDeclaration(_)
+        Object::AuthorWarning(_)
+        | Object::ConstantDeclaration(_)
         | Object::Divert(_)
         | Object::ExternalDeclaration(_)
         | Object::Gather(_)
@@ -1156,7 +1240,8 @@ fn check_call_targets_in_object(
             current_flow_path,
             inside_function,
         ),
-        Object::ConstantDeclaration(_)
+        Object::AuthorWarning(_)
+        | Object::ConstantDeclaration(_)
         | Object::ExternalDeclaration(_)
         | Object::Gather(_)
         | Object::Glue(_)
@@ -1387,7 +1472,8 @@ fn check_nested_choice_termination_in_weave(
             Object::Weave(weave) => {
                 check_nested_choice_termination_in_weave(weave, inside_sealed_content, diagnostics)
             }
-            Object::ConstantDeclaration(_)
+            Object::AuthorWarning(_)
+            | Object::ConstantDeclaration(_)
             | Object::Divert(_)
             | Object::Expression(_)
             | Object::ExternalDeclaration(_)
@@ -1429,7 +1515,8 @@ fn check_nested_choice_termination_in_content_list(
             Object::Weave(weave) => {
                 check_nested_choice_termination_in_weave(weave, inside_sealed_content, diagnostics)
             }
-            Object::Choice(_)
+            Object::AuthorWarning(_)
+            | Object::Choice(_)
             | Object::ConstantDeclaration(_)
             | Object::Divert(_)
             | Object::Expression(_)
@@ -1527,7 +1614,8 @@ fn check_function_flow_control_in_object(object: &Object, diagnostics: &mut Vec<
             }
         }
         Object::Weave(weave) => check_function_flow_control_in_weave(weave, diagnostics),
-        Object::ConstantDeclaration(_)
+        Object::AuthorWarning(_)
+        | Object::ConstantDeclaration(_)
         | Object::Expression(_)
         | Object::ExternalDeclaration(_)
         | Object::Gather(_)
@@ -1577,7 +1665,8 @@ fn find_return_in_object(object: &Object) -> Option<&Return> {
                     .and_then(find_return_in_content_list)
             })
             .or_else(|| find_return_in_content_list(choice.inner_content())),
-        Object::ConstantDeclaration(_)
+        Object::AuthorWarning(_)
+        | Object::ConstantDeclaration(_)
         | Object::Divert(_)
         | Object::Expression(_)
         | Object::ExternalDeclaration(_)
@@ -1606,6 +1695,7 @@ fn last_significant_object(objects: &[Object]) -> Option<&Object> {
 
 fn is_termination_ignored_object(object: &Object) -> bool {
     matches!(object, Object::Text(text) if text.text().trim().is_empty())
+        || matches!(object, Object::AuthorWarning(_))
         || matches!(object, Object::ConstantDeclaration(_))
         || matches!(object, Object::ExternalDeclaration(_))
         || matches!(object, Object::VariableAssignment(assignment) if assignment.is_global())
@@ -1636,7 +1726,8 @@ fn object_terminates_flow(object: &Object) -> bool {
         Object::Sequence(sequence) => sequence.elements().iter().all(|element| {
             last_significant_object(element.objects()).is_some_and(object_terminates_flow)
         }),
-        Object::ConstantDeclaration(_)
+        Object::AuthorWarning(_)
+        | Object::ConstantDeclaration(_)
         | Object::Expression(_)
         | Object::ExternalDeclaration(_)
         | Object::Gather(_)
@@ -1660,6 +1751,7 @@ fn first_span_in_weave(weave: &Weave) -> SourceSpan {
 fn object_span(object: &Object) -> SourceSpan {
     match object {
         Object::Choice(choice) => choice.span().clone(),
+        Object::AuthorWarning(author_warning) => author_warning.span().clone(),
         Object::ConstantDeclaration(declaration) => declaration.span().clone(),
         Object::Divert(divert) => divert.span().clone(),
         Object::Gather(gather) => gather.span().clone(),

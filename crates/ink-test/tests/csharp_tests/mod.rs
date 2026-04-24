@@ -281,6 +281,7 @@ impl CSharpTestSuite {
             let prefix = match diagnostic.severity {
                 DiagnosticSeverity::Error => "ERROR",
                 DiagnosticSeverity::Warning => "WARNING",
+                DiagnosticSeverity::Author => "TODO",
             };
             let full_message = format!(
                 "{}: line {}: {}",
@@ -289,6 +290,7 @@ impl CSharpTestSuite {
             match diagnostic.severity {
                 DiagnosticSeverity::Error => buckets.errors.push(full_message),
                 DiagnosticSeverity::Warning => buckets.warnings.push(full_message),
+                DiagnosticSeverity::Author => buckets.authors.push(full_message),
             }
         }
     }
@@ -319,6 +321,7 @@ impl CSharpTestSuite {
                     match diagnostic.severity {
                         DiagnosticSeverity::Error => "ERROR",
                         DiagnosticSeverity::Warning => "WARNING",
+                        DiagnosticSeverity::Author => "TODO",
                     },
                     diagnostic.line,
                     diagnostic.message
@@ -375,6 +378,7 @@ impl CSharpTestSuite {
                     match diagnostic.severity {
                         DiagnosticSeverity::Error => "ERROR",
                         DiagnosticSeverity::Warning => "WARNING",
+                        DiagnosticSeverity::Author => "TODO",
                     },
                     diagnostic.line,
                     diagnostic.message
@@ -393,6 +397,7 @@ impl CSharpTestSuite {
                         match diagnostic.severity {
                             DiagnosticSeverity::Error => "ERROR",
                             DiagnosticSeverity::Warning => "WARNING",
+                            DiagnosticSeverity::Author => "TODO",
                         },
                         diagnostic.line,
                         diagnostic.message
@@ -6964,7 +6969,6 @@ text 2
     //             Assert.IsTrue (_authorMessages.Count == 1);
     //         }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestLooseEnds() {
         let mut suite = CSharpTestSuite::new(TestMode::Normal);
         suite.compile_string_without_runtime(

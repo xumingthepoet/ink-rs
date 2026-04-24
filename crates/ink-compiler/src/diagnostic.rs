@@ -4,6 +4,7 @@ use crate::source::SourceSpan;
 pub enum DiagnosticSeverity {
     Error,
     Warning,
+    Author,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -29,6 +30,16 @@ impl Diagnostic {
     pub fn warning(span: SourceSpan, message: impl Into<String>) -> Self {
         Self {
             severity: DiagnosticSeverity::Warning,
+            message: message.into(),
+            source_filename: span.source_name,
+            line: span.line,
+            column: span.column,
+        }
+    }
+
+    pub fn author(span: SourceSpan, message: impl Into<String>) -> Self {
+        Self {
+            severity: DiagnosticSeverity::Author,
             message: message.into(),
             source_filename: span.source_name,
             line: span.line,

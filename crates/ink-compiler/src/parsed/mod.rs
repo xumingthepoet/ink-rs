@@ -1,3 +1,4 @@
+mod author_warning;
 mod choice;
 mod conditional;
 mod constant_declaration;
@@ -18,6 +19,7 @@ mod tunnel_onwards;
 mod variable_assignment;
 mod weave;
 
+pub use author_warning::AuthorWarning;
 pub use choice::Choice;
 pub use conditional::{Conditional, ConditionalBranch};
 pub use constant_declaration::ConstantDeclaration;
@@ -41,6 +43,7 @@ pub use weave::Weave;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Object {
     Text(Text),
+    AuthorWarning(AuthorWarning),
     ContentList(ContentList),
     Expression(Expression),
     Conditional(Conditional),
@@ -64,6 +67,9 @@ impl Object {
     pub(crate) fn write_parse_snapshot(&self, out: &mut String, indent: usize) {
         match self {
             Object::Text(text) => text.write_parse_snapshot(out, indent),
+            Object::AuthorWarning(author_warning) => {
+                author_warning.write_parse_snapshot(out, indent)
+            }
             Object::ContentList(content_list) => {
                 out.push('\n');
                 push_indent(out, indent);

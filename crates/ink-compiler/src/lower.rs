@@ -621,7 +621,8 @@ fn collect_constant_values_in_object(object: &Object, constants: &mut HashMap<St
             }
         }
         Object::Weave(weave) => collect_constant_values_in_objects(weave.content(), constants),
-        Object::Text(_)
+        Object::AuthorWarning(_)
+        | Object::Text(_)
         | Object::Expression(_)
         | Object::LogicLine(_)
         | Object::Glue(_)
@@ -871,7 +872,8 @@ fn collect_counted_paths_in_object(
         Object::Weave(weave) => {
             collect_counted_paths_in_weave(weave, global_labels, path_mode, paths)
         }
-        Object::Text(_)
+        Object::AuthorWarning(_)
+        | Object::Text(_)
         | Object::ConstantDeclaration(_)
         | Object::Glue(_)
         | Object::IncDec(_)
@@ -1526,7 +1528,8 @@ fn lower_choice_weave_with_initial_content(
 
     while index < objects.len() {
         match &objects[index] {
-            Object::Text(_)
+            Object::AuthorWarning(_)
+            | Object::Text(_)
             | Object::ContentList(_)
             | Object::Expression(_)
             | Object::Conditional(_)
@@ -1750,7 +1753,8 @@ fn lower_weave_section(
     while *index < objects.len() {
         match &objects[*index] {
             Object::Gather(_) => break,
-            Object::Text(_)
+            Object::AuthorWarning(_)
+            | Object::Text(_)
             | Object::ContentList(_)
             | Object::Expression(_)
             | Object::Conditional(_)
@@ -3381,6 +3385,7 @@ fn lower_object_into_with_context_count(
 ) {
     match object {
         Object::Text(text) => content.push(RuntimeObject::String(text.text().to_string())),
+        Object::AuthorWarning(_) => {}
         Object::ContentList(content_list) => {
             lower_content_list_into_context(
                 content,
