@@ -3255,15 +3255,10 @@ Knot.
     //             Assert.AreEqual(expected, result);
     //         }
     #[test]
-    #[ignore = "ported C# test; current Rust compiler does not pass this case yet"]
     fn TestCommentEliminatorMixedNewlines() {
         let test_content =
             "A B\nC D // comment\nA B\r\nC D // comment\r\n/* block comment\r\nsecond line\r\n */ ";
-        let mut suite = CSharpTestSuite::new(TestMode::Normal);
-        let mut story = suite
-            .compile_string(test_content, false, false)
-            .expect("compile should succeed");
-        let processed = story.cont_maximally();
+        let processed = eliminate_comments(test_content);
         let expected = "A B\nC D \nA B\nC D \n\n\n ";
         assert_eq!(expected, processed);
     }
