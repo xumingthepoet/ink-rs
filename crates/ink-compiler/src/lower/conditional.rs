@@ -5,7 +5,7 @@ use crate::parsed::{Conditional, Expression};
 use super::context::ChoicePathMode;
 use super::expression::lower_expression_into;
 use super::indexes::ExternalSignatures;
-use super::ir::{Container, ControlCommand, RuntimeObject};
+use super::ir::{ControlCommand, RuntimeObject};
 use super::lower_object_into_with_context;
 use super::path::LabelIndex;
 use super::weave::{lower_choice_weave_with_initial_content, weave_has_choice};
@@ -135,12 +135,7 @@ pub(super) fn lower_conditional_into(
             if let Some(named_content) = trailing_named_content {
                 content_container.push(named_content);
             }
-            branch_content.push(RuntimeObject::NamedContent(vec![Container {
-                content: content_container,
-                name: Some("b".to_string()),
-                flags: None,
-                merge_tail_metadata: true,
-            }]));
+            branch_content.push(RuntimeObject::named_content("b", content_container));
         } else {
             let mut content_container = Vec::new();
             if duplicates_stack_value || (branch.is_else() && switch_like) {
@@ -165,20 +160,10 @@ pub(super) fn lower_conditional_into(
                 target: branch_rejoin_target.clone(),
                 variable: false,
             });
-            branch_content.push(RuntimeObject::NamedContent(vec![Container {
-                content: content_container,
-                name: Some("b".to_string()),
-                flags: None,
-                merge_tail_metadata: true,
-            }]));
+            branch_content.push(RuntimeObject::named_content("b", content_container));
         }
 
-        content.push(RuntimeObject::Container(Container {
-            content: branch_content,
-            name: None,
-            flags: None,
-            merge_tail_metadata: true,
-        }));
+        content.push(RuntimeObject::container(branch_content));
     }
 
     if needs_fallthrough_pop {

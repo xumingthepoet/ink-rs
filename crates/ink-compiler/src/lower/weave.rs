@@ -636,18 +636,17 @@ fn lower_choice_in_section(
         *needs_terminal_gather = true;
     }
 
-    named_content.push(Container {
-        content: choice_content,
-        name: Some(choice_container_name),
-        flags: named_container_flags(
+    named_content.push(Container::named_with_flags(
+        choice_container_name,
+        choice_content,
+        named_container_flags(
             count_all_visits
                 || choice.once_only()
                 || counted_paths.visits.contains(&choice_container_path),
             counted_paths.turns.contains(&choice_container_path),
             false,
         ),
-        merge_tail_metadata: true,
-    });
+    ));
     if let Some(identifier) = choice.identifier() {
         choice_labels.insert(
             identifier.to_string(),
@@ -744,12 +743,7 @@ fn choice_outer(
             target: ".^.s".to_string(),
             variable: false,
         });
-        outer_content.push(RuntimeObject::Container(Container {
-            content: Vec::new(),
-            name: Some("$r1".to_string()),
-            flags: None,
-            merge_tail_metadata: true,
-        }));
+        outer_content.push(RuntimeObject::named_container("$r1", Vec::new()));
         outer_content.push(RuntimeObject::ControlCommand(ControlCommand::EndString));
     }
 
@@ -812,19 +806,9 @@ fn choice_outer(
         target: "$r".to_string(),
         variable: true,
     });
-    outer_content.push(RuntimeObject::NamedContent(vec![Container {
-        content: start_content,
-        name: Some("s".to_string()),
-        flags: None,
-        merge_tail_metadata: true,
-    }]));
+    outer_content.push(RuntimeObject::named_content("s", start_content));
 
-    ChoiceOuter::Nested(Container {
-        content: outer_content,
-        name: None,
-        flags: None,
-        merge_tail_metadata: true,
-    })
+    ChoiceOuter::Nested(Container::unnamed(outer_content))
 }
 
 pub(super) fn choice_container_prefix(
@@ -845,12 +829,7 @@ pub(super) fn choice_container_prefix(
             target: path_mode.start_content_target(choice_point_index),
             variable: false,
         },
-        RuntimeObject::Container(Container {
-            content: Vec::new(),
-            name: Some(format!("$r{return_index}")),
-            flags: None,
-            merge_tail_metadata: true,
-        }),
+        RuntimeObject::named_container(format!("$r{return_index}"), Vec::new()),
     ]
 }
 

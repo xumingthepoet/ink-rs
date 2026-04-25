@@ -13,6 +13,39 @@ pub struct Container {
     pub merge_tail_metadata: bool,
 }
 
+impl Container {
+    pub(super) fn unnamed(content: Vec<RuntimeObject>) -> Self {
+        Self {
+            content,
+            name: None,
+            flags: None,
+            merge_tail_metadata: true,
+        }
+    }
+
+    pub(super) fn named(name: impl Into<String>, content: Vec<RuntimeObject>) -> Self {
+        Self {
+            content,
+            name: Some(name.into()),
+            flags: None,
+            merge_tail_metadata: true,
+        }
+    }
+
+    pub(super) fn named_with_flags(
+        name: impl Into<String>,
+        content: Vec<RuntimeObject>,
+        flags: Option<i32>,
+    ) -> Self {
+        Self {
+            content,
+            name: Some(name.into()),
+            flags,
+            merge_tail_metadata: true,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RuntimeObject {
     Container(Container),
@@ -40,6 +73,20 @@ pub enum RuntimeObject {
     Float(FloatLiteral),
     Void,
     NativeFunction(String),
+}
+
+impl RuntimeObject {
+    pub(super) fn container(content: Vec<RuntimeObject>) -> Self {
+        Self::Container(Container::unnamed(content))
+    }
+
+    pub(super) fn named_container(name: impl Into<String>, content: Vec<RuntimeObject>) -> Self {
+        Self::Container(Container::named(name, content))
+    }
+
+    pub(super) fn named_content(name: impl Into<String>, content: Vec<RuntimeObject>) -> Self {
+        Self::NamedContent(vec![Container::named(name, content)])
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

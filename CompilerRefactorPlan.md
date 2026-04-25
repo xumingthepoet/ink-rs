@@ -100,7 +100,7 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 7 in progress. R015 through R070 are complete. Phase 1
+- Current phase: Phase 7 in progress. R015 through R071 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
@@ -1033,13 +1033,18 @@ Use these checks during phase reviews:
     Remaining raw maps in lowering are for non-path data such as constants and
     external signatures.
 
-- [ ] R071 Add runtime container builder helpers
+- [x] R071 Add runtime container builder helpers
   - Purpose: Reduce noisy direct vector manipulation in lowering without hiding
     JSON shape.
   - Approach: Add small helpers for container construction, named content tail
     metadata, and common control-command sequences.
   - Acceptance: At least one complex flow/weave construction becomes easier to
     read, and JSON output remains unchanged.
+  - Completed: Added `Container::unnamed`, `Container::named`,
+    `Container::named_with_flags`, and small `RuntimeObject` container helpers.
+    Applied them to conditional branch containers and choice/weave return and
+    named-content containers, removing repeated default field initialization
+    while preserving the runtime IR shape.
 
 - [ ] R072 Run the path resolution drill
   - Purpose: Prove path handling is centralized.
