@@ -100,7 +100,7 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 2 in progress. R015 through R023 are complete. Phase 1
+- Current phase: Phase 3 in progress. R015 through R024 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
@@ -417,12 +417,17 @@ Use these checks during phase reviews:
     ownership coverage; `cargo test -p ink-compiler syntax::` and
     `cargo test -p ink-test --test compiler_conformance` pass.
 
-- [ ] R024 Run the parser boundary changeability drill
+- [x] R024 Run the parser boundary changeability drill
   - Purpose: Verify that parser modularization improves real edit locality.
   - Approach: Pick a harmless parser diagnostic or small syntax rule adjustment
     and record which files needed edits.
   - Acceptance: The drill touches a small, expected set of parser files and
     focused tests validate it.
+  - Completed: Used the unsupported-syntax diagnostic path as the harmless
+    drill. Only `syntax/parser.rs` and this plan needed edits; the parser-owned
+    diagnostic is covered by a focused test, and `cargo test -p ink-compiler
+    syntax::parser::tests::unsupported_syntax_diagnostics_stay_parser_owned`
+    passes.
 
 ## Phase 3: Shared Scanning Utilities
 

@@ -489,4 +489,19 @@ mod tests {
             ]
         );
     }
+
+    #[test]
+    fn unsupported_syntax_diagnostics_stay_parser_owned() {
+        let output = parse(SourceInput::new("LIST items = ()"));
+
+        assert_eq!(output.diagnostics.len(), 1);
+        assert_eq!(
+            output.diagnostics[0].severity,
+            crate::diagnostic::DiagnosticSeverity::Error
+        );
+        assert_eq!(
+            output.diagnostics[0].message,
+            "unsupported syntax: list declaration"
+        );
+    }
 }
