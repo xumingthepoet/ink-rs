@@ -462,3 +462,80 @@ fn parse_quoted_string_literal(source: &str) -> Option<String> {
 fn is_path_identifier(source: &str) -> bool {
     source.split('.').all(is_identifier)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn snapshot(source: &str) -> String {
+        let expression = parse_initial_expression(source)
+            .unwrap_or_else(|| panic!("expected expression for {source:?}"));
+        let mut output = String::new();
+        expression.write_parse_snapshot(&mut output, 0);
+        output
+    }
+
+    #[test]
+    fn parses_current_expression_behavior_baseline() {
+        let cases = [
+            (
+                "1 + 2 * 3",
+                "Binary(+, Number(1), Binary(*, Number(2), Number(3)))",
+            ),
+            (
+                "(1 + 2) * 3",
+                "Binary(*, Binary(+, Number(1), Number(2)), Number(3))",
+            ),
+            (
+                "1 - 2 - 3",
+                "Binary(-, Binary(-, Number(1), Number(2)), Number(3))",
+            ),
+            (
+                "8 / 4 / 2",
+                "Binary(/, Binary(/, Number(8), Number(4)), Number(2))",
+            ),
+            ("8 mod 3", "Binary(%, Number(8), Number(3))"),
+            ("8 % 3", "Binary(%, Number(8), Number(3))"),
+            ("-5", "Number(-5)"),
+            ("-x", "Unary(-, VariableReference(x))"),
+            ("not ready", "Unary(not, VariableReference(ready))"),
+            ("!ready", "Unary(not, VariableReference(ready))"),
+            ("notebook", "VariableReference(notebook)"),
+            ("true", "Number(true)"),
+            ("false", "Number(false)"),
+            ("3.5", "Number(3.5)"),
+            (r#""hello""#, r#"String("hello")"#),
+            ("foo(1, bar(2, 3), \"x,y\")", "FunctionCall(foo, args=3)"),
+            ("-> knot.stitch", "DivertTarget(-> knot.stitch)"),
+            ("knot.stitch.label", "VariableReference(knot.stitch.label)"),
+            (
+                "a and b or c",
+                "Binary(or, Binary(and, VariableReference(a), VariableReference(b)), VariableReference(c))",
+            ),
+            (
+                "a && b || c",
+                "Binary(||, Binary(&&, VariableReference(a), VariableReference(b)), VariableReference(c))",
+            ),
+            (
+                "list ? item",
+                "Binary(?, VariableReference(list), VariableReference(item))",
+            ),
+            (
+                "list hasnt item",
+                "Binary(!?, VariableReference(list), VariableReference(item))",
+            ),
+            (
+                "a >= b",
+                "Binary(>=, VariableReference(a), VariableReference(b))",
+            ),
+            (
+                "1 < 2 == true",
+                "Binary(==, Binary(<, Number(1), Number(2)), Number(true))",
+            ),
+        ];
+
+        for (source, expected) in cases {
+            assert_eq!(snapshot(source), expected, "source: {source}");
+        }
+    }
+}

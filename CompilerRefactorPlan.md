@@ -100,7 +100,7 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 4 in progress. R015 through R033 are complete. Phase 1
+- Current phase: Phase 4 in progress. R015 through R034 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
@@ -533,11 +533,18 @@ Use these checks during phase reviews:
     points for existing call sites, and `cargo test -p ink-compiler syntax::`
     passes.
 
-- [ ] R034 Add expression behavior baseline tests
+- [x] R034 Add expression behavior baseline tests
   - Purpose: Lock current behavior before replacing the parser.
   - Approach: Add focused tests for precedence, associativity, unary operators,
     negative numbers, function calls, strings, divert targets, and parentheses.
   - Acceptance: At least 20 expression cases pass on the current implementation.
+  - Completed: Added a table-driven expression snapshot baseline with 24 cases
+    covering precedence, left associativity, unary operators, folded negative
+    numbers, booleans, floats, strings, function calls, divert targets, path
+    references, contains operators, comparisons, and parenthesized expressions;
+    `cargo test -p ink-compiler
+    syntax::expression::tests::parses_current_expression_behavior_baseline`
+    passes.
 
 - [ ] R035 Introduce expression token types
   - Purpose: Move away from string splitting toward a parser that can evolve.
