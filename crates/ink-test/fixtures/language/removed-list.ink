@@ -1,0 +1,1 @@
+LIST inventory = sword, shield

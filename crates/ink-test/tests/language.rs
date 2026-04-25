@@ -78,8 +78,10 @@ fn language_diagnostic_helper_asserts_error_messages() {
 
 #[test]
 fn removed_list_declaration_reports_removed_feature_diagnostic() {
-    let diagnostics =
-        diagnostics_for_language_source("removed-list.ink", "LIST inventory = sword, shield");
+    let diagnostics = diagnostics_for_language_source(
+        "removed-list.ink",
+        language_fixture_text("removed-list.ink"),
+    );
 
     assert_diagnostic_code(&diagnostics, DiagnosticCode::RemovedFeature);
     assert_diagnostic(

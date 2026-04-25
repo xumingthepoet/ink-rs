@@ -288,13 +288,17 @@ Use these checks during phase reviews:
   - Acceptance: One smoke fixture compiles through the helper and asserts a
     parse, JSON, or runtime result.
 
-- [ ] R012 Add an intentional-divergence test convention
+- [x] R012 Add an intentional-divergence test convention
   - Purpose: Make language changes explicit when they diverge from upstream
     Ink.
   - Approach: Require divergence fixtures or tests to state the old behavior,
     new behavior, and reason.
   - Acceptance: The fixture README or helper docs include this convention, and
     the first example follows it.
+  - Completed: `fixtures/language/README.md` now requires Intent, Old behavior,
+    New behavior, and Reason for divergences. `removed-list.ink` is the first
+    example fixture, and the removed LIST diagnostic test reads it through the
+    language fixture helper.
 
 - [x] R013 Add focused diagnostic test helpers
   - Purpose: Language removals and parser changes need precise diagnostics,
