@@ -14,7 +14,4 @@ pub use model::{
 };
 
 /// The current compiled story JSON format version.
-pub const INK_VERSION_CURRENT: i32 = 21;
-
-/// The minimum legacy compiled story JSON version accepted by the runtime.
-pub const INK_VERSION_MINIMUM_COMPATIBLE: i32 = 18;
+pub const INK_VERSION_CURRENT: i32 = 1;

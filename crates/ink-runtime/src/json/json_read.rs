@@ -4,42 +4,28 @@ use ink_story_json_format as format;
 use serde_json::Map;
 
 use crate::{
-    choice::Choice,
-    choice_point::ChoicePoint,
-    container::Container,
-    control_command::ControlCommand,
-    divert::Divert,
-    glue::Glue,
-    native_function_call::NativeFunctionCall,
-    object::RTObject,
-    path::Path,
-    push_pop::PushPopType,
-    story::{INK_VERSION_CURRENT, INK_VERSION_MINIMUM_COMPATIBLE},
-    story_error::StoryError,
-    tag::Tag,
-    value::Value,
-    variable_assigment::VariableAssignment,
-    variable_reference::VariableReference,
-    void::Void,
+    choice::Choice, choice_point::ChoicePoint, container::Container,
+    control_command::ControlCommand, divert::Divert, glue::Glue,
+    native_function_call::NativeFunctionCall, object::RTObject, path::Path, push_pop::PushPopType,
+    story::INK_VERSION_CURRENT, story_error::StoryError, tag::Tag, value::Value,
+    variable_assigment::VariableAssignment, variable_reference::VariableReference, void::Void,
 };
 
-pub fn load_from_string(s: &str) -> Result<(i32, Rc<Container>), StoryError> {
+pub fn load_from_string(s: &str) -> Result<Rc<Container>, StoryError> {
     let program = format::Program::from_json_str(s)
         .map_err(|error| StoryError::BadJson(error.to_string()))?;
     let version = program.ink_version;
 
-    if version > INK_VERSION_CURRENT {
-        return Err(StoryError::BadJson(
-            "Version of ink used to build story was newer than the current version of the engine"
-                .to_owned(),
-        ));
-    } else if version < INK_VERSION_MINIMUM_COMPATIBLE {
-        return Err(StoryError::BadJson("Version of ink used to build story is too old to be loaded by this version of the engine".to_owned()));
+    if version != INK_VERSION_CURRENT {
+        return Err(StoryError::BadJson(format!(
+            "Story JSON format version mismatch: expected {}, got {}.",
+            INK_VERSION_CURRENT, version
+        )));
     }
 
     let main_content_container = format_container_to_runtime(&program.root)?;
 
-    Ok((version, main_content_container))
+    Ok(main_content_container)
 }
 
 fn format_container_to_runtime(container: &format::Container) -> Result<Rc<Container>, StoryError> {
@@ -328,4 +314,30 @@ pub(crate) fn jobject_to_int_hashmap(
     }
 
     Ok(dict)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn loads_current_story_json_version() {
+        let json = r#"{"inkVersion":1,"root":["done",null],"listDefs":{}}"#;
+
+        assert!(load_from_string(json).is_ok());
+    }
+
+    #[test]
+    fn rejects_non_current_story_json_version() {
+        let json = r#"{"inkVersion":21,"root":["done",null],"listDefs":{}}"#;
+
+        let error = match load_from_string(json) {
+            Ok(_) => panic!("expected version mismatch"),
+            Err(error) => error,
+        };
+
+        assert!(error
+            .to_string()
+            .contains("Story JSON format version mismatch"));
+    }
 }

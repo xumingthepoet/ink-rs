@@ -371,6 +371,11 @@ Completed in this refactor:
   option through the same format-backed runtime loader.
 - Kept runtime save-state JSON runtime-owned, while routing story-shaped
   runtime object token serialization/deserialization through the format crate.
+- Reset the Rust compiled story JSON format version to `1` and removed legacy
+  version compatibility loading; runtime story JSON now requires an exact
+  `inkVersion` match.
+- Removed legacy save-state JSON compatibility loading; runtime save-state JSON
+  now requires the current `inkSaveVersion` and current required fields.
 
 ## Completion Criteria
 

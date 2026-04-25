@@ -11,10 +11,6 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 /// The current version of the Ink story file format.
 pub const INK_VERSION_CURRENT: i32 = ink_story_json_format::INK_VERSION_CURRENT;
-/// The minimum legacy version of ink that can be loaded by the current version
-/// of the code.
-pub const INK_VERSION_MINIMUM_COMPATIBLE: i32 =
-    ink_story_json_format::INK_VERSION_MINIMUM_COMPATIBLE;
 
 #[derive(PartialEq)]
 pub(crate) enum OutputStateChange {
@@ -122,7 +118,7 @@ mod misc {
         json::json_read,
         object::{Object, RTObject},
         path::Path,
-        story::{Story, INK_VERSION_CURRENT},
+        story::Story,
         story_error::StoryError,
         story_state::StoryState,
         value::Value,
@@ -133,7 +129,7 @@ mod misc {
         /// Construct a `Story` out of a JSON string that was compiled with
         /// `inklecate`.
         pub fn new(json_string: &str) -> Result<Self, StoryError> {
-            let (version, main_content_container) = json_read::load_from_string(json_string)?;
+            let main_content_container = json_read::load_from_string(json_string)?;
 
             let mut story = Story {
                 main_content_container: main_content_container.clone(),
@@ -153,10 +149,6 @@ mod misc {
             };
 
             story.reset_globals()?;
-
-            if version != INK_VERSION_CURRENT {
-                story.add_error(&format!("WARNING: Version of ink used to build story ({}) doesn't match current version ({}) of engine. Non-critical, but recommend synchronising.", version, INK_VERSION_CURRENT), true);
-            }
 
             Ok(story)
         }

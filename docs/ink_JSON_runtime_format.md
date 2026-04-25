@@ -4,14 +4,21 @@ When ink is compiled to JSON, it is converted to a low level format for use by t
 
 ## Top level
 
-At the top level of the JSON file are two properties. `inkVersion` is an integer that denotes the format version, and `root`, which is the outer-most Container for the entire story.
+At the top level of the JSON file are three properties. `inkVersion` is an
+integer that denotes the format version, `root` is the outer-most Container for
+the entire story, and `listDefs` contains list definitions.
 
 ```json
 {
-    "inkVersion": 10,
-    "root": <root container>
+    "inkVersion": 1,
+    "root": <root container>,
+    "listDefs": {}
 }
 ```
+
+The current Rust format version is `1`. The runtime only loads compiled story
+JSON whose `inkVersion` exactly matches the current format version; older
+compiled story JSON versions are not treated as compatible.
 
 Broadly speaking, the entire format is composed of Containers, and individual sub-elements of the Story, within those Containers.
 

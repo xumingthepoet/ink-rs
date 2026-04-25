@@ -220,7 +220,7 @@ mod tests {
         assert_eq!(
             json,
             json!({
-                "inkVersion": 21,
+                "inkVersion": 1,
                 "root": [["^Line.", "\n", ["done", {"#n": "g-0"}], null], "done", null],
                 "listDefs": {}
             })

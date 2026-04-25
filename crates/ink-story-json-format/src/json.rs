@@ -518,7 +518,7 @@ mod tests {
         assert_eq!(
             program.to_json_value(),
             json!({
-                "inkVersion": 21,
+                "inkVersion": 1,
                 "root": [["^Line.", "\n", ["done", {"#n": "g-0"}], null], "done", null],
                 "listDefs": {}
             })
@@ -528,7 +528,7 @@ mod tests {
     #[test]
     fn roundtrips_named_content_and_command_tokens() {
         let input = json!({
-            "inkVersion": 21,
+            "inkVersion": 1,
             "root": [
                 ["#", "^tag", "/#", {"->t->": "knot"}, {"#n": "g-0"}],
                 "done",
@@ -548,7 +548,7 @@ mod tests {
     #[test]
     fn roundtrips_list_values_and_native_tokens() {
         let input = json!({
-            "inkVersion": 21,
+            "inkVersion": 1,
             "root": [
                 "ev",
                 {"list": {"list.a": 1, "list.c": 3}, "origins": ["list"]},

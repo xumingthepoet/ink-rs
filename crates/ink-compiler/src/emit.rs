@@ -37,7 +37,7 @@ mod tests {
         assert_eq!(
             value,
             json!({
-                "inkVersion": 21,
+                "inkVersion": 1,
                 "root": ["^Line.", null],
                 "listDefs": {}
             })
