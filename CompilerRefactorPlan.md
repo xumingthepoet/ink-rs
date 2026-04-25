@@ -100,7 +100,7 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 8 in progress. R015 through R074 are complete. Phase 1
+- Current phase: Phase 8 in progress. R015 through R075 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
@@ -1086,13 +1086,17 @@ Use these checks during phase reviews:
     preprocessing API before syntax parsing. Existing compiler tests and
     `TestInclude` pass unchanged.
 
-- [ ] R075 Add include behavior tests
+- [x] R075 Add include behavior tests
   - Purpose: Include behavior is a language file-organization surface and must
     be protected.
   - Approach: Test root includes, flow includes, recursive includes, missing
     handlers, and missing files.
   - Acceptance: Each include behavior has a focused test with diagnostic
     assertions where relevant.
+  - Completed: Added preprocess-level include tests for root include expansion,
+    included flow reordering, flow-scope include expansion, recursive include
+    diagnostics, missing file-handler diagnostics, and missing include-file
+    diagnostics.
 
 - [ ] R076 Improve include source span strategy
   - Purpose: Diagnostics from included files should point to useful source
