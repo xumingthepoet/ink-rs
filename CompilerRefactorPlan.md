@@ -100,7 +100,7 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 2 in progress. R015 through R021 are complete. Phase 1
+- Current phase: Phase 2 in progress. R015 through R022 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
@@ -394,13 +394,17 @@ Use these checks during phase reviews:
     `cargo test -p ink-compiler syntax::` and
     `cargo test -p ink-test --test compiler_conformance` pass.
 
-- [ ] R022 Make statement trial order explicit
+- [x] R022 Make statement trial order explicit
   - Purpose: Parser behavior depends on rule order, so the order must be easy
     to inspect and defend.
   - Approach: Replace the anonymous statement rule array with named rule groups
     or a documented `StatementRuleSet`.
   - Acceptance: The code documents why the order exists, and failed rules still
     rewind exactly as before.
+  - Completed: Statement parsing now uses a named `STATEMENT_RULES` rule set
+    with an order comment and a focused order test;
+    `cargo test -p ink-compiler syntax::` and
+    `cargo test -p ink-test --test compiler_conformance` pass.
 
 - [ ] R023 Add parser module ownership tests
   - Purpose: Make extracted modules directly testable.

@@ -13,7 +13,63 @@ use super::{
     text_statement, variable,
 };
 
-type StatementRule = for<'source> fn(&mut RuleParser<'source>) -> Option<Vec<Object>>;
+type StatementRuleFn = for<'source> fn(&mut RuleParser<'source>) -> Option<Vec<Object>>;
+
+#[derive(Clone, Copy)]
+struct StatementRule {
+    name: &'static str,
+    parse: StatementRuleFn,
+}
+
+// Trial order is semantic. More specific declaration and logic forms must run
+// before generic logic, divert, and text parsing so failed trials rewind without
+// turning structured syntax into plain content.
+const STATEMENT_RULES: &[StatementRule] = &[
+    StatementRule {
+        name: "global variable declaration",
+        parse: variable::declaration_statement,
+    },
+    StatementRule {
+        name: "constant declaration",
+        parse: declaration::constant_statement,
+    },
+    StatementRule {
+        name: "external declaration",
+        parse: declaration::external_statement,
+    },
+    StatementRule {
+        name: "return statement",
+        parse: logic::return_statement,
+    },
+    StatementRule {
+        name: "temporary declaration",
+        parse: variable::temp_declaration_statement,
+    },
+    StatementRule {
+        name: "variable assignment",
+        parse: variable::assignment_statement,
+    },
+    StatementRule {
+        name: "logic line",
+        parse: logic::line_statement,
+    },
+    StatementRule {
+        name: "choice",
+        parse: choice_statement,
+    },
+    StatementRule {
+        name: "author warning",
+        parse: author_warning_statement,
+    },
+    StatementRule {
+        name: "divert",
+        parse: divert_statement,
+    },
+    StatementRule {
+        name: "text",
+        parse: text_statement,
+    },
+];
 
 pub(crate) fn parse(input: SourceInput) -> StageOutput<Story> {
     let source = SourceFile::from_input(input);
@@ -96,22 +152,10 @@ impl Parser {
         }
 
         let mut line_parser = RuleParser::new(line);
-        let statement_rules: &[StatementRule] = &[
-            variable::declaration_statement,
-            declaration::constant_statement,
-            declaration::external_statement,
-            logic::return_statement,
-            variable::temp_declaration_statement,
-            variable::assignment_statement,
-            logic::line_statement,
-            choice_statement,
-            author_warning_statement,
-            divert_statement,
-            text_statement,
-        ];
 
-        for rule in statement_rules {
-            if let Some(rule_match) = line_parser.parse_rule_with_metadata(*rule) {
+        for rule in STATEMENT_RULES {
+            if let Some(rule_match) = line_parser.parse_rule_with_metadata(rule.parse) {
+                debug_assert!(!rule.name.is_empty());
                 debug_assert!(rule_match.metadata.is_forward());
                 self.diagnostics.extend(line_parser.finish());
                 return rule_match.value;
@@ -419,5 +463,30 @@ mod tests {
 
         assert_eq!(index, 0);
         assert!(parser.diagnostics.is_empty(), "{:#?}", parser.diagnostics);
+    }
+
+    #[test]
+    fn statement_rule_order_keeps_specific_rules_before_fallbacks() {
+        let names = STATEMENT_RULES
+            .iter()
+            .map(|rule| rule.name)
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            names,
+            vec![
+                "global variable declaration",
+                "constant declaration",
+                "external declaration",
+                "return statement",
+                "temporary declaration",
+                "variable assignment",
+                "logic line",
+                "choice",
+                "author warning",
+                "divert",
+                "text",
+            ]
+        );
     }
 }
