@@ -348,6 +348,30 @@ cargo test --workspace
 make gate
 ```
 
+## Implementation Status
+
+Completed in this refactor:
+
+- Added `crates/ink-story-json-format` as the single typed compiled story JSON
+  schema and codec crate.
+- Moved compiled story version constants, control command token mapping, native
+  function token mapping, container metadata, values, diverts, choice points,
+  variable operations, glue, tags, and list values into that crate.
+- Changed compiler lowering to produce `ink_story_json_format::Program`
+  directly.
+- Deleted compiler-local `lower::ir::{RuntimeProgram, Container,
+  RuntimeObject, ControlCommand}` and removed the compiler emit conversion
+  bridge.
+- Reduced compiler `emit.rs` to the public pipeline wrapper around
+  `Program::to_json_string`.
+- Changed runtime story loading to parse JSON through
+  `ink_story_json_format::Program::from_json_str` before building the runtime
+  `Container` / `RTObject` graph.
+- Removed the duplicate streaming compiled-story JSON parser and routed that
+  option through the same format-backed runtime loader.
+- Kept runtime save-state JSON runtime-owned, while routing story-shaped
+  runtime object token serialization/deserialization through the format crate.
+
 ## Completion Criteria
 
 The work is complete when:

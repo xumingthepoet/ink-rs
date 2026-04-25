@@ -1,5 +1,6 @@
 use std::{collections::HashMap, rc::Rc};
 
+use ink_story_json_format as format;
 use serde_json::{json, Map};
 
 use crate::{
@@ -40,143 +41,127 @@ pub fn write_rtobject(o: Rc<dyn RTObject>) -> Result<serde_json::Value, StoryErr
     }
 
     if let Ok(divert) = o.clone().into_any().downcast::<Divert>() {
-        let mut div_type_key = "->";
-
-        if divert.is_external {
-            div_type_key = "x()";
-        } else if divert.pushes_to_stack {
-            if divert.stack_push_type == PushPopType::Function {
-                div_type_key = "f()";
-            } else if divert.stack_push_type == PushPopType::Tunnel {
-                div_type_key = "->t->";
-            }
-        }
-
         let target_str = if divert.has_variable_target() {
             divert.variable_divert_name.clone().unwrap()
         } else {
             divert.get_target_path_string().unwrap()
         };
 
-        let mut jobj: Map<String, serde_json::Value> = Map::new();
+        let object = if divert.is_external {
+            format::Object::ExternalFunction {
+                target: target_str,
+                args: divert.external_args,
+            }
+        } else if divert.pushes_to_stack && divert.stack_push_type == PushPopType::Function {
+            format::Object::FunctionDivert { target: target_str }
+        } else if divert.pushes_to_stack && divert.stack_push_type == PushPopType::Tunnel {
+            format::Object::TunnelDivert {
+                target: target_str,
+                variable: divert.has_variable_target(),
+            }
+        } else if divert.is_conditional {
+            format::Object::ConditionalDivert { target: target_str }
+        } else {
+            format::Object::Divert {
+                target: target_str,
+                variable: divert.has_variable_target(),
+            }
+        };
 
-        jobj.insert(div_type_key.to_string(), json!(target_str));
-
-        if divert.has_variable_target() {
-            jobj.insert("var".to_owned(), json!(true));
-        }
-
-        if divert.is_conditional {
-            jobj.insert("c".to_owned(), json!(true));
-        }
-
-        if divert.external_args > 0 {
-            jobj.insert("exArgs".to_owned(), json!(divert.external_args));
-        }
-
-        return Ok(serde_json::Value::Object(jobj));
+        return Ok(object.to_json_value());
     }
 
     if let Ok(cp) = o.clone().into_any().downcast::<ChoicePoint>() {
-        let mut jobj: Map<String, serde_json::Value> = Map::new();
-        jobj.insert(
-            "*".to_owned(),
-            json!(ChoicePoint::get_path_string_on_choice(&cp)),
-        );
-        jobj.insert("flg".to_owned(), json!(cp.get_flags()));
-        return Ok(serde_json::Value::Object(jobj));
+        return Ok(format::Object::ChoicePoint {
+            target: ChoicePoint::get_path_string_on_choice(&cp),
+            flags: cp.get_flags(),
+        }
+        .to_json_value());
     }
 
     if let Some(v) = Value::get_bool_value(o.as_ref()) {
-        return Ok(json!(v));
+        return Ok(format::Object::Bool(v).to_json_value());
     }
 
     if let Some(v) = Value::get_value::<i32>(o.as_ref()) {
-        return Ok(json!(v));
+        return Ok(format::Object::Int(v).to_json_value());
     }
 
     if let Some(v) = Value::get_value::<f32>(o.as_ref()) {
-        return Ok(json!(v));
+        return Ok(format::Object::Float(v as f64).to_json_value());
     }
 
     if let Some(v) = Value::get_value::<&StringValue>(o.as_ref()) {
-        let mut s = String::new();
-
-        if v.is_newline {
-            s.push('\n');
+        let text = if v.is_newline {
+            "\n".to_string()
         } else {
-            s.push('^');
-            s.push_str(&v.string);
-        }
-
-        return Ok(json!(s));
+            v.string.clone()
+        };
+        return Ok(format::Object::String(text).to_json_value());
     }
 
     if let Some(v) = Value::get_value::<&Path>(o.as_ref()) {
-        let mut jobj: Map<String, serde_json::Value> = Map::new();
-        jobj.insert("^->".to_owned(), json!(v.get_components_string()));
-        return Ok(serde_json::Value::Object(jobj));
+        return Ok(format::Object::DivertTarget(v.get_components_string()).to_json_value());
     }
 
     if let Some(v) = Value::get_value::<&VariablePointerValue>(o.as_ref()) {
-        let mut jobj: Map<String, serde_json::Value> = Map::new();
-        jobj.insert("^var".to_owned(), json!(v.variable_name));
-        jobj.insert("ci".to_owned(), json!(v.context_index));
-        return Ok(serde_json::Value::Object(jobj));
+        return Ok(format::Object::VariablePointer {
+            name: v.variable_name.clone(),
+            context_index: v.context_index,
+        }
+        .to_json_value());
     }
 
     if o.as_any().is::<Glue>() {
-        return Ok(json!("<>"));
+        return Ok(format::Object::Glue.to_json_value());
     }
 
     if let Some(cc) = o.as_any().downcast_ref::<ControlCommand>() {
-        return Ok(json!(ControlCommand::get_name(cc.command_type)));
+        let name = ControlCommand::get_name(cc.command_type);
+        let object = format::Object::from_json_value(serde_json::Value::String(name.clone()))
+            .map_err(|_| {
+                StoryError::BadJson(format!("Unsupported control command token: {name}"))
+            })?;
+        let object = match object {
+            format::Object::ControlCommand(_) | format::Object::Tag { .. } => object,
+            _ => {
+                return Err(StoryError::BadJson(format!(
+                    "Unsupported control command token: {name}"
+                )))
+            }
+        };
+        return Ok(object.to_json_value());
     }
 
     if let Some(f) = o.as_any().downcast_ref::<NativeFunctionCall>() {
-        let mut name = NativeFunctionCall::get_name(f.op);
-
-        // Avoid collision with ^ used to indicate a string
-        if "^".eq(&name) {
-            name = "L^".to_owned();
-        }
-
-        return Ok(json!(name));
+        return Ok(
+            format::Object::NativeFunction(NativeFunctionCall::get_name(f.op)).to_json_value(),
+        );
     }
 
     if let Ok(var_ref) = o.clone().into_any().downcast::<VariableReference>() {
-        let mut jobj: Map<String, serde_json::Value> = Map::new();
-
-        let read_count_path = var_ref.get_path_string_for_count();
-        if read_count_path.is_some() {
-            jobj.insert("CNT?".to_owned(), json!(read_count_path));
+        if let Some(read_count_path) = var_ref.get_path_string_for_count() {
+            return Ok(format::Object::ReadCount(read_count_path).to_json_value());
         } else {
-            jobj.insert("VAR?".to_owned(), json!(var_ref.name.clone()));
+            return Ok(format::Object::VariableReference(var_ref.name.clone()).to_json_value());
         }
-
-        return Ok(serde_json::Value::Object(jobj));
     }
 
     if let Some(var_ass) = o.as_any().downcast_ref::<VariableAssignment>() {
-        let mut jobj: Map<String, serde_json::Value> = Map::new();
-
-        let key = if var_ass.is_global {
-            "VAR=".to_owned()
+        let object = if var_ass.is_new_declaration && var_ass.is_global {
+            format::Object::GlobalVariableAssignment(var_ass.variable_name.clone())
+        } else if var_ass.is_new_declaration {
+            format::Object::VariableAssignment(var_ass.variable_name.clone())
+        } else if var_ass.is_global {
+            format::Object::VariableReassignment(var_ass.variable_name.clone())
         } else {
-            "temp=".to_owned()
+            format::Object::TempVariableReassignment(var_ass.variable_name.clone())
         };
-        jobj.insert(key, json!(var_ass.variable_name));
-
-        // Reassignment?
-        if !var_ass.is_new_declaration {
-            jobj.insert("re".to_owned(), json!(true));
-        }
-
-        return Ok(serde_json::Value::Object(jobj));
+        return Ok(object.to_json_value());
     }
 
     if o.as_any().is::<Void>() {
-        return Ok(json!("void"));
+        return Ok(format::Object::Void.to_json_value());
     }
 
     if let Some(tag) = o.as_any().downcast_ref::<Tag>() {
@@ -201,44 +186,47 @@ pub fn write_rt_container(
     container: &Container,
     without_name: bool,
 ) -> Result<serde_json::Value, StoryError> {
-    let mut c_array: Vec<serde_json::Value> = Vec::new();
-
-    for c in container.content.iter() {
-        c_array.push(write_rtobject(c.clone())?);
+    let mut format_container = runtime_container_to_format(container, container.name.clone())?;
+    if without_name {
+        format_container.name = None;
     }
 
-    // Container is always an array [...]
-    // But the final element is always either:
-    // - a dictionary containing the named content, as well as possibly
-    // the key "#" with the count flags
-    // - null, if neither of the above
-    let named_only_content = &container.get_named_only_content();
-    let count_flags = container.get_count_flags();
-    let has_name_property = container.name.is_some() && !without_name;
+    Ok(format_container.to_json_value_with_name(!without_name))
+}
 
-    let has_terminator = !named_only_content.is_empty() || count_flags > 0 || has_name_property;
+fn runtime_container_to_format(
+    container: &Container,
+    name: Option<String>,
+) -> Result<format::Container, StoryError> {
+    let content = container
+        .content
+        .iter()
+        .map(|object| runtime_object_to_format_object(object.clone()))
+        .collect::<Result<Vec<_>, _>>()?;
+    let named_content = container
+        .get_named_only_content()
+        .iter()
+        .map(|(name, container)| {
+            runtime_container_to_format(container.as_ref(), Some(name.clone()))
+                .map(|container| format::NamedContainer::new(name.clone(), container))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let flags = match container.get_count_flags() {
+        0 => None,
+        flags => Some(flags),
+    };
 
-    if has_terminator {
-        let mut t_obj: Map<String, serde_json::Value> = Map::new();
+    Ok(format::Container {
+        content,
+        named_content,
+        name,
+        flags,
+    })
+}
 
-        for (name, c) in named_only_content {
-            t_obj.insert(name.clone(), write_rt_container(c.as_ref(), true)?);
-        }
-
-        if count_flags > 0 {
-            t_obj.insert("#f".to_owned(), json!(count_flags));
-        }
-
-        if has_name_property {
-            t_obj.insert("#n".to_owned(), json!(container.name));
-        }
-
-        c_array.push(serde_json::Value::Object(t_obj));
-    } else {
-        c_array.push(serde_json::Value::Null);
-    }
-
-    Ok(serde_json::Value::Array(c_array))
+fn runtime_object_to_format_object(object: Rc<dyn RTObject>) -> Result<format::Object, StoryError> {
+    let value = write_rtobject(object)?;
+    format::Object::from_json_value(value).map_err(|error| StoryError::BadJson(error.to_string()))
 }
 
 pub fn write_choice(choice: &Choice) -> serde_json::Value {

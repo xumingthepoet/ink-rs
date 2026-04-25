@@ -67,7 +67,20 @@ fn format_container_to_runtime(container: &format::Container) -> Result<Rc<Conta
 fn format_object_to_runtime(object: &format::Object) -> Result<Rc<dyn RTObject>, StoryError> {
     match object {
         format::Object::Container(container) => Ok(format_container_to_runtime(container)?),
-        format::Object::Value(value) => format_value_to_runtime(value),
+        format::Object::String(value) => Ok(Rc::new(Value::new::<&str>(value))),
+        format::Object::Bool(value) => Ok(Rc::new(Value::new::<bool>(*value))),
+        format::Object::Int(value) => Ok(Rc::new(Value::new::<i32>(*value))),
+        format::Object::Float(value) => Ok(Rc::new(Value::new::<f32>(*value as f32))),
+        format::Object::DivertTarget(target) => Ok(Rc::new(Value::new::<Path>(
+            Path::new_with_components_string(Some(target)),
+        ))),
+        format::Object::VariablePointer {
+            name,
+            context_index,
+        } => Ok(Rc::new(Value::new_variable_pointer(name, *context_index))),
+        format::Object::List(_) => Err(StoryError::BadJson(
+            "Ink list values are not supported by this runtime.".to_owned(),
+        )),
         format::Object::ControlCommand(command) => {
             let token = command.token();
             ControlCommand::new_from_name(token)
@@ -76,82 +89,122 @@ fn format_object_to_runtime(object: &format::Object) -> Result<Rc<dyn RTObject>,
                     StoryError::BadJson(format!("Unsupported control command token: {token}"))
                 })
         }
-        format::Object::NativeFunction(function) => {
-            let name = function.name();
-            NativeFunctionCall::new_from_name(name)
-                .map(|function| Rc::new(function) as Rc<dyn RTObject>)
+        format::Object::NativeFunction(function) => NativeFunctionCall::new_from_name(function)
+            .map(|function| Rc::new(function) as Rc<dyn RTObject>)
+            .ok_or_else(|| {
+                StoryError::BadJson(format!("Unsupported native function token: {function}"))
+            }),
+        format::Object::Divert { target, variable } => {
+            Ok(Rc::new(format_divert_to_runtime(format::Object::Divert {
+                target: target.clone(),
+                variable: *variable,
+            })))
+        }
+        format::Object::TunnelDivert { target, variable } => Ok(Rc::new(format_divert_to_runtime(
+            format::Object::TunnelDivert {
+                target: target.clone(),
+                variable: *variable,
+            },
+        ))),
+        format::Object::FunctionDivert { target } => Ok(Rc::new(format_divert_to_runtime(
+            format::Object::FunctionDivert {
+                target: target.clone(),
+            },
+        ))),
+        format::Object::ExternalFunction { target, args } => Ok(Rc::new(format_divert_to_runtime(
+            format::Object::ExternalFunction {
+                target: target.clone(),
+                args: *args,
+            },
+        ))),
+        format::Object::ConditionalDivert { target } => Ok(Rc::new(format_divert_to_runtime(
+            format::Object::ConditionalDivert {
+                target: target.clone(),
+            },
+        ))),
+        format::Object::ChoicePoint { target, flags } => {
+            Ok(Rc::new(ChoicePoint::new(*flags, target)))
+        }
+        format::Object::VariableAssignment(name) => {
+            Ok(Rc::new(VariableAssignment::new(name, true, false)))
+        }
+        format::Object::GlobalVariableAssignment(name) => {
+            Ok(Rc::new(VariableAssignment::new(name, true, true)))
+        }
+        format::Object::TempVariableReassignment(name) => {
+            Ok(Rc::new(VariableAssignment::new(name, false, false)))
+        }
+        format::Object::VariableReassignment(name) => {
+            Ok(Rc::new(VariableAssignment::new(name, false, true)))
+        }
+        format::Object::VariableReference(name) => Ok(Rc::new(VariableReference::new(name))),
+        format::Object::ReadCount(target) => {
+            Ok(Rc::new(VariableReference::from_path_for_count(target)))
+        }
+        format::Object::Glue => Ok(Rc::new(Glue::new())),
+        format::Object::Tag { is_start } => {
+            let token_value = format::Object::Tag {
+                is_start: *is_start,
+            }
+            .to_json_value();
+            let token = token_value
+                .as_str()
+                .expect("format tag object must serialize to a string token");
+            ControlCommand::new_from_name(token)
+                .map(|command| Rc::new(command) as Rc<dyn RTObject>)
                 .ok_or_else(|| {
-                    StoryError::BadJson(format!("Unsupported native function token: {name}"))
+                    StoryError::BadJson(format!("Unsupported control command token: {token}"))
                 })
         }
-        format::Object::Divert(divert) => Ok(Rc::new(format_divert_to_runtime(divert))),
-        format::Object::ChoicePoint(choice) => {
-            Ok(Rc::new(ChoicePoint::new(choice.flags, &choice.target)))
-        }
-        format::Object::VariableAssignment(assignment) => Ok(Rc::new(VariableAssignment::new(
-            &assignment.name,
-            assignment.is_new_declaration,
-            matches!(assignment.kind, format::VariableAssignmentKind::Global),
-        ))),
-        format::Object::VariableReference(reference) => match reference.kind {
-            format::VariableReferenceKind::Variable => {
-                Ok(Rc::new(VariableReference::new(&reference.name)))
-            }
-            format::VariableReferenceKind::ReadCount => Ok(Rc::new(
-                VariableReference::from_path_for_count(&reference.name),
-            )),
-        },
-        format::Object::Glue => Ok(Rc::new(Glue::new())),
         format::Object::Void => Ok(Rc::new(Void::new())),
     }
 }
 
-fn format_value_to_runtime(value: &format::Value) -> Result<Rc<dyn RTObject>, StoryError> {
-    match value {
-        format::Value::String(value) => Ok(Rc::new(Value::new::<&str>(value))),
-        format::Value::Bool(value) => Ok(Rc::new(Value::new::<bool>(*value))),
-        format::Value::Int(value) => Ok(Rc::new(Value::new::<i32>(*value))),
-        format::Value::Float(value) => Ok(Rc::new(Value::new::<f32>(*value as f32))),
-        format::Value::DivertTarget(target) => Ok(Rc::new(Value::new::<Path>(
-            Path::new_with_components_string(Some(target)),
-        ))),
-        format::Value::VariablePointer(pointer) => Ok(Rc::new(Value::new_variable_pointer(
-            &pointer.name,
-            pointer.context_index,
-        ))),
-        format::Value::List(_) => Err(StoryError::BadJson(
-            "Ink list values are not supported by this runtime.".to_owned(),
-        )),
-    }
-}
-
-fn format_divert_to_runtime(divert: &format::Divert) -> Divert {
-    let pushes_to_stack = matches!(
-        divert.kind,
-        format::DivertKind::Function | format::DivertKind::Tunnel
-    );
-    let div_push_type = match divert.kind {
-        format::DivertKind::Tunnel => PushPopType::Tunnel,
-        _ => PushPopType::Function,
-    };
-    let external = matches!(divert.kind, format::DivertKind::External);
-    let var_divert_name = if divert.variable {
-        Some(divert.target.clone())
-    } else {
+fn format_divert_to_runtime(divert: format::Object) -> Divert {
+    let (target, variable, conditional, external, external_args, pushes_to_stack, div_push_type) =
+        match divert {
+            format::Object::Divert { target, variable } => (
+                target,
+                variable,
+                false,
+                false,
+                0,
+                false,
+                PushPopType::Function,
+            ),
+            format::Object::TunnelDivert { target, variable } => {
+                (target, variable, false, false, 0, true, PushPopType::Tunnel)
+            }
+            format::Object::FunctionDivert { target } => {
+                (target, false, false, false, 0, true, PushPopType::Function)
+            }
+            format::Object::ExternalFunction { target, args } => (
+                target,
+                false,
+                false,
+                true,
+                args,
+                false,
+                PushPopType::Function,
+            ),
+            format::Object::ConditionalDivert { target } => {
+                (target, false, true, false, 0, false, PushPopType::Function)
+            }
+            _ => unreachable!("format divert conversion requires a divert object"),
+        };
+    let var_divert_name = if variable { Some(target.clone()) } else { None };
+    let target_path = if variable {
         None
-    };
-    let target_path = if divert.variable {
-        None
     } else {
-        Some(divert.target.as_str())
+        Some(target.as_str())
     };
 
     Divert::new(
         pushes_to_stack,
         div_push_type,
         external,
-        divert.external_args.unwrap_or(0),
-        divert.conditional,
+        external_args,
+        conditional,
         var_divert_name,
         target_path,
     )
@@ -161,290 +214,38 @@ pub fn jtoken_to_runtime_object(
     token: &serde_json::Value,
     name: Option<String>,
 ) -> Result<Rc<dyn RTObject>, StoryError> {
-    match token {
-        serde_json::Value::Null => Err(StoryError::BadJson(format!(
-            "Failed to convert token to runtime RTObject: {}",
-            token
-        ))),
-        serde_json::Value::Bool(value) => Ok(Rc::new(Value::new::<bool>(value.to_owned()))),
-        serde_json::Value::Number(_) => {
-            if token.is_i64() {
-                let val: i32 = token.as_i64().unwrap().try_into().unwrap();
-                Ok(Rc::new(Value::new::<i32>(val)))
-            } else {
-                let val: f32 = token.as_f64().unwrap() as f32;
-                Ok(Rc::new(Value::new::<f32>(val)))
-            }
+    if let serde_json::Value::Array(value) = token {
+        return jarray_to_container(value, name);
+    }
+
+    if let serde_json::Value::Object(obj) = token {
+        if obj.get("originalChoicePath").is_some() {
+            return jobject_to_choice(obj);
         }
 
-        serde_json::Value::String(value) => {
-            let str = value.as_str();
-
-            // String value
-            let first_char = str.chars().next().unwrap();
-            if first_char == '^' {
-                return Ok(Rc::new(Value::new::<&str>(&str[1..])));
-            } else if first_char == '\n' && str.len() == 1 {
-                return Ok(Rc::new(Value::new::<&str>("\n")));
-            }
-
-            // Glue
-            if "<>".eq(str) {
-                return Ok(Rc::new(Glue::new()));
-            }
-
-            if let Some(control_command) = ControlCommand::new_from_name(str) {
-                return Ok(Rc::new(control_command));
-            }
-
-            // Native functions
-            // "^" conflicts with the way to identify strings, so now
-            // we know it's not a string, we can convert back to the proper
-            // symbol for the operator.
-            let mut call_str = str;
-            if "L^".eq(str) {
-                call_str = "^";
-            }
-            if let Some(native_function_call) = NativeFunctionCall::new_from_name(call_str) {
-                return Ok(Rc::new(native_function_call));
-            }
-
-            // Void
-            if "void".eq(str) {
-                return Ok(Rc::new(Void::new()));
-            }
-
-            Err(StoryError::BadJson(format!(
-                "Failed to convert token to runtime RTObject: {}",
-                token
-            )))
-        }
-        serde_json::Value::Array(value) => Ok(jarray_to_container(value, name)?),
-        serde_json::Value::Object(obj) => {
-            // Divert target value to path
-            let prop_value = obj.get("^->");
-
-            if let Some(prop_value) = prop_value {
-                return Ok(Rc::new(Value::new::<Path>(
-                    Path::new_with_components_string(prop_value.as_str()),
-                )));
-            }
-
-            // // VariablePointerValue
-            let prop_value = obj.get("^var");
-
-            if let Some(v) = prop_value {
-                let variable_name = v.as_str().unwrap();
-                let mut contex_index = -1;
-                let prop_value = obj.get("ci");
-
-                if let Some(v) = prop_value {
-                    contex_index = v.as_i64().unwrap() as i32;
-                }
-
-                let var_ptr = Rc::new(Value::new_variable_pointer(variable_name, contex_index));
-
-                return Ok(var_ptr);
-            }
-
-            // // Divert
-            let mut is_divert = false;
-            let mut pushes_to_stack = false;
-            let mut div_push_type = PushPopType::Function;
-            let mut external = false;
-
-            let mut prop_value = obj.get("->");
-            if prop_value.is_some() {
-                is_divert = true;
-            } else {
-                prop_value = obj.get("f()");
-                if prop_value.is_some() {
-                    is_divert = true;
-                    pushes_to_stack = true;
-                    div_push_type = PushPopType::Function;
-                } else {
-                    prop_value = obj.get("->t->");
-                    if prop_value.is_some() {
-                        is_divert = true;
-                        pushes_to_stack = true;
-                        div_push_type = PushPopType::Tunnel;
-                    } else {
-                        prop_value = obj.get("x()");
-                        if prop_value.is_some() {
-                            is_divert = true;
-                            external = true;
-                            pushes_to_stack = false;
-                            div_push_type = PushPopType::Function;
-                        }
-                    }
-                }
-            }
-
-            if is_divert {
-                let target = prop_value.unwrap().as_str().unwrap().to_string();
-
-                let mut var_divert_name: Option<String> = None;
-                let mut target_path: Option<String> = None;
-
-                prop_value = obj.get("var");
-
-                if prop_value.is_some() {
-                    var_divert_name = Some(target);
-                } else {
-                    target_path = Some(target);
-                }
-
-                prop_value = obj.get("c");
-                let conditional = prop_value.is_some();
-                let mut external_args = 0;
-
-                if external {
-                    prop_value = obj.get("exArgs");
-                    if let Some(prop_value) = prop_value {
-                        external_args = prop_value.as_i64().unwrap() as usize;
-                    }
-                }
-
-                return Ok(Rc::new(Divert::new(
-                    pushes_to_stack,
-                    div_push_type,
-                    external,
-                    external_args,
-                    conditional,
-                    var_divert_name,
-                    target_path.as_deref(),
-                )));
-            }
-
-            // Choice
-            let prop_value = obj.get("*");
-            if let Some(cp) = prop_value {
-                let mut flags = 0;
-                let path_string_on_choice = cp.as_str().unwrap();
-                let prop_value = obj.get("flg");
-                if let Some(f) = prop_value {
-                    flags = f.as_u64().unwrap();
-                }
-
-                return Ok(Rc::new(ChoicePoint::new(
-                    flags as i32,
-                    path_string_on_choice,
-                )));
-            }
-
-            // // Variable reference
-            let prop_value = obj.get("VAR?");
-            if let Some(name) = prop_value {
-                return Ok(Rc::new(VariableReference::new(name.as_str().unwrap())));
-            }
-
-            let prop_value = obj.get("CNT?");
-            if let Some(v) = prop_value {
-                return Ok(Rc::new(VariableReference::from_path_for_count(
-                    v.as_str().unwrap(),
-                )));
-            }
-
-            // // Variable assignment
-            let mut is_var_ass = false;
-            let mut is_global_var = false;
-
-            let mut prop_value = obj.get("VAR=");
-            match prop_value {
-                Some(_) => {
-                    is_var_ass = true;
-                    is_global_var = true;
-                }
-                None => {
-                    prop_value = obj.get("temp=");
-                    if prop_value.is_some() {
-                        is_var_ass = true;
-                        is_global_var = false;
-                    }
-                }
-            }
-
-            if is_var_ass {
-                let var_name = prop_value.unwrap().as_str().unwrap();
-                let prop_value = obj.get("re");
-                let is_new_decl = prop_value.is_none();
-
-                let var_ass = Rc::new(VariableAssignment::new(
-                    var_name,
-                    is_new_decl,
-                    is_global_var,
-                ));
-                return Ok(var_ass);
-            }
-
-            // Legacy Tag
-            prop_value = obj.get("#");
-            if let Some(prop_value) = prop_value {
-                return Ok(Rc::new(Tag::new(prop_value.as_str().unwrap())));
-            }
-
-            prop_value = obj.get("list");
-
-            if prop_value.is_some() {
-                return Err(StoryError::BadJson(
-                    "Ink list values are not supported by this runtime.".to_owned(),
-                ));
-            }
-
-            // Used when serialising save state only
-            if obj.get("originalChoicePath").is_some() {
-                return jobject_to_choice(obj);
-            }
-
-            Err(StoryError::BadJson(format!(
-                "Failed to convert token to runtime RTObject: {}",
-                token
-            )))
+        if let Some(prop_value) = obj.get("#") {
+            return Ok(Rc::new(Tag::new(prop_value.as_str().unwrap())));
         }
     }
+
+    let object = format::Object::from_json_value(token.clone()).map_err(|_| {
+        StoryError::BadJson(format!(
+            "Failed to convert token to runtime RTObject: {}",
+            token
+        ))
+    })?;
+    format_object_to_runtime(&object)
 }
 
 fn jarray_to_container(
-    jarray: &Vec<serde_json::Value>,
+    jarray: &[serde_json::Value],
     name: Option<String>,
 ) -> Result<Rc<dyn RTObject>, StoryError> {
-    // Final object in the array is always a combination of
-    //  - named content
-    //  - a "#f" key with the countFlags
-    // (if either exists at all, otherwise null)
-    let terminating_obj = jarray[jarray.len() - 1].as_object();
-    let mut name: Option<String> = name;
-    let mut flags = 0;
-
-    let mut named_only_content: HashMap<String, Rc<Container>> = HashMap::new();
-
-    if let Some(terminating_obj) = terminating_obj {
-        for (k, v) in terminating_obj {
-            match k.as_str() {
-                "#f" => flags = v.as_i64().unwrap().try_into().unwrap(),
-                "#n" => name = Some(v.as_str().unwrap().to_string()),
-                k => {
-                    let named_content_item =
-                        jtoken_to_runtime_object(v, Some(k.to_string())).unwrap();
-
-                    let named_sub_container = named_content_item
-                        .into_any()
-                        .downcast::<Container>()
-                        .unwrap();
-
-                    named_only_content.insert(k.to_string(), named_sub_container);
-                }
-            }
-        }
-    }
-
-    let container = Container::new(
-        name,
-        flags,
-        jarray_to_runtime_obj_list(jarray, true)?,
-        named_only_content,
-    );
-    Ok(container)
+    let container_value = serde_json::Value::Array(jarray.to_vec());
+    let container = format::Container::from_json_value(container_value, name)
+        .map_err(|error| StoryError::BadJson(error.to_string()))?;
+    let runtime_container: Rc<dyn RTObject> = format_container_to_runtime(&container)?;
+    Ok(runtime_container)
 }
 
 pub fn jarray_to_runtime_obj_list(

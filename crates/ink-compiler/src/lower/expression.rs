@@ -1,10 +1,11 @@
 use std::collections::{HashMap, HashSet};
 
+use ink_story_json_format::{ControlCommand, Object as RuntimeObject};
+
 use crate::parsed::{BinaryOperator, Expression, FlowArgument};
 
 use super::context::ChoicePathMode;
 use super::indexes::{CallSignature, ExternalSignatures};
-use super::ir::{ControlCommand, RuntimeObject};
 use super::path::LabelIndex;
 use super::weave::lower_content_list_into_context;
 
@@ -113,7 +114,7 @@ fn lower_expression_into_with_constants(
             content.push(RuntimeObject::ControlCommand(ControlCommand::EndString));
         }
         Expression::NumberInt(value) => content.push(RuntimeObject::Int(*value)),
-        Expression::NumberFloat(value) => content.push(RuntimeObject::Float(*value)),
+        Expression::NumberFloat(value) => content.push(RuntimeObject::Float(value.value())),
         Expression::NumberBool(value) => content.push(RuntimeObject::Bool(*value)),
         Expression::DivertTarget(target) => {
             let resolved_target = if let Some(choice_target) = choice_labels.get(target) {

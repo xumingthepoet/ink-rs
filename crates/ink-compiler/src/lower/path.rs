@@ -1,6 +1,6 @@
 use std::{borrow::Borrow, collections::HashMap, fmt};
 
-use super::ir::{Container, RuntimeObject};
+use ink_story_json_format::{Container, Object as RuntimeObject};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub(super) struct RuntimePath(String);
@@ -210,13 +210,13 @@ fn compact_path_strings_in_container_at(
     container_path: &str,
     semantic_paths: &HashMap<String, Option<String>>,
 ) {
+    for named in &mut container.named_content {
+        let path = child_path(container_path, &named.name);
+        compact_path_strings_in_container_at(&mut named.container, &path, semantic_paths);
+    }
+
     let mut content_index = 0;
     for object in &mut container.content {
-        if matches!(object, RuntimeObject::NamedContent(_)) {
-            compact_path_strings_in_named_content(object, container_path, semantic_paths);
-            continue;
-        }
-
         let object_path = match object {
             RuntimeObject::Container(container) => container
                 .name
@@ -230,24 +230,6 @@ fn compact_path_strings_in_container_at(
     }
 }
 
-fn compact_path_strings_in_named_content(
-    object: &mut RuntimeObject,
-    container_path: &str,
-    semantic_paths: &HashMap<String, Option<String>>,
-) {
-    let RuntimeObject::NamedContent(containers) = object else {
-        return;
-    };
-
-    for container in containers {
-        let Some(name) = container.name.clone() else {
-            continue;
-        };
-        let path = child_path(container_path, &name);
-        compact_path_strings_in_container_at(container, &path, semantic_paths);
-    }
-}
-
 fn compact_path_strings_in_object(
     object: &mut RuntimeObject,
     object_path: &str,
@@ -256,9 +238,6 @@ fn compact_path_strings_in_object(
     match object {
         RuntimeObject::Container(container) => {
             compact_path_strings_in_container_at(container, object_path, semantic_paths);
-        }
-        RuntimeObject::NamedContent(_) => {
-            compact_path_strings_in_named_content(object, object_path, semantic_paths)
         }
         RuntimeObject::Divert { target, variable }
         | RuntimeObject::TunnelDivert { target, variable } => {
@@ -300,19 +279,13 @@ fn collect_semantic_paths(
     container_path: &str,
     paths: &mut HashMap<String, Option<String>>,
 ) {
+    for named in &container.named_content {
+        let path = child_path(container_path, &named.name);
+        collect_semantic_path_for_container(&named.container, &path, paths);
+    }
+
     let mut content_index = 0;
     for object in &container.content {
-        if let RuntimeObject::NamedContent(containers) = object {
-            for container in containers {
-                let Some(name) = container.name.as_deref() else {
-                    continue;
-                };
-                let path = child_path(container_path, name);
-                collect_semantic_path_for_container(container, &path, paths);
-            }
-            continue;
-        }
-
         let object_path = match object {
             RuntimeObject::Container(container) => container
                 .name
@@ -360,10 +333,14 @@ mod tests {
     fn container(name: Option<&str>, content: Vec<RuntimeObject>) -> Container {
         Container {
             content,
+            named_content: Vec::new(),
             name: name.map(str::to_string),
             flags: None,
-            merge_tail_metadata: true,
         }
+    }
+
+    fn named_container(container: Container) -> ink_story_json_format::NamedContainer {
+        ink_story_json_format::NamedContainer::new(container.name.clone().unwrap(), container)
     }
 
     #[test]
@@ -433,15 +410,16 @@ mod tests {
             None,
             vec![RuntimeObject::Container(container(
                 Some("knot"),
-                vec![
-                    RuntimeObject::Divert {
-                        target: "knot.0.label".to_string(),
-                        variable: false,
-                    },
-                    RuntimeObject::NamedContent(vec![container(Some("label"), Vec::new())]),
-                ],
+                vec![RuntimeObject::Divert {
+                    target: "knot.0.label".to_string(),
+                    variable: false,
+                }],
             ))],
         );
+        if let RuntimeObject::Container(knot) = &mut root.content[0] {
+            knot.named_content
+                .push(named_container(container(Some("label"), Vec::new())));
+        }
 
         compact_path_strings_in_container(&mut root);
 

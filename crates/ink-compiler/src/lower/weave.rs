@@ -1,15 +1,16 @@
 use std::collections::{HashMap, HashSet};
 
+use ink_story_json_format::{Container, ControlCommand, NamedContainer, Object as RuntimeObject};
+
 use crate::parsed::{Choice, ContentList, Expression, Object, Weave};
 
 use super::context::ChoicePathMode;
 use super::expression::lower_expression_into;
 use super::indexes::{collect_counted_paths_in_weave, CountedFlowPaths, ExternalSignatures};
-use super::ir::{Container, ControlCommand, RuntimeObject};
 use super::path::{child_path, LabelIndex};
 use super::{
     done_container, ends_with_end_or_done, lower_object_into_with_context,
-    lower_object_into_with_context_count,
+    lower_object_into_with_context_count, named_container, named_content,
 };
 
 enum ChoiceOuter {
@@ -150,7 +151,7 @@ pub(super) fn lower_choice_weave(
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
     count_all_visits: bool,
-) -> Vec<RuntimeObject> {
+) -> Container {
     lower_choice_weave_with_initial_content(
         weave,
         path_mode,
@@ -172,7 +173,7 @@ pub(super) fn lower_choice_weave_with_initial_content(
     constants: &HashMap<String, Expression>,
     count_all_visits: bool,
     initial_content: Vec<RuntimeObject>,
-) -> Vec<RuntimeObject> {
+) -> Container {
     let mut main_content = initial_content;
     let mut named_content = Vec::new();
     let mut index = 0;
@@ -280,9 +281,6 @@ pub(super) fn lower_choice_weave_with_initial_content(
                     count_all_visits,
                     &counted_paths,
                 );
-                if !gather_named_content.is_empty() {
-                    gather_content.push(RuntimeObject::NamedContent(gather_named_content));
-                }
                 if !gather_has_choice && !ends_with_end_or_done(&gather_content) {
                     if let Some(target) = gather_path_mode.fallback_gather_target() {
                         gather_content.push(RuntimeObject::Divert {
@@ -294,6 +292,7 @@ pub(super) fn lower_choice_weave_with_initial_content(
 
                 let gather_container = Container {
                     content: gather_content,
+                    named_content: gather_named_content,
                     name: Some(gather_name),
                     flags: named_container_flags(
                         count_all_visits
@@ -306,7 +305,6 @@ pub(super) fn lower_choice_weave_with_initial_content(
                             .contains(&gather_path_mode.container_path()),
                         gather.identifier().is_some(),
                     ),
-                    merge_tail_metadata: true,
                 };
                 if auto_enter_gather {
                     if let Some(location) = last_gather_location.clone() {
@@ -327,7 +325,7 @@ pub(super) fn lower_choice_weave_with_initial_content(
                         last_gather_location = Some(GatherLocation::Main(vec![child_index]));
                     }
                 } else {
-                    named_content.push(gather_container);
+                    named_content.push(named_container(gather_container));
                     last_gather_location =
                         Some(GatherLocation::Named(vec![named_content.len() - 1]));
                 }
@@ -364,13 +362,12 @@ pub(super) fn lower_choice_weave_with_initial_content(
             if let Some(container) =
                 gather_container_at_location_mut(&mut main_content, &mut named_content, &location)
             {
-                push_before_trailing_named_content(
-                    &mut container.content,
-                    RuntimeObject::Container(done_container(
+                container
+                    .content
+                    .push(RuntimeObject::Container(done_container(
                         &format!("g-{gather_count}"),
                         count_all_visits,
-                    )),
-                );
+                    )));
             }
         }
     } else if !path_mode.is_nested_root()
@@ -378,23 +375,17 @@ pub(super) fn lower_choice_weave_with_initial_content(
         && needs_terminal_gather
         && path_mode.fallback_gather_target().is_none()
     {
-        named_content.push(done_container(
+        named_content.push(named_container(done_container(
             &format!("g-{gather_count}"),
             count_all_visits,
-        ));
-    }
-    if !named_content.is_empty() {
-        main_content.push(RuntimeObject::NamedContent(named_content));
+        )));
     }
 
-    main_content
-}
-
-fn push_before_trailing_named_content(content: &mut Vec<RuntimeObject>, object: RuntimeObject) {
-    if matches!(content.last(), Some(RuntimeObject::NamedContent(_))) {
-        content.insert(content.len() - 1, object);
-    } else {
-        content.push(object);
+    Container {
+        content: main_content,
+        named_content,
+        name: None,
+        flags: None,
     }
 }
 
@@ -402,7 +393,7 @@ fn lower_weave_section(
     objects: &[Object],
     index: &mut usize,
     content: &mut Vec<RuntimeObject>,
-    named_content: &mut Vec<Container>,
+    named_content: &mut Vec<NamedContainer>,
     choice_count: &mut usize,
     needs_terminal_gather: &mut bool,
     choice_labels: &mut LabelIndex,
@@ -486,7 +477,7 @@ fn section_contains_choice(objects: &[Object], start: usize, end: usize) -> bool
 
 fn gather_container_at_location_mut<'a>(
     main_content: &'a mut Vec<RuntimeObject>,
-    named_content: &'a mut [Container],
+    named_content: &'a mut [NamedContainer],
     location: &GatherLocation,
 ) -> Option<&'a mut Container> {
     match location {
@@ -496,12 +487,12 @@ fn gather_container_at_location_mut<'a>(
 }
 
 fn nested_container_in_named_content_mut<'a>(
-    named_content: &'a mut [Container],
+    named_content: &'a mut [NamedContainer],
     path: &[usize],
 ) -> Option<&'a mut Container> {
     let (&first, rest) = path.split_first()?;
-    let container = named_content.get_mut(first)?;
-    nested_container_in_container_mut(container, rest)
+    let named = named_content.get_mut(first)?;
+    nested_container_in_container_mut(&mut named.container, rest)
 }
 
 fn nested_container_in_runtime_content_mut<'a>(
@@ -532,7 +523,7 @@ fn lower_choice_in_section(
     objects: &[Object],
     index: &mut usize,
     content: &mut Vec<RuntimeObject>,
-    named_content: &mut Vec<Container>,
+    named_content: &mut Vec<NamedContainer>,
     choice_count: &mut usize,
     needs_terminal_gather: &mut bool,
     choice_labels: &mut LabelIndex,
@@ -636,7 +627,7 @@ fn lower_choice_in_section(
         *needs_terminal_gather = true;
     }
 
-    named_content.push(Container::named_with_flags(
+    named_content.push(named_container(Container::named_with_flags(
         choice_container_name,
         choice_content,
         named_container_flags(
@@ -646,7 +637,7 @@ fn lower_choice_in_section(
             counted_paths.turns.contains(&choice_container_path),
             false,
         ),
-    ));
+    )));
     if let Some(identifier) = choice.identifier() {
         choice_labels.insert(
             identifier.to_string(),
@@ -806,9 +797,13 @@ fn choice_outer(
         target: "$r".to_string(),
         variable: true,
     });
-    outer_content.push(RuntimeObject::named_content("s", start_content));
 
-    ChoiceOuter::Nested(Container::unnamed(outer_content))
+    let mut outer_container = Container::unnamed(outer_content);
+    outer_container
+        .named_content
+        .push(named_content("s", start_content));
+
+    ChoiceOuter::Nested(outer_container)
 }
 
 pub(super) fn choice_container_prefix(

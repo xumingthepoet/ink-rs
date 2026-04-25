@@ -16,9 +16,9 @@ mod syntax;
 pub use analysis::CheckedStory;
 pub use compiler::{CompiledStory, Compiler, CompilerOptions, StageOutput};
 pub use diagnostic::{Diagnostic, DiagnosticCode, DiagnosticSeverity};
-pub use lower::ir::{
-    Container as RuntimeContainer, ControlCommand as RuntimeControlCommand, RuntimeObject,
-    RuntimeProgram,
+pub use ink_story_json_format::{
+    Container as RuntimeContainer, ControlCommand as RuntimeControlCommand,
+    NamedContainer as RuntimeNamedContainer, Object as RuntimeObject, Program as RuntimeProgram,
 };
 pub use parsed::{
     Choice, ContentList, Divert, DivertTarget, Object, Story as ParsedStory, Text, Weave,

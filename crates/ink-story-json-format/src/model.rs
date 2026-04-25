@@ -44,7 +44,7 @@ pub struct Container {
 }
 
 impl Container {
-    pub fn new(content: Vec<Object>) -> Self {
+    pub fn unnamed(content: Vec<Object>) -> Self {
         Self {
             content,
             named_content: Vec::new(),
@@ -74,6 +74,21 @@ impl Container {
             flags,
         }
     }
+
+    pub fn from_json_value(
+        value: JsonValue,
+        name_hint: Option<String>,
+    ) -> Result<Self, FormatError> {
+        json::container_from_value(&value, name_hint)
+    }
+
+    pub fn to_json_value(&self) -> JsonValue {
+        json::container_to_value(self, true)
+    }
+
+    pub fn to_json_value_with_name(&self, include_name: bool) -> JsonValue {
+        json::container_to_value(self, include_name)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -94,32 +109,55 @@ impl NamedContainer {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Object {
     Container(Container),
-    Value(Value),
-    ControlCommand(ControlCommand),
-    NativeFunction(NativeFunction),
-    Divert(Divert),
-    ChoicePoint(ChoicePoint),
-    VariableAssignment(VariableAssignment),
-    VariableReference(VariableReference),
-    Glue,
-    Void,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum Value {
     String(String),
+    ControlCommand(ControlCommand),
+    Divert { target: String, variable: bool },
+    TunnelDivert { target: String, variable: bool },
+    FunctionDivert { target: String },
+    ExternalFunction { target: String, args: usize },
+    ConditionalDivert { target: String },
+    DivertTarget(String),
+    ReadCount(String),
+    VariableAssignment(String),
+    GlobalVariableAssignment(String),
+    TempVariableReassignment(String),
+    VariableReassignment(String),
+    VariableReference(String),
+    VariablePointer { name: String, context_index: i32 },
+    ChoicePoint { target: String, flags: i32 },
+    Glue,
+    Tag { is_start: bool },
     Bool(bool),
     Int(i32),
     Float(f64),
-    DivertTarget(String),
-    VariablePointer(VariablePointer),
     List(ListValue),
+    Void,
+    NativeFunction(String),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct VariablePointer {
-    pub name: String,
-    pub context_index: i32,
+impl Object {
+    pub fn container(content: Vec<Object>) -> Self {
+        Self::Container(Container::unnamed(content))
+    }
+
+    pub fn named_container(name: impl Into<String>, content: Vec<Object>) -> Self {
+        Self::Container(Container::named(name, content))
+    }
+
+    pub fn direct_divert(target: impl Into<String>, variable: bool) -> Self {
+        Self::Divert {
+            target: target.into(),
+            variable,
+        }
+    }
+
+    pub fn from_json_value(value: JsonValue) -> Result<Self, FormatError> {
+        json::object_from_value(&value)
+    }
+
+    pub fn to_json_value(&self) -> JsonValue {
+        json::object_to_value(self)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -168,8 +206,6 @@ pub enum ControlCommand {
     SeedRandom,
     ListRange,
     ListRandom,
-    BeginTag,
-    EndTag,
 }
 
 impl ControlCommand {
@@ -198,8 +234,6 @@ impl ControlCommand {
             "srnd" => Some(Self::SeedRandom),
             "range" => Some(Self::ListRange),
             "lrnd" => Some(Self::ListRandom),
-            "#" => Some(Self::BeginTag),
-            "/#" => Some(Self::EndTag),
             _ => None,
         }
     }
@@ -229,110 +263,22 @@ impl ControlCommand {
             Self::SeedRandom => "srnd",
             Self::ListRange => "range",
             Self::ListRandom => "lrnd",
-            Self::BeginTag => "#",
-            Self::EndTag => "/#",
         }
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NativeFunction {
-    name: String,
-}
-
-impl NativeFunction {
-    pub fn new(name: impl Into<String>) -> Self {
-        Self { name: name.into() }
-    }
-
-    pub fn from_token(token: &str) -> Self {
-        if token == "L^" {
-            Self::new("^")
-        } else {
-            Self::new(token)
-        }
-    }
-
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
-    pub fn token(&self) -> &str {
-        if self.name == "^" {
-            "L^"
-        } else {
-            &self.name
-        }
+pub fn native_function_name_from_token(token: &str) -> String {
+    if token == "L^" {
+        "^".to_string()
+    } else {
+        token.to_string()
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Divert {
-    pub kind: DivertKind,
-    pub target: String,
-    pub variable: bool,
-    pub conditional: bool,
-    pub external_args: Option<usize>,
-}
-
-impl Divert {
-    pub fn new(kind: DivertKind, target: impl Into<String>) -> Self {
-        Self {
-            kind,
-            target: target.into(),
-            variable: false,
-            conditional: false,
-            external_args: None,
-        }
+pub fn native_function_token(name: &str) -> &str {
+    if name == "^" {
+        "L^"
+    } else {
+        name
     }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DivertKind {
-    Direct,
-    Function,
-    Tunnel,
-    External,
-}
-
-impl DivertKind {
-    pub(crate) fn key(self) -> &'static str {
-        match self {
-            Self::Direct => "->",
-            Self::Function => "f()",
-            Self::Tunnel => "->t->",
-            Self::External => "x()",
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChoicePoint {
-    pub target: String,
-    pub flags: i32,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct VariableAssignment {
-    pub kind: VariableAssignmentKind,
-    pub name: String,
-    pub is_new_declaration: bool,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum VariableAssignmentKind {
-    Global,
-    Temporary,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct VariableReference {
-    pub kind: VariableReferenceKind,
-    pub name: String,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum VariableReferenceKind {
-    Variable,
-    ReadCount,
 }

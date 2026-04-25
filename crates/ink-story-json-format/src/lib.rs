@@ -9,9 +9,8 @@ mod model;
 
 pub use error::FormatError;
 pub use model::{
-    ChoicePoint, Container, ControlCommand, Divert, DivertKind, ListItemValue, ListValue,
-    NamedContainer, NativeFunction, Object, Program, Value, VariableAssignment,
-    VariableAssignmentKind, VariablePointer, VariableReference, VariableReferenceKind,
+    native_function_name_from_token, native_function_token, Container, ControlCommand,
+    ListItemValue, ListValue, NamedContainer, Object, Program,
 };
 
 /// The current compiled story JSON format version.

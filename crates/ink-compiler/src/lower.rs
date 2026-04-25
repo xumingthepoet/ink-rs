@@ -5,11 +5,14 @@ mod context;
 mod expression;
 mod flow;
 mod indexes;
-pub(crate) mod ir;
 mod labels;
 mod path;
 mod sequence;
 mod weave;
+
+use ink_story_json_format::{
+    Container, ControlCommand, NamedContainer, Object as RuntimeObject, Program as RuntimeProgram,
+};
 
 use crate::{
     analysis::CheckedStory,
@@ -22,7 +25,6 @@ use context::ChoicePathMode;
 use expression::{lower_expression_into, lower_logic_line_into, lower_output_expression_into};
 use flow::{lower_flow, lower_root_weave};
 use indexes::{ExternalSignatures, LoweringIndexes, RuntimeLenEstimator};
-use ir::{Container, ControlCommand, RuntimeObject, RuntimeProgram};
 use path::{compact_path_strings_in_container, LabelIndex};
 use sequence::lower_sequence;
 use weave::{choice_container_prefix, lower_choice_weave, lower_content_list_into_context};
@@ -36,17 +38,10 @@ pub(crate) fn lower(story: &CheckedStory, count_all_visits: bool) -> StageOutput
         },
     );
     let root_weave = story.parsed.root_weave();
-    let main_content = lower_root_weave(root_weave, &indexes, count_all_visits);
+    let main_container = lower_root_weave(root_weave, &indexes, count_all_visits);
 
-    let main_container = RuntimeObject::Container(Container {
-        content: main_content,
-        name: None,
-        flags: None,
-        merge_tail_metadata: true,
-    });
-
-    let mut root_content = vec![
-        main_container,
+    let root_content = vec![
+        RuntimeObject::Container(main_container),
         RuntimeObject::ControlCommand(ControlCommand::Done),
     ];
 
@@ -54,27 +49,48 @@ pub(crate) fn lower(story: &CheckedStory, count_all_visits: bool) -> StageOutput
         .parsed
         .flows()
         .iter()
-        .map(|flow| lower_flow(flow, &indexes, count_all_visits))
+        .map(|flow| named_container(lower_flow(flow, &indexes, count_all_visits)))
         .collect::<Vec<_>>();
     if let Some(global_declarations) = lower_global_declarations(&indexes) {
-        named_containers.push(global_declarations);
-    }
-    if !named_containers.is_empty() {
-        root_content.push(RuntimeObject::NamedContent(named_containers));
+        named_containers.push(named_container(global_declarations));
     }
 
     let mut root = Container {
         content: root_content,
+        named_content: named_containers,
         name: None,
         flags: count_all_visits.then_some(1),
-        merge_tail_metadata: true,
     };
     compact_path_strings_in_container(&mut root);
 
     StageOutput {
-        artifact: Some(RuntimeProgram { root }),
+        artifact: Some(RuntimeProgram::new(root)),
         diagnostics: Vec::new(),
     }
+}
+
+pub(super) fn named_container(container: Container) -> NamedContainer {
+    let name = container
+        .name
+        .clone()
+        .expect("named content containers must carry a container name");
+    NamedContainer::new(name, container)
+}
+
+pub(super) fn named_content(
+    name: impl Into<String>,
+    content: Vec<RuntimeObject>,
+) -> NamedContainer {
+    let name = name.into();
+    NamedContainer::new(
+        name.clone(),
+        Container {
+            content,
+            named_content: Vec::new(),
+            name: Some(name),
+            flags: None,
+        },
+    )
 }
 
 fn lower_global_declarations(indexes: &LoweringIndexes<'_>) -> Option<Container> {
@@ -111,9 +127,9 @@ fn lower_global_declarations(indexes: &LoweringIndexes<'_>) -> Option<Container>
 
     Some(Container {
         content,
+        named_content: Vec::new(),
         name: Some("global decl".to_string()),
         flags: None,
-        merge_tail_metadata: true,
     })
 }
 
@@ -319,20 +335,15 @@ fn lower_object_into_with_context_count(
         ))),
         Object::Weave(weave) => {
             let nested_path_mode = path_mode.for_nested_weave(content.len());
-            content.push(RuntimeObject::Container(Container {
-                content: lower_choice_weave(
-                    weave,
-                    nested_path_mode,
-                    global_labels,
-                    global_variables,
-                    external_signatures,
-                    constants,
-                    count_all_visits,
-                ),
-                name: None,
-                flags: None,
-                merge_tail_metadata: true,
-            }));
+            content.push(RuntimeObject::Container(lower_choice_weave(
+                weave,
+                nested_path_mode,
+                global_labels,
+                global_variables,
+                external_signatures,
+                constants,
+                count_all_visits,
+            )));
         }
         Object::ExternalDeclaration(_) => {}
     }
@@ -570,8 +581,8 @@ fn ends_with_end_or_done(content: &[RuntimeObject]) -> bool {
 fn done_container(name: &str, count_all_visits: bool) -> Container {
     Container {
         content: vec![RuntimeObject::ControlCommand(ControlCommand::Done)],
+        named_content: Vec::new(),
         name: Some(name.to_string()),
         flags: count_all_visits.then_some(5),
-        merge_tail_metadata: true,
     }
 }

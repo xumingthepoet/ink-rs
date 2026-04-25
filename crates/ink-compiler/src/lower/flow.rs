@@ -1,22 +1,23 @@
 use std::collections::{HashMap, HashSet};
 
+use ink_story_json_format::{Container, Object as RuntimeObject};
+
 use crate::parsed::{ContentList, Expression, Flow, Object, Weave};
 
 use super::context::ChoicePathMode;
 use super::indexes::{CountedFlowPaths, ExternalSignatures, LoweringIndexes};
-use super::ir::{Container, RuntimeObject};
 use super::path::LabelIndex;
 use super::weave::{
     lower_choice_weave, lower_linear_weave, lower_linear_weave_into_context, weave_has_choice,
     weave_has_weave_points,
 };
-use super::{done_container, ends_with_flow_terminator};
+use super::{done_container, ends_with_flow_terminator, named_container};
 
 pub(super) fn lower_root_weave(
     weave: &Weave,
     indexes: &LoweringIndexes<'_>,
     count_all_visits: bool,
-) -> Vec<RuntimeObject> {
+) -> Container {
     if weave_has_weave_points(weave) {
         lower_choice_weave(
             weave,
@@ -39,7 +40,12 @@ pub(super) fn lower_root_weave(
             "g-0",
             count_all_visits,
         )));
-        content
+        Container {
+            content,
+            named_content: Vec::new(),
+            name: None,
+            flags: None,
+        }
     }
 }
 
@@ -98,20 +104,15 @@ fn lower_flow_with_context(
             self_target_relative: false,
             fallback_gather_target: None,
         };
-        content.push(RuntimeObject::Container(Container {
-            content: lower_choice_weave(
-                flow.weave(),
-                path_mode,
-                global_labels,
-                global_variables,
-                external_signatures,
-                constants,
-                count_all_visits,
-            ),
-            name: None,
-            flags: None,
-            merge_tail_metadata: true,
-        }));
+        content.push(RuntimeObject::Container(lower_choice_weave(
+            flow.weave(),
+            path_mode,
+            global_labels,
+            global_variables,
+            external_signatures,
+            constants,
+            count_all_visits,
+        )));
     } else if !flow.weave().content().is_empty() {
         let path_mode = ChoicePathMode::Flow {
             flow_name: flow.name().to_string(),
@@ -148,11 +149,11 @@ fn lower_flow_with_context(
             .map(|f| f.name().to_string())
             .collect();
 
-        let child_containers: Vec<Container> = flow
+        let child_containers = flow
             .child_flows()
             .iter()
             .map(|child| {
-                lower_flow_with_context(
+                named_container(lower_flow_with_context(
                     child,
                     Some(flow.name()),
                     &child_stitch_names,
@@ -162,21 +163,31 @@ fn lower_flow_with_context(
                     constants,
                     counted_flow_paths,
                     count_all_visits,
-                )
+                ))
             })
             .collect();
-        content.push(RuntimeObject::NamedContent(child_containers));
+
+        return Container {
+            content,
+            named_content: child_containers,
+            name: Some(flow.name().to_string()),
+            flags: flow_container_flags(
+                counted_flow_paths.turns.contains(&flow_path),
+                counted_flow_paths.visits.contains(&flow_path),
+                count_all_visits,
+            ),
+        };
     }
 
     Container {
         content,
+        named_content: Vec::new(),
         name: Some(flow.name().to_string()),
         flags: flow_container_flags(
             counted_flow_paths.turns.contains(&flow_path),
             counted_flow_paths.visits.contains(&flow_path),
             count_all_visits,
         ),
-        merge_tail_metadata: true,
     }
 }
 

@@ -1,9 +1,8 @@
 use serde_json::{Map, Number, Value as JsonValue};
 
 use crate::{
-    ChoicePoint, Container, Divert, DivertKind, FormatError, ListItemValue, ListValue,
-    NamedContainer, NativeFunction, Object, Program, Value, VariableAssignment,
-    VariableAssignmentKind, VariablePointer, VariableReference, VariableReferenceKind,
+    native_function_name_from_token, native_function_token, Container, FormatError, ListItemValue,
+    ListValue, NamedContainer, Object, Program,
 };
 
 pub(crate) fn program_from_str(input: &str) -> Result<Program, FormatError> {
@@ -55,7 +54,7 @@ pub(crate) fn program_to_value(program: &Program) -> JsonValue {
     JsonValue::Object(obj)
 }
 
-fn container_from_value(
+pub(crate) fn container_from_value(
     value: &JsonValue,
     name_hint: Option<String>,
 ) -> Result<Container, FormatError> {
@@ -106,7 +105,7 @@ fn container_from_value(
     })
 }
 
-fn container_to_value(container: &Container, include_name: bool) -> JsonValue {
+pub(crate) fn container_to_value(container: &Container, include_name: bool) -> JsonValue {
     let mut values = container
         .content
         .iter()
@@ -143,22 +142,22 @@ fn container_terminator_to_value(container: &Container, include_name: bool) -> J
     }
 }
 
-fn object_from_value(value: &JsonValue) -> Result<Object, FormatError> {
+pub(crate) fn object_from_value(value: &JsonValue) -> Result<Object, FormatError> {
     match value {
         JsonValue::Null => Err(FormatError::new(
             "null is only valid as a container terminator",
         )),
-        JsonValue::Bool(value) => Ok(Object::Value(Value::Bool(*value))),
+        JsonValue::Bool(value) => Ok(Object::Bool(*value)),
         JsonValue::Number(number) => {
             if let Some(value) = number.as_i64() {
                 let value = i32::try_from(value)
                     .map_err(|_| FormatError::new("integer value is outside i32 range"))?;
-                Ok(Object::Value(Value::Int(value)))
+                Ok(Object::Int(value))
             } else {
                 let value = number
                     .as_f64()
                     .ok_or_else(|| FormatError::new("number value is not representable as f64"))?;
-                Ok(Object::Value(Value::Float(value)))
+                Ok(Object::Float(value))
             }
         }
         JsonValue::String(value) => string_object_from_token(value),
@@ -167,33 +166,71 @@ fn object_from_value(value: &JsonValue) -> Result<Object, FormatError> {
     }
 }
 
-fn object_to_value(object: &Object) -> JsonValue {
+pub(crate) fn object_to_value(object: &Object) -> JsonValue {
     match object {
         Object::Container(container) => container_to_value(container, true),
-        Object::Value(value) => value_to_json(value),
+        Object::String(text) if text == "\n" => JsonValue::String("\n".to_string()),
+        Object::String(text) => JsonValue::String(format!("^{text}")),
         Object::ControlCommand(command) => JsonValue::String(command.token().to_string()),
-        Object::NativeFunction(function) => JsonValue::String(function.token().to_string()),
-        Object::Divert(divert) => divert_to_value(divert),
-        Object::ChoicePoint(choice) => {
+        Object::Divert { target, variable } => {
+            divert_to_value("->", target, *variable, false, None)
+        }
+        Object::TunnelDivert { target, variable } => {
+            divert_to_value("->t->", target, *variable, false, None)
+        }
+        Object::FunctionDivert { target } => divert_to_value("f()", target, false, false, None),
+        Object::ExternalFunction { target, args } => {
+            divert_to_value("x()", target, false, false, Some(*args))
+        }
+        Object::ConditionalDivert { target } => divert_to_value("->", target, false, true, None),
+        Object::DivertTarget(target) => {
             let mut obj = Map::new();
-            obj.insert("*".to_string(), JsonValue::String(choice.target.clone()));
-            obj.insert("flg".to_string(), JsonValue::Number(choice.flags.into()));
+            obj.insert("^->".to_string(), JsonValue::String(target.clone()));
             JsonValue::Object(obj)
         }
-        Object::VariableAssignment(assignment) => variable_assignment_to_value(assignment),
-        Object::VariableReference(reference) => variable_reference_to_value(reference),
+        Object::ReadCount(target) => single_property_object("CNT?", target),
+        Object::VariableAssignment(name) => single_property_object("temp=", name),
+        Object::GlobalVariableAssignment(name) => single_property_object("VAR=", name),
+        Object::TempVariableReassignment(name) => variable_assignment_to_value("temp=", name),
+        Object::VariableReassignment(name) => variable_assignment_to_value("VAR=", name),
+        Object::VariableReference(name) => single_property_object("VAR?", name),
+        Object::VariablePointer {
+            name,
+            context_index,
+        } => {
+            let mut obj = Map::new();
+            obj.insert("^var".to_string(), JsonValue::String(name.clone()));
+            obj.insert("ci".to_string(), JsonValue::Number((*context_index).into()));
+            JsonValue::Object(obj)
+        }
+        Object::ChoicePoint { target, flags } => {
+            let mut obj = Map::new();
+            obj.insert("*".to_string(), JsonValue::String(target.clone()));
+            obj.insert("flg".to_string(), JsonValue::Number((*flags).into()));
+            JsonValue::Object(obj)
+        }
         Object::Glue => JsonValue::String("<>".to_string()),
+        Object::Tag { is_start } => {
+            JsonValue::String(if *is_start { "#" } else { "/#" }.to_string())
+        }
+        Object::Bool(value) => JsonValue::Bool(*value),
+        Object::Int(value) => JsonValue::Number((*value).into()),
+        Object::Float(value) => JsonValue::Number(
+            Number::from_f64(*value).expect("compiled story float values must be finite"),
+        ),
+        Object::List(value) => list_value_to_json(value),
         Object::Void => JsonValue::String("void".to_string()),
+        Object::NativeFunction(name) => JsonValue::String(native_function_token(name).to_string()),
     }
 }
 
 fn string_object_from_token(token: &str) -> Result<Object, FormatError> {
     if let Some(text) = token.strip_prefix('^') {
-        return Ok(Object::Value(Value::String(text.to_string())));
+        return Ok(Object::String(text.to_string()));
     }
 
     if token == "\n" {
-        return Ok(Object::Value(Value::String("\n".to_string())));
+        return Ok(Object::String("\n".to_string()));
     }
 
     if token == "<>" {
@@ -204,45 +241,28 @@ fn string_object_from_token(token: &str) -> Result<Object, FormatError> {
         return Ok(Object::Void);
     }
 
+    if token == "#" {
+        return Ok(Object::Tag { is_start: true });
+    }
+
+    if token == "/#" {
+        return Ok(Object::Tag { is_start: false });
+    }
+
     if let Some(command) = crate::ControlCommand::from_token(token) {
         return Ok(Object::ControlCommand(command));
     }
 
-    Ok(Object::NativeFunction(NativeFunction::from_token(token)))
-}
-
-fn value_to_json(value: &Value) -> JsonValue {
-    match value {
-        Value::String(text) if text == "\n" => JsonValue::String("\n".to_string()),
-        Value::String(text) => JsonValue::String(format!("^{text}")),
-        Value::Bool(value) => JsonValue::Bool(*value),
-        Value::Int(value) => JsonValue::Number((*value).into()),
-        Value::Float(value) => JsonValue::Number(
-            Number::from_f64(*value).expect("compiled story float values must be finite"),
-        ),
-        Value::DivertTarget(target) => {
-            let mut obj = Map::new();
-            obj.insert("^->".to_string(), JsonValue::String(target.clone()));
-            JsonValue::Object(obj)
-        }
-        Value::VariablePointer(pointer) => {
-            let mut obj = Map::new();
-            obj.insert("^var".to_string(), JsonValue::String(pointer.name.clone()));
-            obj.insert(
-                "ci".to_string(),
-                JsonValue::Number(pointer.context_index.into()),
-            );
-            JsonValue::Object(obj)
-        }
-        Value::List(value) => list_value_to_json(value),
-    }
+    Ok(Object::NativeFunction(native_function_name_from_token(
+        token,
+    )))
 }
 
 fn object_from_map(obj: &Map<String, JsonValue>) -> Result<Object, FormatError> {
     if let Some(target) = obj.get("^->") {
-        return Ok(Object::Value(Value::DivertTarget(
+        return Ok(Object::DivertTarget(
             json_value_to_string(target, "^->")?.to_string(),
-        )));
+        ));
     }
 
     if let Some(name) = obj.get("^var") {
@@ -250,14 +270,14 @@ fn object_from_map(obj: &Map<String, JsonValue>) -> Result<Object, FormatError> 
             Some(value) => json_value_to_i32(value, "ci")?,
             None => -1,
         };
-        return Ok(Object::Value(Value::VariablePointer(VariablePointer {
+        return Ok(Object::VariablePointer {
             name: json_value_to_string(name, "^var")?.to_string(),
             context_index,
-        })));
+        });
     }
 
-    if let Some(divert) = divert_from_map(obj)? {
-        return Ok(Object::Divert(divert));
+    if let Some(object) = divert_from_map(obj)? {
+        return Ok(object);
     }
 
     if let Some(target) = obj.get("*") {
@@ -265,32 +285,30 @@ fn object_from_map(obj: &Map<String, JsonValue>) -> Result<Object, FormatError> 
             Some(value) => json_value_to_i32(value, "flg")?,
             None => 0,
         };
-        return Ok(Object::ChoicePoint(ChoicePoint {
+        return Ok(Object::ChoicePoint {
             target: json_value_to_string(target, "*")?.to_string(),
             flags,
-        }));
+        });
     }
 
     if let Some(name) = obj.get("VAR?") {
-        return Ok(Object::VariableReference(VariableReference {
-            kind: VariableReferenceKind::Variable,
-            name: json_value_to_string(name, "VAR?")?.to_string(),
-        }));
+        return Ok(Object::VariableReference(
+            json_value_to_string(name, "VAR?")?.to_string(),
+        ));
     }
 
     if let Some(name) = obj.get("CNT?") {
-        return Ok(Object::VariableReference(VariableReference {
-            kind: VariableReferenceKind::ReadCount,
-            name: json_value_to_string(name, "CNT?")?.to_string(),
-        }));
+        return Ok(Object::ReadCount(
+            json_value_to_string(name, "CNT?")?.to_string(),
+        ));
     }
 
     if let Some(assignment) = variable_assignment_from_map(obj)? {
-        return Ok(Object::VariableAssignment(assignment));
+        return Ok(assignment);
     }
 
     if obj.contains_key("list") {
-        return Ok(Object::Value(Value::List(list_value_from_map(obj)?)));
+        return Ok(Object::List(list_value_from_map(obj)?));
     }
 
     Err(FormatError::new(format!(
@@ -299,46 +317,60 @@ fn object_from_map(obj: &Map<String, JsonValue>) -> Result<Object, FormatError> 
     )))
 }
 
-fn divert_from_map(obj: &Map<String, JsonValue>) -> Result<Option<Divert>, FormatError> {
-    let keys = [
-        (DivertKind::Direct, "->"),
-        (DivertKind::Function, "f()"),
-        (DivertKind::Tunnel, "->t->"),
-        (DivertKind::External, "x()"),
-    ];
+fn divert_from_map(obj: &Map<String, JsonValue>) -> Result<Option<Object>, FormatError> {
+    if let Some(target) = obj.get("->") {
+        let target = json_value_to_string(target, "->")?.to_string();
+        let variable = obj.contains_key("var");
+        let conditional = obj.contains_key("c");
+        return Ok(Some(if conditional {
+            Object::ConditionalDivert { target }
+        } else {
+            Object::Divert { target, variable }
+        }));
+    }
 
-    for (kind, key) in keys {
-        if let Some(target) = obj.get(key) {
-            let external_args = match obj.get("exArgs") {
-                Some(value) => Some(json_value_to_usize(value, "exArgs")?),
-                None => None,
-            };
-            return Ok(Some(Divert {
-                kind,
-                target: json_value_to_string(target, key)?.to_string(),
-                variable: obj.contains_key("var"),
-                conditional: obj.contains_key("c"),
-                external_args,
-            }));
-        }
+    if let Some(target) = obj.get("f()") {
+        return Ok(Some(Object::FunctionDivert {
+            target: json_value_to_string(target, "f()")?.to_string(),
+        }));
+    }
+
+    if let Some(target) = obj.get("->t->") {
+        return Ok(Some(Object::TunnelDivert {
+            target: json_value_to_string(target, "->t->")?.to_string(),
+            variable: obj.contains_key("var"),
+        }));
+    }
+
+    if let Some(target) = obj.get("x()") {
+        return Ok(Some(Object::ExternalFunction {
+            target: json_value_to_string(target, "x()")?.to_string(),
+            args: match obj.get("exArgs") {
+                Some(value) => json_value_to_usize(value, "exArgs")?,
+                None => 0,
+            },
+        }));
     }
 
     Ok(None)
 }
 
-fn divert_to_value(divert: &Divert) -> JsonValue {
+fn divert_to_value(
+    key: &str,
+    target: &str,
+    variable: bool,
+    conditional: bool,
+    external_args: Option<usize>,
+) -> JsonValue {
     let mut obj = Map::new();
-    obj.insert(
-        divert.kind.key().to_string(),
-        JsonValue::String(divert.target.clone()),
-    );
-    if divert.variable {
+    obj.insert(key.to_string(), JsonValue::String(target.to_string()));
+    if variable {
         obj.insert("var".to_string(), JsonValue::Bool(true));
     }
-    if divert.conditional {
+    if conditional {
         obj.insert("c".to_string(), JsonValue::Bool(true));
     }
-    if let Some(external_args) = divert.external_args {
+    if let Some(external_args) = external_args {
         if external_args > 0 {
             obj.insert(
                 "exArgs".to_string(),
@@ -351,45 +383,38 @@ fn divert_to_value(divert: &Divert) -> JsonValue {
 
 fn variable_assignment_from_map(
     obj: &Map<String, JsonValue>,
-) -> Result<Option<VariableAssignment>, FormatError> {
-    let Some((kind, name)) = obj
-        .get("VAR=")
-        .map(|name| (VariableAssignmentKind::Global, name))
-        .or_else(|| {
-            obj.get("temp=")
-                .map(|name| (VariableAssignmentKind::Temporary, name))
-        })
-    else {
-        return Ok(None);
-    };
+) -> Result<Option<Object>, FormatError> {
+    if let Some(name) = obj.get("VAR=") {
+        let name = json_value_to_string(name, "VAR=")?.to_string();
+        return Ok(Some(if obj.contains_key("re") {
+            Object::VariableReassignment(name)
+        } else {
+            Object::GlobalVariableAssignment(name)
+        }));
+    }
 
-    Ok(Some(VariableAssignment {
-        kind,
-        name: json_value_to_string(name, "variable assignment")?.to_string(),
-        is_new_declaration: !obj.contains_key("re"),
-    }))
+    if let Some(name) = obj.get("temp=") {
+        let name = json_value_to_string(name, "temp=")?.to_string();
+        return Ok(Some(if obj.contains_key("re") {
+            Object::TempVariableReassignment(name)
+        } else {
+            Object::VariableAssignment(name)
+        }));
+    }
+
+    Ok(None)
 }
 
-fn variable_assignment_to_value(assignment: &VariableAssignment) -> JsonValue {
+fn single_property_object(key: &str, value: &str) -> JsonValue {
     let mut obj = Map::new();
-    let key = match assignment.kind {
-        VariableAssignmentKind::Global => "VAR=",
-        VariableAssignmentKind::Temporary => "temp=",
-    };
-    obj.insert(key.to_string(), JsonValue::String(assignment.name.clone()));
-    if !assignment.is_new_declaration {
-        obj.insert("re".to_string(), JsonValue::Bool(true));
-    }
+    obj.insert(key.to_string(), JsonValue::String(value.to_string()));
     JsonValue::Object(obj)
 }
 
-fn variable_reference_to_value(reference: &VariableReference) -> JsonValue {
+fn variable_assignment_to_value(key: &str, name: &str) -> JsonValue {
     let mut obj = Map::new();
-    let key = match reference.kind {
-        VariableReferenceKind::Variable => "VAR?",
-        VariableReferenceKind::ReadCount => "CNT?",
-    };
-    obj.insert(key.to_string(), JsonValue::String(reference.name.clone()));
+    obj.insert(key.to_string(), JsonValue::String(name.to_string()));
+    obj.insert("re".to_string(), JsonValue::Bool(true));
     JsonValue::Object(obj)
 }
 
@@ -474,14 +499,14 @@ mod tests {
     use serde_json::json;
 
     use super::*;
-    use crate::{ControlCommand, NativeFunction};
+    use crate::ControlCommand;
 
     #[test]
     fn writes_plain_text_story_json() {
-        let program = Program::new(Container::new(vec![
-            Object::Container(Container::new(vec![
-                Object::Value(Value::String("Line.".to_string())),
-                Object::Value(Value::String("\n".to_string())),
+        let program = Program::new(Container::unnamed(vec![
+            Object::Container(Container::unnamed(vec![
+                Object::String("Line.".to_string()),
+                Object::String("\n".to_string()),
                 Object::Container(Container::named(
                     "g-0",
                     vec![Object::ControlCommand(ControlCommand::Done)],
@@ -546,7 +571,7 @@ mod tests {
             .content
             .iter()
             .filter_map(|object| match object {
-                Object::NativeFunction(function) => Some(function.name()),
+                Object::NativeFunction(name) => Some(name.as_str()),
                 _ => None,
             });
         assert_eq!(native_tokens.collect::<Vec<_>>(), vec!["LIST_ALL", "^"]);
@@ -554,8 +579,7 @@ mod tests {
 
     #[test]
     fn native_function_escapes_caret_token() {
-        let function = NativeFunction::new("^");
-        assert_eq!(function.token(), "L^");
-        assert_eq!(NativeFunction::from_token("L^").name(), "^");
+        assert_eq!(native_function_token("^"), "L^");
+        assert_eq!(native_function_name_from_token("L^"), "^");
     }
 }

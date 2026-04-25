@@ -1,10 +1,11 @@
 use std::sync::Arc;
 
+use ink_story_json_format::Program as RuntimeProgram;
+
 use crate::{
     analysis::{self, CheckedStory},
     diagnostic::{Diagnostic, DiagnosticSeverity},
-    emit,
-    lower::{self, ir::RuntimeProgram},
+    emit, lower,
     parsed::Story as ParsedStory,
     source::{
         preprocess::{preprocess_includes, PreprocessOptions},
@@ -39,7 +40,7 @@ impl<T> StageOutput<T> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct CompiledStory {
     pub program: RuntimeProgram,
     pub json: String,

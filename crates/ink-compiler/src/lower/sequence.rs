@@ -1,10 +1,12 @@
 use std::collections::{HashMap, HashSet};
 
+use ink_story_json_format::{Container, ControlCommand, Object as RuntimeObject};
+
 use crate::parsed::{Expression, Sequence, SequenceType, Weave};
 
 use super::context::ChoicePathMode;
 use super::indexes::ExternalSignatures;
-use super::ir::{Container, ControlCommand, RuntimeObject};
+use super::named_container;
 use super::path::{compact_relative_path, LabelIndex};
 use super::weave::{
     content_list_has_choice, lower_choice_weave_with_initial_content,
@@ -98,10 +100,11 @@ pub(super) fn lower_sequence(
             let branch_path_mode =
                 path_mode.for_sequence_branch(sequence_container_path, &branch_name);
             let mut branch_content = vec![RuntimeObject::ControlCommand(ControlCommand::Pop)];
+            let mut branch_named_content = Vec::new();
             if let Some(element) = element {
                 if content_list_has_choice(element) {
                     let element_weave = Weave::new(element.objects().to_vec(), 0);
-                    branch_content = lower_choice_weave_with_initial_content(
+                    let lowered_branch = lower_choice_weave_with_initial_content(
                         &element_weave,
                         branch_path_mode.clone(),
                         global_labels,
@@ -111,6 +114,8 @@ pub(super) fn lower_sequence(
                         false,
                         branch_content,
                     );
+                    branch_content = lowered_branch.content;
+                    branch_named_content = lowered_branch.named_content;
                 } else {
                     lower_content_list_into_context(
                         &mut branch_content,
@@ -126,33 +131,24 @@ pub(super) fn lower_sequence(
             }
             let relative_return_target = format!(".^.^.{post_sequence_index}");
             let global_return_target = format!("{sequence_container_path}.{post_sequence_index}");
-            let trailing_named_content =
-                if matches!(branch_content.last(), Some(RuntimeObject::NamedContent(_))) {
-                    branch_content.pop()
-                } else {
-                    None
-                };
             branch_content.push(RuntimeObject::Divert {
                 target: compact_relative_path(&relative_return_target, &global_return_target),
                 variable: false,
             });
-            if let Some(named_content) = trailing_named_content {
-                branch_content.push(named_content);
-            }
             Container {
                 content: branch_content,
+                named_content: branch_named_content,
                 name: Some(branch_name),
                 flags: None,
-                merge_tail_metadata: true,
             }
         })
+        .map(named_container)
         .collect::<Vec<_>>();
-    content.push(RuntimeObject::NamedContent(branch_containers));
 
     Container {
         content,
+        named_content: branch_containers,
         name: None,
         flags: Some(5),
-        merge_tail_metadata: true,
     }
 }

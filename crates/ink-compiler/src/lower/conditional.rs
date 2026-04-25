@@ -1,14 +1,16 @@
 use std::collections::{HashMap, HashSet};
 
+use ink_story_json_format::{Container, ControlCommand, Object as RuntimeObject};
+
 use crate::parsed::{Conditional, Expression};
 
 use super::context::ChoicePathMode;
 use super::expression::lower_expression_into;
 use super::indexes::ExternalSignatures;
-use super::ir::{ControlCommand, RuntimeObject};
 use super::lower_object_into_with_context;
 use super::path::LabelIndex;
 use super::weave::{lower_choice_weave_with_initial_content, weave_has_choice};
+use super::{named_container, named_content};
 
 pub(super) fn lower_conditional_into(
     content: &mut Vec<RuntimeObject>,
@@ -110,8 +112,7 @@ pub(super) fn lower_conditional_into(
                 initial_content.push(RuntimeObject::String("\n".to_string()));
                 initial_content
             };
-            let mut content_container = Vec::new();
-            let mut lowered_branch = lower_choice_weave_with_initial_content(
+            let lowered_branch = lower_choice_weave_with_initial_content(
                 branch.content(),
                 branch_path_mode,
                 global_labels,
@@ -121,21 +122,23 @@ pub(super) fn lower_conditional_into(
                 false,
                 initial_content,
             );
-            let trailing_named_content =
-                if matches!(lowered_branch.last(), Some(RuntimeObject::NamedContent(_))) {
-                    lowered_branch.pop()
-                } else {
-                    None
-                };
-            content_container.extend(lowered_branch);
+            let mut content_container = lowered_branch.content;
+            let content_named_content = lowered_branch.named_content;
             content_container.push(RuntimeObject::Divert {
                 target: branch_rejoin_target.clone(),
                 variable: false,
             });
-            if let Some(named_content) = trailing_named_content {
-                content_container.push(named_content);
-            }
-            branch_content.push(RuntimeObject::named_content("b", content_container));
+            let mut branch_container = Container::unnamed(branch_content);
+            branch_container
+                .named_content
+                .push(named_container(Container {
+                    content: content_container,
+                    named_content: content_named_content,
+                    name: Some("b".to_string()),
+                    flags: None,
+                }));
+            content.push(RuntimeObject::Container(branch_container));
+            continue;
         } else {
             let mut content_container = Vec::new();
             if duplicates_stack_value || (branch.is_else() && switch_like) {
@@ -160,10 +163,13 @@ pub(super) fn lower_conditional_into(
                 target: branch_rejoin_target.clone(),
                 variable: false,
             });
-            branch_content.push(RuntimeObject::named_content("b", content_container));
+            let mut branch_container = Container::unnamed(branch_content);
+            branch_container
+                .named_content
+                .push(named_content("b", content_container));
+            content.push(RuntimeObject::Container(branch_container));
+            continue;
         }
-
-        content.push(RuntimeObject::container(branch_content));
     }
 
     if needs_fallthrough_pop {
