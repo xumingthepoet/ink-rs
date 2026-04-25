@@ -100,10 +100,13 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 1 complete except the first real intentional-divergence
-  fixture, which should wait until an actual language change is chosen.
+- Current phase: Phase 2 in progress. R015 is complete. Phase 1 is complete
+  except the first real intentional-divergence fixture, which should wait until
+  an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
-- Last focused validation: `cargo test -p ink-test --test language`, passed.
+- Last focused validation: `cargo check -p ink-compiler`,
+  `cargo test -p ink-compiler syntax::`, and
+  `cargo test -p ink-test --test compiler_conformance` on 2026-04-25, passed.
 - Known blockers: none for behavior-preserving refactors.
 
 ## Focused Validation Commands
@@ -135,8 +138,10 @@ Full validation:
   in `compiler.rs`.
 - Comment elimination and source line creation:
   `crates/ink-compiler/src/source.rs`.
-- Parsing entry point: `syntax::parse` in
-  `crates/ink-compiler/src/syntax/mod.rs`.
+- Parsing entry point and parser driver: `syntax::parse`, re-exported from
+  `crates/ink-compiler/src/syntax/parser.rs`.
+- Syntax rules and statement parsers: `crates/ink-compiler/src/syntax/mod.rs`
+  plus focused submodules under `crates/ink-compiler/src/syntax/`.
 - Parsed model: `crates/ink-compiler/src/parsed/`.
 - Analysis entry point: `analysis::analyze` in
   `crates/ink-compiler/src/analysis.rs`.
@@ -295,12 +300,15 @@ Use these checks during phase reviews:
 
 ## Phase 2: Parser Module Boundaries
 
-- [ ] R015 Extract `syntax/parser.rs`
+- [x] R015 Extract `syntax/parser.rs`
   - Purpose: Separate the parser driver from syntax-specific parsing logic.
   - Approach: Move `Parser`, story parsing, flow parsing, and stitch parsing
     out of `syntax/mod.rs`.
   - Acceptance: `syntax/mod.rs` becomes a thin module/export file, and parser
     focused tests pass with no parse snapshot changes.
+  - Completed: Parser driver and multiline orchestration now live in
+    `syntax/parser.rs`; `cargo test -p ink-compiler syntax::` and
+    `cargo test -p ink-test --test compiler_conformance` pass.
 
 - [ ] R016 Extract `syntax/conditional.rs`
   - Purpose: Give multiline conditional parsing its own owner.
