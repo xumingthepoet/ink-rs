@@ -100,12 +100,14 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 6 in progress. R015 through R056 are complete. Phase 1
+- Current phase: Phase 6 in progress. R015 through R057 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
 - Last focused validation:
-  `cargo test -p ink-compiler` on 2026-04-25, passed.
+  `cargo test -p ink-compiler
+  analysis::tests::analysis_sources_do_not_import_lower_or_emit_modules` on
+  2026-04-25, passed.
 - Known blockers: none for behavior-preserving refactors.
 
 ## Focused Validation Commands
@@ -863,11 +865,15 @@ Use these checks during phase reviews:
     surface is required. Added a boundary comment to `CheckedStory` and kept
     existing focused analysis/lowering tests as validation.
 
-- [ ] R057 Add analysis API boundary checks
+- [x] R057 Add analysis API boundary checks
   - Purpose: Keep analysis independent from lowering and JSON shape.
   - Approach: Review imports and move any runtime-specific logic out of
     analysis.
   - Acceptance: Analysis modules do not import lower/emit modules.
+  - Completed: Added a focused analysis boundary test that scans analysis
+    source files and fails if they import `lower` or `emit` module APIs.
+    Existing analysis imports were reviewed and already had no runtime
+    lowering or JSON emission dependency.
 
 - [ ] R058 Run the diagnostic drill
   - Purpose: Prove a diagnostic change is easy to locate.

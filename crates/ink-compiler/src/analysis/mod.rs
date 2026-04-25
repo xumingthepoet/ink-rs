@@ -57,3 +57,50 @@ fn run_analysis_passes(story: &Story) -> Vec<Diagnostic> {
 
     diagnostics
 }
+
+#[cfg(test)]
+mod tests {
+    const ANALYSIS_SOURCES: &[(&str, &str)] = &[
+        ("mod.rs", include_str!("mod.rs")),
+        ("constants.rs", include_str!("constants.rs")),
+        ("context.rs", include_str!("context.rs")),
+        ("flow.rs", include_str!("flow.rs")),
+        ("names.rs", include_str!("names.rs")),
+        ("span.rs", include_str!("span.rs")),
+        ("targets.rs", include_str!("targets.rs")),
+        ("test_support.rs", include_str!("test_support.rs")),
+        ("variables.rs", include_str!("variables.rs")),
+        ("warnings.rs", include_str!("warnings.rs")),
+    ];
+
+    #[test]
+    fn analysis_sources_do_not_import_lower_or_emit_modules() {
+        let forbidden_fragments = [
+            concat!("crate", "::", "lower"),
+            concat!("crate", "::", "emit"),
+            concat!("lower", "::"),
+            concat!("emit", "::"),
+            concat!("lower", ","),
+            concat!("emit", ","),
+            concat!("lower", "}"),
+            concat!("emit", "}"),
+        ];
+
+        for (path, source) in ANALYSIS_SOURCES {
+            for (line_index, line) in source.lines().enumerate() {
+                let code = line.split("//").next().unwrap_or_default();
+                let compact = code
+                    .chars()
+                    .filter(|ch| !ch.is_whitespace())
+                    .collect::<String>();
+                for fragment in forbidden_fragments {
+                    assert!(
+                        !compact.contains(fragment),
+                        "analysis source {path}:{} must not import lower/emit module APIs",
+                        line_index + 1
+                    );
+                }
+            }
+        }
+    }
+}
