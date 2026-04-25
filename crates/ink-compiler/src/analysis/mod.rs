@@ -7,7 +7,7 @@ mod targets;
 mod variables;
 mod warnings;
 
-use crate::{compiler::StageOutput, parsed::Story};
+use crate::{compiler::StageOutput, diagnostic::Diagnostic, parsed::Story};
 
 use constants::constant_redefinition_diagnostics;
 use flow::flow_diagnostics;
@@ -21,13 +21,34 @@ pub struct CheckedStory {
 }
 
 pub(crate) fn analyze(parsed: Story) -> StageOutput<CheckedStory> {
-    let mut diagnostics = constant_redefinition_diagnostics(&parsed);
-    diagnostics.extend(author_warning_diagnostics(&parsed));
-    diagnostics.extend(naming_diagnostics(&parsed));
-    diagnostics.extend(flow_diagnostics(&parsed));
-    diagnostics.extend(call_target_diagnostics(&parsed));
+    let diagnostics = run_analysis_passes(&parsed);
     StageOutput {
         artifact: Some(CheckedStory { parsed }),
         diagnostics,
     }
+}
+
+fn run_analysis_passes(story: &Story) -> Vec<Diagnostic> {
+    let mut diagnostics = Vec::new();
+
+    // Constants and author warnings are story-wide discovery passes. They do
+    // not depend on symbol or variable indexes.
+    diagnostics.extend(constant_redefinition_diagnostics(story));
+    diagnostics.extend(author_warning_diagnostics(story));
+
+    // Naming must run before target checks so name collisions are reported
+    // independently from downstream target/variable resolution.
+    diagnostics.extend(naming_diagnostics(story));
+
+    // Flow checks are order-sensitive and should stay before target checks:
+    // loose ends, illegal returns, and function body restrictions describe
+    // control-flow shape rather than target availability.
+    diagnostics.extend(flow_diagnostics(story));
+
+    // Target checks build symbol, variable-target, and variable-scope indexes.
+    // Keep this after naming/flow diagnostics so resolution errors do not hide
+    // more local structural problems.
+    diagnostics.extend(call_target_diagnostics(story));
+
+    diagnostics
 }

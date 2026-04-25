@@ -100,20 +100,16 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 6 in progress. R015 through R053 are complete. Phase 1
+- Current phase: Phase 6 in progress. R015 through R054 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
 - Last focused validation:
   `cargo test -p ink-compiler`, and
   `cargo test -p ink-test --features csharp-tests --test csharp_tests --
-  TestTemp`, and
+  TestFunction`, and
   `cargo test -p ink-test --features csharp-tests --test csharp_tests --
-  TestVariable`, and
-  `cargo test -p ink-test --features csharp-tests --test csharp_tests --
-  TestDivert`, and
-  `cargo test -p ink-test --features csharp-tests --test csharp_tests --
-  TestRequireVariableTargetsTyped` on 2026-04-25, passed.
+  TestLooseEnds` on 2026-04-25, passed.
 - Known blockers: none for behavior-preserving refactors.
 
 ## Focused Validation Commands
@@ -833,12 +829,17 @@ Use these checks during phase reviews:
     context structs and parallel argument/function maps. Focused compiler,
     temp, variable, divert, and variable-target typing tests pass.
 
-- [ ] R054 Make analysis pass ordering explicit
+- [x] R054 Make analysis pass ordering explicit
   - Purpose: Future language rules need a clear place in the analysis pipeline.
   - Approach: Use an ordered pass list or direct sequence with comments about
     dependencies.
   - Acceptance: A reader can see which passes depend on symbols, variables, or
     prior diagnostics.
+  - Completed: Added `run_analysis_passes` in `analysis/mod.rs`, leaving
+    `analyze` as pipeline wrapping only. The pass sequence is now grouped and
+    commented by dependency: story-wide discovery, naming, order-sensitive
+    flow checks, then target/variable resolution. Focused compiler, function,
+    and loose-end tests pass.
 
 - [ ] R055 Add focused tests per analysis pass
   - Purpose: Make each analysis pass locally verifiable.
