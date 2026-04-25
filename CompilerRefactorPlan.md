@@ -100,7 +100,7 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 8 in progress. R015 through R081 are complete. Phase 1
+- Current phase: Phase 8 in progress. R015 through R082 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
@@ -1168,12 +1168,16 @@ Use these checks during phase reviews:
     document: status, upstream behavior, ink-rs behavior, rationale, migration
     guidance, and tests.
 
-- [ ] R082 Run the removed-feature drill
+- [x] R082 Run the removed-feature drill
   - Purpose: Prove that removing a legacy syntax feature is localized and clear.
   - Approach: Prototype removal or diagnostic-only rejection of a small feature
     and record touch points.
   - Acceptance: The drill touches parser diagnostics, tests, and docs, with no
     lowering hack or fixture-specific branch.
+  - Completed: Promoted `LIST` declarations from generic unsupported syntax to
+    an explicit `RemovedFeature` diagnostic. The drill touched parser
+    diagnostics, compiler/parser/language tests, and the `Changed from upstream
+    Ink` docs section, without involving lowering or fixture-specific branches.
 
 - [ ] R083 Review public compiler API after refactor
   - Purpose: Keep external API stable and clear while internals change.

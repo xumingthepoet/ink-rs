@@ -1,4 +1,4 @@
-use ink_compiler::{Compiler, Diagnostic, DiagnosticSeverity, SourceInput};
+use ink_compiler::{Compiler, Diagnostic, DiagnosticCode, DiagnosticSeverity, SourceInput};
 use ink_runtime::story::Story;
 
 fn language_fixture_text(filename: &str) -> String {
@@ -42,6 +42,15 @@ fn assert_diagnostic(
     );
 }
 
+fn assert_diagnostic_code(diagnostics: &[Diagnostic], code: DiagnosticCode) {
+    assert!(
+        diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == Some(code)),
+        "expected diagnostic code {code:?}, got {diagnostics:#?}"
+    );
+}
+
 fn assert_story_output(compiled: &ink_compiler::CompiledStory, expected: &str) {
     let mut story = Story::new(&compiled.json).expect("compiled JSON should load");
     let output = story
@@ -65,4 +74,17 @@ fn language_fixture_smoke_test_runs_compiled_story() {
 fn language_diagnostic_helper_asserts_error_messages() {
     let diagnostics = diagnostics_for_language_source("diagnostic-smoke.ink", "-> missing_target");
     assert_diagnostic(&diagnostics, DiagnosticSeverity::Error, "target not found");
+}
+
+#[test]
+fn removed_list_declaration_reports_removed_feature_diagnostic() {
+    let diagnostics =
+        diagnostics_for_language_source("removed-list.ink", "LIST inventory = sword, shield");
+
+    assert_diagnostic_code(&diagnostics, DiagnosticCode::RemovedFeature);
+    assert_diagnostic(
+        &diagnostics,
+        DiagnosticSeverity::Error,
+        "removed feature: LIST declarations",
+    );
 }

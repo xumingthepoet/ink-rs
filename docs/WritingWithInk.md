@@ -52,7 +52,18 @@ implementation and upstream inkle Ink. If a syntax or behavior is not listed
 here, assume it is intended to match upstream Ink unless the compiler reports a
 specific unsupported or removed-feature diagnostic.
 
-No intentional language divergences are documented yet.
+### LIST declarations are removed
+
+- status: removed
+- upstream behavior: upstream Ink supports `LIST` declarations for named list
+  origins and list items.
+- ink-rs behavior: `LIST` declarations produce a removed-feature diagnostic.
+- rationale: the Rust language surface is being reduced to features that are
+  actively maintained and useful for the current project direction.
+- migration guidance: use variables, functions, or host-side data for inventory
+  and set-like game state until a replacement list design is added.
+- tests: `removed_list_declaration_reports_removed_feature_diagnostic` in
+  `crates/ink-test/tests/language.rs`.
 
 When adding a divergence, include:
 

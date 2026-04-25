@@ -211,12 +211,18 @@ impl Parser {
     fn try_unsupported_statement(&self, line: &SourceLine) -> Option<Diagnostic> {
         let trimmed = line.text.trim_start();
 
+        if trimmed.starts_with("LIST ") {
+            return Some(Diagnostic::removed_feature(
+                line.span.clone(),
+                "LIST declarations",
+                "Use variables, functions, or host data instead.",
+            ));
+        }
+
         let feature = if trimmed.starts_with("INCLUDE ") {
             Some("include")
         } else if trimmed.starts_with("VAR ") {
             Some("global variable declaration")
-        } else if trimmed.starts_with("LIST ") {
-            Some("list declaration")
         } else if trimmed.starts_with("CONST ") {
             Some("constant declaration")
         } else if trimmed.starts_with("EXTERNAL ") {
@@ -499,7 +505,7 @@ mod tests {
 
     #[test]
     fn unsupported_syntax_diagnostics_stay_parser_owned() {
-        let output = parse(SourceInput::new("LIST items = ()"));
+        let output = parse(SourceInput::new("INCLUDE file.ink"));
 
         assert_eq!(output.diagnostics.len(), 1);
         assert_eq!(
@@ -510,9 +516,27 @@ mod tests {
             output.diagnostics[0].code,
             Some(crate::diagnostic::DiagnosticCode::UnsupportedSyntax)
         );
+        assert_eq!(output.diagnostics[0].message, "unsupported syntax: include");
+    }
+
+    #[test]
+    fn removed_feature_diagnostics_stay_parser_owned() {
+        let output = parse(SourceInput::new("LIST items = ()"));
+
+        assert_eq!(output.diagnostics.len(), 1);
+        assert_eq!(
+            output.diagnostics[0].severity,
+            crate::diagnostic::DiagnosticSeverity::Error
+        );
+        assert_eq!(
+            output.diagnostics[0].code,
+            Some(crate::diagnostic::DiagnosticCode::RemovedFeature)
+        );
+        assert_eq!(output.diagnostics[0].line, 1);
+        assert_eq!(output.diagnostics[0].column, 1);
         assert_eq!(
             output.diagnostics[0].message,
-            "unsupported syntax: list declaration"
+            "removed feature: LIST declarations. Use variables, functions, or host data instead."
         );
     }
 
@@ -533,12 +557,12 @@ mod tests {
         );
         assert_eq!(
             output.diagnostics[1].code,
-            Some(crate::diagnostic::DiagnosticCode::UnsupportedSyntax)
+            Some(crate::diagnostic::DiagnosticCode::RemovedFeature)
         );
         assert_eq!(output.diagnostics[1].line, 2);
         assert_eq!(
             output.diagnostics[1].message,
-            "unsupported syntax: list declaration"
+            "removed feature: LIST declarations. Use variables, functions, or host data instead."
         );
     }
 

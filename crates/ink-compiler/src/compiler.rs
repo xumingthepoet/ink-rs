@@ -249,10 +249,13 @@ mod tests {
         assert_eq!(output.diagnostics.len(), 1);
         let diagnostic = &output.diagnostics[0];
         assert_eq!(diagnostic.severity, DiagnosticSeverity::Error);
-        assert_eq!(diagnostic.code, Some(DiagnosticCode::UnsupportedSyntax));
+        assert_eq!(diagnostic.code, Some(DiagnosticCode::RemovedFeature));
         assert_eq!(diagnostic.source_filename.as_deref(), Some("inc.ink"));
         assert_eq!(diagnostic.line, 1);
         assert_eq!(diagnostic.column, 1);
-        assert_eq!(diagnostic.message, "unsupported syntax: list declaration");
+        assert_eq!(
+            diagnostic.message,
+            "removed feature: LIST declarations. Use variables, functions, or host data instead."
+        );
     }
 }
