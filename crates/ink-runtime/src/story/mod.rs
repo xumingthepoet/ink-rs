@@ -119,7 +119,7 @@ pub(crate) fn csharp_random_next(seed: i32) -> i32 {
 
 mod misc {
     use crate::{
-        json::{json_read, json_read_stream},
+        json::json_read,
         object::{Object, RTObject},
         path::Path,
         story::{Story, INK_VERSION_CURRENT},
@@ -133,11 +133,7 @@ mod misc {
         /// Construct a `Story` out of a JSON string that was compiled with
         /// `inklecate`.
         pub fn new(json_string: &str) -> Result<Self, StoryError> {
-            let (version, main_content_container) = if cfg!(feature = "stream-json-parser") {
-                json_read_stream::load_from_string(json_string)?
-            } else {
-                json_read::load_from_string(json_string)?
-            };
+            let (version, main_content_container) = json_read::load_from_string(json_string)?;
 
             let mut story = Story {
                 main_content_container: main_content_container.clone(),

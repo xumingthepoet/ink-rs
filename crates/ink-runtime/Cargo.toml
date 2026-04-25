@@ -1,30 +1,15 @@
 [package]
 name = "ink-runtime"
 version = "1.2.1"
-description = """
-This is a Rust port of inkle's ink, a scripting language for writing interactive narrative.
-"""
-license = "Apache-2.0"
-keywords = ["ink", "gamedev", "narrative"]
-categories = ["game-development"]
-readme = "../../README.md"
-edition = "2021"
-
-[lib]
-name = "ink_runtime"
-path = "src/lib.rs"
+edition.workspace = true
 
 [dependencies]
 ink-story-json-format = { path = "../ink-story-json-format" }
-serde = { version = "1.0.152", features = ["derive"] }
 serde_json = "1.0.93"
 strum = { version = "0.27.2", features = ["derive"] }
 as-any = "0.3.0"
 rand = "0.9.2"
 web-time = "1.1.0"
-
-[features]
-stream-json-parser = []
 
 [target.'cfg(all(target_family = "wasm", target_os = "unknown"))'.dependencies]
 getrandom = { version = "0.3.3", features = ["wasm_js"] }
