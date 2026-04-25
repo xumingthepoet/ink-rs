@@ -574,180 +574,57 @@ impl VariableScopeIndex {
 }
 
 fn build_variable_scope_index(story: &Story) -> VariableScopeIndex {
-    let mut index = VariableScopeIndex::default();
-    collect_story_scope_variables_in_weave(story.root_weave(), &mut index.globals, true);
-    for flow in story.flows() {
-        collect_story_scope_variables_in_flow(flow, &mut index.globals);
-        collect_flow_variable_scope(flow, None, &mut index);
+    #[derive(Default)]
+    struct VariableScopeVisitor {
+        index: VariableScopeIndex,
     }
-    index
-}
 
-fn collect_story_scope_variables_in_flow(flow: &Flow, globals: &mut HashSet<String>) {
-    collect_story_scope_variables_in_weave(flow.weave(), globals, false);
-    for child in flow.child_flows() {
-        collect_story_scope_variables_in_flow(child, globals);
-    }
-}
-
-fn collect_story_scope_variables_in_weave(
-    weave: &Weave,
-    globals: &mut HashSet<String>,
-    include_temps: bool,
-) {
-    for object in weave.content() {
-        collect_story_scope_variables_in_object(object, globals, include_temps);
-    }
-}
-
-fn collect_story_scope_variables_in_content_list(
-    content: &ContentList,
-    globals: &mut HashSet<String>,
-    include_temps: bool,
-) {
-    for object in content.objects() {
-        collect_story_scope_variables_in_object(object, globals, include_temps);
-    }
-}
-
-fn collect_story_scope_variables_in_object(
-    object: &Object,
-    globals: &mut HashSet<String>,
-    include_temps: bool,
-) {
-    match object {
-        Object::ConstantDeclaration(declaration) => {
-            globals.insert(declaration.name().to_string());
+    impl ParsedVisitor for VariableScopeVisitor {
+        fn visit_flow(&mut self, flow: &Flow, context: &VisitContext) {
+            let Some(flow_path) = &context.current_flow_path else {
+                return;
+            };
+            let locals = flow
+                .arguments()
+                .iter()
+                .map(|argument| argument.name().to_string())
+                .collect::<HashSet<_>>();
+            self.index
+                .locals_by_flow_path
+                .entry(flow_path.clone())
+                .or_insert(locals);
         }
-        Object::VariableAssignment(assignment)
-            if assignment.is_global() || (include_temps && assignment.is_temporary()) =>
-        {
-            globals.insert(assignment.name().to_string());
-        }
-        Object::Choice(choice) => {
-            if let Some(content) = choice.start_content() {
-                collect_story_scope_variables_in_content_list(content, globals, include_temps);
-            }
-            if let Some(content) = choice.choice_only_content() {
-                collect_story_scope_variables_in_content_list(content, globals, include_temps);
-            }
-            collect_story_scope_variables_in_content_list(
-                choice.inner_content(),
-                globals,
-                include_temps,
-            );
-        }
-        Object::Conditional(conditional) => {
-            for branch in conditional.branches() {
-                collect_story_scope_variables_in_weave(branch.content(), globals, include_temps);
+
+        fn visit_object(&mut self, object: &Object, context: &VisitContext) {
+            match object {
+                Object::ConstantDeclaration(declaration) => {
+                    self.index.globals.insert(declaration.name().to_string());
+                }
+                Object::VariableAssignment(assignment) if assignment.is_global() => {
+                    self.index.globals.insert(assignment.name().to_string());
+                }
+                Object::VariableAssignment(assignment)
+                    if assignment.is_temporary() && context.current_flow_path.is_none() =>
+                {
+                    self.index.globals.insert(assignment.name().to_string());
+                }
+                Object::VariableAssignment(assignment) if assignment.is_temporary() => {
+                    if let Some(flow_path) = &context.current_flow_path {
+                        self.index
+                            .locals_by_flow_path
+                            .entry(flow_path.clone())
+                            .or_default()
+                            .insert(assignment.name().to_string());
+                    }
+                }
+                _ => {}
             }
         }
-        Object::ContentList(content) => {
-            collect_story_scope_variables_in_content_list(content, globals, include_temps)
-        }
-        Object::Sequence(sequence) => {
-            for element in sequence.elements() {
-                collect_story_scope_variables_in_content_list(element, globals, include_temps);
-            }
-        }
-        Object::Weave(weave) => {
-            collect_story_scope_variables_in_weave(weave, globals, include_temps)
-        }
-        Object::AuthorWarning(_)
-        | Object::Divert(_)
-        | Object::Expression(_)
-        | Object::ExternalDeclaration(_)
-        | Object::Gather(_)
-        | Object::Glue(_)
-        | Object::IncDec(_)
-        | Object::LogicLine(_)
-        | Object::Return(_)
-        | Object::Tag(_)
-        | Object::Text(_)
-        | Object::TunnelOnwards(_)
-        | Object::VariableAssignment(_) => {}
     }
-}
 
-fn collect_flow_variable_scope(
-    flow: &Flow,
-    parent_path: Option<&str>,
-    index: &mut VariableScopeIndex,
-) {
-    let flow_path = parent_path
-        .map(|parent| format!("{parent}.{}", flow.name()))
-        .unwrap_or_else(|| flow.name().to_string());
-    let mut locals = flow
-        .arguments()
-        .iter()
-        .map(|argument| argument.name().to_string())
-        .collect::<HashSet<_>>();
-    collect_temporary_variables_in_weave(flow.weave(), &mut locals);
-    index.locals_by_flow_path.insert(flow_path.clone(), locals);
-
-    for child in flow.child_flows() {
-        collect_flow_variable_scope(child, Some(&flow_path), index);
-    }
-}
-
-fn collect_temporary_variables_in_weave(weave: &Weave, locals: &mut HashSet<String>) {
-    for object in weave.content() {
-        collect_temporary_variables_in_object(object, locals);
-    }
-}
-
-fn collect_temporary_variables_in_content_list(
-    content: &ContentList,
-    locals: &mut HashSet<String>,
-) {
-    for object in content.objects() {
-        collect_temporary_variables_in_object(object, locals);
-    }
-}
-
-fn collect_temporary_variables_in_object(object: &Object, locals: &mut HashSet<String>) {
-    match object {
-        Object::VariableAssignment(assignment) if assignment.is_temporary() => {
-            locals.insert(assignment.name().to_string());
-        }
-        Object::Choice(choice) => {
-            if let Some(content) = choice.start_content() {
-                collect_temporary_variables_in_content_list(content, locals);
-            }
-            if let Some(content) = choice.choice_only_content() {
-                collect_temporary_variables_in_content_list(content, locals);
-            }
-            collect_temporary_variables_in_content_list(choice.inner_content(), locals);
-        }
-        Object::Conditional(conditional) => {
-            for branch in conditional.branches() {
-                collect_temporary_variables_in_weave(branch.content(), locals);
-            }
-        }
-        Object::ContentList(content) => {
-            collect_temporary_variables_in_content_list(content, locals)
-        }
-        Object::Sequence(sequence) => {
-            for element in sequence.elements() {
-                collect_temporary_variables_in_content_list(element, locals);
-            }
-        }
-        Object::Weave(weave) => collect_temporary_variables_in_weave(weave, locals),
-        Object::AuthorWarning(_)
-        | Object::ConstantDeclaration(_)
-        | Object::Divert(_)
-        | Object::Expression(_)
-        | Object::ExternalDeclaration(_)
-        | Object::Gather(_)
-        | Object::Glue(_)
-        | Object::IncDec(_)
-        | Object::LogicLine(_)
-        | Object::Return(_)
-        | Object::Tag(_)
-        | Object::Text(_)
-        | Object::TunnelOnwards(_)
-        | Object::VariableAssignment(_) => {}
-    }
+    let mut visitor = VariableScopeVisitor::default();
+    walk_story(story, &mut visitor);
+    visitor.index
 }
 
 fn check_variable_reference(

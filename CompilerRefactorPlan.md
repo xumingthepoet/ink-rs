@@ -100,14 +100,16 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 5 in progress. R015 through R046 are complete. Phase 1
+- Current phase: Phase 5 in progress. R015 through R047 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
 - Last focused validation:
   `cargo test -p ink-compiler`, and
   `cargo test -p ink-test --features csharp-tests --test csharp_tests --
-  TestConstRedefinition` on 2026-04-25, passed.
+  TestTemp`, and
+  `cargo test -p ink-test --features csharp-tests --test csharp_tests --
+  TestVariable` on 2026-04-25, passed.
 - Known blockers: none for behavior-preserving refactors.
 
 ## Focused Validation Commands
@@ -717,11 +719,20 @@ Use these checks during phase reviews:
     ink-compiler` and `cargo test -p ink-test --features csharp-tests --test
     csharp_tests -- TestConstRedefinition` pass.
 
-- [ ] R047 Refactor variable scope collection onto traversal
+- [x] R047 Refactor variable scope collection onto traversal
   - Purpose: Make variable visibility easier to change later.
   - Approach: Use traversal context to build globals and locals by flow path.
   - Acceptance: Temp/global/function-argument tests pass, and scope collection
     logic has one owner.
+  - Completed: Replaced the story/flow variable-scope recursion helpers in
+    `analysis.rs` with a `VariableScopeVisitor` over `parsed::visit`.
+    Story-scope constants, globals, and root temps populate the global set.
+    Flow arguments and flow-local temps populate `locals_by_flow_path` through
+    `VisitContext.current_flow_path`, so child-flow locals stay isolated from
+    parent flows. `cargo test -p ink-compiler`, `cargo test -p ink-test
+    --features csharp-tests --test csharp_tests -- TestTemp`, and `cargo test
+    -p ink-test --features csharp-tests --test csharp_tests -- TestVariable`
+    pass.
 
 - [ ] R048 Refactor target symbol collection onto traversal
   - Purpose: Centralize labels, flow symbols, choice identifiers, and gather
