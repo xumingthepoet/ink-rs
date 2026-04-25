@@ -100,24 +100,14 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 5 in progress. R015 through R050 are complete. Phase 1
-  is complete except the first real intentional-divergence fixture, which
-  should wait until an actual language change is chosen.
+- Current phase: Phase 5 complete. R015 through R051 are complete. Phase 1 is
+  complete except the first real intentional-divergence fixture, which should
+  wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
 - Last focused validation:
-  `cargo test -p ink-compiler`, and
-  `cargo test -p ink-test --features csharp-tests --test csharp_tests --
-  TestFunction`, and
-  `cargo test -p ink-test --features csharp-tests --test csharp_tests --
-  TestLooseEnds`, and
-  `cargo test -p ink-test --features csharp-tests --test csharp_tests --
-  TestNestedChoiceError`, and
-  `cargo test -p ink-test --features csharp-tests --test csharp_tests --
-  TestReturnTextWarning`, and
-  `cargo test -p ink-test --features csharp-tests --test csharp_tests --
-  TestShouldntGatherDueToChoice`, and
-  `cargo test -p ink-test --features csharp-tests --test csharp_tests --
-  TestKnotTerminationSkipsGlobalObjects` on 2026-04-25, passed.
+  `rg -n "format!\\(\".*\\{.*\\}\\.\"|split\\('\\.'\\)|rsplit_once\\('\\.'\\)|to_snapshot_string\\(|DivertTarget::Path\\(|String\\)"`
+  over compiler analysis, lowering, parsed, and syntax modules on
+  2026-04-25, completed for the R051 ownership review.
 - Known blockers: none for behavior-preserving refactors.
 
 ## Focused Validation Commands
@@ -788,13 +778,24 @@ Use these checks during phase reviews:
     function, loose-end, nested-choice, return-warning, gather, and knot
     termination C# tests pass.
 
-- [ ] R051 Review parsed model ownership
+- [x] R051 Review parsed model ownership
   - Purpose: Ensure language concepts are represented in parsed types before
     lowering.
   - Approach: Review recent parser/lowering code for data that is inferred late
     from raw strings instead of stored in parsed nodes.
   - Acceptance: Any missing parsed-model fields are added or recorded as
     follow-up tasks.
+  - Completed: Reviewed parsed, analysis, syntax, and lowering call sites for
+    raw string path/target inference. The two durable ownership gaps are not
+    small enough for this traversal phase: `DivertTarget::Path(String)` and
+    `Expression::DivertTarget(String)` still leave dotted path semantics to
+    analysis/lowering string helpers, and `Expression` nodes still lack source
+    spans, forcing analysis to use owner-object spans. The path gap is recorded
+    against the Phase 7 typed path work, especially R061 and R062. The
+    expression-span gap is recorded against Phase 6 analysis pass extraction and
+    focused diagnostic tests, especially R055 and R058. No immediate parsed
+    field was added because both changes would touch parser snapshots,
+    diagnostics, and lowering contracts.
 
 ## Phase 6: Analysis Pass Architecture
 
