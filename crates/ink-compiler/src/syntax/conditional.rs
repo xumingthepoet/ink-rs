@@ -5,7 +5,7 @@ use crate::{
 
 use super::{
     is_identifier, is_identifier_continue, parse_initial_expression, parser::Parser, text,
-    weave_from_objects,
+    weave::weave_from_objects,
 };
 
 pub(super) fn parse_multiline_prefix(line: &SourceLine) -> Option<(Vec<Object>, &str)> {

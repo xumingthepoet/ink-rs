@@ -7,6 +7,7 @@ mod rule;
 mod sequence;
 mod state;
 mod text;
+mod weave;
 
 mod parser;
 
@@ -16,65 +17,12 @@ use crate::{
     parsed::{
         AuthorWarning, BinaryOperator, Choice, ConstantDeclaration, ContentList, Expression,
         ExternalDeclaration, FloatLiteral, IncDec, Object, Return, Text, UnaryOperator,
-        VariableAssignment, Weave,
+        VariableAssignment,
     },
     source::SourceLine,
 };
 
 use self::rule::RuleParser;
-
-fn group_nested_weaves(objects: Vec<Object>, base_depth: usize) -> Vec<Object> {
-    let mut grouped = Vec::new();
-    let mut index = 0;
-
-    while index < objects.len() {
-        if object_depth(&objects[index]).is_some_and(|depth| depth > base_depth) {
-            let mut nested = Vec::new();
-            while index < objects.len() {
-                if object_depth(&objects[index]).is_some_and(|depth| depth <= base_depth) {
-                    break;
-                }
-                nested.push(objects[index].clone());
-                index += 1;
-            }
-            let nested_base_depth = determine_base_depth(&nested);
-            grouped.push(Object::Weave(Weave::new(
-                group_nested_weaves(nested, nested_base_depth),
-                nested_base_depth.saturating_sub(1),
-            )));
-        } else {
-            grouped.push(objects[index].clone());
-            index += 1;
-        }
-    }
-
-    grouped
-}
-
-fn group_weave_content(objects: Vec<Object>) -> Vec<Object> {
-    let base_depth = determine_base_depth(&objects);
-    group_nested_weaves(objects, base_depth)
-}
-
-pub(super) fn weave_from_objects(objects: Vec<Object>) -> Weave {
-    let base_depth = determine_base_depth(&objects);
-    Weave::new(
-        group_nested_weaves(objects, base_depth),
-        base_depth.saturating_sub(1),
-    )
-}
-
-fn determine_base_depth(objects: &[Object]) -> usize {
-    objects.iter().find_map(object_depth).unwrap_or(1)
-}
-
-fn object_depth(object: &Object) -> Option<usize> {
-    match object {
-        Object::Choice(choice) => Some(choice.indentation_depth()),
-        Object::Gather(gather) => Some(gather.indentation_depth()),
-        _ => None,
-    }
-}
 
 fn parse_choice_from_line(line: &SourceLine) -> Option<Choice> {
     let mut line_parser = RuleParser::new(line);

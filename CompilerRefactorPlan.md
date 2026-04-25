@@ -100,7 +100,7 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 2 in progress. R015 through R017 are complete. Phase 1
+- Current phase: Phase 2 in progress. R015 through R018 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
@@ -146,6 +146,8 @@ Full validation:
   `crates/ink-compiler/src/syntax/conditional.rs`.
 - Multiline sequence parsing:
   `crates/ink-compiler/src/syntax/sequence.rs`.
+- Weave grouping:
+  `crates/ink-compiler/src/syntax/weave.rs`.
 - Parsed model: `crates/ink-compiler/src/parsed/`.
 - Analysis entry point: `analysis::analyze` in
   `crates/ink-compiler/src/analysis.rs`.
@@ -337,13 +339,17 @@ Use these checks during phase reviews:
     `syntax/text.rs`; `cargo test -p ink-compiler syntax::` and
     `cargo test -p ink-test --test compiler_conformance` pass.
 
-- [ ] R018 Extract `syntax/weave.rs`
+- [x] R018 Extract `syntax/weave.rs`
   - Purpose: Make weave grouping explicit instead of hidden in the parser
     driver.
   - Approach: Move weave grouping, nested weave grouping, depth detection, and
     weave construction helpers.
   - Acceptance: Choice/gather/nested weave snapshots are unchanged, and weave
     grouping can be tested without reading the parser driver.
+  - Completed: Weave grouping, depth detection, and parsed weave construction
+    helpers now live in `syntax/weave.rs` with a focused unit test;
+    `cargo test -p ink-compiler syntax::` and
+    `cargo test -p ink-test --test compiler_conformance` pass.
 
 - [ ] R019 Extract `syntax/gather.rs`
   - Purpose: Keep gather statement parsing separate from both generic parser

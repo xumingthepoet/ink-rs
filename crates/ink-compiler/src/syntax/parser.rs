@@ -6,12 +6,13 @@ use crate::{
 };
 
 use super::rule::RuleParser;
+use super::weave::group_weave_content;
 use super::{
     author_warning_statement, choice_statement, constant_declaration_statement, divert_statement,
-    external_declaration_statement, gather_statement, group_weave_content,
-    is_choice_continuation_boundary, knot, leading_whitespace_count, logic_line_statement,
-    parse_choice_from_line, return_statement, temp_declaration_statement, text_statement,
-    variable_assignment_statement, variable_declaration_statement,
+    external_declaration_statement, gather_statement, is_choice_continuation_boundary, knot,
+    leading_whitespace_count, logic_line_statement, parse_choice_from_line, return_statement,
+    temp_declaration_statement, text_statement, variable_assignment_statement,
+    variable_declaration_statement,
 };
 
 type StatementRule = for<'source> fn(&mut RuleParser<'source>) -> Option<Vec<Object>>;
