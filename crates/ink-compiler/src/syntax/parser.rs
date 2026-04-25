@@ -1,21 +1,18 @@
 use crate::{
     compiler::StageOutput,
     diagnostic::Diagnostic,
-    parsed::{Conditional, ContentList, Flow, Object, Sequence, Story, Text},
+    parsed::{ContentList, Flow, Object, Sequence, Story, Text},
     source::{SourceFile, SourceInput, SourceLine},
 };
 
 use super::rule::RuleParser;
 use super::{
-    author_warning_statement, choice_statement, classify_conditional_branches,
-    constant_declaration_statement, divert_statement, external_declaration_statement,
-    gather_statement, group_weave_content, is_choice_continuation_boundary,
-    is_multiline_sequence_element_start, knot, leading_whitespace_count, logic_line_statement,
-    parse_choice_from_line, parse_conditional_branch_header,
-    parse_default_conditional_branch_content, parse_initial_expression,
-    parse_multiline_conditional_prefix, return_statement, temp_declaration_statement, text,
-    text_statement, variable_assignment_statement, variable_declaration_statement,
-    ConditionalBranchBuilder,
+    author_warning_statement, choice_statement, constant_declaration_statement, divert_statement,
+    external_declaration_statement, gather_statement, group_weave_content,
+    is_choice_continuation_boundary, is_multiline_sequence_element_start, knot,
+    leading_whitespace_count, logic_line_statement, parse_choice_from_line, return_statement,
+    temp_declaration_statement, text, text_statement, variable_assignment_statement,
+    variable_declaration_statement,
 };
 
 type StatementRule = for<'source> fn(&mut RuleParser<'source>) -> Option<Vec<Object>>;
@@ -31,7 +28,7 @@ pub(crate) fn parse(input: SourceInput) -> StageOutput<Story> {
     }
 }
 
-struct Parser {
+pub(super) struct Parser {
     source: SourceFile,
     diagnostics: Vec<Diagnostic>,
 }
@@ -91,7 +88,7 @@ impl Parser {
         Story::new(group_weave_content(objects), flows)
     }
 
-    fn parse_statement(&mut self, line: &SourceLine) -> Vec<Object> {
+    pub(super) fn parse_statement(&mut self, line: &SourceLine) -> Vec<Object> {
         if line.text.trim().is_empty() {
             return Vec::new();
         }
@@ -312,7 +309,7 @@ impl Parser {
         ))
     }
 
-    fn parse_compound_statement(
+    pub(super) fn parse_compound_statement(
         &mut self,
         lines: &[SourceLine],
         index: &mut usize,
@@ -334,7 +331,7 @@ impl Parser {
         })
     }
 
-    fn parse_multiline_rule<T>(
+    pub(super) fn parse_multiline_rule<T>(
         &mut self,
         index: &mut usize,
         rule: impl FnOnce(&mut Self, &mut usize) -> Option<T>,
@@ -404,213 +401,6 @@ impl Parser {
 
         *index = next_index;
         Some(vec![Object::Choice(combined_choice)])
-    }
-
-    fn parse_multiline_conditional(
-        &mut self,
-        lines: &[SourceLine],
-        index: &mut usize,
-    ) -> Option<Vec<Object>> {
-        let line = &lines[*index];
-        let (prefix, conditional_source) = parse_multiline_conditional_prefix(line)?;
-        let trimmed = conditional_source.trim();
-        if !trimmed.starts_with('{') {
-            return None;
-        }
-
-        let after_open = trimmed.strip_prefix('{')?.trim();
-        let initial_condition = if after_open.is_empty() {
-            None
-        } else {
-            let condition_source = after_open.strip_suffix(':')?.trim();
-            Some(parse_initial_expression(condition_source)?)
-        };
-
-        *index += 1;
-        let mut branches = Vec::new();
-        let mut current_branch = ConditionalBranchBuilder::true_branch();
-
-        while *index < lines.len() {
-            let current_line = &lines[*index];
-            let current_trimmed = current_line.text.trim();
-
-            if let Some(after_close) = current_trimmed.strip_prefix('}') {
-                branches.push(current_branch);
-                classify_conditional_branches(initial_condition.is_some(), &mut branches);
-                let branches = branches
-                    .into_iter()
-                    .map(ConditionalBranchBuilder::finish)
-                    .collect();
-                let conditional = Conditional::new(initial_condition, branches);
-                let mut objects = prefix;
-                objects.push(Object::ContentList(ContentList::new(vec![
-                    Object::Conditional(conditional),
-                ])));
-                let suffix = after_close.trim_start();
-                if suffix.is_empty() {
-                    *index += 1;
-                    objects.push(Object::Text(Text::new("\n", current_line.span.clone())));
-                    return Some(objects);
-                }
-                if let Some(mut suffix_objects) =
-                    self.parse_multiline_conditional_suffix(suffix, current_line, lines, index)
-                {
-                    objects.append(&mut suffix_objects);
-                    return Some(objects);
-                }
-                let suffix_line = SourceLine {
-                    text: suffix.to_string(),
-                    span: current_line.span.clone(),
-                };
-                objects.extend(self.parse_statement(&suffix_line));
-                *index += 1;
-                return Some(objects);
-            }
-
-            if let Some(content) = parse_default_conditional_branch_content(current_trimmed) {
-                if let Some(nested_objects) =
-                    self.parse_nested_conditional_branch_content(lines, index, content)
-                {
-                    if current_branch.has_content() || !branches.is_empty() {
-                        branches.push(current_branch);
-                    }
-                    current_branch = ConditionalBranchBuilder::content_branch();
-                    current_branch.objects.extend(nested_objects);
-                    continue;
-                }
-            }
-
-            if let Some(parsed_branch) = parse_conditional_branch_header(current_trimmed) {
-                if current_branch.has_content() || !branches.is_empty() {
-                    branches.push(current_branch);
-                }
-                current_branch = parsed_branch.builder;
-                if let Some(content) = parsed_branch.inline_content {
-                    self.append_conditional_branch_inline_content(
-                        &mut current_branch,
-                        content,
-                        current_line,
-                    );
-                }
-                *index += 1;
-                continue;
-            }
-
-            if let Some(content) = parse_default_conditional_branch_content(current_trimmed) {
-                if current_branch.has_content() || !branches.is_empty() {
-                    branches.push(current_branch);
-                }
-                current_branch = ConditionalBranchBuilder::content_branch();
-                self.append_conditional_branch_inline_content(
-                    &mut current_branch,
-                    content,
-                    current_line,
-                );
-                *index += 1;
-                continue;
-            }
-
-            if current_trimmed.starts_with('{') {
-                if let Some(nested_objects) = self.parse_compound_statement(lines, index) {
-                    current_branch.objects.extend(nested_objects);
-                    continue;
-                }
-            }
-
-            current_branch
-                .objects
-                .extend(self.parse_statement(current_line));
-            *index += 1;
-        }
-
-        None
-    }
-
-    fn parse_multiline_conditional_suffix(
-        &mut self,
-        suffix: &str,
-        source_line: &SourceLine,
-        lines: &[SourceLine],
-        index: &mut usize,
-    ) -> Option<Vec<Object>> {
-        for (brace_index, _) in suffix.match_indices('{') {
-            let prefix = &suffix[..brace_index];
-            let nested_source = suffix[brace_index..].trim_start();
-            let mut nested_lines = Vec::with_capacity(lines.len() - *index);
-            nested_lines.push(SourceLine {
-                text: nested_source.to_string(),
-                span: source_line.span.clone(),
-            });
-            nested_lines.extend(lines[*index + 1..].iter().cloned());
-
-            let mut nested_index = 0;
-            let nested_objects = self
-                .parse_multiline_rule(&mut nested_index, |parser, index| {
-                    parser.parse_multiline_conditional(&nested_lines, index)
-                })?;
-            if nested_index == 0 {
-                continue;
-            }
-
-            let mut objects = Vec::new();
-            if !prefix.trim().is_empty() {
-                objects.extend(text::parse_inline_content(
-                    prefix.trim_start(),
-                    &source_line.span,
-                )?);
-            }
-            objects.extend(nested_objects);
-            *index += nested_index;
-            return Some(objects);
-        }
-
-        None
-    }
-
-    fn parse_nested_conditional_branch_content(
-        &mut self,
-        lines: &[SourceLine],
-        index: &mut usize,
-        content: &str,
-    ) -> Option<Vec<Object>> {
-        if !content.trim_start().starts_with('{') {
-            return None;
-        }
-
-        let mut nested_lines = Vec::with_capacity(lines.len() - *index);
-        nested_lines.push(SourceLine {
-            text: content.trim_start().to_string(),
-            span: lines[*index].span.clone(),
-        });
-        nested_lines.extend(lines[*index + 1..].iter().cloned());
-
-        let mut nested_index = 0;
-        let nested_objects = self.parse_multiline_rule(&mut nested_index, |parser, index| {
-            parser.parse_multiline_conditional(&nested_lines, index)
-        })?;
-        if nested_index == 0 {
-            return None;
-        }
-
-        *index += nested_index;
-        Some(nested_objects)
-    }
-
-    fn append_conditional_branch_inline_content(
-        &mut self,
-        branch: &mut ConditionalBranchBuilder,
-        content: &str,
-        source_line: &SourceLine,
-    ) {
-        if content.trim().is_empty() {
-            return;
-        }
-
-        let content_line = SourceLine {
-            text: content.trim_start().to_string(),
-            span: source_line.span.clone(),
-        };
-        branch.objects.extend(self.parse_statement(&content_line));
     }
 
     fn parse_multiline_sequence(

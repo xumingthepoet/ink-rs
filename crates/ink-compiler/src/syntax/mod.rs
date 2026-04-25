@@ -1,4 +1,5 @@
 mod choice;
+mod conditional;
 mod divert;
 mod error;
 mod knot;
@@ -12,230 +13,14 @@ pub(crate) use parser::parse;
 
 use crate::{
     parsed::{
-        AuthorWarning, BinaryOperator, Choice, ConditionalBranch, ConstantDeclaration, ContentList,
-        Expression, ExternalDeclaration, FloatLiteral, IncDec, Object, Return, Text, UnaryOperator,
+        AuthorWarning, BinaryOperator, Choice, ConstantDeclaration, ContentList, Expression,
+        ExternalDeclaration, FloatLiteral, IncDec, Object, Return, Text, UnaryOperator,
         VariableAssignment, Weave,
     },
     source::SourceLine,
 };
 
 use self::rule::RuleParser;
-
-fn parse_multiline_conditional_prefix(line: &SourceLine) -> Option<(Vec<Object>, &str)> {
-    let trimmed = line.text.trim_start();
-    if trimmed.starts_with('{') {
-        return Some((Vec::new(), trimmed));
-    }
-
-    let mut rest = trimmed;
-    let mut indentation_depth = 0;
-    loop {
-        if rest.starts_with("->") {
-            return None;
-        }
-        let Some(after_dash) = rest.strip_prefix('-') else {
-            break;
-        };
-        indentation_depth += 1;
-        rest = after_dash.trim_start();
-    }
-
-    if indentation_depth == 0 {
-        return None;
-    }
-
-    let (identifier, after_identifier) = parse_optional_gather_identifier(rest);
-    rest = after_identifier.trim_start();
-    if !rest.starts_with('{') {
-        return None;
-    }
-
-    let mut gather = crate::parsed::Gather::new(line.span.clone(), indentation_depth);
-    gather.set_identifier(identifier);
-    Some((vec![Object::Gather(gather)], rest))
-}
-
-fn parse_optional_gather_identifier(source: &str) -> (Option<String>, &str) {
-    let Some(after_open) = source.strip_prefix('(') else {
-        return (None, source);
-    };
-    let Some(close_index) = after_open.find(')') else {
-        return (None, source);
-    };
-    let name = after_open[..close_index].trim();
-    if !is_identifier(name) {
-        return (None, source);
-    }
-    (Some(name.to_string()), &after_open[close_index + 1..])
-}
-
-struct ConditionalBranchBuilder {
-    is_true_branch: bool,
-    is_else: bool,
-    explicit_else: bool,
-    own_condition: Option<Expression>,
-    objects: Vec<Object>,
-}
-
-impl ConditionalBranchBuilder {
-    fn true_branch() -> Self {
-        Self {
-            is_true_branch: true,
-            is_else: false,
-            explicit_else: false,
-            own_condition: None,
-            objects: Vec::new(),
-        }
-    }
-
-    fn content_branch() -> Self {
-        Self {
-            is_true_branch: false,
-            is_else: false,
-            explicit_else: false,
-            own_condition: None,
-            objects: Vec::new(),
-        }
-    }
-
-    fn has_content(&self) -> bool {
-        !self.objects.is_empty() || self.own_condition.is_some() || self.is_else
-    }
-
-    fn finish(self) -> ConditionalBranch {
-        ConditionalBranch::new(
-            self.is_true_branch,
-            self.is_else,
-            false,
-            weave_from_objects(self.objects),
-            self.own_condition,
-        )
-    }
-}
-
-struct ParsedConditionalBranchHeader<'a> {
-    builder: ConditionalBranchBuilder,
-    inline_content: Option<&'a str>,
-}
-
-fn parse_conditional_branch_header(trimmed: &str) -> Option<ParsedConditionalBranchHeader<'_>> {
-    let after_dash = trimmed.strip_prefix('-')?.trim_start();
-    if trimmed.starts_with("->") {
-        return None;
-    }
-
-    if let Some(after_else) = after_dash.strip_prefix("else") {
-        if after_else
-            .chars()
-            .next()
-            .is_some_and(is_identifier_continue)
-        {
-            return None;
-        }
-
-        let inline_content = after_else.trim_start().strip_prefix(':')?;
-        return Some(ParsedConditionalBranchHeader {
-            builder: ConditionalBranchBuilder {
-                is_true_branch: false,
-                is_else: true,
-                explicit_else: true,
-                own_condition: None,
-                objects: Vec::new(),
-            },
-            inline_content: non_empty_trimmed(inline_content),
-        });
-    }
-
-    let (condition_source, inline_content) = split_top_level_once(after_dash, ':')?;
-    Some(ParsedConditionalBranchHeader {
-        builder: ConditionalBranchBuilder {
-            is_true_branch: false,
-            is_else: false,
-            explicit_else: false,
-            own_condition: Some(parse_initial_expression(condition_source.trim())?),
-            objects: Vec::new(),
-        },
-        inline_content: non_empty_trimmed(inline_content),
-    })
-}
-
-fn parse_default_conditional_branch_content(trimmed: &str) -> Option<&str> {
-    if trimmed.starts_with("->") {
-        return None;
-    }
-    let content = trimmed.strip_prefix('-')?.trim_start();
-    Some(content)
-}
-
-fn classify_conditional_branches(
-    has_initial_condition: bool,
-    branches: &mut [ConditionalBranchBuilder],
-) {
-    if has_initial_condition {
-        let mut earlier_branches_have_own_condition = false;
-        let last_index = branches.len().saturating_sub(1);
-
-        for (index, branch) in branches.iter_mut().enumerate() {
-            let is_last = index == last_index;
-            branch.is_true_branch = false;
-
-            if branch.own_condition.is_some() {
-                branch.is_else = false;
-                earlier_branches_have_own_condition = true;
-            } else if branch.explicit_else || (earlier_branches_have_own_condition && is_last) {
-                branch.is_else = true;
-            } else if index == 0 {
-                branch.is_true_branch = true;
-                branch.is_else = false;
-            } else {
-                branch.is_else = true;
-            }
-        }
-    } else {
-        let last_index = branches.len().saturating_sub(1);
-        for (index, branch) in branches.iter_mut().enumerate() {
-            branch.is_true_branch = false;
-            if branch.explicit_else || (branch.own_condition.is_none() && index == last_index) {
-                branch.is_else = true;
-            }
-        }
-    }
-}
-
-fn non_empty_trimmed(source: &str) -> Option<&str> {
-    let trimmed = source.trim();
-    (!trimmed.is_empty()).then_some(trimmed)
-}
-
-fn split_top_level_once(source: &str, needle: char) -> Option<(&str, &str)> {
-    let mut in_string = false;
-    let mut escaped = false;
-    let mut paren_depth = 0;
-    let mut brace_depth = 0;
-
-    for (index, ch) in source.char_indices() {
-        if escaped {
-            escaped = false;
-            continue;
-        }
-
-        match ch {
-            '\\' => escaped = true,
-            '"' => in_string = !in_string,
-            '(' if !in_string => paren_depth += 1,
-            ')' if !in_string => paren_depth -= 1,
-            '{' if !in_string => brace_depth += 1,
-            '}' if !in_string => brace_depth -= 1,
-            _ if ch == needle && !in_string && paren_depth == 0 && brace_depth == 0 => {
-                let right_start = index + ch.len_utf8();
-                return Some((&source[..index], &source[right_start..]));
-            }
-            _ => {}
-        }
-    }
-
-    None
-}
 
 fn is_multiline_sequence_element_start(line: &SourceLine) -> bool {
     let trimmed = line.text.trim_start();
@@ -275,7 +60,7 @@ fn group_weave_content(objects: Vec<Object>) -> Vec<Object> {
     group_nested_weaves(objects, base_depth)
 }
 
-fn weave_from_objects(objects: Vec<Object>) -> Weave {
+pub(super) fn weave_from_objects(objects: Vec<Object>) -> Weave {
     let base_depth = determine_base_depth(&objects);
     Weave::new(
         group_nested_weaves(objects, base_depth),

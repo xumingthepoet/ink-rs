@@ -100,9 +100,9 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 2 in progress. R015 is complete. Phase 1 is complete
-  except the first real intentional-divergence fixture, which should wait until
-  an actual language change is chosen.
+- Current phase: Phase 2 in progress. R015 and R016 are complete. Phase 1 is
+  complete except the first real intentional-divergence fixture, which should
+  wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
 - Last focused validation: `cargo check -p ink-compiler`,
   `cargo test -p ink-compiler syntax::`, and
@@ -142,6 +142,8 @@ Full validation:
   `crates/ink-compiler/src/syntax/parser.rs`.
 - Syntax rules and statement parsers: `crates/ink-compiler/src/syntax/mod.rs`
   plus focused submodules under `crates/ink-compiler/src/syntax/`.
+- Multiline conditional parsing:
+  `crates/ink-compiler/src/syntax/conditional.rs`.
 - Parsed model: `crates/ink-compiler/src/parsed/`.
 - Analysis entry point: `analysis::analyze` in
   `crates/ink-compiler/src/analysis.rs`.
@@ -310,12 +312,16 @@ Use these checks during phase reviews:
     `syntax/parser.rs`; `cargo test -p ink-compiler syntax::` and
     `cargo test -p ink-test --test compiler_conformance` pass.
 
-- [ ] R016 Extract `syntax/conditional.rs`
+- [x] R016 Extract `syntax/conditional.rs`
   - Purpose: Give multiline conditional parsing its own owner.
   - Approach: Move conditional prefix parsing, branch builders, branch
     classification, nested conditional parsing, and suffix parsing.
   - Acceptance: Conditional parse snapshots and JSON fixtures are unchanged,
     and future conditional syntax changes have one obvious module to edit.
+  - Completed: Conditional prefix parsing, branch classification, nested
+    conditional handling, suffix parsing, and branch construction now live in
+    `syntax/conditional.rs`; `cargo test -p ink-compiler syntax::` and
+    `cargo test -p ink-test --test compiler_conformance` pass.
 
 - [ ] R017 Extract `syntax/sequence.rs`
   - Purpose: Isolate sequence syntax, which is likely to change or shrink in a
