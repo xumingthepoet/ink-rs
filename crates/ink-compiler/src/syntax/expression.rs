@@ -6,7 +6,8 @@ use crate::{
 use super::{is_identifier, is_identifier_continue, scan, text};
 
 pub(super) fn parse_initial_expression(source: &str) -> Option<Expression> {
-    let _tokens = tokenize_expression(source.trim());
+    let tokens = tokenize_expression(source.trim());
+    let _ = TokenExpressionParser::new(&tokens).parse();
     parse_expression(source.trim())
 }
 
@@ -182,6 +183,178 @@ fn classify_word_token(word: &str) -> ExpressionTokenKind {
     }
 
     ExpressionTokenKind::Identifier(word.to_string())
+}
+
+struct TokenExpressionParser<'a> {
+    tokens: &'a [ExpressionToken],
+    index: usize,
+}
+
+impl<'a> TokenExpressionParser<'a> {
+    fn new(tokens: &'a [ExpressionToken]) -> Self {
+        Self { tokens, index: 0 }
+    }
+
+    fn parse(mut self) -> Option<Expression> {
+        let expression = self.parse_expression(0)?;
+        (self.index == self.tokens.len()).then_some(expression)
+    }
+
+    fn parse_expression(&mut self, minimum_precedence: u8) -> Option<Expression> {
+        let mut left = self.parse_prefix()?;
+
+        while let Some((operator, precedence)) = self.current_binary_operator() {
+            if precedence < minimum_precedence {
+                break;
+            }
+            self.index += 1;
+            let right = self.parse_expression(precedence + 1)?;
+            left = Expression::Binary {
+                operator,
+                left: Box::new(left),
+                right: Box::new(right),
+            };
+        }
+
+        Some(left)
+    }
+
+    fn parse_prefix(&mut self) -> Option<Expression> {
+        let kind = self.advance()?.kind.clone();
+        match kind {
+            ExpressionTokenKind::IntLiteral(value) => {
+                Some(Expression::NumberInt(value.parse::<i32>().ok()?))
+            }
+            ExpressionTokenKind::FloatLiteral(value) => Some(Expression::NumberFloat(
+                FloatLiteral::new(value.parse().ok()?),
+            )),
+            ExpressionTokenKind::StringLiteral(value) => Some(parse_string_expression(&value)),
+            ExpressionTokenKind::Identifier(name) => self.parse_identifier_or_call(&name),
+            ExpressionTokenKind::Arrow => self.parse_divert_target(),
+            ExpressionTokenKind::Operator(operator)
+                if matches!(operator.as_str(), "-" | "!" | "not") =>
+            {
+                let unary_operator = match operator.as_str() {
+                    "-" => UnaryOperator::Negate,
+                    "!" | "not" => UnaryOperator::Not,
+                    _ => return None,
+                };
+                let expression = self.parse_expression(10)?;
+                Some(unary_expression(unary_operator, expression))
+            }
+            ExpressionTokenKind::OpenParen => {
+                let expression = self.parse_expression(0)?;
+                self.expect_kind(|kind| matches!(kind, ExpressionTokenKind::CloseParen))?;
+                Some(expression)
+            }
+            _ => None,
+        }
+    }
+
+    fn parse_identifier_or_call(&mut self, name: &str) -> Option<Expression> {
+        if name == "true" {
+            return Some(Expression::NumberBool(true));
+        }
+        if name == "false" {
+            return Some(Expression::NumberBool(false));
+        }
+
+        if !self.match_kind(|kind| matches!(kind, ExpressionTokenKind::OpenParen)) {
+            return Some(Expression::VariableReference(name.to_string()));
+        }
+
+        let mut args = Vec::new();
+        if self.match_kind(|kind| matches!(kind, ExpressionTokenKind::CloseParen)) {
+            return Some(Expression::FunctionCall {
+                name: name.to_string(),
+                args,
+            });
+        }
+
+        loop {
+            args.push(self.parse_expression(0)?);
+            if self.match_kind(|kind| matches!(kind, ExpressionTokenKind::Comma)) {
+                continue;
+            }
+            self.expect_kind(|kind| matches!(kind, ExpressionTokenKind::CloseParen))?;
+            break;
+        }
+
+        Some(Expression::FunctionCall {
+            name: name.to_string(),
+            args,
+        })
+    }
+
+    fn parse_divert_target(&mut self) -> Option<Expression> {
+        let kind = self.advance()?.kind.clone();
+        let ExpressionTokenKind::Identifier(target) = kind else {
+            return None;
+        };
+        Some(Expression::DivertTarget(
+            crate::parsed::DivertTarget::from_source(&target).to_snapshot_string(),
+        ))
+    }
+
+    fn current_binary_operator(&self) -> Option<(BinaryOperator, u8)> {
+        let token = self.peek()?;
+        let ExpressionTokenKind::Operator(operator) = &token.kind else {
+            return None;
+        };
+        match operator.as_str() {
+            "&&" => Some((BinaryOperator::AndSymbol, 1)),
+            "||" => Some((BinaryOperator::OrSymbol, 1)),
+            "and" => Some((BinaryOperator::And, 1)),
+            "or" => Some((BinaryOperator::Or, 1)),
+            "==" => Some((BinaryOperator::Equals, 2)),
+            "!=" => Some((BinaryOperator::NotEquals, 2)),
+            ">=" => Some((BinaryOperator::GreaterThanOrEquals, 2)),
+            "<=" => Some((BinaryOperator::LessThanOrEquals, 2)),
+            ">" => Some((BinaryOperator::GreaterThan, 2)),
+            "<" => Some((BinaryOperator::LessThan, 2)),
+            "!?" => Some((BinaryOperator::Hasnt, 3)),
+            "hasnt" => Some((BinaryOperator::Hasnt, 4)),
+            "has" => Some((BinaryOperator::Has, 4)),
+            "?" => Some((BinaryOperator::Has, 4)),
+            "+" => Some((BinaryOperator::Add, 5)),
+            "-" => Some((BinaryOperator::Subtract, 5)),
+            "*" => Some((BinaryOperator::Multiply, 6)),
+            "/" => Some((BinaryOperator::Divide, 7)),
+            "mod" => Some((BinaryOperator::Modulo, 8)),
+            "%" => Some((BinaryOperator::Modulo, 9)),
+            _ => None,
+        }
+    }
+
+    fn peek(&self) -> Option<&'a ExpressionToken> {
+        self.tokens.get(self.index)
+    }
+
+    fn advance(&mut self) -> Option<&'a ExpressionToken> {
+        let token = self.peek()?;
+        self.index += 1;
+        Some(token)
+    }
+
+    fn match_kind(&mut self, matches: impl FnOnce(&ExpressionTokenKind) -> bool) -> bool {
+        if self.peek().is_some_and(|token| matches(&token.kind)) {
+            self.index += 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    fn expect_kind(
+        &mut self,
+        matches: impl FnOnce(&ExpressionTokenKind) -> bool,
+    ) -> Option<&'a ExpressionToken> {
+        if self.peek().is_some_and(|token| matches(&token.kind)) {
+            self.advance()
+        } else {
+            None
+        }
+    }
 }
 
 fn parse_expression(source: &str) -> Option<Expression> {
@@ -653,6 +826,16 @@ mod tests {
         output
     }
 
+    fn token_parser_snapshot(source: &str) -> String {
+        let tokens = tokenize_expression(source);
+        let expression = TokenExpressionParser::new(&tokens)
+            .parse()
+            .unwrap_or_else(|| panic!("expected token parser expression for {source:?}"));
+        let mut output = String::new();
+        expression.write_parse_snapshot(&mut output, 0);
+        output
+    }
+
     fn token(kind: ExpressionTokenKind, byte_index: usize, column: usize) -> ExpressionToken {
         ExpressionToken {
             kind,
@@ -814,5 +997,69 @@ mod tests {
                 token(ExpressionTokenKind::StringLiteral("ok".to_string()), 9, 6),
             ]
         );
+    }
+
+    #[test]
+    fn token_parser_reproduces_current_expression_baseline() {
+        let cases = [
+            (
+                "1 + 2 * 3",
+                "Binary(+, Number(1), Binary(*, Number(2), Number(3)))",
+            ),
+            (
+                "(1 + 2) * 3",
+                "Binary(*, Binary(+, Number(1), Number(2)), Number(3))",
+            ),
+            (
+                "1 - 2 - 3",
+                "Binary(-, Binary(-, Number(1), Number(2)), Number(3))",
+            ),
+            (
+                "8 / 4 / 2",
+                "Binary(/, Binary(/, Number(8), Number(4)), Number(2))",
+            ),
+            ("8 mod 3", "Binary(%, Number(8), Number(3))"),
+            ("8 % 3", "Binary(%, Number(8), Number(3))"),
+            ("-5", "Number(-5)"),
+            ("-x", "Unary(-, VariableReference(x))"),
+            ("not ready", "Unary(not, VariableReference(ready))"),
+            ("!ready", "Unary(not, VariableReference(ready))"),
+            ("notebook", "VariableReference(notebook)"),
+            ("true", "Number(true)"),
+            ("false", "Number(false)"),
+            ("3.5", "Number(3.5)"),
+            (r#""hello""#, r#"String("hello")"#),
+            ("foo(1, bar(2, 3), \"x,y\")", "FunctionCall(foo, args=3)"),
+            ("-> knot.stitch", "DivertTarget(-> knot.stitch)"),
+            ("knot.stitch.label", "VariableReference(knot.stitch.label)"),
+            (
+                "a and b or c",
+                "Binary(or, Binary(and, VariableReference(a), VariableReference(b)), VariableReference(c))",
+            ),
+            (
+                "a && b || c",
+                "Binary(||, Binary(&&, VariableReference(a), VariableReference(b)), VariableReference(c))",
+            ),
+            (
+                "list ? item",
+                "Binary(?, VariableReference(list), VariableReference(item))",
+            ),
+            (
+                "list hasnt item",
+                "Binary(!?, VariableReference(list), VariableReference(item))",
+            ),
+            (
+                "a >= b",
+                "Binary(>=, VariableReference(a), VariableReference(b))",
+            ),
+            (
+                "1 < 2 == true",
+                "Binary(==, Binary(<, Number(1), Number(2)), Number(true))",
+            ),
+        ];
+
+        for (source, expected) in cases {
+            assert_eq!(token_parser_snapshot(source), expected, "source: {source}");
+        }
     }
 }

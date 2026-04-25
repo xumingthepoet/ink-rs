@@ -100,13 +100,13 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 4 in progress. R015 through R036 are complete. Phase 1
+- Current phase: Phase 4 in progress. R015 through R037 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
-- Last focused validation: `cargo check -p ink-compiler`,
-  `cargo test -p ink-compiler syntax::`, and
-  `cargo test -p ink-test --test compiler_conformance` on 2026-04-25, passed.
+- Last focused validation:
+  `cargo test -p ink-compiler syntax::expression::tests::` on 2026-04-25,
+  passed.
 - Known blockers: none for behavior-preserving refactors.
 
 ## Focused Validation Commands
@@ -569,12 +569,20 @@ Use these checks during phase reviews:
     prefix case where byte offsets and character columns differ. `cargo test -p
     ink-compiler syntax::expression::tests::` passes.
 
-- [ ] R037 Implement a Pratt or precedence-climbing parser
+- [x] R037 Implement a Pratt or precedence-climbing parser
   - Purpose: Make operator precedence and associativity explicit and easy to
     extend.
   - Approach: Parse tokens into the existing `Expression` enum first, without
     changing the parsed model.
   - Acceptance: R034 baseline tests pass on the new parser.
+  - Completed: Added a token-backed precedence-climbing parser behind the
+    current expression adapter. It parses literals, identifiers, function
+    calls, divert targets, unary operators, parenthesized expressions, and the
+    existing binary operator precedence table into the current `Expression`
+    enum. A focused baseline test proves the new parser reproduces the 24-case
+    R034 expression behavior set while the compiler entry point still returns
+    the old parser result pending R039; `cargo test -p ink-compiler
+    syntax::expression::tests::` passes.
 
 - [ ] R038 Add structured expression parse errors
   - Purpose: Avoid silent `None` failures that collapse into vague unsupported
