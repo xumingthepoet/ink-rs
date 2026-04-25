@@ -100,7 +100,7 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 7 in progress. R015 through R060 are complete. Phase 1
+- Current phase: Phase 7 in progress. R015 through R061 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
@@ -910,12 +910,17 @@ Use these checks during phase reviews:
     use `lower::ir`. Focused compiler tests pass, including the existing JSON
     emission assertions.
 
-- [ ] R061 Add minimal path helper before deeper lowering extraction
+- [x] R061 Add minimal path helper before deeper lowering extraction
   - Purpose: Prevent lower splitting from copying existing string path logic.
   - Approach: Add a small `lower/path.rs` helper for child, parent, relative,
     canonical, and component operations, even before full typed paths.
   - Acceptance: New lowering modules use the helper instead of fresh path
     string formatting.
+  - Completed: Added `lower/path.rs` for child, parent, component, relative
+    compaction, absolute-runtime-path, semantic-key, and canonical-runtime-path
+    helpers. Existing lower path compaction now imports these helpers instead
+    of owning the logic inline, with focused path helper tests and compiler
+    tests passing.
 
 - [ ] R062 Extract `lower/indexes.rs`
   - Purpose: Give constants, labels, globals, external signatures, and counted

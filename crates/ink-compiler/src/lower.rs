@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 pub(crate) mod ir;
+mod path;
 
 use crate::{
     analysis::CheckedStory,
@@ -12,6 +13,10 @@ use crate::{
 };
 
 use ir::{Container, ControlCommand, RuntimeObject, RuntimeProgram};
+use path::{
+    canonical_runtime_path, child_path, compact_path_string, compact_relative_path,
+    is_absolute_runtime_path, is_user_named_path_component, semantic_path_key,
+};
 
 enum ChoiceOuter {
     Inline(Vec<RuntimeObject>),
@@ -2890,76 +2895,6 @@ fn compact_target_path_string(
     *target = compact_path_string(object_path, target);
 }
 
-fn is_absolute_runtime_path(target: &str) -> bool {
-    !target.is_empty()
-        && !target.starts_with('.')
-        && !target.starts_with('$')
-        && target != "DONE"
-        && target != "END"
-}
-
-fn compact_path_string(object_path: &str, global_path: &str) -> String {
-    let own_components = path_components(object_path);
-    let global_components = path_components(global_path);
-    let mut last_shared_index = None;
-
-    for (index, (own, global)) in own_components
-        .iter()
-        .zip(global_components.iter())
-        .enumerate()
-    {
-        if own == global {
-            last_shared_index = Some(index);
-        } else {
-            break;
-        }
-    }
-
-    let Some(last_shared_index) = last_shared_index else {
-        return global_path.to_string();
-    };
-
-    let upward_moves = own_components
-        .len()
-        .saturating_sub(1)
-        .saturating_sub(last_shared_index);
-    let relative = relative_path_string(upward_moves, &global_components[last_shared_index + 1..]);
-
-    if relative.len() < global_path.len() {
-        relative
-    } else {
-        global_path.to_string()
-    }
-}
-
-fn path_components(path: &str) -> Vec<&str> {
-    path.split('.')
-        .filter(|component| !component.is_empty())
-        .collect()
-}
-
-fn relative_path_string(upward_moves: usize, downward_components: &[&str]) -> String {
-    let mut components = vec!["^"; upward_moves];
-    components.extend(downward_components.iter().copied());
-
-    if components
-        .first()
-        .is_some_and(|component| *component == "^")
-    {
-        format!(".{}", components.join("."))
-    } else {
-        components.join(".")
-    }
-}
-
-fn child_path(parent: &str, child: &str) -> String {
-    if parent.is_empty() {
-        child.to_string()
-    } else {
-        format!("{parent}.{child}")
-    }
-}
-
 fn build_semantic_path_index(container: &Container) -> HashMap<String, Option<String>> {
     let mut paths = HashMap::new();
     collect_semantic_paths(container, "", &mut paths);
@@ -3022,34 +2957,6 @@ fn collect_semantic_path_for_container(
         }
     }
     collect_semantic_paths(container, path, paths);
-}
-
-fn canonical_runtime_path(
-    target: &str,
-    semantic_paths: &HashMap<String, Option<String>>,
-) -> Option<String> {
-    let last = path_components(target).pop()?;
-    if !is_user_named_path_component(last) {
-        return None;
-    }
-    let key = semantic_path_key(target)?;
-    semantic_paths.get(&key).and_then(Clone::clone)
-}
-
-fn semantic_path_key(path: &str) -> Option<String> {
-    let components = path_components(path)
-        .into_iter()
-        .filter(|component| is_user_named_path_component(component))
-        .collect::<Vec<_>>();
-    (!components.is_empty()).then(|| components.join("."))
-}
-
-fn is_user_named_path_component(component: &str) -> bool {
-    !component.is_empty()
-        && component.parse::<usize>().is_err()
-        && !component.starts_with("c-")
-        && !component.starts_with("g-")
-        && !component.starts_with('$')
 }
 
 fn lower_output_expression_into(
@@ -3946,14 +3853,6 @@ fn resolve_single_stitch_target(target: &str, path_mode: &ChoicePathMode) -> Str
                 }
             }
         }
-    }
-}
-
-fn compact_relative_path(relative: &str, global: &str) -> String {
-    if relative.len() < global.len() {
-        relative.to_string()
-    } else {
-        global.to_string()
     }
 }
 
