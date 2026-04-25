@@ -9,6 +9,7 @@ pub enum DiagnosticSeverity {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DiagnosticCode {
+    InvalidExpression,
     UnsupportedSyntax,
 }
 

@@ -100,7 +100,7 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 8 in progress. R015 through R077 are complete. Phase 1
+- Current phase: Phase 8 in progress. R015 through R078 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
@@ -1122,12 +1122,17 @@ Use these checks during phase reviews:
     `Diagnostic::unsupported` now emits `UnsupportedSyntax`; focused diagnostic,
     parser, and compiler tests assert the code without changing messages.
 
-- [ ] R078 Improve expression error recovery
+- [x] R078 Improve expression error recovery
   - Purpose: Invalid expressions should not collapse into vague parser failure.
   - Approach: Use structured expression parse errors and recover at statement
     boundaries.
   - Acceptance: Invalid expression tests assert clear messages and do not hide
     diagnostics from later lines.
+  - Completed: Routed expression parse failures through statement rules as
+    `InvalidExpression` diagnostics, preserving exact expression spans and
+    messages. Logic, variable, temp, assignment, and constant statements now
+    report structured expression errors, with a recovery test proving the next
+    source line still emits its own diagnostic.
 
 - [ ] R079 Improve choice and inline syntax recovery
   - Purpose: Choice bracket and inline brace mistakes are common and should be

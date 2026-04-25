@@ -1,6 +1,6 @@
 use crate::parsed::{ConstantDeclaration, ExternalDeclaration, Object};
 
-use super::{is_identifier, is_identifier_continue, parse_initial_expression, rule::RuleParser};
+use super::{is_identifier, is_identifier_continue, parse_expression_remainder, rule::RuleParser};
 
 pub(super) fn constant_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
     parser.skip_horizontal_whitespace();
@@ -14,7 +14,7 @@ pub(super) fn constant_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Obje
     parser.skip_horizontal_whitespace();
     parser.match_string("=")?;
     parser.skip_horizontal_whitespace();
-    let expression = parse_initial_expression(parser.line_remainder().trim())?;
+    let expression = parse_expression_remainder(parser)?;
     parser.skip_to_end();
 
     Some(vec![Object::ConstantDeclaration(ConstantDeclaration::new(

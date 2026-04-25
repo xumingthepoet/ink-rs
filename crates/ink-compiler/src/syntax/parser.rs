@@ -515,4 +515,30 @@ mod tests {
             "unsupported syntax: list declaration"
         );
     }
+
+    #[test]
+    fn invalid_logic_expression_reports_specific_error_and_recovers_next_line() {
+        let output = parse(SourceInput::new("~ x +\nLIST items = ()"));
+
+        assert_eq!(output.diagnostics.len(), 2, "{:#?}", output.diagnostics);
+        assert_eq!(
+            output.diagnostics[0].code,
+            Some(crate::diagnostic::DiagnosticCode::InvalidExpression)
+        );
+        assert_eq!(output.diagnostics[0].line, 1);
+        assert_eq!(output.diagnostics[0].column, 6);
+        assert_eq!(
+            output.diagnostics[0].message,
+            "expected expression after operator `+` before end of input"
+        );
+        assert_eq!(
+            output.diagnostics[1].code,
+            Some(crate::diagnostic::DiagnosticCode::UnsupportedSyntax)
+        );
+        assert_eq!(output.diagnostics[1].line, 2);
+        assert_eq!(
+            output.diagnostics[1].message,
+            "unsupported syntax: list declaration"
+        );
+    }
 }

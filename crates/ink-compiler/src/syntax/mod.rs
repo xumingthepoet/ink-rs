@@ -22,7 +22,7 @@ pub(crate) use parser::parse;
 pub(crate) use parser::parse_source;
 
 use crate::{
-    parsed::{AuthorWarning, Choice, Object},
+    parsed::{AuthorWarning, Choice, Expression, Object},
     source::SourceLine,
 };
 
@@ -78,6 +78,17 @@ fn is_choice_continuation_boundary(trimmed: &str) -> bool {
 
 pub(super) fn parse_initial_expression(source: &str) -> Option<crate::parsed::Expression> {
     expression::parse_initial_expression(source)
+}
+
+fn parse_expression_remainder(parser: &mut RuleParser<'_>) -> Option<Expression> {
+    let span = parser.current_span();
+    match expression::parse_initial_expression_or_error(parser.line_remainder(), span) {
+        Ok(expression) => Some(expression),
+        Err(diagnostic) => {
+            parser.diagnostic(diagnostic);
+            None
+        }
+    }
 }
 
 pub(super) fn split_top_level_args(source: &str) -> Vec<&str> {

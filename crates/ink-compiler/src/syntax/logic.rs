@@ -1,6 +1,6 @@
 use crate::parsed::{ContentList, Expression, Object, Return, Text};
 
-use super::{is_identifier_continue, parse_initial_expression, rule::RuleParser};
+use super::{is_identifier_continue, parse_expression_remainder, rule::RuleParser};
 
 pub(super) fn return_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
     parser.skip_horizontal_whitespace();
@@ -12,7 +12,11 @@ pub(super) fn return_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object
         return None;
     }
     parser.skip_horizontal_whitespace();
-    let expression = parse_initial_expression(parser.line_remainder().trim());
+    let expression = if parser.line_remainder().trim().is_empty() {
+        None
+    } else {
+        Some(parse_expression_remainder(parser)?)
+    };
     parser.skip_to_end();
     let ret = Object::Return(Return::new(expression, span.clone()));
     if object_contains_function_call(&ret) {
@@ -29,7 +33,7 @@ pub(super) fn line_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>>
     parser.skip_horizontal_whitespace();
     parser.match_string("~")?;
     parser.skip_horizontal_whitespace();
-    let expression = parse_initial_expression(parser.line_remainder().trim())?;
+    let expression = parse_expression_remainder(parser)?;
     parser.skip_to_end();
     Some(vec![Object::LogicLine(expression)])
 }

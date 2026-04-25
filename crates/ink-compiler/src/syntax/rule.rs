@@ -94,9 +94,17 @@ impl<'source> RuleParser<'source> {
             return;
         }
 
-        self.diagnostics
-            .push(Diagnostic::error(self.current_span(), message.into()));
-        self.state.note_error_reported();
+        self.diagnostic(Diagnostic::error(self.current_span(), message.into()));
+    }
+
+    pub(super) fn diagnostic(&mut self, diagnostic: Diagnostic) {
+        if diagnostic.severity == crate::diagnostic::DiagnosticSeverity::Error {
+            if self.state.error_reported_in_scope() {
+                return;
+            }
+            self.state.note_error_reported();
+        }
+        self.diagnostics.push(diagnostic);
     }
 
     pub(super) fn warning(&mut self, message: impl Into<String>) {

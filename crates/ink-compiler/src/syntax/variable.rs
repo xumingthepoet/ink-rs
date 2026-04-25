@@ -2,7 +2,7 @@ use crate::parsed::{ContentList, Expression, IncDec, Object, Text, VariableAssig
 
 use super::{
     is_identifier, is_identifier_continue, logic::expression_contains_function_call,
-    parse_initial_expression, rule::RuleParser,
+    parse_expression_remainder, rule::RuleParser,
 };
 
 pub(super) fn declaration_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
@@ -17,7 +17,7 @@ pub(super) fn declaration_statement(parser: &mut RuleParser<'_>) -> Option<Vec<O
     parser.skip_horizontal_whitespace();
     parser.match_string("=")?;
     parser.skip_horizontal_whitespace();
-    let expression = parse_initial_expression(parser.line_remainder().trim())?;
+    let expression = parse_expression_remainder(parser)?;
     parser.skip_to_end();
 
     Some(vec![Object::VariableAssignment(VariableAssignment::new(
@@ -42,7 +42,7 @@ pub(super) fn temp_declaration_statement(parser: &mut RuleParser<'_>) -> Option<
     parser.skip_horizontal_whitespace();
     parser.match_string("=")?;
     parser.skip_horizontal_whitespace();
-    let expression = parse_initial_expression(parser.line_remainder().trim())?;
+    let expression = parse_expression_remainder(parser)?;
     parser.skip_to_end();
 
     let assignment = VariableAssignment::new(name, expression, false, true, span.clone());
@@ -94,7 +94,7 @@ pub(super) fn assignment_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Ob
     }
     if parser.match_string("+=").is_some() {
         parser.skip_horizontal_whitespace();
-        let expression = parse_initial_expression(parser.line_remainder().trim())?;
+        let expression = parse_expression_remainder(parser)?;
         parser.skip_to_end();
         let inc = IncDec::new(name, expression, true, span.clone());
         if expression_contains_function_call(inc.expression()) {
@@ -107,7 +107,7 @@ pub(super) fn assignment_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Ob
     }
     if parser.match_string("-=").is_some() {
         parser.skip_horizontal_whitespace();
-        let expression = parse_initial_expression(parser.line_remainder().trim())?;
+        let expression = parse_expression_remainder(parser)?;
         parser.skip_to_end();
         let dec = IncDec::new(name, expression, false, span.clone());
         if expression_contains_function_call(dec.expression()) {
@@ -120,7 +120,7 @@ pub(super) fn assignment_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Ob
     }
     parser.match_string("=")?;
     parser.skip_horizontal_whitespace();
-    let expression = parse_initial_expression(parser.line_remainder().trim())?;
+    let expression = parse_expression_remainder(parser)?;
     parser.skip_to_end();
 
     let assignment = VariableAssignment::new(name, expression, false, false, span.clone());

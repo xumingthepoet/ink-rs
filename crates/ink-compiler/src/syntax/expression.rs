@@ -1,4 +1,5 @@
 use crate::{
+    diagnostic::{Diagnostic, DiagnosticCode},
     parsed::{BinaryOperator, ContentList, Expression, FloatLiteral, Object, UnaryOperator},
     source::SourceSpan,
 };
@@ -13,6 +14,13 @@ pub(super) fn parse_initial_expression(source: &str) -> Option<Expression> {
             None
         }
     }
+}
+
+pub(super) fn parse_initial_expression_or_error(
+    source: &str,
+    base_span: SourceSpan,
+) -> Result<Expression, Diagnostic> {
+    parse_token_expression_at(source, base_span).map_err(|error| error.into_diagnostic())
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -250,6 +258,11 @@ impl ExpressionParseError {
             }
         }
     }
+
+    fn into_diagnostic(self) -> Diagnostic {
+        let message = self.message();
+        Diagnostic::error(self.span, message).with_code(DiagnosticCode::InvalidExpression)
+    }
 }
 
 fn found_clause(found: &Option<String>) -> String {
@@ -259,7 +272,12 @@ fn found_clause(found: &Option<String>) -> String {
     }
 }
 
+#[cfg(test)]
 fn tokenize_expression(source: &str) -> Vec<ExpressionToken> {
+    tokenize_expression_at(source, &SourceSpan::new(None, 1, 1))
+}
+
+fn tokenize_expression_at(source: &str, base_span: &SourceSpan) -> Vec<ExpressionToken> {
     let mut tokens = Vec::new();
     let mut index = 0;
 
@@ -273,7 +291,12 @@ fn tokenize_expression(source: &str) -> Vec<ExpressionToken> {
         }
 
         if rest.starts_with("->") {
-            tokens.push(token_at(source, index, ExpressionTokenKind::Arrow));
+            tokens.push(token_at(
+                source,
+                index,
+                ExpressionTokenKind::Arrow,
+                base_span,
+            ));
             index += "->".len();
             continue;
         }
@@ -283,6 +306,7 @@ fn tokenize_expression(source: &str) -> Vec<ExpressionToken> {
                 source,
                 index,
                 ExpressionTokenKind::Operator(operator.to_string()),
+                base_span,
             ));
             index += operator.len();
             continue;
@@ -290,15 +314,30 @@ fn tokenize_expression(source: &str) -> Vec<ExpressionToken> {
 
         match ch {
             '(' => {
-                tokens.push(token_at(source, index, ExpressionTokenKind::OpenParen));
+                tokens.push(token_at(
+                    source,
+                    index,
+                    ExpressionTokenKind::OpenParen,
+                    base_span,
+                ));
                 index += ch.len_utf8();
             }
             ')' => {
-                tokens.push(token_at(source, index, ExpressionTokenKind::CloseParen));
+                tokens.push(token_at(
+                    source,
+                    index,
+                    ExpressionTokenKind::CloseParen,
+                    base_span,
+                ));
                 index += ch.len_utf8();
             }
             ',' => {
-                tokens.push(token_at(source, index, ExpressionTokenKind::Comma));
+                tokens.push(token_at(
+                    source,
+                    index,
+                    ExpressionTokenKind::Comma,
+                    base_span,
+                ));
                 index += ch.len_utf8();
             }
             '"' => {
@@ -307,12 +346,18 @@ fn tokenize_expression(source: &str) -> Vec<ExpressionToken> {
                     source,
                     index,
                     ExpressionTokenKind::StringLiteral(literal),
+                    base_span,
                 ));
                 index = next_index;
             }
             _ if is_token_word_start(ch) => {
                 let (word, next_index) = read_token_word(source, index);
-                tokens.push(token_at(source, index, classify_word_token(word)));
+                tokens.push(token_at(
+                    source,
+                    index,
+                    classify_word_token(word),
+                    base_span,
+                ));
                 index = next_index;
             }
             _ => {
@@ -320,6 +365,7 @@ fn tokenize_expression(source: &str) -> Vec<ExpressionToken> {
                     source,
                     index,
                     ExpressionTokenKind::Operator(ch.to_string()),
+                    base_span,
                 ));
                 index += ch.len_utf8();
             }
@@ -329,11 +375,20 @@ fn tokenize_expression(source: &str) -> Vec<ExpressionToken> {
     tokens
 }
 
-fn token_at(source: &str, byte_index: usize, kind: ExpressionTokenKind) -> ExpressionToken {
+fn token_at(
+    source: &str,
+    byte_index: usize,
+    kind: ExpressionTokenKind,
+    base_span: &SourceSpan,
+) -> ExpressionToken {
     ExpressionToken {
         kind,
         byte_index,
-        span: SourceSpan::new(None, 1, source[..byte_index].chars().count() + 1),
+        span: SourceSpan::new(
+            base_span.source_name.clone(),
+            base_span.line,
+            base_span.column + source[..byte_index].chars().count(),
+        ),
     }
 }
 
@@ -718,13 +773,30 @@ impl ExpressionParseError {
 }
 
 fn parse_token_expression(source: &str) -> Result<Expression, ExpressionParseError> {
-    let source = source.trim();
-    let tokens = tokenize_expression(source);
-    TokenExpressionParser::new(&tokens, end_span(source)).parse()
+    parse_token_expression_at(source, SourceSpan::new(None, 1, 1))
 }
 
-fn end_span(source: &str) -> SourceSpan {
-    SourceSpan::new(None, 1, source.chars().count() + 1)
+fn parse_token_expression_at(
+    source: &str,
+    base_span: SourceSpan,
+) -> Result<Expression, ExpressionParseError> {
+    let leading_whitespace = source.chars().take_while(|ch| ch.is_whitespace()).count();
+    let source = source.trim();
+    let base_span = SourceSpan::new(
+        base_span.source_name,
+        base_span.line,
+        base_span.column + leading_whitespace,
+    );
+    let tokens = tokenize_expression_at(source, &base_span);
+    TokenExpressionParser::new(&tokens, end_span(source, &base_span)).parse()
+}
+
+fn end_span(source: &str, base_span: &SourceSpan) -> SourceSpan {
+    SourceSpan::new(
+        base_span.source_name.clone(),
+        base_span.line,
+        base_span.column + source.chars().count(),
+    )
 }
 
 fn describe_token_kind(kind: &ExpressionTokenKind) -> String {
