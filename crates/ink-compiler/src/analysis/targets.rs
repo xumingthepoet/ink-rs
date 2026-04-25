@@ -10,14 +10,12 @@ use crate::{
 };
 
 use super::{
+    context::{
+        FlowContext, FlowSymbol, TargetSymbolIndex, VariableScopeIndex, VariableTargetIndex,
+    },
     span::object_span,
-    variables::{build_variable_scope_index, VariableScopeIndex},
+    variables::build_variable_scope_index,
 };
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct FlowSymbol {
-    is_function: bool,
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 enum TargetSymbolCollectionPhase {
@@ -36,18 +34,17 @@ pub(super) fn call_target_diagnostics(story: &Story) -> Vec<Diagnostic> {
 }
 
 struct CallTargetChecker<'a> {
-    target_symbols: &'a HashMap<String, FlowSymbol>,
-    variable_targets: &'a HashSet<String>,
+    target_symbols: &'a TargetSymbolIndex,
+    variable_targets: &'a VariableTargetIndex,
     variable_scopes: &'a VariableScopeIndex,
     diagnostics: Vec<Diagnostic>,
-    arguments_by_flow_path: HashMap<String, Vec<FlowArgument>>,
-    functions_by_flow_path: HashMap<String, bool>,
+    flow_contexts_by_path: HashMap<String, FlowContext>,
 }
 
 impl<'a> CallTargetChecker<'a> {
     fn new(
-        target_symbols: &'a HashMap<String, FlowSymbol>,
-        variable_targets: &'a HashSet<String>,
+        target_symbols: &'a TargetSymbolIndex,
+        variable_targets: &'a VariableTargetIndex,
         variable_scopes: &'a VariableScopeIndex,
     ) -> Self {
         Self {
@@ -55,8 +52,7 @@ impl<'a> CallTargetChecker<'a> {
             variable_targets,
             variable_scopes,
             diagnostics: Vec::new(),
-            arguments_by_flow_path: HashMap::new(),
-            functions_by_flow_path: HashMap::new(),
+            flow_contexts_by_path: HashMap::new(),
         }
     }
 
@@ -67,19 +63,19 @@ impl<'a> CallTargetChecker<'a> {
         context.current_flow_path.as_deref()
     }
 
+    fn current_flow_context(&self, context: &VisitContext) -> Option<&FlowContext> {
+        self.current_flow_path(context)
+            .and_then(|flow_path| self.flow_contexts_by_path.get(flow_path))
+    }
+
     fn current_flow_arguments(&self, context: &VisitContext) -> Option<&[FlowArgument]> {
-        self.current_flow_path(context).and_then(|flow_path| {
-            self.arguments_by_flow_path
-                .get(flow_path)
-                .map(Vec::as_slice)
-        })
+        self.current_flow_context(context)
+            .map(FlowContext::arguments)
     }
 
     fn current_flow_is_function(&self, context: &VisitContext) -> bool {
-        self.current_flow_path(context)
-            .and_then(|flow_path| self.functions_by_flow_path.get(flow_path))
-            .copied()
-            .unwrap_or(false)
+        self.current_flow_context(context)
+            .is_some_and(FlowContext::is_function)
     }
 
     fn check_plain_divert_target(
@@ -218,12 +214,9 @@ impl ParsedVisitor for CallTargetChecker<'_> {
         let Some(flow_path) = self.current_flow_path(context) else {
             return;
         };
-        self.arguments_by_flow_path
+        self.flow_contexts_by_path
             .entry(flow_path.to_string())
-            .or_insert_with(|| flow.arguments().to_vec());
-        self.functions_by_flow_path
-            .entry(flow_path.to_string())
-            .or_insert(flow.is_function());
+            .or_insert_with(|| FlowContext::new(flow.arguments().to_vec(), flow.is_function()));
     }
 
     fn visit_object(&mut self, object: &Object, context: &VisitContext) {
@@ -294,11 +287,11 @@ impl ParsedVisitor for CallTargetChecker<'_> {
     }
 }
 
-fn build_target_symbol_index(story: &Story) -> HashMap<String, FlowSymbol> {
+fn build_target_symbol_index(story: &Story) -> TargetSymbolIndex {
     #[derive(Default)]
     struct TargetSymbolVisitor {
         phase: TargetSymbolCollectionPhase,
-        symbols: HashMap<String, FlowSymbol>,
+        symbols: TargetSymbolIndex,
     }
 
     impl ParsedVisitor for TargetSymbolVisitor {
@@ -372,7 +365,7 @@ fn insert_label_symbol(
     }
 }
 
-fn build_variable_target_index(story: &Story) -> HashSet<String> {
+fn build_variable_target_index(story: &Story) -> VariableTargetIndex {
     let mut names = HashSet::new();
     collect_variable_targets_in_weave(story.root_weave(), &mut names);
     for flow in story.flows() {
@@ -506,7 +499,7 @@ fn resolve_current_flow_argument<'a>(
 fn resolve_target_symbol<'a>(
     target: &str,
     current_flow_path: Option<&str>,
-    target_symbols: &'a HashMap<String, FlowSymbol>,
+    target_symbols: &'a TargetSymbolIndex,
 ) -> Option<&'a FlowSymbol> {
     if target.contains('.') {
         return target_symbols.get(target);

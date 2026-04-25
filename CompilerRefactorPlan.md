@@ -100,22 +100,20 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 6 in progress. R015 through R052 are complete. Phase 1
+- Current phase: Phase 6 in progress. R015 through R053 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
 - Last focused validation:
   `cargo test -p ink-compiler`, and
   `cargo test -p ink-test --features csharp-tests --test csharp_tests --
-  TestConst`, and
-  `cargo test -p ink-test --features csharp-tests --test csharp_tests --
-  TestArgument`, and
-  `cargo test -p ink-test --features csharp-tests --test csharp_tests --
   TestTemp`, and
+  `cargo test -p ink-test --features csharp-tests --test csharp_tests --
+  TestVariable`, and
   `cargo test -p ink-test --features csharp-tests --test csharp_tests --
   TestDivert`, and
   `cargo test -p ink-test --features csharp-tests --test csharp_tests --
-  TestFunction` on 2026-04-25, passed.
+  TestRequireVariableTargetsTyped` on 2026-04-25, passed.
 - Known blockers: none for behavior-preserving refactors.
 
 ## Focused Validation Commands
@@ -822,12 +820,18 @@ Use these checks during phase reviews:
     Focused compiler, constant, naming, temp/scope, divert/target, and function
     flow-control tests pass.
 
-- [ ] R053 Add `analysis/context.rs`
+- [x] R053 Add `analysis/context.rs`
   - Purpose: Share symbol, variable, and flow context types without duplicating
     structs across passes.
   - Approach: Move shared indexes and context into crate-private types.
   - Acceptance: Variables and targets passes reuse context types without
     circular dependencies.
+  - Completed: Added `analysis/context.rs` for `VariableScopeIndex`,
+    `FlowSymbol`, target/variable-target index aliases, and `FlowContext`.
+    `variables` now builds the shared variable-scope index, while `targets`
+    consumes the shared index and flow context instead of owning duplicate
+    context structs and parallel argument/function maps. Focused compiler,
+    temp, variable, divert, and variable-target typing tests pass.
 
 - [ ] R054 Make analysis pass ordering explicit
   - Purpose: Future language rules need a clear place in the analysis pipeline.

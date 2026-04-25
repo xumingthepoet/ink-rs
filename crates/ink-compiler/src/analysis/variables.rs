@@ -1,35 +1,11 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use crate::parsed::{
     visit::{walk_story, ParsedVisitor, VisitContext},
     Flow, Object, Story,
 };
 
-#[derive(Debug, Default)]
-pub(super) struct VariableScopeIndex {
-    globals: HashSet<String>,
-    locals_by_flow_path: HashMap<String, HashSet<String>>,
-}
-
-impl VariableScopeIndex {
-    pub(super) fn contains_visible_variable(
-        &self,
-        name: &str,
-        current_flow_path: Option<&str>,
-    ) -> bool {
-        if let Some(flow_path) = current_flow_path {
-            if self
-                .locals_by_flow_path
-                .get(flow_path)
-                .is_some_and(|locals| locals.contains(name))
-            {
-                return true;
-            }
-        }
-
-        self.globals.contains(name)
-    }
-}
+use super::context::VariableScopeIndex;
 
 pub(super) fn build_variable_scope_index(story: &Story) -> VariableScopeIndex {
     #[derive(Default)]
