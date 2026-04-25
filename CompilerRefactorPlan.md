@@ -100,7 +100,7 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 6 complete. R015 through R059 are complete. Phase 1
+- Current phase: Phase 7 in progress. R015 through R060 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
@@ -898,12 +898,17 @@ Use these checks during phase reviews:
 
 ## Phase 7: Lowering Architecture And Typed Paths
 
-- [ ] R060 Extract `lower/ir.rs`
+- [x] R060 Extract `lower/ir.rs`
   - Purpose: Separate runtime IR data types from lowering algorithms.
   - Approach: Move `RuntimeProgram`, `Container`, `RuntimeObject`, and
     `ControlCommand`.
   - Acceptance: `emit.rs` depends on runtime IR only, and JSON output is
     unchanged.
+  - Completed: Added `lower/ir.rs` for `RuntimeProgram`, `Container`,
+    `RuntimeObject`, and `ControlCommand`. `lower.rs` now imports those IR
+    types for lowering algorithms, while `emit.rs` and compiler API references
+    use `lower::ir`. Focused compiler tests pass, including the existing JSON
+    emission assertions.
 
 - [ ] R061 Add minimal path helper before deeper lowering extraction
   - Purpose: Prevent lower splitting from copying existing string path logic.

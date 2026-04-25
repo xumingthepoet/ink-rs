@@ -7,7 +7,7 @@ use crate::{
     analysis::{self, CheckedStory},
     diagnostic::{Diagnostic, DiagnosticSeverity},
     emit,
-    lower::{self, RuntimeProgram},
+    lower::{self, ir::RuntimeProgram},
     parsed::Story as ParsedStory,
     source::{eliminate_comments, FileHandler, SourceInput, SourceSpan},
     syntax,

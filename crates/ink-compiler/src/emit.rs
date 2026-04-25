@@ -3,7 +3,7 @@ use serde_json::{json, Map, Value};
 use crate::{
     compiler::StageOutput,
     diagnostic::Diagnostic,
-    lower::{Container, ControlCommand, RuntimeObject, RuntimeProgram},
+    lower::ir::{Container, ControlCommand, RuntimeObject, RuntimeProgram},
     source::SourceSpan,
 };
 
@@ -216,7 +216,7 @@ fn named_content_to_value_with_extra(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lower::{Container, RuntimeObject};
+    use crate::lower::ir::{Container, RuntimeObject};
 
     #[test]
     fn emits_text_string_tokens() {
