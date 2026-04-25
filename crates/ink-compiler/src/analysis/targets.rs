@@ -132,7 +132,7 @@ impl<'a> CallTargetChecker<'a> {
                         self.diagnostics.push(Diagnostic::error(
                             span.clone(),
                             format!(
-                                "{name} hasn't been marked as a function, but it's being called as one. Do you need to delcare the knot as '== function {name} =='?"
+                                "{name} hasn't been marked as a function, but it's being called as one. Do you need to declare the knot as '== function {name} =='?"
                             ),
                         ));
                     }
@@ -537,6 +537,18 @@ mod tests {
             &diagnostics,
             DiagnosticSeverity::Error,
             "target not found: 'missing'",
+        );
+    }
+
+    #[test]
+    fn reports_non_function_call_targets() {
+        let story = parse_story("~ knot()\n== knot ==\n-> DONE");
+        let diagnostics = call_target_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "knot hasn't been marked as a function, but it's being called as one. Do you need to declare the knot as '== function knot =='?",
         );
     }
 }

@@ -100,14 +100,14 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 6 in progress. R015 through R057 are complete. Phase 1
+- Current phase: Phase 6 in progress. R015 through R058 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
 - Last focused validation:
   `cargo test -p ink-compiler
-  analysis::tests::analysis_sources_do_not_import_lower_or_emit_modules` on
-  2026-04-25, passed.
+  analysis::targets::tests::reports_non_function_call_targets` on 2026-04-25,
+  passed.
 - Known blockers: none for behavior-preserving refactors.
 
 ## Focused Validation Commands
@@ -875,11 +875,16 @@ Use these checks during phase reviews:
     Existing analysis imports were reviewed and already had no runtime
     lowering or JSON emission dependency.
 
-- [ ] R058 Run the diagnostic drill
+- [x] R058 Run the diagnostic drill
   - Purpose: Prove a diagnostic change is easy to locate.
   - Approach: Improve one small diagnostic message and record the touched files.
   - Acceptance: The change touches one owning analysis/parser module plus a
     focused diagnostic test.
+  - Completed: Improved the non-function call target diagnostic in
+    `analysis/targets.rs` by fixing `delcare` to `declare`, and added a direct
+    target-pass test for the exact diagnostic. Touched files:
+    `analysis/targets.rs` and `CompilerRefactorPlan.md`. Focused diagnostic
+    test passes.
 
 - [ ] R059 Review analysis file sizes and responsibilities
   - Purpose: Ensure splitting analysis did not create new dumping grounds.
