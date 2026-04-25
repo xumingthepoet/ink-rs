@@ -4,7 +4,7 @@ use crate::{
     compiler::StageOutput,
     diagnostic::Diagnostic,
     parsed::{
-        visit::{walk_story, ParsedVisitor, VisitContext},
+        visit::{walk_story, walk_weave, ParsedVisitor, VisitContext},
         ContentList, DivertTarget, Expression, Flow, FlowArgument, FlowLevel, Object, Return,
         Story, Weave,
     },
@@ -1315,64 +1315,35 @@ fn check_function_flow_control(flow: &Flow, diagnostics: &mut Vec<Diagnostic>) {
             ),
         ));
     }
-    check_function_flow_control_in_weave(flow.weave(), diagnostics);
+
+    let mut visitor = FunctionFlowControlVisitor { diagnostics };
+    walk_weave(flow.weave(), &mut visitor, &VisitContext::default());
 }
 
-fn check_function_flow_control_in_weave(weave: &Weave, diagnostics: &mut Vec<Diagnostic>) {
-    for object in weave.content() {
-        check_function_flow_control_in_object(object, diagnostics);
-    }
+struct FunctionFlowControlVisitor<'a> {
+    diagnostics: &'a mut Vec<Diagnostic>,
 }
 
-fn check_function_flow_control_in_content_list(
-    content: &ContentList,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
-    for object in content.objects() {
-        check_function_flow_control_in_object(object, diagnostics);
-    }
-}
+impl ParsedVisitor for FunctionFlowControlVisitor<'_> {
+    fn visit_object(&mut self, object: &Object, context: &VisitContext) {
+        if context.inside_choice_content || context.inside_expression {
+            return;
+        }
 
-fn check_function_flow_control_in_object(object: &Object, diagnostics: &mut Vec<Diagnostic>) {
-    match object {
-        Object::Divert(divert) => diagnostics.push(Diagnostic::error(
-            divert.span().clone(),
-            format!(
-                "Functions may not contain diverts, but saw '-> {}'",
-                divert.target().to_snapshot_string()
-            ),
-        )),
-        Object::Choice(choice) => diagnostics.push(Diagnostic::error(
-            choice.span().clone(),
-            "Functions may not contain choices",
-        )),
-        Object::ContentList(content) => {
-            check_function_flow_control_in_content_list(content, diagnostics)
+        match object {
+            Object::Divert(divert) => self.diagnostics.push(Diagnostic::error(
+                divert.span().clone(),
+                format!(
+                    "Functions may not contain diverts, but saw '-> {}'",
+                    divert.target().to_snapshot_string()
+                ),
+            )),
+            Object::Choice(choice) => self.diagnostics.push(Diagnostic::error(
+                choice.span().clone(),
+                "Functions may not contain choices",
+            )),
+            _ => {}
         }
-        Object::Conditional(conditional) => {
-            for branch in conditional.branches() {
-                check_function_flow_control_in_weave(branch.content(), diagnostics);
-            }
-        }
-        Object::Sequence(sequence) => {
-            for element in sequence.elements() {
-                check_function_flow_control_in_content_list(element, diagnostics);
-            }
-        }
-        Object::Weave(weave) => check_function_flow_control_in_weave(weave, diagnostics),
-        Object::AuthorWarning(_)
-        | Object::ConstantDeclaration(_)
-        | Object::Expression(_)
-        | Object::ExternalDeclaration(_)
-        | Object::Gather(_)
-        | Object::Glue(_)
-        | Object::IncDec(_)
-        | Object::LogicLine(_)
-        | Object::Return(_)
-        | Object::Tag(_)
-        | Object::Text(_)
-        | Object::TunnelOnwards(_)
-        | Object::VariableAssignment(_) => {}
     }
 }
 

@@ -14,6 +14,8 @@ pub(crate) struct VisitContext {
     pub(crate) current_flow_path: Option<String>,
     pub(crate) parent_flow_path: Option<String>,
     pub(crate) inside_function: bool,
+    pub(crate) inside_choice_content: bool,
+    pub(crate) inside_expression: bool,
 }
 
 impl VisitContext {
@@ -27,6 +29,22 @@ impl VisitContext {
             current_flow_path: Some(current_flow_path),
             parent_flow_path: self.current_flow_path.clone(),
             inside_function: self.inside_function || flow.is_function(),
+            inside_choice_content: self.inside_choice_content,
+            inside_expression: self.inside_expression,
+        }
+    }
+
+    fn enter_choice_content(&self) -> Self {
+        Self {
+            inside_choice_content: true,
+            ..self.clone()
+        }
+    }
+
+    fn enter_expression(&self) -> Self {
+        Self {
+            inside_expression: true,
+            ..self.clone()
         }
     }
 }
@@ -55,7 +73,7 @@ where
     }
 }
 
-fn walk_weave<V>(weave: &Weave, visitor: &mut V, context: &VisitContext)
+pub(crate) fn walk_weave<V>(weave: &Weave, visitor: &mut V, context: &VisitContext)
 where
     V: ParsedVisitor + ?Sized,
 {
@@ -127,13 +145,14 @@ where
     if let Some(condition) = choice.condition() {
         walk_expression(condition, visitor, context);
     }
+    let choice_content_context = context.enter_choice_content();
     if let Some(content) = choice.start_content() {
-        walk_content_list(content, visitor, context);
+        walk_content_list(content, visitor, &choice_content_context);
     }
     if let Some(content) = choice.choice_only_content() {
-        walk_content_list(content, visitor, context);
+        walk_content_list(content, visitor, &choice_content_context);
     }
-    walk_content_list(choice.inner_content(), visitor, context);
+    walk_content_list(choice.inner_content(), visitor, &choice_content_context);
 }
 
 fn walk_conditional<V>(conditional: &Conditional, visitor: &mut V, context: &VisitContext)
@@ -165,21 +184,26 @@ where
     V: ParsedVisitor + ?Sized,
 {
     visitor.visit_expression(expression, context);
+    let expression_context = context.enter_expression();
     match expression {
-        Expression::StringContent(content) => walk_content_list(content, visitor, context),
+        Expression::StringContent(content) => {
+            walk_content_list(content, visitor, &expression_context)
+        }
         Expression::FunctionCall { args, .. } => {
             for argument in args {
-                walk_expression(argument, visitor, context);
+                walk_expression(argument, visitor, &expression_context);
             }
         }
         Expression::Binary { left, right, .. } => {
-            walk_expression(left, visitor, context);
-            walk_expression(right, visitor, context);
+            walk_expression(left, visitor, &expression_context);
+            walk_expression(right, visitor, &expression_context);
         }
-        Expression::Unary { expression, .. } => walk_expression(expression, visitor, context),
+        Expression::Unary { expression, .. } => {
+            walk_expression(expression, visitor, &expression_context)
+        }
         Expression::MultipleCondition(expressions) => {
             for expression in expressions {
-                walk_expression(expression, visitor, context);
+                walk_expression(expression, visitor, &expression_context);
             }
         }
         Expression::String(_)

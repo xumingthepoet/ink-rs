@@ -100,24 +100,24 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 5 in progress. R015 through R049 are complete. Phase 1
+- Current phase: Phase 5 in progress. R015 through R050 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
 - Last focused validation:
   `cargo test -p ink-compiler`, and
   `cargo test -p ink-test --features csharp-tests --test csharp_tests --
-  TestFunctionCallRestrictions`, and
+  TestFunction`, and
   `cargo test -p ink-test --features csharp-tests --test csharp_tests --
-  TestDivert`, and
+  TestLooseEnds`, and
   `cargo test -p ink-test --features csharp-tests --test csharp_tests --
-  TestVariable`, and
+  TestNestedChoiceError`, and
   `cargo test -p ink-test --features csharp-tests --test csharp_tests --
-  TestRequireVariableTargetsTyped`, and
+  TestReturnTextWarning`, and
   `cargo test -p ink-test --features csharp-tests --test csharp_tests --
-  TestWrongVariableDivertTargetReference`, and
+  TestShouldntGatherDueToChoice`, and
   `cargo test -p ink-test --features csharp-tests --test csharp_tests --
-  TestDisallowEmptyDiverts` on 2026-04-25, passed.
+  TestKnotTerminationSkipsGlobalObjects` on 2026-04-25, passed.
 - Known blockers: none for behavior-preserving refactors.
 
 ## Focused Validation Commands
@@ -773,12 +773,20 @@ Use these checks during phase reviews:
     Focused function-call, divert-target, variable-target, unresolved-variable,
     and empty-divert C# tests pass.
 
-- [ ] R050 Refactor flow-control diagnostics onto traversal where useful
+- [x] R050 Refactor flow-control diagnostics onto traversal where useful
   - Purpose: Keep loose-end and function-return rules close to flow semantics.
   - Approach: Use shared traversal for discovery, but keep sequential flow
     checks explicit where order matters.
   - Acceptance: Flow-control warnings/errors are unchanged, and the code makes
     order-sensitive logic obvious.
+  - Completed: Moved the function-only "no diverts/no choices" scan to a
+    `FunctionFlowControlVisitor` over `parsed::visit`, while keeping loose-end,
+    return, and nested sealed-choice checks in explicit sequential helpers.
+    `VisitContext` now marks choice-content and expression-content traversal so
+    the visitor preserves the old function-flow-control surface and does not
+    report inside regions the previous pass intentionally skipped. Focused
+    function, loose-end, nested-choice, return-warning, gather, and knot
+    termination C# tests pass.
 
 - [ ] R051 Review parsed model ownership
   - Purpose: Ensure language concepts are represented in parsed types before
