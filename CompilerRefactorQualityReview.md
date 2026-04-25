@@ -102,8 +102,9 @@ Touch points:
 - Parser ownership: `syntax/parser.rs` detects the removed declaration form.
 - Diagnostic ownership: `diagnostic.rs` provides `DiagnosticCode::RemovedFeature`.
 - Language tests: `crates/ink-test/tests/language.rs` asserts the stable code.
-- Documentation: `docs/WritingWithInk.md` documents the divergence from
-  upstream Ink.
+- Documentation: `docs/WritingWithInk-updates.md` records the divergence, and
+  `docs/WritingWithInk-latest.md` applies it to the current ink-rs language
+  documentation.
 
 Result: the feature is localized to parser diagnostics, tests, and docs. It
 does not require parsed-model pollution, lowering special cases, emitted JSON
@@ -182,4 +183,3 @@ test-only coverage.
    Purpose: prevent new god files from returning quietly.
    Next step: add a lightweight script or test that reports compiler files over
    the threshold, with explicit allowlist entries for known follow-ups.
-

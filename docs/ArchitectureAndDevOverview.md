@@ -215,7 +215,8 @@ make gate
 
 `make gate` is the project-level gate and includes the C# parity tests. If a
 compiler change intentionally changes language behavior, update tests and
-`docs/WritingWithInk.md` in the same change.
+`docs/WritingWithInk-updates.md` and `docs/WritingWithInk-latest.md` in the
+same change. Do not edit `docs/WritingWithInk-origin.md`.
 
 ## Debugging Tips
 

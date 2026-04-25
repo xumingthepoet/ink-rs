@@ -51,8 +51,9 @@ These rules apply to every phase.
 - Each behavior-preserving refactor must keep parse snapshots, diagnostics,
   JSON output, and runtime behavior unchanged unless an intentional language
   change is documented.
-- Intentional language changes must update tests and `docs/WritingWithInk.md`
-  in the same change.
+- Intentional language changes must update tests, `docs/WritingWithInk-updates.md`,
+  and `docs/WritingWithInk-latest.md` in the same change. Do not edit
+  `docs/WritingWithInk-origin.md`.
 
 ## Per-Phase Definition Of Done
 
@@ -1165,13 +1166,14 @@ Use these checks during phase reviews:
 - [x] R081 Add a language divergence documentation location
   - Purpose: Intentional language changes need a stable home.
   - Approach: Add a "Changed from upstream Ink" section to
-    `docs/WritingWithInk.md` or create a linked language changes document.
+    `docs/WritingWithInk-updates.md` and `docs/WritingWithInk-latest.md`.
   - Acceptance: The first intentional divergence can be documented without
     inventing a new structure.
   - Completed: Added a `Changed from upstream Ink` section and table-of-contents
-    entry to `docs/WritingWithInk.md`, with the fields future divergences must
-    document: status, upstream behavior, ink-rs behavior, rationale, migration
-    guidance, and tests.
+    entry to `docs/WritingWithInk-updates.md` and reflected it in
+    `docs/WritingWithInk-latest.md`, with the fields future divergences must
+    document: status, upstream behavior, ink-rs behavior, documentation effect,
+    rationale, migration guidance, and tests.
 
 - [x] R082 Run the removed-feature drill
   - Purpose: Prove that removing a legacy syntax feature is localized and clear.

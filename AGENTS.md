@@ -50,7 +50,9 @@ The upstream reference lives in `ink-csharp/`.
 - When behavior intentionally diverges from upstream Ink, update tests and
   documentation in the same change.
 - Avoid broad unrelated edits when working on compiler or language behavior.
-- Keep `docs/WritingWithInk.md` synchronized with syntax and semantic changes.
+- Keep `docs/WritingWithInk-updates.md` synchronized with syntax and semantic
+  changes, then apply those updates to `docs/WritingWithInk-latest.md`.
+- Do not edit `docs/WritingWithInk-origin.md`; it is the upstream C# snapshot.
 
 ## Continuation Workflow
 

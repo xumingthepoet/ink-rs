@@ -52,6 +52,10 @@ implementation and upstream inkle Ink. If a syntax or behavior is not listed
 here, assume it is intended to match upstream Ink unless the compiler reports a
 specific unsupported or removed-feature diagnostic.
 
+The full change history lives in `WritingWithInk-updates.md`. The upstream C#
+documentation snapshot lives in `WritingWithInk-origin.md` and should not be
+edited for ink-rs language changes.
+
 ### LIST declarations are removed
 
 - status: removed
@@ -67,6 +71,7 @@ specific unsupported or removed-feature diagnostic.
 
 When adding a divergence, include:
 
+- an entry in `WritingWithInk-updates.md`
 - status: experimental, supported, deprecated, or removed
 - upstream behavior
 - ink-rs behavior
