@@ -1,9 +1,11 @@
 mod choice;
 mod conditional;
+mod declaration;
 mod divert;
 mod error;
 mod gather;
 mod knot;
+mod logic;
 mod rule;
 mod sequence;
 mod state;
@@ -17,8 +19,8 @@ pub(crate) use parser::parse;
 
 use crate::{
     parsed::{
-        AuthorWarning, BinaryOperator, Choice, ConstantDeclaration, ContentList, Expression,
-        ExternalDeclaration, FloatLiteral, Object, Return, Text, UnaryOperator,
+        AuthorWarning, BinaryOperator, Choice, ContentList, Expression, FloatLiteral, Object,
+        UnaryOperator,
     },
     source::SourceLine,
 };
@@ -71,176 +73,6 @@ fn is_choice_continuation_boundary(trimmed: &str) -> bool {
         || trimmed.starts_with("->")
         || knot::is_knot_declaration_line(trimmed)
         || knot::is_stitch_declaration_line(trimmed)
-}
-
-fn constant_declaration_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
-    parser.skip_horizontal_whitespace();
-    let span = parser.current_span();
-    parser.match_string("CONST")?;
-    parser.skip_horizontal_whitespace();
-    let name = parser.take_while(is_identifier_continue)?;
-    if !is_identifier(&name) {
-        return None;
-    }
-    parser.skip_horizontal_whitespace();
-    parser.match_string("=")?;
-    parser.skip_horizontal_whitespace();
-    let expression = parse_initial_expression(parser.line_remainder().trim())?;
-    parser.skip_to_end();
-
-    Some(vec![Object::ConstantDeclaration(ConstantDeclaration::new(
-        name, expression, span,
-    ))])
-}
-
-fn external_declaration_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
-    parser.skip_horizontal_whitespace();
-    parser.match_string("EXTERNAL")?;
-    parser.skip_horizontal_whitespace();
-    let name = parser.take_while(is_identifier_continue)?;
-    if !is_identifier(&name) {
-        return None;
-    }
-    parser.skip_horizontal_whitespace();
-    parser.match_string("(")?;
-    parser.skip_horizontal_whitespace();
-
-    let mut arguments = Vec::new();
-    if parser.match_string(")").is_none() {
-        loop {
-            parser.skip_horizontal_whitespace();
-            let argument = parser.take_while(is_identifier_continue)?;
-            if !is_identifier(&argument) {
-                return None;
-            }
-            arguments.push(argument);
-            parser.skip_horizontal_whitespace();
-
-            if parser.match_string(")").is_some() {
-                break;
-            }
-            parser.match_string(",")?;
-        }
-    }
-    parser.skip_horizontal_whitespace();
-    if !parser.line_remainder().is_empty() {
-        return None;
-    }
-    parser.skip_to_end();
-
-    Some(vec![Object::ExternalDeclaration(ExternalDeclaration::new(
-        name, arguments,
-    ))])
-}
-
-fn return_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
-    parser.skip_horizontal_whitespace();
-    let span = parser.current_span();
-    parser.match_string("~")?;
-    parser.skip_horizontal_whitespace();
-    let keyword = parser.take_while(is_identifier_continue)?;
-    if keyword != "return" {
-        return None;
-    }
-    parser.skip_horizontal_whitespace();
-    let expression = parse_initial_expression(parser.line_remainder().trim());
-    parser.skip_to_end();
-    let ret = Object::Return(Return::new(expression, span.clone()));
-    if object_contains_function_call(&ret) {
-        Some(vec![Object::ContentList(ContentList::new(vec![
-            ret,
-            Object::Text(Text::new("\n", span)),
-        ]))])
-    } else {
-        Some(vec![ret])
-    }
-}
-
-pub(super) fn expression_contains_function_call(expr: &Expression) -> bool {
-    match expr {
-        Expression::FunctionCall { .. } => true,
-        Expression::StringContent(content) => {
-            content.objects().iter().any(object_contains_function_call)
-        }
-        Expression::Binary { left, right, .. } => {
-            expression_contains_function_call(left) || expression_contains_function_call(right)
-        }
-        Expression::Unary { expression, .. } => expression_contains_function_call(expression),
-        Expression::MultipleCondition(expressions) => {
-            expressions.iter().any(expression_contains_function_call)
-        }
-        _ => false,
-    }
-}
-
-fn object_contains_function_call(object: &Object) -> bool {
-    match object {
-        Object::Expression(expression) | Object::LogicLine(expression) => {
-            expression_contains_function_call(expression)
-        }
-        Object::ContentList(content) => content.objects().iter().any(object_contains_function_call),
-        Object::Conditional(conditional) => {
-            conditional
-                .initial_condition()
-                .is_some_and(expression_contains_function_call)
-                || conditional.branches().iter().any(|branch| {
-                    branch
-                        .own_condition()
-                        .is_some_and(expression_contains_function_call)
-                        || branch
-                            .content()
-                            .content()
-                            .iter()
-                            .any(object_contains_function_call)
-                })
-        }
-        Object::Choice(choice) => {
-            choice
-                .condition()
-                .is_some_and(expression_contains_function_call)
-                || choice.start_content().is_some_and(|content| {
-                    content.objects().iter().any(object_contains_function_call)
-                })
-                || choice.choice_only_content().is_some_and(|content| {
-                    content.objects().iter().any(object_contains_function_call)
-                })
-                || choice
-                    .inner_content()
-                    .objects()
-                    .iter()
-                    .any(object_contains_function_call)
-        }
-        Object::Sequence(sequence) => sequence
-            .elements()
-            .iter()
-            .any(|content| content.objects().iter().any(object_contains_function_call)),
-        Object::VariableAssignment(assignment) => {
-            expression_contains_function_call(assignment.expression())
-        }
-        Object::IncDec(inc_dec) => expression_contains_function_call(inc_dec.expression()),
-        Object::Return(ret) => ret
-            .returned_expression()
-            .is_some_and(expression_contains_function_call),
-        Object::Weave(weave) => weave.content().iter().any(object_contains_function_call),
-        Object::Text(_)
-        | Object::AuthorWarning(_)
-        | Object::ConstantDeclaration(_)
-        | Object::Glue(_)
-        | Object::Divert(_)
-        | Object::TunnelOnwards(_)
-        | Object::Gather(_)
-        | Object::ExternalDeclaration(_)
-        | Object::Tag(_) => false,
-    }
-}
-
-fn logic_line_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
-    parser.skip_horizontal_whitespace();
-    parser.match_string("~")?;
-    parser.skip_horizontal_whitespace();
-    let expression = parse_initial_expression(parser.line_remainder().trim())?;
-    parser.skip_to_end();
-    Some(vec![Object::LogicLine(expression)])
 }
 
 pub(super) fn parse_initial_expression(source: &str) -> Option<Expression> {

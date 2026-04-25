@@ -100,7 +100,7 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 2 in progress. R015 through R020 are complete. Phase 1
+- Current phase: Phase 2 in progress. R015 through R021 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
@@ -152,6 +152,9 @@ Full validation:
   `crates/ink-compiler/src/syntax/gather.rs`.
 - Variable syntax:
   `crates/ink-compiler/src/syntax/variable.rs`.
+- Declaration and logic syntax:
+  `crates/ink-compiler/src/syntax/declaration.rs` and
+  `crates/ink-compiler/src/syntax/logic.rs`.
 - Parsed model: `crates/ink-compiler/src/parsed/`.
 - Analysis entry point: `analysis::analyze` in
   `crates/ink-compiler/src/analysis.rs`.
@@ -379,12 +382,17 @@ Use these checks during phase reviews:
     `cargo test -p ink-compiler syntax::` and
     `cargo test -p ink-test --test compiler_conformance` pass.
 
-- [ ] R021 Extract declaration and logic modules
+- [x] R021 Extract declaration and logic modules
   - Purpose: Remove remaining unrelated statement parsers from `syntax/mod.rs`.
   - Approach: Add `syntax/declaration.rs` for `CONST` and `EXTERNAL`, and
     `syntax/logic.rs` for return and logic-line statements.
   - Acceptance: Statement parsing uses module-level entry points, and
     declaration/logic tests pass.
+  - Completed: `CONST` and `EXTERNAL` parsing now live in
+    `syntax/declaration.rs`; `return`, logic-line parsing, and function-call
+    content wrapping now live in `syntax/logic.rs`;
+    `cargo test -p ink-compiler syntax::` and
+    `cargo test -p ink-test --test compiler_conformance` pass.
 
 - [ ] R022 Make statement trial order explicit
   - Purpose: Parser behavior depends on rule order, so the order must be easy

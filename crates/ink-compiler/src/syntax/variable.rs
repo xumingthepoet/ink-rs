@@ -1,7 +1,7 @@
 use crate::parsed::{ContentList, Expression, IncDec, Object, Text, VariableAssignment};
 
 use super::{
-    expression_contains_function_call, is_identifier, is_identifier_continue,
+    is_identifier, is_identifier_continue, logic::expression_contains_function_call,
     parse_initial_expression, rule::RuleParser,
 };
 

@@ -8,9 +8,8 @@ use crate::{
 use super::rule::RuleParser;
 use super::weave::group_weave_content;
 use super::{
-    author_warning_statement, choice_statement, constant_declaration_statement, divert_statement,
-    external_declaration_statement, gather, is_choice_continuation_boundary, knot,
-    leading_whitespace_count, logic_line_statement, parse_choice_from_line, return_statement,
+    author_warning_statement, choice_statement, declaration, divert_statement, gather,
+    is_choice_continuation_boundary, knot, leading_whitespace_count, logic, parse_choice_from_line,
     text_statement, variable,
 };
 
@@ -99,12 +98,12 @@ impl Parser {
         let mut line_parser = RuleParser::new(line);
         let statement_rules: &[StatementRule] = &[
             variable::declaration_statement,
-            constant_declaration_statement,
-            external_declaration_statement,
-            return_statement,
+            declaration::constant_statement,
+            declaration::external_statement,
+            logic::return_statement,
             variable::temp_declaration_statement,
             variable::assignment_statement,
-            logic_line_statement,
+            logic::line_statement,
             choice_statement,
             author_warning_statement,
             divert_statement,
