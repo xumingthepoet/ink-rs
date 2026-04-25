@@ -3,7 +3,7 @@ use crate::{
     source::SourceSpan,
 };
 
-use super::{parse_initial_expression, rule::RuleParser, split_top_level_args};
+use super::{parse_initial_expression, rule::RuleParser, scan, split_top_level_args};
 
 pub(super) fn parse_divert_objects(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
     parser.skip_horizontal_whitespace();
@@ -107,51 +107,34 @@ impl TrailingDivertSyntax<'_> {
 fn split_multidivert_segments(source: &str) -> (Vec<&str>, TrailingDivertSyntax<'_>) {
     let mut segments = Vec::new();
     let mut start = 0;
-    let mut index = 0;
-    let mut in_string = false;
-    let mut escaped = false;
-    let mut paren_depth = 0;
 
-    while index < source.len() {
-        let rest = &source[index..];
-        let ch = rest.chars().next().expect("index is inside source");
-
-        if escaped {
-            escaped = false;
-            index += ch.len_utf8();
-            continue;
-        }
-
-        match ch {
-            '\\' if in_string => escaped = true,
-            '"' => in_string = !in_string,
-            '(' if !in_string => paren_depth += 1,
-            ')' if !in_string => paren_depth -= 1,
-            '-' if !in_string && paren_depth == 0 && rest.starts_with("->->") => {
+    for (index, token) in scan::top_level_token_matches_with_options(
+        source,
+        &["->->", "->"],
+        scan::ScanOptions::expression(),
+    ) {
+        match token {
+            "->->" => {
                 let segment = source[start..index].trim();
                 if !segment.is_empty() {
                     segments.push(segment);
                 }
-                let override_target = rest["->->".len()..].trim();
+                let override_target = source[index + "->->".len()..].trim();
                 let override_target = (!override_target.is_empty()).then_some(override_target);
                 return (
                     segments,
                     TrailingDivertSyntax::TunnelOnwards(override_target),
                 );
             }
-            '-' if !in_string && paren_depth == 0 && rest.starts_with("->") => {
+            "->" => {
                 let segment = source[start..index].trim();
                 if !segment.is_empty() {
                     segments.push(segment);
                 }
-                index += "->".len();
-                start = index;
-                continue;
+                start = index + "->".len();
             }
             _ => {}
         }
-
-        index += ch.len_utf8();
     }
 
     let tail = source[start..].trim();
@@ -198,4 +181,29 @@ fn is_divert_path(source: &str) -> bool {
         && source
             .split('.')
             .all(|part| super::is_identifier(part.trim()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn multidivert_split_ignores_arrows_inside_arguments() {
+        let (segments, trailing) = split_multidivert_segments(r#"first("->") -> second"#);
+
+        assert_eq!(segments, vec![r#"first("->")"#, "second"]);
+        assert_eq!(trailing, TrailingDivertSyntax::None);
+    }
+
+    #[test]
+    fn multidivert_split_preserves_tunnel_onwards_override() {
+        let (segments, trailing) =
+            split_multidivert_segments(r#"first -> second ->-> escape("->")"#);
+
+        assert_eq!(segments, vec!["first", "second"]);
+        assert_eq!(
+            trailing,
+            TrailingDivertSyntax::TunnelOnwards(Some(r#"escape("->")"#))
+        );
+    }
 }

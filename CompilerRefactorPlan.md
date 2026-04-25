@@ -100,7 +100,7 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 3 in progress. R015 through R028 are complete. Phase 1
+- Current phase: Phase 3 in progress. R015 through R029 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
@@ -475,12 +475,15 @@ Use these checks during phase reviews:
     a focused test covers arrows inside braced strings, and
     `cargo test -p ink-compiler syntax::` passes.
 
-- [ ] R029 Replace multidivert scans
+- [x] R029 Replace multidivert scans
   - Purpose: Divert/tunnel parsing should not maintain its own scanner.
   - Approach: Rewrite multidivert segment splitting in `syntax/divert.rs` using
     `scan.rs`.
   - Acceptance: Tunnel and divert fixtures pass, including arguments or strings
     containing arrow-like text.
+  - Completed: Multidivert segment splitting now uses `syntax/scan.rs`, with
+    focused coverage for arrows inside arguments and tunnel-onwards override
+    targets; `cargo test -p ink-compiler syntax::` passes.
 
 - [ ] R030 Add scanner ownership rules
   - Purpose: Prevent new syntax modules from adding another local scanner.
