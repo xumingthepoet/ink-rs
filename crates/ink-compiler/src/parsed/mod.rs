@@ -17,6 +17,7 @@ mod tag;
 mod text;
 mod tunnel_onwards;
 mod variable_assignment;
+pub(crate) mod visit;
 mod weave;
 
 pub use author_warning::AuthorWarning;

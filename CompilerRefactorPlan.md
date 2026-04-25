@@ -100,13 +100,14 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 4 complete. R015 through R042 are complete. Phase 1
+- Current phase: Phase 5 in progress. R015 through R045 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
 - Last focused validation:
-  `cargo test -p ink-compiler syntax::expression::tests::` on 2026-04-25,
-  passed.
+  `cargo test -p ink-compiler`, and
+  `cargo test -p ink-test --features csharp-tests --test csharp_tests --
+  TestAuthorWarningsInsideContentListBug` on 2026-04-25, passed.
 - Known blockers: none for behavior-preserving refactors.
 
 ## Focused Validation Commands
@@ -661,25 +662,47 @@ Use these checks during phase reviews:
 
 ## Phase 5: Parsed Model Traversal And Model Quality
 
-- [ ] R043 Add `parsed/visit.rs`
+- [x] R043 Add `parsed/visit.rs`
   - Purpose: Replace repeated hand-written tree walks with reusable traversal.
   - Approach: Implement immutable traversal over `Story`, `Flow`, `Weave`,
     `ContentList`, `Object`, and `Expression`.
   - Acceptance: Visitor tests prove traversal reaches choices, gathers,
     sequences, conditionals, string expressions, and nested weaves.
+  - Completed: Added `parsed::visit` with a crate-visible immutable
+    `ParsedVisitor` trait and `walk_story` entry point. The walker descends
+    through stories, flows, weaves, content lists, objects, expression trees,
+    choice content and conditions, conditional branches, sequence elements,
+    string-expression content, divert/tunnel arguments, returns, assignments,
+    constants, and nested weave objects. A focused visitor test constructs a
+    mixed parsed tree and verifies traversal reaches choices, gathers,
+    sequences, conditionals, string expressions, nested weaves, flows, and
+    expression variants; `cargo test -p ink-compiler parsed::visit::tests::`
+    passes.
 
-- [ ] R044 Add traversal context
+- [x] R044 Add traversal context
   - Purpose: Analysis passes need current flow path, parent flow, and function
     context.
   - Approach: Pass a context struct through traversal and update it when
     entering flows and nested content.
   - Acceptance: Tests prove context for root, knot, and child stitch traversal.
+  - Completed: Added `VisitContext` to `parsed::visit`, carrying current flow
+    path, parent flow path, and function context. The visitor test now verifies
+    root context has no flow path, knot context has `knot`, and child stitch
+    context has `knot.stitch`, parent `knot`, and function context when the
+    child flow is marked as a function.
 
-- [ ] R045 Refactor author warnings onto traversal
+- [x] R045 Refactor author warnings onto traversal
   - Purpose: Validate the visitor on the simplest analysis pass first.
   - Approach: Collect `AuthorWarning` diagnostics through visitor callbacks.
   - Acceptance: Existing author warning behavior is unchanged, and old warning
     recursion helpers are removed.
+  - Completed: Replaced the dedicated author-warning recursion helpers in
+    `analysis.rs` with an `AuthorWarningVisitor` that collects diagnostics from
+    `visit_object`. The traversal itself now owns descent through choices,
+    conditionals, sequences, content lists, and nested weaves. `cargo test -p
+    ink-test --features csharp-tests --test csharp_tests --
+    TestAuthorWarningsInsideContentListBug` and `cargo test -p ink-compiler`
+    pass.
 
 - [ ] R046 Refactor constant redefinition onto traversal
   - Purpose: Reduce repeated recursion while preserving story-wide constant

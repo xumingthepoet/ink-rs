@@ -4,6 +4,7 @@ use crate::{
     compiler::StageOutput,
     diagnostic::Diagnostic,
     parsed::{
+        visit::{walk_story, ParsedVisitor, VisitContext},
         ContentList, DivertTarget, Expression, Flow, FlowArgument, FlowLevel, Object, Return,
         Story, Weave,
     },
@@ -28,79 +29,25 @@ pub(crate) fn analyze(parsed: Story) -> StageOutput<CheckedStory> {
 }
 
 fn author_warning_diagnostics(story: &Story) -> Vec<Diagnostic> {
-    let mut diagnostics = Vec::new();
-    collect_author_warnings_in_weave(story.root_weave(), &mut diagnostics);
-    for flow in story.flows() {
-        collect_author_warnings_in_flow(flow, &mut diagnostics);
+    #[derive(Default)]
+    struct AuthorWarningVisitor {
+        diagnostics: Vec<Diagnostic>,
     }
-    diagnostics
-}
 
-fn collect_author_warnings_in_flow(flow: &Flow, diagnostics: &mut Vec<Diagnostic>) {
-    collect_author_warnings_in_weave(flow.weave(), diagnostics);
-    for child in flow.child_flows() {
-        collect_author_warnings_in_flow(child, diagnostics);
-    }
-}
-
-fn collect_author_warnings_in_weave(weave: &Weave, diagnostics: &mut Vec<Diagnostic>) {
-    for object in weave.content() {
-        collect_author_warnings_in_object(object, diagnostics);
-    }
-}
-
-fn collect_author_warnings_in_content_list(
-    content: &ContentList,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
-    for object in content.objects() {
-        collect_author_warnings_in_object(object, diagnostics);
-    }
-}
-
-fn collect_author_warnings_in_object(object: &Object, diagnostics: &mut Vec<Diagnostic>) {
-    match object {
-        Object::AuthorWarning(author_warning) => diagnostics.push(Diagnostic::author(
-            author_warning.span().clone(),
-            author_warning.message().to_string(),
-        )),
-        Object::ContentList(content) => {
-            collect_author_warnings_in_content_list(content, diagnostics)
-        }
-        Object::Conditional(conditional) => {
-            for branch in conditional.branches() {
-                collect_author_warnings_in_weave(branch.content(), diagnostics);
+    impl ParsedVisitor for AuthorWarningVisitor {
+        fn visit_object(&mut self, object: &Object, _context: &VisitContext) {
+            if let Object::AuthorWarning(author_warning) = object {
+                self.diagnostics.push(Diagnostic::author(
+                    author_warning.span().clone(),
+                    author_warning.message().to_string(),
+                ));
             }
         }
-        Object::Choice(choice) => {
-            if let Some(content) = choice.start_content() {
-                collect_author_warnings_in_content_list(content, diagnostics);
-            }
-            if let Some(content) = choice.choice_only_content() {
-                collect_author_warnings_in_content_list(content, diagnostics);
-            }
-            collect_author_warnings_in_content_list(choice.inner_content(), diagnostics);
-        }
-        Object::Sequence(sequence) => {
-            for element in sequence.elements() {
-                collect_author_warnings_in_content_list(element, diagnostics);
-            }
-        }
-        Object::Weave(weave) => collect_author_warnings_in_weave(weave, diagnostics),
-        Object::ConstantDeclaration(_)
-        | Object::Divert(_)
-        | Object::Expression(_)
-        | Object::ExternalDeclaration(_)
-        | Object::Gather(_)
-        | Object::Glue(_)
-        | Object::IncDec(_)
-        | Object::LogicLine(_)
-        | Object::Return(_)
-        | Object::Tag(_)
-        | Object::Text(_)
-        | Object::TunnelOnwards(_)
-        | Object::VariableAssignment(_) => {}
     }
+
+    let mut visitor = AuthorWarningVisitor::default();
+    walk_story(story, &mut visitor);
+    visitor.diagnostics
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
