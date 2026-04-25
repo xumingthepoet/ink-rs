@@ -4,57 +4,9 @@ use crate::{
 };
 
 use super::{
-    is_identifier, is_identifier_continue, parse_initial_expression, parser::Parser, text,
+    gather, is_identifier_continue, parse_initial_expression, parser::Parser, text,
     weave::weave_from_objects,
 };
-
-pub(super) fn parse_multiline_prefix(line: &SourceLine) -> Option<(Vec<Object>, &str)> {
-    let trimmed = line.text.trim_start();
-    if trimmed.starts_with('{') {
-        return Some((Vec::new(), trimmed));
-    }
-
-    let mut rest = trimmed;
-    let mut indentation_depth = 0;
-    loop {
-        if rest.starts_with("->") {
-            return None;
-        }
-        let Some(after_dash) = rest.strip_prefix('-') else {
-            break;
-        };
-        indentation_depth += 1;
-        rest = after_dash.trim_start();
-    }
-
-    if indentation_depth == 0 {
-        return None;
-    }
-
-    let (identifier, after_identifier) = parse_optional_gather_identifier(rest);
-    rest = after_identifier.trim_start();
-    if !rest.starts_with('{') {
-        return None;
-    }
-
-    let mut gather = crate::parsed::Gather::new(line.span.clone(), indentation_depth);
-    gather.set_identifier(identifier);
-    Some((vec![Object::Gather(gather)], rest))
-}
-
-fn parse_optional_gather_identifier(source: &str) -> (Option<String>, &str) {
-    let Some(after_open) = source.strip_prefix('(') else {
-        return (None, source);
-    };
-    let Some(close_index) = after_open.find(')') else {
-        return (None, source);
-    };
-    let name = after_open[..close_index].trim();
-    if !is_identifier(name) {
-        return (None, source);
-    }
-    (Some(name.to_string()), &after_open[close_index + 1..])
-}
 
 struct ConditionalBranchBuilder {
     is_true_branch: bool,
@@ -228,7 +180,7 @@ impl Parser {
         index: &mut usize,
     ) -> Option<Vec<Object>> {
         let line = &lines[*index];
-        let (prefix, conditional_source) = parse_multiline_prefix(line)?;
+        let (prefix, conditional_source) = gather::parse_multiline_conditional_prefix(line)?;
         let trimmed = conditional_source.trim();
         if !trimmed.starts_with('{') {
             return None;

@@ -9,7 +9,7 @@ use super::rule::RuleParser;
 use super::weave::group_weave_content;
 use super::{
     author_warning_statement, choice_statement, constant_declaration_statement, divert_statement,
-    external_declaration_statement, gather_statement, is_choice_continuation_boundary, knot,
+    external_declaration_statement, gather, is_choice_continuation_boundary, knot,
     leading_whitespace_count, logic_line_statement, parse_choice_from_line, return_statement,
     temp_declaration_statement, text_statement, variable_assignment_statement,
     variable_declaration_statement,
@@ -136,7 +136,7 @@ impl Parser {
 
     fn parse_gather_line(&mut self, line: &SourceLine) -> Option<Vec<Object>> {
         let mut line_parser = RuleParser::new(line);
-        let mut objects = line_parser.parse_rule(gather_statement)?;
+        let mut objects = line_parser.parse_rule(gather::parse_statement)?;
         let had_error = line_parser.had_error();
         line_parser.skip_horizontal_whitespace();
 

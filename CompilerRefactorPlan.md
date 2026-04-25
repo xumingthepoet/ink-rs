@@ -100,7 +100,7 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 2 in progress. R015 through R018 are complete. Phase 1
+- Current phase: Phase 2 in progress. R015 through R019 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
@@ -148,6 +148,8 @@ Full validation:
   `crates/ink-compiler/src/syntax/sequence.rs`.
 - Weave grouping:
   `crates/ink-compiler/src/syntax/weave.rs`.
+- Gather syntax:
+  `crates/ink-compiler/src/syntax/gather.rs`.
 - Parsed model: `crates/ink-compiler/src/parsed/`.
 - Analysis entry point: `analysis::analyze` in
   `crates/ink-compiler/src/analysis.rs`.
@@ -351,13 +353,17 @@ Use these checks during phase reviews:
     `cargo test -p ink-compiler syntax::` and
     `cargo test -p ink-test --test compiler_conformance` pass.
 
-- [ ] R019 Extract `syntax/gather.rs`
+- [x] R019 Extract `syntax/gather.rs`
   - Purpose: Keep gather statement parsing separate from both generic parser
     control flow and weave grouping.
   - Approach: Move gather statement parsing, bracketed identifier parsing, and
     gather-specific inline prefix parsing.
   - Acceptance: Gather fixtures pass, and parser driver no longer contains
     gather-specific parsing details.
+  - Completed: Gather statement parsing, bracketed identifier parsing, and
+    conditional gather-prefix parsing now live in `syntax/gather.rs` with
+    focused tests; `cargo test -p ink-compiler syntax::` and
+    `cargo test -p ink-test --test compiler_conformance` pass.
 
 - [ ] R020 Extract `syntax/variable.rs`
   - Purpose: Put `VAR`, `temp`, assignment, and inc/dec syntax in one place

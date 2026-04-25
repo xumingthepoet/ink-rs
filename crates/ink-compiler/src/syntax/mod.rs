@@ -2,6 +2,7 @@ mod choice;
 mod conditional;
 mod divert;
 mod error;
+mod gather;
 mod knot;
 mod rule;
 mod sequence;
@@ -930,48 +931,6 @@ fn parse_quoted_string_literal(source: &str) -> Option<String> {
     }
 
     None
-}
-
-fn gather_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
-    parser.skip_horizontal_whitespace();
-    let span = parser.current_span();
-
-    let mut indentation_depth = 0;
-    loop {
-        // Match one or more '-' gather dashes, but never consume a divert arrow.
-        if parser.line_remainder().starts_with("->") || parser.match_string("-").is_none() {
-            break;
-        }
-        indentation_depth += 1;
-        parser.skip_horizontal_whitespace();
-    }
-
-    if indentation_depth == 0 {
-        return None;
-    }
-
-    let identifier = parse_bracketed_identifier(parser);
-    parser.skip_horizontal_whitespace();
-
-    let mut gather = crate::parsed::Gather::new(span.clone(), indentation_depth);
-    gather.set_identifier(identifier);
-
-    Some(vec![Object::Gather(gather)])
-}
-
-fn parse_bracketed_identifier(parser: &mut RuleParser<'_>) -> Option<String> {
-    parser.parse_rule(|parser| {
-        parser.skip_horizontal_whitespace();
-        parser.match_string("(")?;
-        parser.skip_horizontal_whitespace();
-        let name = parser.take_while(is_identifier_continue)?;
-        if !is_identifier(&name) {
-            return None;
-        }
-        parser.skip_horizontal_whitespace();
-        parser.match_string(")")?;
-        Some(name)
-    })
 }
 
 pub(super) fn is_identifier(source: &str) -> bool {
