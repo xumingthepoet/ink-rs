@@ -748,12 +748,11 @@ fn collect_weave_labels(
             Object::Choice(choice) => {
                 if let Some(identifier) = choice.identifier() {
                     let target_path = format!("{current_container_path}.c-{choice_count}");
-                    insert_label_aliases(
-                        labels,
+                    labels.insert_scoped_aliases(
                         identifier,
                         container_path,
                         flow_alias_prefix,
-                        &target_path,
+                        RuntimePath::new(target_path),
                     );
                 }
                 let choice_path = format!("{current_container_path}.c-{choice_count}");
@@ -777,12 +776,11 @@ fn collect_weave_labels(
                     format!("{current_container_path}.{gather_name}")
                 };
                 if let Some(identifier) = gather.identifier() {
-                    insert_label_aliases(
-                        labels,
+                    labels.insert_scoped_aliases(
                         identifier,
                         container_path,
                         flow_alias_prefix,
-                        &gather_path,
+                        RuntimePath::new(gather_path.as_str()),
                     );
                 }
                 current_container_path = gather_path;
@@ -817,27 +815,5 @@ fn collect_weave_labels(
                 }
             }
         }
-    }
-}
-
-fn insert_label_aliases(
-    labels: &mut LabelIndex,
-    identifier: &str,
-    container_path: &str,
-    flow_alias_prefix: Option<&str>,
-    target_path: &str,
-) {
-    labels.insert(identifier.to_string(), RuntimePath::new(target_path));
-    if let Some(flow_path) = flow_alias_prefix {
-        labels.insert(
-            format!("{flow_path}.{identifier}"),
-            RuntimePath::new(target_path),
-        );
-    }
-    if let Some(flow_path) = container_path.strip_suffix(".0") {
-        labels.insert(
-            format!("{flow_path}.{identifier}"),
-            RuntimePath::new(target_path),
-        );
     }
 }

@@ -383,13 +383,7 @@ impl ChoicePathMode {
         target: &str,
         global_labels: &'a LabelIndex,
     ) -> Option<&'a str> {
-        if target.contains('.') {
-            return global_labels.get(target);
-        }
-
-        self.current_flow_path()
-            .and_then(|flow_path| global_labels.get(&format!("{flow_path}.{target}")))
-            .or_else(|| global_labels.get(target))
+        global_labels.scoped_target(target, self.current_flow_path().as_deref())
     }
 
     fn current_flow_path(&self) -> Option<String> {

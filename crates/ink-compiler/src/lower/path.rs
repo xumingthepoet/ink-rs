@@ -50,8 +50,39 @@ impl LabelIndex {
         self.labels.insert(LabelAlias::new(alias), target.into());
     }
 
+    pub(super) fn insert_scoped_aliases(
+        &mut self,
+        identifier: &str,
+        container_path: &str,
+        flow_alias_prefix: Option<&str>,
+        target: impl Into<RuntimePath>,
+    ) {
+        let target = target.into();
+        self.insert(identifier.to_string(), target.clone());
+        if let Some(flow_path) = flow_alias_prefix {
+            self.insert(format!("{flow_path}.{identifier}"), target.clone());
+        }
+        if let Some(flow_path) = container_path.strip_suffix(".0") {
+            self.insert(format!("{flow_path}.{identifier}"), target);
+        }
+    }
+
     pub(super) fn get(&self, alias: &str) -> Option<&str> {
         self.labels.get(alias).map(RuntimePath::as_str)
+    }
+
+    pub(super) fn scoped_target<'a>(
+        &'a self,
+        target: &str,
+        current_flow_path: Option<&str>,
+    ) -> Option<&'a str> {
+        if target.contains('.') {
+            return self.get(target);
+        }
+
+        current_flow_path
+            .and_then(|flow_path| self.get(&format!("{flow_path}.{target}")))
+            .or_else(|| self.get(target))
     }
 }
 
@@ -380,6 +411,33 @@ mod tests {
         labels.insert("short_label", RuntimePath::new("knot.0.label"));
 
         assert_eq!(labels.get("short_label"), Some("knot.0.label"));
+    }
+
+    #[test]
+    fn label_index_resolves_flow_scoped_aliases_before_global_aliases() {
+        let mut labels = LabelIndex::new();
+        labels.insert("label", RuntimePath::new("global.label"));
+        labels.insert("knot.label", RuntimePath::new("knot.0.label"));
+
+        assert_eq!(
+            labels.scoped_target("label", Some("knot")),
+            Some("knot.0.label")
+        );
+        assert_eq!(labels.scoped_target("label", None), Some("global.label"));
+    }
+
+    #[test]
+    fn label_index_inserts_flow_and_container_scoped_aliases() {
+        let mut labels = LabelIndex::new();
+        labels.insert_scoped_aliases(
+            "choice",
+            "knot.0",
+            Some("knot"),
+            RuntimePath::new("knot.0.c-0"),
+        );
+
+        assert_eq!(labels.get("choice"), Some("knot.0.c-0"));
+        assert_eq!(labels.get("knot.choice"), Some("knot.0.c-0"));
     }
 
     #[test]

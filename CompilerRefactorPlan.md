@@ -100,7 +100,7 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 7 in progress. R015 through R071 are complete. Phase 1
+- Current phase: Phase 7 in progress. R015 through R072 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
@@ -1046,12 +1046,17 @@ Use these checks during phase reviews:
     named-content containers, removing repeated default field initialization
     while preserving the runtime IR shape.
 
-- [ ] R072 Run the path resolution drill
+- [x] R072 Run the path resolution drill
   - Purpose: Prove path handling is centralized.
   - Approach: Prototype or adjust one path resolution rule and record touched
     files.
   - Acceptance: The drill touches path/context/index modules and focused tests,
     not scattered string formatting call sites.
+  - Completed: Moved scoped label-target lookup and scoped label-alias
+    insertion into `LabelIndex` in `lower/path.rs`. `lower/context.rs` now
+    passes only the current flow path into that path API, and
+    `lower/indexes.rs` delegates flow/container alias insertion to it. Focused
+    path tests cover scoped lookup precedence and scoped alias insertion.
 
 - [ ] R073 Review lower module sizes and ownership
   - Purpose: Ensure lower extraction does not recreate a god file under another
