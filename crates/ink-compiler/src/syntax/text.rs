@@ -6,7 +6,7 @@ use crate::{
     source::SourceSpan,
 };
 
-use super::rule::RuleParser;
+use super::{rule::RuleParser, scan};
 
 pub(super) fn parse_text_line(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
     let span = parser.current_span();
@@ -177,30 +177,12 @@ fn parse_inline_content_inner(
 }
 
 fn find_next_unescaped_inline_token(source: &str) -> Option<usize> {
-    let mut escaped = false;
-
-    for (index, ch) in source.char_indices() {
-        if escaped {
-            escaped = false;
-            continue;
-        }
-
-        if ch == '\\' {
-            escaped = true;
-            continue;
-        }
-
-        if ch == '#'
-            || ch == '{'
-            || source[index..].starts_with("<>")
-            || source[index..].starts_with("->")
-            || source[index..].starts_with("<-")
-        {
-            return Some(index);
-        }
-    }
-
-    None
+    scan::find_top_level_token_with_options(
+        source,
+        &["#", "{", "<>", "->", "<-"],
+        scan::ScanOptions::inline_tokens(),
+    )
+    .map(|(index, _)| index)
 }
 
 fn unescape_content_text(source: &str) -> String {
@@ -237,31 +219,7 @@ fn parse_inline_braced_objects(
 }
 
 fn find_matching_brace(source_after_open: &str) -> Option<usize> {
-    let mut depth = 0;
-    let mut in_string = false;
-    let mut escaped = false;
-
-    for (index, ch) in source_after_open.char_indices() {
-        if escaped {
-            escaped = false;
-            continue;
-        }
-
-        match ch {
-            '\\' if in_string => escaped = true,
-            '"' => in_string = !in_string,
-            '{' if !in_string => depth += 1,
-            '}' if !in_string => {
-                if depth == 0 {
-                    return Some(index);
-                }
-                depth -= 1;
-            }
-            _ => {}
-        }
-    }
-
-    None
+    scan::find_matching_delimiter(source_after_open, '{', '}')
 }
 
 fn parse_inline_braced_object(
@@ -387,44 +345,15 @@ fn contains_top_level(source: &str, needle: char) -> bool {
 }
 
 fn split_top_level_once(source: &str, needle: char) -> Option<(&str, &str)> {
-    let mut in_string = false;
-    let mut escaped = false;
-    let mut paren_depth = 0;
-    let mut brace_depth = 0;
-
-    for (index, ch) in source.char_indices() {
-        if escaped {
-            escaped = false;
-            continue;
-        }
-
-        match ch {
-            '\\' => escaped = true,
-            '"' => in_string = !in_string,
-            '(' if !in_string => paren_depth += 1,
-            ')' if !in_string => paren_depth -= 1,
-            '{' if !in_string => brace_depth += 1,
-            '}' if !in_string => brace_depth -= 1,
-            _ if ch == needle && !in_string && paren_depth == 0 && brace_depth == 0 => {
-                let right_start = index + ch.len_utf8();
-                return Some((&source[..index], &source[right_start..]));
-            }
-            _ => {}
-        }
-    }
-
-    None
+    scan::split_top_level_once_with_options(source, needle, scan::ScanOptions::inline_text())
 }
 
 fn split_top_level(source: &str, separator: char) -> Vec<&str> {
-    let mut parts = Vec::new();
-    let mut rest = source;
-    while let Some((left, right)) = split_top_level_once(rest, separator) {
-        parts.push(left);
-        rest = right;
-    }
-    parts.push(rest);
-    parts
+    scan::split_top_level_preserving_whitespace_with_options(
+        source,
+        separator,
+        scan::ScanOptions::inline_text(),
+    )
 }
 
 fn normalize_divert_separator_whitespace(text: &str) -> String {

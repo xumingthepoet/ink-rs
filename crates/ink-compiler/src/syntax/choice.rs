@@ -1,6 +1,6 @@
 use crate::parsed::{Choice, ContentList, Expression};
 
-use super::{is_identifier, rule::RuleParser, text};
+use super::{is_identifier, rule::RuleParser, scan, text};
 
 pub(super) fn parse_choice(parser: &mut RuleParser<'_>) -> Option<Choice> {
     parser.skip_horizontal_whitespace();
@@ -201,33 +201,7 @@ fn parse_choice_segments(choice_body: &str) -> Result<ChoiceSegments, &'static s
 }
 
 fn find_top_level_divert(source: &str) -> Option<usize> {
-    let mut in_string = false;
-    let mut escaped = false;
-    let mut paren_depth = 0;
-    let mut brace_depth = 0;
-
-    for (index, ch) in source.char_indices() {
-        if escaped {
-            escaped = false;
-            continue;
-        }
-
-        let rest = &source[index..];
-        match ch {
-            '\\' if in_string => escaped = true,
-            '"' => in_string = !in_string,
-            '(' if !in_string => paren_depth += 1,
-            ')' if !in_string => paren_depth -= 1,
-            '{' if !in_string => brace_depth += 1,
-            '}' if !in_string => brace_depth -= 1,
-            '-' if !in_string && paren_depth == 0 && brace_depth == 0 && rest.starts_with("->") => {
-                return Some(index);
-            }
-            _ => {}
-        }
-    }
-
-    None
+    scan::find_top_level_token(source, &["->"]).map(|(index, _)| index)
 }
 
 fn content_list_from_segment(
@@ -254,4 +228,18 @@ fn append_newline(mut content: ContentList, span: crate::source::SourceSpan) -> 
         "\n", span,
     )));
     content
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn top_level_divert_ignores_arrows_inside_braced_strings() {
+        assert_eq!(
+            find_top_level_divert(r#"visible {"->"} -> target"#),
+            Some(15)
+        );
+        assert_eq!(find_top_level_divert(r#"visible {"->"}"#), None);
+    }
 }

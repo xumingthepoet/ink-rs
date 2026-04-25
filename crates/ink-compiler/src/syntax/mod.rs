@@ -7,6 +7,7 @@ mod gather;
 mod knot;
 mod logic;
 mod rule;
+mod scan;
 mod sequence;
 mod state;
 mod text;
@@ -138,7 +139,7 @@ fn parse_expression(source: &str) -> Option<Expression> {
     }
     if let Some((left, operator, right)) = split_top_level_operator(
         source,
-        &[('+', BinaryOperator::Add), ('-', BinaryOperator::Subtract)],
+        &[("+", BinaryOperator::Add), ("-", BinaryOperator::Subtract)],
     ) {
         return Some(Expression::Binary {
             operator,
@@ -147,7 +148,7 @@ fn parse_expression(source: &str) -> Option<Expression> {
         });
     }
     if let Some((left, operator, right)) =
-        split_top_level_operator(source, &[('*', BinaryOperator::Multiply)])
+        split_top_level_operator(source, &[("*", BinaryOperator::Multiply)])
     {
         return Some(Expression::Binary {
             operator,
@@ -156,7 +157,7 @@ fn parse_expression(source: &str) -> Option<Expression> {
         });
     }
     if let Some((left, operator, right)) =
-        split_top_level_operator(source, &[('/', BinaryOperator::Divide)])
+        split_top_level_operator(source, &[("/", BinaryOperator::Divide)])
     {
         return Some(Expression::Binary {
             operator,
@@ -172,7 +173,7 @@ fn parse_expression(source: &str) -> Option<Expression> {
         });
     }
     if let Some((left, operator, right)) =
-        split_top_level_operator(source, &[('%', BinaryOperator::Modulo)])
+        split_top_level_operator(source, &[("%", BinaryOperator::Modulo)])
     {
         return Some(Expression::Binary {
             operator,
@@ -293,117 +294,57 @@ fn flatten_string_expression_content(objects: Vec<Object>) -> Vec<Object> {
 }
 
 pub(super) fn split_top_level_args(source: &str) -> Vec<&str> {
-    let mut args = Vec::new();
-    let mut start = 0;
-    let mut in_string = false;
-    let mut escaped = false;
-    let mut paren_depth = 0;
-
-    for (index, ch) in source.char_indices() {
-        if escaped {
-            escaped = false;
-            continue;
-        }
-
-        match ch {
-            '\\' if in_string => escaped = true,
-            '"' => in_string = !in_string,
-            '(' if !in_string => paren_depth += 1,
-            ')' if !in_string => paren_depth -= 1,
-            ',' if !in_string && paren_depth == 0 => {
-                args.push(source[start..index].trim());
-                start = index + ch.len_utf8();
-            }
-            _ => {}
-        }
-    }
-    args.push(source[start..].trim());
-    args
+    scan::split_top_level_with_options(source, ',', scan::ScanOptions::expression())
 }
 
 fn split_top_level_operator<'a>(
     source: &'a str,
-    operators: &[(char, BinaryOperator)],
+    operators: &[(&'static str, BinaryOperator)],
 ) -> Option<(&'a str, BinaryOperator, &'a str)> {
-    let mut in_string = false;
-    let mut escaped = false;
-    let mut paren_depth = 0;
-
-    for (index, ch) in source.char_indices().rev() {
-        if escaped {
-            escaped = false;
-            continue;
-        }
-
-        match ch {
-            '\\' if in_string => escaped = true,
-            '"' => in_string = !in_string,
-            ')' if !in_string => paren_depth += 1,
-            '(' if !in_string => paren_depth -= 1,
-            _ if !in_string && paren_depth == 0 => {
-                let Some((_, operator)) = operators
-                    .iter()
-                    .find(|(operator_char, _)| *operator_char == ch)
-                else {
-                    continue;
-                };
-                let left = &source[..index];
-                let right = &source[index + ch.len_utf8()..];
-                if !left.trim().is_empty()
-                    && !right.trim().is_empty()
-                    && !is_unary_operator_position(source, index)
-                {
-                    return Some((left.trim(), *operator, right.trim()));
-                }
-            }
-            _ => {}
-        }
-    }
-
-    None
+    split_top_level_operator_text(source, operators, false, true)
 }
 
 fn split_top_level_word_operator<'a>(
     source: &'a str,
-    operators: &[(&str, BinaryOperator)],
+    operators: &[(&'static str, BinaryOperator)],
 ) -> Option<(&'a str, BinaryOperator, &'a str)> {
-    let mut in_string = false;
-    let mut escaped = false;
-    let mut paren_depth = 0;
+    split_top_level_operator_text(source, operators, false, true)
+}
 
-    for (index, ch) in source.char_indices().rev() {
-        if escaped {
-            escaped = false;
-            continue;
-        }
-
-        match ch {
-            '\\' if in_string => escaped = true,
-            '"' => in_string = !in_string,
-            ')' if !in_string => paren_depth += 1,
-            '(' if !in_string => paren_depth -= 1,
-            _ if !in_string && paren_depth == 0 => {
-                let Some((operator_text, operator)) = operators
-                    .iter()
-                    .find(|(operator_text, _)| source[index..].starts_with(operator_text))
-                else {
-                    continue;
-                };
-                let right_start = index + operator_text.len();
-                let left = &source[..index];
-                let right = &source[right_start..];
-                if !left.trim().is_empty()
-                    && !right.trim().is_empty()
-                    && !is_unary_operator_position(source, index)
-                {
-                    return Some((left.trim(), *operator, right.trim()));
-                }
+fn split_top_level_operator_text<'a>(
+    source: &'a str,
+    operators: &[(&'static str, BinaryOperator)],
+    require_word_boundaries: bool,
+    reject_unary_position: bool,
+) -> Option<(&'a str, BinaryOperator, &'a str)> {
+    let tokens = operators
+        .iter()
+        .map(|(operator_text, _)| *operator_text)
+        .collect::<Vec<_>>();
+    scan::top_level_token_matches_with_options(source, &tokens, scan::ScanOptions::expression())
+        .into_iter()
+        .rev()
+        .find_map(|(index, operator_text)| {
+            if require_word_boundaries && !has_word_boundaries(source, index, operator_text.len()) {
+                return None;
             }
-            _ => {}
-        }
-    }
 
-    None
+            let (_, operator) = operators
+                .iter()
+                .find(|(candidate, _)| *candidate == operator_text)?;
+            let left = source[..index].trim();
+            let right = source[index + operator_text.len()..].trim();
+
+            if left.is_empty() || right.is_empty() {
+                return None;
+            }
+
+            if reject_unary_position && is_unary_operator_position(source, index) {
+                return None;
+            }
+
+            Some((left, *operator, right))
+        })
 }
 
 fn split_top_level_word_text_operator<'a>(
@@ -442,44 +383,32 @@ fn split_top_level_text_operators<'a>(
     source: &'a str,
     operators: &[TextOperator],
 ) -> Option<(&'a str, BinaryOperator, &'a str)> {
-    let mut in_string = false;
-    let mut escaped = false;
-    let mut paren_depth = 0;
+    let tokens = operators
+        .iter()
+        .map(|operator| operator.text)
+        .collect::<Vec<_>>();
+    scan::top_level_token_matches_with_options(source, &tokens, scan::ScanOptions::expression())
+        .into_iter()
+        .rev()
+        .find_map(|(index, operator_text)| {
+            let operator = operators
+                .iter()
+                .find(|operator| operator.text == operator_text)?;
 
-    for (index, ch) in source.char_indices().rev() {
-        if escaped {
-            escaped = false;
-            continue;
-        }
-
-        match ch {
-            '\\' if in_string => escaped = true,
-            '"' => in_string = !in_string,
-            ')' if !in_string => paren_depth += 1,
-            '(' if !in_string => paren_depth -= 1,
-            _ if !in_string && paren_depth == 0 => {
-                let Some(operator) = operators
-                    .iter()
-                    .find(|operator| source[index..].starts_with(operator.text))
-                else {
-                    continue;
-                };
-                if operator.require_word_boundaries
-                    && !has_word_boundaries(source, index, operator.text.len())
-                {
-                    continue;
-                }
-                let left = source[..index].trim();
-                let right = source[index + operator.text.len()..].trim();
-                if !left.is_empty() && !right.is_empty() {
-                    return Some((left, operator.operator, right));
-                }
+            if operator.require_word_boundaries
+                && !has_word_boundaries(source, index, operator.text.len())
+            {
+                return None;
             }
-            _ => {}
-        }
-    }
 
-    None
+            let left = source[..index].trim();
+            let right = source[index + operator.text.len()..].trim();
+            if left.is_empty() || right.is_empty() {
+                return None;
+            }
+
+            Some((left, operator.operator, right))
+        })
 }
 
 fn split_top_level_text_operator_with_boundaries<'a>(
@@ -487,36 +416,22 @@ fn split_top_level_text_operator_with_boundaries<'a>(
     operator: &str,
     require_word_boundaries: bool,
 ) -> Option<(&'a str, &'a str)> {
-    let mut in_string = false;
-    let mut escaped = false;
-    let mut paren_depth = 0;
-
-    for (index, ch) in source.char_indices().rev() {
-        if escaped {
-            escaped = false;
-            continue;
-        }
-
-        match ch {
-            '\\' if in_string => escaped = true,
-            '"' => in_string = !in_string,
-            ')' if !in_string => paren_depth += 1,
-            '(' if !in_string => paren_depth -= 1,
-            _ if !in_string && paren_depth == 0 && source[index..].starts_with(operator) => {
-                if require_word_boundaries && !has_word_boundaries(source, index, operator.len()) {
-                    continue;
-                }
-                let left = source[..index].trim();
-                let right = source[index + operator.len()..].trim();
-                if !left.is_empty() && !right.is_empty() {
-                    return Some((left, right));
-                }
+    scan::top_level_token_matches_with_options(source, &[operator], scan::ScanOptions::expression())
+        .into_iter()
+        .rev()
+        .find_map(|(index, _)| {
+            if require_word_boundaries && !has_word_boundaries(source, index, operator.len()) {
+                return None;
             }
-            _ => {}
-        }
-    }
 
-    None
+            let left = source[..index].trim();
+            let right = source[index + operator.len()..].trim();
+            if left.is_empty() || right.is_empty() {
+                return None;
+            }
+
+            Some((left, right))
+        })
 }
 
 fn has_word_boundaries(source: &str, index: usize, length: usize) -> bool {
@@ -554,29 +469,11 @@ fn strip_enclosing_parentheses(source: &str) -> &str {
 }
 
 fn parentheses_wrap_entire_expression(source: &str) -> bool {
-    let mut in_string = false;
-    let mut escaped = false;
-    let mut depth = 0;
-    for (index, ch) in source.char_indices() {
-        if escaped {
-            escaped = false;
-            continue;
-        }
-
-        match ch {
-            '\\' if in_string => escaped = true,
-            '"' => in_string = !in_string,
-            '(' if !in_string => depth += 1,
-            ')' if !in_string => {
-                depth -= 1;
-                if depth == 0 && index + ch.len_utf8() != source.len() {
-                    return false;
-                }
-            }
-            _ => {}
-        }
-    }
-    depth == 0
+    let Some(after_open) = source.strip_prefix('(') else {
+        return false;
+    };
+    scan::find_matching_delimiter(after_open, '(', ')')
+        .is_some_and(|close_index| close_index + 1 == after_open.len())
 }
 
 fn parse_quoted_string_literal(source: &str) -> Option<String> {

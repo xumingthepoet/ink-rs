@@ -4,7 +4,7 @@ use crate::{
 };
 
 use super::{
-    gather, is_identifier_continue, parse_initial_expression, parser::Parser, text,
+    gather, is_identifier_continue, parse_initial_expression, parser::Parser, scan, text,
     weave::weave_from_objects,
 };
 
@@ -144,33 +144,7 @@ fn non_empty_trimmed(source: &str) -> Option<&str> {
 }
 
 fn split_top_level_once(source: &str, needle: char) -> Option<(&str, &str)> {
-    let mut in_string = false;
-    let mut escaped = false;
-    let mut paren_depth = 0;
-    let mut brace_depth = 0;
-
-    for (index, ch) in source.char_indices() {
-        if escaped {
-            escaped = false;
-            continue;
-        }
-
-        match ch {
-            '\\' => escaped = true,
-            '"' => in_string = !in_string,
-            '(' if !in_string => paren_depth += 1,
-            ')' if !in_string => paren_depth -= 1,
-            '{' if !in_string => brace_depth += 1,
-            '}' if !in_string => brace_depth -= 1,
-            _ if ch == needle && !in_string && paren_depth == 0 && brace_depth == 0 => {
-                let right_start = index + ch.len_utf8();
-                return Some((&source[..index], &source[right_start..]));
-            }
-            _ => {}
-        }
-    }
-
-    None
+    scan::split_top_level_once_with_options(source, needle, scan::ScanOptions::inline_text())
 }
 
 impl Parser {

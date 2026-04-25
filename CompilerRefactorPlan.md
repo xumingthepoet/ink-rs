@@ -100,7 +100,7 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 3 in progress. R015 through R024 are complete. Phase 1
+- Current phase: Phase 3 in progress. R015 through R028 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
@@ -431,35 +431,49 @@ Use these checks during phase reviews:
 
 ## Phase 3: Shared Scanning Utilities
 
-- [ ] R025 Add `syntax/scan.rs`
+- [x] R025 Add `syntax/scan.rs`
   - Purpose: Eliminate duplicated state machines for strings, escapes,
     parentheses, braces, and top-level separators.
   - Approach: Implement a shared scanner with configurable delimiter searches
     and top-level token finding.
   - Acceptance: Unit tests cover nested strings, escaped quotes, braces,
     parentheses, commas, and top-level separators.
+  - Completed: Added `syntax/scan.rs` with configurable top-level scanning,
+    top-level splitting, token lookup, and delimiter matching. Focused scanner
+    tests cover escaped quotes, nested parentheses/braces, commas, inline text
+    escapes, and top-level token detection; `cargo test -p ink-compiler
+    syntax::scan::tests::` passes.
 
-- [ ] R026 Replace expression top-level scans
+- [x] R026 Replace expression top-level scans
   - Purpose: Expression parsing currently duplicates operator scanning logic.
   - Approach: Keep the old parser shape initially, but route operator splitting
     through `scan.rs`.
   - Acceptance: Existing expression behavior is unchanged, and duplicate
     expression scanner helpers are removed or marked for immediate removal.
+  - Completed: Expression argument splitting, operator matching, textual
+    operator matching, and enclosing-parenthesis checks now route through
+    `syntax/scan.rs`; `cargo test -p ink-compiler syntax::` passes.
 
-- [ ] R027 Replace inline text scans
+- [x] R027 Replace inline text scans
   - Purpose: Inline text, tags, glue, braces, and sequences must share the same
     understanding of escaped and nested syntax.
   - Approach: Replace local brace matching and top-level split helpers in
     `syntax/text.rs`.
   - Acceptance: Inline conditional, inline sequence, string expression, glue,
     and tag fixtures are unchanged.
+  - Completed: Inline token lookup, brace matching, conditional/sequence
+    top-level splitting, and multiline conditional branch splitting now use
+    `syntax/scan.rs`; `cargo test -p ink-compiler syntax::` passes.
 
-- [ ] R028 Replace choice top-level divert scans
+- [x] R028 Replace choice top-level divert scans
   - Purpose: Choice parsing should not misread arrows inside strings, braces, or
     parentheses.
   - Approach: Rewrite choice divert detection using `scan.rs`.
   - Acceptance: Existing choice fixtures pass, and a new focused test covers an
     arrow that should not split choice content.
+  - Completed: Choice top-level divert detection now uses `syntax/scan.rs`;
+    a focused test covers arrows inside braced strings, and
+    `cargo test -p ink-compiler syntax::` passes.
 
 - [ ] R029 Replace multidivert scans
   - Purpose: Divert/tunnel parsing should not maintain its own scanner.
