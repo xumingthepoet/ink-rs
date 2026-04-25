@@ -100,7 +100,7 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 2 in progress. R015 through R022 are complete. Phase 1
+- Current phase: Phase 2 in progress. R015 through R023 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
@@ -406,12 +406,16 @@ Use these checks during phase reviews:
     `cargo test -p ink-compiler syntax::` and
     `cargo test -p ink-test --test compiler_conformance` pass.
 
-- [ ] R023 Add parser module ownership tests
+- [x] R023 Add parser module ownership tests
   - Purpose: Make extracted modules directly testable.
   - Approach: Add focused tests near each module or through language/compiler
     conformance helpers.
   - Acceptance: Every extracted syntax module has at least one focused test or
     fixture that would fail if the module were broken.
+  - Completed: Parser, conditional, sequence, weave, gather, variable,
+    declaration, and logic modules now have focused tests or direct parser
+    ownership coverage; `cargo test -p ink-compiler syntax::` and
+    `cargo test -p ink-test --test compiler_conformance` pass.
 
 - [ ] R024 Run the parser boundary changeability drill
   - Purpose: Verify that parser modularization improves real edit locality.

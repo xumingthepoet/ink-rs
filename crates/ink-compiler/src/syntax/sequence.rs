@@ -94,3 +94,24 @@ fn is_multiline_sequence_element_start(line: &SourceLine) -> bool {
     let trimmed = line.text.trim_start();
     trimmed.starts_with('-') && !trimmed.starts_with("->")
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{parsed::Object, source::SourceInput, syntax::parse};
+
+    #[test]
+    fn parses_multiline_sequence_into_content_list() {
+        let output = parse(SourceInput::new("{ cycle:\n- one\n- two\n}"));
+
+        assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
+        let story = output.artifact.expect("expected story");
+        let has_sequence = story.root_weave().content().iter().any(|object| {
+            matches!(
+                object,
+                Object::ContentList(content)
+                    if matches!(content.objects().first(), Some(Object::Sequence(_)))
+            )
+        });
+        assert!(has_sequence);
+    }
+}

@@ -381,3 +381,24 @@ impl Parser {
         branch.objects.extend(self.parse_statement(&content_line));
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{parsed::Object, source::SourceInput, syntax::parse};
+
+    #[test]
+    fn parses_multiline_conditional_into_content_list() {
+        let output = parse(SourceInput::new("{ true:\n- yes\n}"));
+
+        assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
+        let story = output.artifact.expect("expected story");
+        let has_conditional = story.root_weave().content().iter().any(|object| {
+            matches!(
+                object,
+                Object::ContentList(content)
+                    if matches!(content.objects().first(), Some(Object::Conditional(_)))
+            )
+        });
+        assert!(has_conditional);
+    }
+}
