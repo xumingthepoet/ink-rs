@@ -1,9 +1,8 @@
 [package]
-name = "ink-compiler"
+name = "ink-story-json-format"
 version = "0.1.0"
 edition.workspace = true
 publish = false
 
 [dependencies]
-ink-story-json-format = { path = "../ink-story-json-format" }
 serde_json = "1"

@@ -1,4 +1,4 @@
-use serde_json::{json, Map, Value};
+use ink_story_json_format as format;
 
 use crate::{
     compiler::StageOutput,
@@ -7,230 +7,272 @@ use crate::{
     source::SourceSpan,
 };
 
-pub(crate) const INK_VERSION_CURRENT: i32 = 21;
+pub(crate) const INK_VERSION_CURRENT: i32 = format::INK_VERSION_CURRENT;
 
 pub(crate) fn emit_json(program: RuntimeProgram) -> StageOutput<String> {
-    let value = json!({
-        "inkVersion": INK_VERSION_CURRENT,
-        "root": container_to_value(&program.root),
-        "listDefs": {},
-    });
-
-    match serde_json::to_string(&value) {
+    match program_to_format(&program).and_then(|program| {
+        program
+            .to_json_string()
+            .map_err(|error| format!("failed to serialize compiled story JSON: {error}"))
+    }) {
         Ok(json) => StageOutput {
             artifact: Some(json),
             diagnostics: Vec::new(),
         },
         Err(error) => StageOutput {
             artifact: None,
-            diagnostics: vec![Diagnostic::error(
-                SourceSpan::new(None, 1, 1),
-                format!("failed to serialize compiled story JSON: {error}"),
-            )],
+            diagnostics: vec![Diagnostic::error(SourceSpan::new(None, 1, 1), error)],
         },
     }
 }
 
-fn container_to_value(container: &Container) -> Value {
-    container_to_value_with_name(container, true)
+fn program_to_format(program: &RuntimeProgram) -> Result<format::Program, String> {
+    Ok(format::Program {
+        ink_version: INK_VERSION_CURRENT,
+        root: container_to_format(&program.root)?,
+        list_defs: serde_json::Map::new(),
+    })
 }
 
-fn container_to_value_without_name(container: &Container) -> Value {
-    container_to_value_with_name(container, false)
-}
+fn container_to_format(container: &Container) -> Result<format::Container, String> {
+    let trailing_named_content = container.content.last().and_then(|object| match object {
+        RuntimeObject::NamedContent(containers) if container.merge_tail_metadata => {
+            Some(containers)
+        }
+        _ => None,
+    });
 
-fn container_to_value_with_name(container: &Container, include_name: bool) -> Value {
-    let named_content_tail = container
-        .content
-        .last()
-        .is_some_and(|object| matches!(object, RuntimeObject::NamedContent(_)));
-    let merge_named_content_tail = named_content_tail && container.merge_tail_metadata;
-    let value_content = if merge_named_content_tail {
+    let content_objects = if trailing_named_content.is_some() {
         &container.content[..container.content.len() - 1]
     } else {
         &container.content
     };
-    let mut values = value_content
-        .iter()
-        .map(runtime_object_to_value)
-        .collect::<Vec<_>>();
 
-    if merge_named_content_tail {
-        if let Some(RuntimeObject::NamedContent(containers)) = container.content.last() {
-            values.push(named_content_to_value_with_metadata(
-                containers,
-                container,
-                include_name,
+    let mut content = Vec::with_capacity(content_objects.len());
+    for object in content_objects {
+        if matches!(object, RuntimeObject::NamedContent(_)) {
+            return Err(
+                "compiler lowering produced named content outside a container terminator"
+                    .to_string(),
+            );
+        }
+        content.push(object_to_format(object)?);
+    }
+
+    let mut named_content = Vec::new();
+    if let Some(containers) = trailing_named_content {
+        for container in containers {
+            let Some(name) = &container.name else {
+                continue;
+            };
+            named_content.push(format::NamedContainer::new(
+                name.clone(),
+                container_to_format(container)?,
             ));
         }
-    } else {
-        values.push(container_terminator_to_value(container, include_name));
     }
-    Value::Array(values)
+
+    Ok(format::Container {
+        content,
+        named_content,
+        name: container.name.clone(),
+        flags: container.flags,
+    })
 }
 
-fn container_terminator_to_value(container: &Container, include_name: bool) -> Value {
-    let mut obj = Map::new();
-
-    if let Some(flags) = container.flags {
-        obj.insert("#f".to_string(), Value::Number(flags.into()));
-    }
-
-    if include_name {
-        if let Some(name) = &container.name {
-            obj.insert("#n".to_string(), Value::String(name.clone()));
+fn object_to_format(object: &RuntimeObject) -> Result<format::Object, String> {
+    Ok(match object {
+        RuntimeObject::Container(container) => {
+            format::Object::Container(container_to_format(container)?)
         }
-    }
-
-    if obj.is_empty() {
-        Value::Null
-    } else {
-        Value::Object(obj)
-    }
-}
-
-fn runtime_object_to_value(object: &RuntimeObject) -> Value {
-    match object {
-        RuntimeObject::Container(container) => container_to_value(container),
-        RuntimeObject::NamedContent(containers) => named_content_to_value(containers),
-        RuntimeObject::String(text) if text == "\n" => Value::String("\n".to_string()),
-        RuntimeObject::String(text) => Value::String(format!("^{text}")),
-        RuntimeObject::Glue => Value::String("<>".to_string()),
-        RuntimeObject::ControlCommand(command) => Value::String(
-            match command {
-                ControlCommand::Done => "done",
-                ControlCommand::End => "end",
-                ControlCommand::EvalStart => "ev",
-                ControlCommand::EvalOutput => "out",
-                ControlCommand::EvalEnd => "/ev",
-                ControlCommand::BeginString => "str",
-                ControlCommand::EndString => "/str",
-                ControlCommand::VisitIndex => "visit",
-                ControlCommand::SequenceShuffleIndex => "seq",
-                ControlCommand::Duplicate => "du",
-                ControlCommand::NoOp => "nop",
-                ControlCommand::Pop => "pop",
-                ControlCommand::PopFunction => "~ret",
-                ControlCommand::PopTunnel => "->->",
-                ControlCommand::StartThread => "thread",
-                ControlCommand::ChoiceCount => "choiceCnt",
-                ControlCommand::Turns => "turn",
-                ControlCommand::TurnsSince => "turns",
-                ControlCommand::ReadCount => "readc",
-                ControlCommand::Random => "rnd",
-                ControlCommand::SeedRandom => "srnd",
-                ControlCommand::ListRange => "range",
-                ControlCommand::ListRandom => "lrnd",
-            }
-            .to_string(),
-        ),
-        RuntimeObject::Tag { is_start } => {
-            Value::String(if *is_start { "#" } else { "/#" }.to_string())
+        RuntimeObject::NamedContent(_) => {
+            return Err("named content must be part of a container terminator".to_string())
         }
-        RuntimeObject::Bool(value) => Value::Bool(*value),
-        RuntimeObject::Int(value) => Value::Number((*value).into()),
-        RuntimeObject::Float(value) => Value::Number(
-            serde_json::Number::from_f64(value.value()).expect("finite ink float literal"),
-        ),
-        RuntimeObject::Void => Value::String("void".to_string()),
-        RuntimeObject::NativeFunction(name) => Value::String(name.clone()),
-        RuntimeObject::ConditionalDivert { target } => {
-            let mut obj = Map::new();
-            obj.insert("->".to_string(), Value::String(target.clone()));
-            obj.insert("c".to_string(), Value::Bool(true));
-            Value::Object(obj)
+        RuntimeObject::String(text) => format::Object::Value(format::Value::String(text.clone())),
+        RuntimeObject::ControlCommand(command) => {
+            format::Object::ControlCommand(control_command_to_format(*command))
         }
-        RuntimeObject::Divert { target, variable } => {
-            let mut obj = Map::new();
-            obj.insert("->".to_string(), Value::String(target.clone()));
-            if *variable {
-                obj.insert("var".to_string(), Value::Bool(true));
-            }
-            Value::Object(obj)
-        }
+        RuntimeObject::Divert { target, variable } => format::Object::Divert(format::Divert {
+            kind: format::DivertKind::Direct,
+            target: target.clone(),
+            variable: *variable,
+            conditional: false,
+            external_args: None,
+        }),
         RuntimeObject::TunnelDivert { target, variable } => {
-            let mut obj = Map::new();
-            obj.insert("->t->".to_string(), Value::String(target.clone()));
-            if *variable {
-                obj.insert("var".to_string(), Value::Bool(true));
-            }
-            Value::Object(obj)
+            format::Object::Divert(format::Divert {
+                kind: format::DivertKind::Tunnel,
+                target: target.clone(),
+                variable: *variable,
+                conditional: false,
+                external_args: None,
+            })
         }
-        RuntimeObject::FunctionDivert { target } => {
-            let mut obj = Map::new();
-            obj.insert("f()".to_string(), Value::String(target.clone()));
-            Value::Object(obj)
-        }
+        RuntimeObject::FunctionDivert { target } => format::Object::Divert(format::Divert {
+            kind: format::DivertKind::Function,
+            target: target.clone(),
+            variable: false,
+            conditional: false,
+            external_args: None,
+        }),
         RuntimeObject::ExternalFunction { target, args } => {
-            let mut obj = Map::new();
-            obj.insert("x()".to_string(), Value::String(target.clone()));
-            if *args > 0 {
-                obj.insert("exArgs".to_string(), Value::Number((*args).into()));
-            }
-            Value::Object(obj)
+            format::Object::Divert(format::Divert {
+                kind: format::DivertKind::External,
+                target: target.clone(),
+                variable: false,
+                conditional: false,
+                external_args: Some(*args),
+            })
         }
-        RuntimeObject::DivertTarget(target) => json!({ "^->": target }),
-        RuntimeObject::ReadCount(target) => json!({ "CNT?": target }),
-        RuntimeObject::VariableAssignment(name) => json!({ "temp=": name }),
-        RuntimeObject::GlobalVariableAssignment(name) => json!({ "VAR=": name }),
-        RuntimeObject::TempVariableReassignment(name) => json!({ "temp=": name, "re": true }),
-        RuntimeObject::VariableReassignment(name) => json!({ "VAR=": name, "re": true }),
-        RuntimeObject::VariableReference(name) => json!({ "VAR?": name }),
+        RuntimeObject::ConditionalDivert { target } => format::Object::Divert(format::Divert {
+            kind: format::DivertKind::Direct,
+            target: target.clone(),
+            variable: false,
+            conditional: true,
+            external_args: None,
+        }),
+        RuntimeObject::DivertTarget(target) => {
+            format::Object::Value(format::Value::DivertTarget(target.clone()))
+        }
+        RuntimeObject::ReadCount(target) => {
+            format::Object::VariableReference(format::VariableReference {
+                kind: format::VariableReferenceKind::ReadCount,
+                name: target.clone(),
+            })
+        }
+        RuntimeObject::VariableAssignment(name) => {
+            variable_assignment_to_format(format::VariableAssignmentKind::Temporary, name, true)
+        }
+        RuntimeObject::GlobalVariableAssignment(name) => {
+            variable_assignment_to_format(format::VariableAssignmentKind::Global, name, true)
+        }
+        RuntimeObject::TempVariableReassignment(name) => {
+            variable_assignment_to_format(format::VariableAssignmentKind::Temporary, name, false)
+        }
+        RuntimeObject::VariableReassignment(name) => {
+            variable_assignment_to_format(format::VariableAssignmentKind::Global, name, false)
+        }
+        RuntimeObject::VariableReference(name) => {
+            format::Object::VariableReference(format::VariableReference {
+                kind: format::VariableReferenceKind::Variable,
+                name: name.clone(),
+            })
+        }
         RuntimeObject::VariablePointer {
             name,
             context_index,
-        } => json!({ "^var": name, "ci": context_index }),
-        RuntimeObject::ChoicePoint { target, flags } => json!({ "*": target, "flg": flags }),
+        } => format::Object::Value(format::Value::VariablePointer(format::VariablePointer {
+            name: name.clone(),
+            context_index: *context_index,
+        })),
+        RuntimeObject::ChoicePoint { target, flags } => {
+            format::Object::ChoicePoint(format::ChoicePoint {
+                target: target.clone(),
+                flags: *flags,
+            })
+        }
+        RuntimeObject::Glue => format::Object::Glue,
+        RuntimeObject::Tag { is_start } => {
+            let command = if *is_start {
+                format::ControlCommand::BeginTag
+            } else {
+                format::ControlCommand::EndTag
+            };
+            format::Object::ControlCommand(command)
+        }
+        RuntimeObject::Bool(value) => format::Object::Value(format::Value::Bool(*value)),
+        RuntimeObject::Int(value) => format::Object::Value(format::Value::Int(*value)),
+        RuntimeObject::Float(value) => format::Object::Value(format::Value::Float(value.value())),
+        RuntimeObject::Void => format::Object::Void,
+        RuntimeObject::NativeFunction(name) => {
+            format::Object::NativeFunction(format::NativeFunction::new(name.clone()))
+        }
+    })
+}
+
+fn control_command_to_format(command: ControlCommand) -> format::ControlCommand {
+    match command {
+        ControlCommand::Done => format::ControlCommand::Done,
+        ControlCommand::End => format::ControlCommand::End,
+        ControlCommand::EvalStart => format::ControlCommand::EvalStart,
+        ControlCommand::EvalOutput => format::ControlCommand::EvalOutput,
+        ControlCommand::EvalEnd => format::ControlCommand::EvalEnd,
+        ControlCommand::BeginString => format::ControlCommand::BeginString,
+        ControlCommand::EndString => format::ControlCommand::EndString,
+        ControlCommand::VisitIndex => format::ControlCommand::VisitIndex,
+        ControlCommand::SequenceShuffleIndex => format::ControlCommand::SequenceShuffleIndex,
+        ControlCommand::Duplicate => format::ControlCommand::Duplicate,
+        ControlCommand::NoOp => format::ControlCommand::NoOp,
+        ControlCommand::Pop => format::ControlCommand::Pop,
+        ControlCommand::PopFunction => format::ControlCommand::PopFunction,
+        ControlCommand::PopTunnel => format::ControlCommand::PopTunnel,
+        ControlCommand::StartThread => format::ControlCommand::StartThread,
+        ControlCommand::ChoiceCount => format::ControlCommand::ChoiceCount,
+        ControlCommand::Turns => format::ControlCommand::Turns,
+        ControlCommand::TurnsSince => format::ControlCommand::TurnsSince,
+        ControlCommand::ReadCount => format::ControlCommand::ReadCount,
+        ControlCommand::Random => format::ControlCommand::Random,
+        ControlCommand::SeedRandom => format::ControlCommand::SeedRandom,
+        ControlCommand::ListRange => format::ControlCommand::ListRange,
+        ControlCommand::ListRandom => format::ControlCommand::ListRandom,
     }
 }
 
-fn named_content_to_value(containers: &[Container]) -> Value {
-    named_content_to_value_with_extra(containers, Map::new())
-}
-
-fn named_content_to_value_with_metadata(
-    containers: &[Container],
-    container: &Container,
-    include_name: bool,
-) -> Value {
-    let extra = match container_terminator_to_value(container, include_name) {
-        Value::Object(map) => map,
-        _ => Map::new(),
-    };
-    named_content_to_value_with_extra(containers, extra)
-}
-
-fn named_content_to_value_with_extra(
-    containers: &[Container],
-    mut obj: Map<String, Value>,
-) -> Value {
-    for container in containers {
-        let Some(name) = &container.name else {
-            continue;
-        };
-        obj.insert(name.clone(), container_to_value_without_name(container));
-    }
-    Value::Object(obj)
+fn variable_assignment_to_format(
+    kind: format::VariableAssignmentKind,
+    name: &str,
+    is_new_declaration: bool,
+) -> format::Object {
+    format::Object::VariableAssignment(format::VariableAssignment {
+        kind,
+        name: name.to_string(),
+        is_new_declaration,
+    })
 }
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
+
     use super::*;
     use crate::lower::ir::{Container, RuntimeObject};
 
     #[test]
     fn emits_text_string_tokens() {
-        let container = Container {
-            content: vec![RuntimeObject::String("Line.".to_string())],
-            name: None,
-            flags: None,
-            merge_tail_metadata: true,
+        let program = RuntimeProgram {
+            root: Container {
+                content: vec![RuntimeObject::String("Line.".to_string())],
+                name: None,
+                flags: None,
+                merge_tail_metadata: true,
+            },
         };
-        assert_eq!(container_to_value(&container), json!(["^Line.", null]));
+
+        let json = emit_json(program).artifact.expect("expected emitted json");
+        let value: serde_json::Value = serde_json::from_str(&json).expect("valid json");
+        assert_eq!(
+            value,
+            json!({
+                "inkVersion": 21,
+                "root": ["^Line.", null],
+                "listDefs": {}
+            })
+        );
     }
 
     #[test]
     fn emits_void_token() {
-        assert_eq!(runtime_object_to_value(&RuntimeObject::Void), json!("void"));
+        let program = RuntimeProgram {
+            root: Container {
+                content: vec![RuntimeObject::Void],
+                name: None,
+                flags: None,
+                merge_tail_metadata: true,
+            },
+        };
+
+        let json = emit_json(program).artifact.expect("expected emitted json");
+        let value: serde_json::Value = serde_json::from_str(&json).expect("valid json");
+        assert_eq!(value["root"][0], json!("void"));
     }
 }

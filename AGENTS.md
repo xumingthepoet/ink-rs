@@ -6,31 +6,43 @@ The upstream reference lives in `ink-csharp/`.
 
 ## Project Goal
 
-- Evolve Ink as a Rust-first language and toolchain.
-- Add language features the project owner wants and remove features that no
-  longer justify their complexity.
-- Preserve compatibility with the existing JSON story format unless a language
-  change explicitly requires a documented runtime-format change.
-- Keep the implementation coherent, testable, and suitable for long-term
-  compiler work rather than only matching legacy fixtures.
+- Complete the compiled story JSON format refactor described in
+  `CompiledStoryJsonFormatRefactor.md`.
+- Add `crates/ink-story-json-format` as the single typed owner of compiled
+  story JSON data structures, token names, memory-to-JSON serialization, and
+  JSON-to-memory deserialization.
+- Make both `crates/ink-compiler` and `crates/ink-runtime` depend directly on
+  `ink-story-json-format`.
+- Remove duplicate compiled-story JSON schemas from compiler lowering/emit code
+  and runtime JSON reader/writer code.
+- Delete migration adapters and wrappers before considering the refactor done:
+  the compiler should lower directly into format crate data, and the runtime
+  should load compiled story JSON through the format crate and consume that data
+  directly when constructing its execution graph.
+- Preserve compatibility with the existing JSON story format unless an explicit,
+  documented runtime-format change is required.
 
 ## Current State
 
 - The runtime layer has already been ported from a third-party implementation and is passing tests.
-- The compiler layer is the main area of active language evolution.
-- Compiler refactoring should bring the compiler layer up to the runtime
-  layer's maintainability standard: clear module boundaries, focused files,
-  typed concepts, local testability, and low-cost future changes.
-- The compiler rewrite is the preferred path forward when existing structure
-  blocks clear language design.
-- Do not treat the current compiler code or upstream Ink syntax as something to
-  preserve at all costs. If a clean rewrite is simpler and better supports the
-  intended language, prefer it.
+- The compiler currently lowers into compiler-owned runtime-shaped IR and then
+  emits compiled story JSON.
+- The runtime currently parses compiled story JSON into executable runtime
+  objects with a separate JSON reader and token mapping.
+- The main active project work is to introduce a shared compiled story JSON
+  format crate and converge compiler output plus runtime loading onto it.
+- Runtime execution objects should remain runtime-owned. The new format crate is
+  only the wire-format memory model and JSON codec.
+- Do not treat the current compiler `lower::ir` or runtime JSON reader shape as
+  something to preserve at all costs. If rewriting the affected path is clearer
+  and better supports the final format boundary, prefer it.
 
 ## Repository Layout
 
 - `crates/ink-runtime`: runtime story engine
 - `crates/ink-compiler`: parser, parsed model, and JSON export pipeline
+- `crates/ink-story-json-format`: target shared compiled story JSON format
+  crate for this refactor
 - `crates/ink-test`: conformance and integration tests
 - `ink-csharp/compiler`: historical C# compiler reference
 - `ink-csharp/ink-engine-runtime`: historical C# runtime reference
@@ -43,13 +55,17 @@ The upstream reference lives in `ink-csharp/`.
   veto over intentional language changes.
 - Prefer design notes and tests before broad language changes; avoid speculative
   refactors that are not tied to a concrete language goal.
-- Keep compiler work focused on the Rust compiler layer unless runtime changes are strictly required.
+- For the current format refactor, keep changes focused on the compiler JSON
+  output path, the runtime compiled-story JSON loading path, and the new format
+  crate. Avoid unrelated parser, language, or runtime execution changes.
 - If the existing compiler architecture blocks progress, rewrite the affected area instead of extending a fragile partial port.
 - For unchanged legacy features, preserve existing behavior unless there is a
   clear reason to change it.
 - When behavior intentionally diverges from upstream Ink, update tests and
   documentation in the same change.
 - Avoid broad unrelated edits when working on compiler or language behavior.
+- Keep `CompiledStoryJsonFormatRefactor.md` synchronized with the active format
+  refactor plan.
 - Keep `docs/WritingWithInk-updates.md` synchronized with syntax and semantic
   changes, then apply those updates to `docs/WritingWithInk-latest.md`.
 - Do not edit `docs/WritingWithInk-origin.md`; it is the upstream C# snapshot.
@@ -58,8 +74,9 @@ The upstream reference lives in `ink-csharp/`.
 
 - If the user sends a continuation prompt such as `continue`, `go on`, `keep
   going`, `next`, `继续`, `继续吧`, or similar without replacing the task,
-  interpret it as: continue the current language-evolution work and validate it
-  with the smallest relevant tests, then `make gate` when the change is ready.
+  interpret it as: continue the compiled story JSON format refactor from
+  `CompiledStoryJsonFormatRefactor.md` and validate it with the smallest
+  relevant tests, then `make gate` when the change is ready.
 - `make gate` is still the full project gate. If intentional language changes
   make legacy C# compatibility tests obsolete, update or replace those tests as
   part of the same language-change work rather than hiding failures.
@@ -116,10 +133,11 @@ Use the smallest relevant validation first, then widen coverage:
 
 When touching compiler logic, favor focused test runs in `crates/ink-test` before running the full workspace.
 
-For language-evolution work, the minimum required validation before marking a
-change done is:
+For the current compiled-story format refactor, the minimum required validation
+before marking a change done is:
 
-- focused tests that cover the changed syntax or semantics
+- focused tests that cover the changed format data, JSON serialization, JSON
+  deserialization, compiler output, or runtime loading behavior
 - `make gate`
 
 ## Practical Guidance
@@ -129,12 +147,14 @@ change done is:
 - Use conformance fixtures in `crates/ink-test/` to pin the intended language
   behavior.
 - Keep diagnostics clear and actionable.
-- Prefer small, reviewable changes that isolate parser, parsed-model, and export logic.
+- Prefer small, reviewable changes that isolate parser, parsed-model, format,
+  compiler output, and runtime loading logic.
 
 ## Working Notes
 
-- During language-evolution work, only record notes that are general, reusable,
-  and likely to help future compiler or language-design work.
+- During current format-refactor or language-evolution work, only record notes
+  that are general, reusable, and likely to help future compiler, runtime, or
+  format-design work.
 - Do not record fixture-specific hacks, temporary observations, or narrow one-off
   facts.
 - Keep this section to at most 10 entries total.
