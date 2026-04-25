@@ -6,6 +6,7 @@ mod expression;
 mod flow;
 mod indexes;
 pub(crate) mod ir;
+mod labels;
 mod path;
 mod sequence;
 mod weave;

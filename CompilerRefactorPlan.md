@@ -100,7 +100,7 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 7 in progress. R015 through R072 are complete. Phase 1
+- Current phase: Phase 8 ready. R015 through R073 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
@@ -1058,11 +1058,17 @@ Use these checks during phase reviews:
     `lower/indexes.rs` delegates flow/container alias insertion to it. Focused
     path tests cover scoped lookup precedence and scoped alias insertion.
 
-- [ ] R073 Review lower module sizes and ownership
+- [x] R073 Review lower module sizes and ownership
   - Purpose: Ensure lower extraction does not recreate a god file under another
     name.
   - Approach: Check line counts, imports, and responsibilities of lower modules.
   - Acceptance: No lower module is both large and mixed-responsibility.
+  - Completed: Reviewed lower module sizes and ownership. Extracted
+    `lower/labels.rs` so label-index construction no longer lives inside the
+    broader index builder. After extraction, `indexes.rs` is 680 lines and
+    focused on non-label lowering indexes; `weave.rs` remains the only module
+    above 800 lines at 881 lines, but its responsibility is concentrated on
+    choice/gather/weave lowering. Other lower modules are below 600 lines.
 
 ## Phase 8: Source Preprocessing, Diagnostics, And Documentation
 
