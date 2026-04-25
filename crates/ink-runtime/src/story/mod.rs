@@ -10,10 +10,11 @@ use crate::{
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 /// The current version of the Ink story file format.
-pub const INK_VERSION_CURRENT: i32 = 21;
+pub const INK_VERSION_CURRENT: i32 = ink_story_json_format::INK_VERSION_CURRENT;
 /// The minimum legacy version of ink that can be loaded by the current version
 /// of the code.
-pub const INK_VERSION_MINIMUM_COMPATIBLE: i32 = 18;
+pub const INK_VERSION_MINIMUM_COMPATIBLE: i32 =
+    ink_story_json_format::INK_VERSION_MINIMUM_COMPATIBLE;
 
 #[derive(PartialEq)]
 pub(crate) enum OutputStateChange {

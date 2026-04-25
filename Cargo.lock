@@ -54,6 +54,7 @@ version = "1.2.1"
 dependencies = [
  "as-any",
  "getrandom",
+ "ink-story-json-format",
  "rand",
  "serde",
  "serde_json",

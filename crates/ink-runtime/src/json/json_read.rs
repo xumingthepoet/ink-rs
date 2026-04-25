@@ -1,5 +1,6 @@
 use std::{collections::HashMap, rc::Rc};
 
+use ink_story_json_format as format;
 use serde_json::Map;
 
 use crate::{
@@ -23,20 +24,9 @@ use crate::{
 };
 
 pub fn load_from_string(s: &str) -> Result<(i32, Rc<Container>), StoryError> {
-    let json: serde_json::Value = match serde_json::from_str(s) {
-        Ok(value) => value,
-        Err(_) => return Err(StoryError::BadJson("Story not in JSON format.".to_owned())),
-    };
-
-    let version_opt = json.get("inkVersion");
-
-    if version_opt.is_none() || !version_opt.unwrap().is_number() {
-        return Err(StoryError::BadJson(
-            "ink version number not found. Are you sure it's a valid .ink.json file?".to_owned(),
-        ));
-    }
-
-    let version: i32 = version_opt.unwrap().as_i64().unwrap().try_into().unwrap();
+    let program = format::Program::from_json_str(s)
+        .map_err(|error| StoryError::BadJson(error.to_string()))?;
+    let version = program.ink_version;
 
     if version > INK_VERSION_CURRENT {
         return Err(StoryError::BadJson(
@@ -47,28 +37,124 @@ pub fn load_from_string(s: &str) -> Result<(i32, Rc<Container>), StoryError> {
         return Err(StoryError::BadJson("Version of ink used to build story is too old to be loaded by this version of the engine".to_owned()));
     }
 
-    let root_token = match json.get("root") {
-        Some(value) => value,
-        None => {
-            return Err(StoryError::BadJson(
-                "Root node for ink not found. Are you sure it's a valid .ink.json file?".to_owned(),
-            ))
-        }
-    };
-
-    let main_content_container = jtoken_to_runtime_object(root_token, None)?;
-
-    let main_content_container = main_content_container.into_any().downcast::<Container>();
-
-    if main_content_container.is_err() {
-        return Err(StoryError::BadJson(
-            "Root node for ink is not a container?".to_owned(),
-        ));
-    };
-
-    let main_content_container = main_content_container.unwrap(); // unwrap: checked for err above
+    let main_content_container = format_container_to_runtime(&program.root)?;
 
     Ok((version, main_content_container))
+}
+
+fn format_container_to_runtime(container: &format::Container) -> Result<Rc<Container>, StoryError> {
+    let mut content = Vec::with_capacity(container.content.len());
+    for object in &container.content {
+        content.push(format_object_to_runtime(object)?);
+    }
+
+    let mut named_content = HashMap::new();
+    for named in &container.named_content {
+        named_content.insert(
+            named.name.clone(),
+            format_container_to_runtime(&named.container)?,
+        );
+    }
+
+    Ok(Container::new(
+        container.name.clone(),
+        container.flags.unwrap_or(0),
+        content,
+        named_content,
+    ))
+}
+
+fn format_object_to_runtime(object: &format::Object) -> Result<Rc<dyn RTObject>, StoryError> {
+    match object {
+        format::Object::Container(container) => Ok(format_container_to_runtime(container)?),
+        format::Object::Value(value) => format_value_to_runtime(value),
+        format::Object::ControlCommand(command) => {
+            let token = command.token();
+            ControlCommand::new_from_name(token)
+                .map(|command| Rc::new(command) as Rc<dyn RTObject>)
+                .ok_or_else(|| {
+                    StoryError::BadJson(format!("Unsupported control command token: {token}"))
+                })
+        }
+        format::Object::NativeFunction(function) => {
+            let name = function.name();
+            NativeFunctionCall::new_from_name(name)
+                .map(|function| Rc::new(function) as Rc<dyn RTObject>)
+                .ok_or_else(|| {
+                    StoryError::BadJson(format!("Unsupported native function token: {name}"))
+                })
+        }
+        format::Object::Divert(divert) => Ok(Rc::new(format_divert_to_runtime(divert))),
+        format::Object::ChoicePoint(choice) => {
+            Ok(Rc::new(ChoicePoint::new(choice.flags, &choice.target)))
+        }
+        format::Object::VariableAssignment(assignment) => Ok(Rc::new(VariableAssignment::new(
+            &assignment.name,
+            assignment.is_new_declaration,
+            matches!(assignment.kind, format::VariableAssignmentKind::Global),
+        ))),
+        format::Object::VariableReference(reference) => match reference.kind {
+            format::VariableReferenceKind::Variable => {
+                Ok(Rc::new(VariableReference::new(&reference.name)))
+            }
+            format::VariableReferenceKind::ReadCount => Ok(Rc::new(
+                VariableReference::from_path_for_count(&reference.name),
+            )),
+        },
+        format::Object::Glue => Ok(Rc::new(Glue::new())),
+        format::Object::Void => Ok(Rc::new(Void::new())),
+    }
+}
+
+fn format_value_to_runtime(value: &format::Value) -> Result<Rc<dyn RTObject>, StoryError> {
+    match value {
+        format::Value::String(value) => Ok(Rc::new(Value::new::<&str>(value))),
+        format::Value::Bool(value) => Ok(Rc::new(Value::new::<bool>(*value))),
+        format::Value::Int(value) => Ok(Rc::new(Value::new::<i32>(*value))),
+        format::Value::Float(value) => Ok(Rc::new(Value::new::<f32>(*value as f32))),
+        format::Value::DivertTarget(target) => Ok(Rc::new(Value::new::<Path>(
+            Path::new_with_components_string(Some(target)),
+        ))),
+        format::Value::VariablePointer(pointer) => Ok(Rc::new(Value::new_variable_pointer(
+            &pointer.name,
+            pointer.context_index,
+        ))),
+        format::Value::List(_) => Err(StoryError::BadJson(
+            "Ink list values are not supported by this runtime.".to_owned(),
+        )),
+    }
+}
+
+fn format_divert_to_runtime(divert: &format::Divert) -> Divert {
+    let pushes_to_stack = matches!(
+        divert.kind,
+        format::DivertKind::Function | format::DivertKind::Tunnel
+    );
+    let div_push_type = match divert.kind {
+        format::DivertKind::Tunnel => PushPopType::Tunnel,
+        _ => PushPopType::Function,
+    };
+    let external = matches!(divert.kind, format::DivertKind::External);
+    let var_divert_name = if divert.variable {
+        Some(divert.target.clone())
+    } else {
+        None
+    };
+    let target_path = if divert.variable {
+        None
+    } else {
+        Some(divert.target.as_str())
+    };
+
+    Divert::new(
+        pushes_to_stack,
+        div_push_type,
+        external,
+        divert.external_args.unwrap_or(0),
+        divert.conditional,
+        var_divert_name,
+        target_path,
+    )
 }
 
 pub fn jtoken_to_runtime_object(
