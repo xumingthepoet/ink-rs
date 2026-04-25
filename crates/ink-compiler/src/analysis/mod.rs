@@ -19,6 +19,9 @@ use warnings::author_warning_diagnostics;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CheckedStory {
+    // Keep analysis indexes pass-local until an index has stable semantics
+    // outside diagnostics. Lowering currently builds runtime-path indexes that
+    // are tied to JSON container layout rather than the analysis symbol model.
     pub parsed: Story,
 }
 

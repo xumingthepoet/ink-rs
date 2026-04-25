@@ -100,7 +100,7 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 6 in progress. R015 through R055 are complete. Phase 1
+- Current phase: Phase 6 in progress. R015 through R056 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
@@ -848,13 +848,20 @@ Use these checks during phase reviews:
     variable scope indexing, flow loose-end warnings, and missing target
     diagnostics. Focused compiler tests pass.
 
-- [ ] R056 Decide whether checked story should carry indexes
+- [x] R056 Decide whether checked story should carry indexes
   - Purpose: Avoid rebuilding the same indexes in analysis and lowering if they
     are semantically shared.
   - Approach: Review which indexes are pure analysis artifacts and which should
     become part of `CheckedStory`.
   - Acceptance: A decision is recorded, and any chosen index sharing is covered
     by tests.
+  - Completed: Decision is to keep `CheckedStory` parsed-model-only for now.
+    The current analysis target and variable indexes are diagnostic artifacts,
+    while lowering builds runtime-label, constant, external-signature,
+    local-variable, and counted-path indexes whose semantics depend on JSON
+    container layout. No index sharing was chosen, so no new shared-index test
+    surface is required. Added a boundary comment to `CheckedStory` and kept
+    existing focused analysis/lowering tests as validation.
 
 - [ ] R057 Add analysis API boundary checks
   - Purpose: Keep analysis independent from lowering and JSON shape.
