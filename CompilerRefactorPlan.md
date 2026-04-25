@@ -100,7 +100,7 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 4 in progress. R015 through R041 are complete. Phase 1
+- Current phase: Phase 4 complete. R015 through R042 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
@@ -637,13 +637,27 @@ Use these checks during phase reviews:
     or docs were needed because no new language behavior was kept. Focused
     expression tests pass.
 
-- [ ] R042 Review expression AST fit
+- [x] R042 Review expression AST fit
   - Purpose: Decide whether the current `Expression` enum still supports future
     language design.
   - Approach: Review variants such as `MultipleCondition`, `StringContent`, and
     `DivertTarget` against planned language changes.
   - Acceptance: Either the enum is accepted as good enough, or follow-up tasks
     are recorded for typed expression model changes.
+  - Completed: Accepted the current `Expression` enum as good enough for the
+    next refactor phases because literals, variable references, divert targets,
+    calls, unary expressions, binary expressions, and string expressions are now
+    parsed through one token-backed parser and are exhaustively matched by
+    analysis and lowering. Follow-up pressure points are recorded here rather
+    than expanded immediately: `StringContent(ContentList)` mixes string
+    interpolation with general content trees and should be revisited if the new
+    language narrows interpolation syntax; `MultipleCondition(Vec<Expression>)`
+    is choice-condition aggregation rather than a pure expression and should be
+    revisited with choice model changes; `DivertTarget(String)` should move to
+    a typed target/path value during Phase 7; and `BinaryOperator` still carries
+    source spelling aliases such as `And` versus `AndSymbol`, which is
+    acceptable for compatibility snapshots but should stay behind syntax
+    operator metadata for future aliases.
 
 ## Phase 5: Parsed Model Traversal And Model Quality
 
