@@ -1,4 +1,7 @@
-use crate::parsed::{BinaryOperator, ContentList, Expression, FloatLiteral, Object, UnaryOperator};
+use crate::{
+    parsed::{BinaryOperator, ContentList, Expression, FloatLiteral, Object, UnaryOperator},
+    source::SourceSpan,
+};
 
 use super::{is_identifier, is_identifier_continue, scan, text};
 
@@ -8,7 +11,14 @@ pub(super) fn parse_initial_expression(source: &str) -> Option<Expression> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum ExpressionToken {
+struct ExpressionToken {
+    kind: ExpressionTokenKind,
+    byte_index: usize,
+    span: SourceSpan,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum ExpressionTokenKind {
     Identifier(String),
     IntLiteral(String),
     FloatLiteral(String),
@@ -34,48 +44,68 @@ fn tokenize_expression(source: &str) -> Vec<ExpressionToken> {
         }
 
         if rest.starts_with("->") {
-            tokens.push(ExpressionToken::Arrow);
+            tokens.push(token_at(source, index, ExpressionTokenKind::Arrow));
             index += "->".len();
             continue;
         }
 
         if let Some(operator) = match_operator(rest) {
-            tokens.push(ExpressionToken::Operator(operator.to_string()));
+            tokens.push(token_at(
+                source,
+                index,
+                ExpressionTokenKind::Operator(operator.to_string()),
+            ));
             index += operator.len();
             continue;
         }
 
         match ch {
             '(' => {
-                tokens.push(ExpressionToken::OpenParen);
+                tokens.push(token_at(source, index, ExpressionTokenKind::OpenParen));
                 index += ch.len_utf8();
             }
             ')' => {
-                tokens.push(ExpressionToken::CloseParen);
+                tokens.push(token_at(source, index, ExpressionTokenKind::CloseParen));
                 index += ch.len_utf8();
             }
             ',' => {
-                tokens.push(ExpressionToken::Comma);
+                tokens.push(token_at(source, index, ExpressionTokenKind::Comma));
                 index += ch.len_utf8();
             }
             '"' => {
                 let (literal, next_index) = read_string_literal(source, index);
-                tokens.push(ExpressionToken::StringLiteral(literal));
+                tokens.push(token_at(
+                    source,
+                    index,
+                    ExpressionTokenKind::StringLiteral(literal),
+                ));
                 index = next_index;
             }
             _ if is_token_word_start(ch) => {
                 let (word, next_index) = read_token_word(source, index);
-                tokens.push(classify_word_token(word));
+                tokens.push(token_at(source, index, classify_word_token(word)));
                 index = next_index;
             }
             _ => {
-                tokens.push(ExpressionToken::Operator(ch.to_string()));
+                tokens.push(token_at(
+                    source,
+                    index,
+                    ExpressionTokenKind::Operator(ch.to_string()),
+                ));
                 index += ch.len_utf8();
             }
         }
     }
 
     tokens
+}
+
+fn token_at(source: &str, byte_index: usize, kind: ExpressionTokenKind) -> ExpressionToken {
+    ExpressionToken {
+        kind,
+        byte_index,
+        span: SourceSpan::new(None, 1, source[..byte_index].chars().count() + 1),
+    }
 }
 
 fn match_operator(source: &str) -> Option<&'static str> {
@@ -135,23 +165,23 @@ fn read_token_word(source: &str, start: usize) -> (&str, usize) {
     (&source[start..end], end)
 }
 
-fn classify_word_token(word: &str) -> ExpressionToken {
+fn classify_word_token(word: &str) -> ExpressionTokenKind {
     if matches!(word, "and" | "or" | "has" | "hasnt" | "mod" | "not") {
-        return ExpressionToken::Operator(word.to_string());
+        return ExpressionTokenKind::Operator(word.to_string());
     }
 
     if word.chars().all(|ch| ch.is_ascii_digit()) {
-        return ExpressionToken::IntLiteral(word.to_string());
+        return ExpressionTokenKind::IntLiteral(word.to_string());
     }
 
     if word.contains('.')
         && word.chars().all(|ch| ch.is_ascii_digit() || ch == '.')
         && word.parse::<f64>().is_ok()
     {
-        return ExpressionToken::FloatLiteral(word.to_string());
+        return ExpressionTokenKind::FloatLiteral(word.to_string());
     }
 
-    ExpressionToken::Identifier(word.to_string())
+    ExpressionTokenKind::Identifier(word.to_string())
 }
 
 fn parse_expression(source: &str) -> Option<Expression> {
@@ -623,6 +653,14 @@ mod tests {
         output
     }
 
+    fn token(kind: ExpressionTokenKind, byte_index: usize, column: usize) -> ExpressionToken {
+        ExpressionToken {
+            kind,
+            byte_index,
+            span: SourceSpan::new(None, 1, column),
+        }
+    }
+
     #[test]
     fn parses_current_expression_behavior_baseline() {
         let cases = [
@@ -694,21 +732,25 @@ mod tests {
         assert_eq!(
             tokens,
             vec![
-                ExpressionToken::Identifier("foo".to_string()),
-                ExpressionToken::OpenParen,
-                ExpressionToken::IntLiteral("1".to_string()),
-                ExpressionToken::Comma,
-                ExpressionToken::FloatLiteral("2.5".to_string()),
-                ExpressionToken::Comma,
-                ExpressionToken::StringLiteral("a,b".to_string()),
-                ExpressionToken::Comma,
-                ExpressionToken::Arrow,
-                ExpressionToken::Identifier("knot".to_string()),
-                ExpressionToken::Comma,
-                ExpressionToken::Identifier("list".to_string()),
-                ExpressionToken::Operator("?".to_string()),
-                ExpressionToken::Identifier("item".to_string()),
-                ExpressionToken::CloseParen,
+                token(ExpressionTokenKind::Identifier("foo".to_string()), 0, 1),
+                token(ExpressionTokenKind::OpenParen, 3, 4),
+                token(ExpressionTokenKind::IntLiteral("1".to_string()), 4, 5),
+                token(ExpressionTokenKind::Comma, 5, 6),
+                token(ExpressionTokenKind::FloatLiteral("2.5".to_string()), 7, 8),
+                token(ExpressionTokenKind::Comma, 10, 11),
+                token(
+                    ExpressionTokenKind::StringLiteral("a,b".to_string()),
+                    12,
+                    13
+                ),
+                token(ExpressionTokenKind::Comma, 17, 18),
+                token(ExpressionTokenKind::Arrow, 19, 20),
+                token(ExpressionTokenKind::Identifier("knot".to_string()), 22, 23),
+                token(ExpressionTokenKind::Comma, 26, 27),
+                token(ExpressionTokenKind::Identifier("list".to_string()), 28, 29),
+                token(ExpressionTokenKind::Operator("?".to_string()), 33, 34),
+                token(ExpressionTokenKind::Identifier("item".to_string()), 35, 36),
+                token(ExpressionTokenKind::CloseParen, 39, 40),
             ]
         );
     }
@@ -720,16 +762,20 @@ mod tests {
         assert_eq!(
             tokens,
             vec![
-                ExpressionToken::Operator("not".to_string()),
-                ExpressionToken::Identifier("ready".to_string()),
-                ExpressionToken::Operator("and".to_string()),
-                ExpressionToken::Identifier("notebook".to_string()),
-                ExpressionToken::Operator("or".to_string()),
-                ExpressionToken::Identifier("list".to_string()),
-                ExpressionToken::Operator("hasnt".to_string()),
-                ExpressionToken::Identifier("item".to_string()),
-                ExpressionToken::Operator("mod".to_string()),
-                ExpressionToken::IntLiteral("2".to_string()),
+                token(ExpressionTokenKind::Operator("not".to_string()), 0, 1),
+                token(ExpressionTokenKind::Identifier("ready".to_string()), 4, 5),
+                token(ExpressionTokenKind::Operator("and".to_string()), 10, 11),
+                token(
+                    ExpressionTokenKind::Identifier("notebook".to_string()),
+                    14,
+                    15
+                ),
+                token(ExpressionTokenKind::Operator("or".to_string()), 23, 24),
+                token(ExpressionTokenKind::Identifier("list".to_string()), 26, 27),
+                token(ExpressionTokenKind::Operator("hasnt".to_string()), 31, 32),
+                token(ExpressionTokenKind::Identifier("item".to_string()), 37, 38),
+                token(ExpressionTokenKind::Operator("mod".to_string()), 42, 43),
+                token(ExpressionTokenKind::IntLiteral("2".to_string()), 46, 47),
             ]
         );
     }
@@ -741,17 +787,31 @@ mod tests {
         assert_eq!(
             tokens,
             vec![
-                ExpressionToken::Identifier("a.b".to_string()),
-                ExpressionToken::Operator(">=".to_string()),
-                ExpressionToken::Identifier("c".to_string()),
-                ExpressionToken::Operator("&&".to_string()),
-                ExpressionToken::Identifier("x".to_string()),
-                ExpressionToken::Operator("!=".to_string()),
-                ExpressionToken::Identifier("y".to_string()),
-                ExpressionToken::Operator("||".to_string()),
-                ExpressionToken::Identifier("z".to_string()),
-                ExpressionToken::Operator("<=".to_string()),
-                ExpressionToken::IntLiteral("3".to_string()),
+                token(ExpressionTokenKind::Identifier("a.b".to_string()), 0, 1),
+                token(ExpressionTokenKind::Operator(">=".to_string()), 4, 5),
+                token(ExpressionTokenKind::Identifier("c".to_string()), 7, 8),
+                token(ExpressionTokenKind::Operator("&&".to_string()), 9, 10),
+                token(ExpressionTokenKind::Identifier("x".to_string()), 12, 13),
+                token(ExpressionTokenKind::Operator("!=".to_string()), 14, 15),
+                token(ExpressionTokenKind::Identifier("y".to_string()), 17, 18),
+                token(ExpressionTokenKind::Operator("||".to_string()), 19, 20),
+                token(ExpressionTokenKind::Identifier("z".to_string()), 22, 23),
+                token(ExpressionTokenKind::Operator("<=".to_string()), 24, 25),
+                token(ExpressionTokenKind::IntLiteral("3".to_string()), 27, 28),
+            ]
+        );
+    }
+
+    #[test]
+    fn tokenizer_tracks_character_columns_for_unicode_prefixes() {
+        let tokens = tokenize_expression("变量 + \"ok\"");
+
+        assert_eq!(
+            tokens,
+            vec![
+                token(ExpressionTokenKind::Identifier("变量".to_string()), 0, 1),
+                token(ExpressionTokenKind::Operator("+".to_string()), 7, 4),
+                token(ExpressionTokenKind::StringLiteral("ok".to_string()), 9, 6),
             ]
         );
     }

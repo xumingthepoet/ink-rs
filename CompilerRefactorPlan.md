@@ -100,7 +100,7 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 4 in progress. R015 through R035 are complete. Phase 1
+- Current phase: Phase 4 in progress. R015 through R036 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
@@ -558,12 +558,16 @@ Use these checks during phase reviews:
     now tokenizes without changing parse behavior, and `cargo test -p
     ink-compiler syntax::expression::tests::` passes.
 
-- [ ] R036 Preserve expression source spans
+- [x] R036 Preserve expression source spans
   - Purpose: Improve diagnostics and make parser errors easier to maintain.
   - Approach: Store byte or column positions on tokens and map them to
     `SourceSpan`.
   - Acceptance: Tests can assert token columns for at least identifiers,
     operators, and string literals.
+  - Completed: Tokens now carry `kind`, `byte_index`, and `SourceSpan`; tests
+    assert columns for identifiers, operators, string literals, and a unicode
+    prefix case where byte offsets and character columns differ. `cargo test -p
+    ink-compiler syntax::expression::tests::` passes.
 
 - [ ] R037 Implement a Pratt or precedence-climbing parser
   - Purpose: Make operator precedence and associativity explicit and easy to
