@@ -106,13 +106,6 @@ pub(super) fn child_path(parent: &str, child: &str) -> String {
     }
 }
 
-#[allow(dead_code)]
-pub(super) fn parent_path(path: &str) -> Option<&str> {
-    path.rsplit_once('.')
-        .map(|(parent, _)| parent)
-        .filter(|parent| !parent.is_empty())
-}
-
 pub(super) fn is_absolute_runtime_path(target: &str) -> bool {
     !target.is_empty()
         && !target.starts_with('.')
@@ -377,12 +370,6 @@ mod tests {
     fn child_path_omits_empty_parent() {
         assert_eq!(child_path("", "knot"), "knot");
         assert_eq!(child_path("knot", "stitch"), "knot.stitch");
-    }
-
-    #[test]
-    fn parent_path_returns_non_empty_parent() {
-        assert_eq!(parent_path("knot.stitch.label"), Some("knot.stitch"));
-        assert_eq!(parent_path("knot"), None);
     }
 
     #[test]

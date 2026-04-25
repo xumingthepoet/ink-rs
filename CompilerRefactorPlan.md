@@ -1191,72 +1191,103 @@ Use these checks during phase reviews:
 
 ## Phase 9: Runtime-Level Quality Review
 
-- [ ] R084 Compare compiler maintainability against runtime
+- [x] R084 Compare compiler maintainability against runtime
   - Purpose: Verify the compiler now feels closer to the runtime layer in
     findability and local change cost.
   - Approach: Compare module layout, file sizes, API surfaces, and focused test
     entry points between `ink-compiler` and `ink-runtime`.
   - Acceptance: A short review records what now matches runtime quality and
     what still falls short.
+  - Completed: Added `CompilerRefactorQualityReview.md`, recording the compiler
+    pipeline/API/test improvements and the remaining expression, weave, and
+    path-string quality gaps.
 
-- [ ] R085 Check for remaining compiler god files
+- [x] R085 Check for remaining compiler god files
   - Purpose: Ensure the original structural problem did not move elsewhere.
   - Approach: Run line-count checks and manually review responsibilities.
   - Acceptance: No compiler file over roughly 800 to 1000 lines has mixed
     responsibilities without a documented split task.
+  - Completed: Line-count review found `syntax/expression.rs` at 1171 lines and
+    `lower/weave.rs` at 881 lines. Both are documented as follow-up split
+    tasks; no other compiler file is over the threshold.
 
-- [ ] R086 Check for remaining raw path/symbol string abuse
+- [x] R086 Check for remaining raw path/symbol string abuse
   - Purpose: Confirm typed path and symbol work improved safety.
   - Approach: Search for raw path maps, repeated path formatting, and stringly
     target resolution.
   - Acceptance: Remaining raw strings are either low-risk, wrapped by helpers,
     or recorded as follow-up work.
+  - Completed: Reviewed `HashMap<String, ...>`, dot-splitting, and path
+    formatting sites. Remaining raw strings are concentrated in analysis flow
+    path keys and lower runtime path construction, with typed path/key builder
+    follow-ups recorded in `CompilerRefactorQualityReview.md`.
 
-- [ ] R087 Check new feature placement
+- [x] R087 Check new feature placement
   - Purpose: Ensure language features are not implemented as parser hacks plus
     lowering special cases.
   - Approach: Pick one new language behavior and trace parser, parsed model,
     analysis, lowering, tests, and docs.
   - Acceptance: The feature has explicit model/data ownership and no
     fixture-specific code path.
+  - Completed: Traced the removed `LIST` declaration behavior. It is owned by
+    parser diagnostics plus stable diagnostic tests and language docs, with no
+    lowering branch or fixture-specific code path.
 
-- [ ] R088 Run all changeability drills
+- [x] R088 Run all changeability drills
   - Purpose: Validate maintainability through real edits, not just review.
   - Approach: Run or simulate the expression operator, choice syntax,
     removed-feature, path resolution, and diagnostic drills.
   - Acceptance: Each drill has recorded touch points, validation commands, and
     any follow-up tasks.
+  - Completed: Recorded drill touch points in `CompilerRefactorQualityReview.md`.
+    The drills confirm stage ownership is now findable, while expression syntax,
+    weave lowering, and path builders remain follow-up work.
 
-- [ ] R089 Remove obsolete C# parity comments
+- [x] R089 Remove obsolete C# parity comments
   - Purpose: Keep code comments aligned with the new language-evolution phase.
   - Approach: Search for C# parity comments and rewrite them as legacy
     reference notes only where still useful.
   - Acceptance: Remaining C# comments clearly describe compatibility reference
     or historical behavior, not default project direction.
+  - Completed: `rg` found no obsolete C# parity comments in
+    `crates/ink-compiler/src`. Remaining references in docs and test harnesses
+    describe upstream Ink as a compatibility reference or legacy corpus.
 
-- [ ] R090 Remove obsolete helpers and transitional code
+- [x] R090 Remove obsolete helpers and transitional code
   - Purpose: Avoid maintaining duplicate old and new mechanisms.
   - Approach: Delete unused scanner, parser, analysis, path, and lowering
     helpers after replacements are complete.
   - Acceptance: `cargo check --workspace` passes without new dead-code warnings,
     and `rg` confirms known old helpers are gone.
+  - Completed: Removed the unused `parent_path` helper and its test-only
+    coverage from `lower/path.rs`; it was the only compiler
+    `#[allow(dead_code)]` site found by `rg`.
 
-- [ ] R091 Run formatting and compile checks
+- [x] R091 Run formatting and compile checks
   - Purpose: Confirm the refactor is mechanically clean.
   - Approach: Run `cargo fmt --all --check` and `cargo check --workspace`.
   - Acceptance: Both commands pass, or failures are fixed before the task is
     marked complete.
+  - Completed: `cargo fmt --all --check` and `cargo check --workspace` pass
+    after the Phase 9 review and cleanup.
 
-- [ ] R092 Run the full validation ladder
+- [x] R092 Run the full validation ladder
   - Purpose: Complete the refactor with project-wide confidence.
   - Approach: Run focused tests, `cargo test --workspace`, and `make gate`.
   - Acceptance: The full gate passes. If an intentional language divergence
     invalidates a legacy test, the test, language fixture, and documentation are
     updated in the same change.
+  - Completed: Focused `cargo test -p ink-compiler lower::path` passed, and
+    `make gate` passed with compiler, runtime, conformance, compiler
+    conformance, language, inkling, and C# compatibility tests.
 
-- [ ] R093 Update the next refactor plan
+- [x] R093 Update the next refactor plan
   - Purpose: Preserve any remaining quality gaps as actionable work.
   - Approach: Convert findings from R084-R088 into new tasks or a follow-up
     plan.
   - Acceptance: Every unresolved runtime-level quality gap has an owner, a
     reason, and a concrete next step.
+  - Completed: Added the follow-up backlog in
+    `CompilerRefactorQualityReview.md` for splitting expression syntax, splitting
+    weave lowering, typing analysis path keys, centralizing lower runtime path
+    construction, and adding a compiler size fitness check.
