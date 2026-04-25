@@ -1,4 +1,4 @@
-use serde_json::{Map, Value as JsonValue};
+use serde_json::Value as JsonValue;
 
 use crate::{json, FormatError, INK_VERSION_CURRENT};
 
@@ -6,7 +6,6 @@ use crate::{json, FormatError, INK_VERSION_CURRENT};
 pub struct Program {
     pub ink_version: i32,
     pub root: Container,
-    pub list_defs: Map<String, JsonValue>,
 }
 
 impl Program {
@@ -14,7 +13,6 @@ impl Program {
         Self {
             ink_version: INK_VERSION_CURRENT,
             root,
-            list_defs: Map::new(),
         }
     }
 
@@ -130,7 +128,6 @@ pub enum Object {
     Bool(bool),
     Int(i32),
     Float(f64),
-    List(ListValue),
     Void,
     NativeFunction(String),
 }
@@ -160,27 +157,6 @@ impl Object {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ListValue {
-    pub items: Vec<ListItemValue>,
-    pub origins: Vec<String>,
-}
-
-impl ListValue {
-    pub fn empty() -> Self {
-        Self {
-            items: Vec::new(),
-            origins: Vec::new(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ListItemValue {
-    pub name: String,
-    pub value: i32,
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ControlCommand {
     Done,
@@ -204,8 +180,6 @@ pub enum ControlCommand {
     ReadCount,
     Random,
     SeedRandom,
-    ListRange,
-    ListRandom,
 }
 
 impl ControlCommand {
@@ -232,8 +206,6 @@ impl ControlCommand {
             "readc" => Some(Self::ReadCount),
             "rnd" => Some(Self::Random),
             "srnd" => Some(Self::SeedRandom),
-            "range" => Some(Self::ListRange),
-            "lrnd" => Some(Self::ListRandom),
             _ => None,
         }
     }
@@ -261,24 +233,6 @@ impl ControlCommand {
             Self::ReadCount => "readc",
             Self::Random => "rnd",
             Self::SeedRandom => "srnd",
-            Self::ListRange => "range",
-            Self::ListRandom => "lrnd",
         }
-    }
-}
-
-pub fn native_function_name_from_token(token: &str) -> String {
-    if token == "L^" {
-        "^".to_string()
-    } else {
-        token.to_string()
-    }
-}
-
-pub fn native_function_token(name: &str) -> &str {
-    if name == "^" {
-        "L^"
-    } else {
-        name
     }
 }

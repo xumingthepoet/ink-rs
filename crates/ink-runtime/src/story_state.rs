@@ -1437,7 +1437,7 @@ mod tests {
 
     use crate::story::Story;
 
-    const SIMPLE_STORY_JSON: &str = r#"{"inkVersion":1,"root":["done",null],"listDefs":{}}"#;
+    const SIMPLE_STORY_JSON: &str = r#"{"inkVersion":1,"root":["done",null]}"#;
 
     #[test]
     fn rejects_non_current_save_state_version() {

@@ -221,8 +221,7 @@ mod tests {
             json,
             json!({
                 "inkVersion": 1,
-                "root": [["^Line.", "\n", ["done", {"#n": "g-0"}], null], "done", null],
-                "listDefs": {}
+                "root": [["^Line.", "\n", ["done", {"#n": "g-0"}], null], "done", null]
             })
         );
     }

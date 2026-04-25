@@ -38,8 +38,7 @@ mod tests {
             value,
             json!({
                 "inkVersion": 1,
-                "root": ["^Line.", null],
-                "listDefs": {}
+                "root": ["^Line.", null]
             })
         );
     }

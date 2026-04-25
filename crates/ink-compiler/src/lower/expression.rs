@@ -331,40 +331,6 @@ fn lower_function_call_into(
             }
             content.push(RuntimeObject::ControlCommand(ControlCommand::SeedRandom));
         }
-        "LIST_RANGE" => {
-            for arg in args {
-                lower_function_arg_into(
-                    content,
-                    arg,
-                    None,
-                    choice_labels,
-                    global_labels,
-                    external_signatures,
-                    constants,
-                    path_mode,
-                    has_start_content,
-                    visiting_constants,
-                );
-            }
-            content.push(RuntimeObject::ControlCommand(ControlCommand::ListRange));
-        }
-        "LIST_RANDOM" => {
-            for arg in args {
-                lower_function_arg_into(
-                    content,
-                    arg,
-                    None,
-                    choice_labels,
-                    global_labels,
-                    external_signatures,
-                    constants,
-                    path_mode,
-                    has_start_content,
-                    visiting_constants,
-                );
-            }
-            content.push(RuntimeObject::ControlCommand(ControlCommand::ListRandom));
-        }
         _ if is_builtin_function(name) => {
             for arg in args {
                 lower_function_arg_into(
@@ -497,18 +463,6 @@ fn operator_runtime_name(operator: BinaryOperator) -> &'static str {
 fn is_builtin_function(name: &str) -> bool {
     matches!(
         name,
-        "LIST_VALUE"
-            | "MIN"
-            | "MAX"
-            | "POW"
-            | "FLOOR"
-            | "CEILING"
-            | "INT"
-            | "FLOAT"
-            | "LIST_MIN"
-            | "LIST_MAX"
-            | "LIST_ALL"
-            | "LIST_COUNT"
-            | "LIST_INVERT"
+        "MIN" | "MAX" | "POW" | "FLOOR" | "CEILING" | "INT" | "FLOAT"
     )
 }

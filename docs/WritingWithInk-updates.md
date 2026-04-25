@@ -30,8 +30,11 @@ Each entry should include:
 - status: removed
 - upstream behavior: upstream Ink supports `LIST` declarations for named list
   origins and list items, documented in the upstream "Advanced State Tracking"
-  list sections.
+  list sections. It also exposes `LIST_*` builtin functions and serializes list
+  definitions and list values in compiled story JSON.
 - ink-rs behavior: `LIST` declarations produce a removed-feature diagnostic.
+  Compiled story JSON no longer serializes `listDefs`, list value objects, or
+  list-specific runtime tokens.
 - documentation effect: `WritingWithInk-latest.md` removes the upstream list
   documentation from the main table of contents and body, and records the
   divergence in "Changed from upstream Ink".

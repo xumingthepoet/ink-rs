@@ -1,9 +1,6 @@
 use serde_json::{Map, Number, Value as JsonValue};
 
-use crate::{
-    native_function_name_from_token, native_function_token, Container, FormatError, ListItemValue,
-    ListValue, NamedContainer, Object, Program,
-};
+use crate::{Container, FormatError, NamedContainer, Object, Program};
 
 pub(crate) fn program_from_str(input: &str) -> Result<Program, FormatError> {
     let value = serde_json::from_str(input)
@@ -21,17 +18,8 @@ pub(crate) fn program_from_value(value: JsonValue) -> Result<Program, FormatErro
         .get("root")
         .ok_or_else(|| FormatError::new("compiled story JSON is missing root"))?;
     let root = container_from_value(root_value, None)?;
-    let list_defs = match obj.get("listDefs") {
-        Some(JsonValue::Object(list_defs)) => list_defs.clone(),
-        Some(_) => return Err(FormatError::new("listDefs must be an object")),
-        None => Map::new(),
-    };
 
-    Ok(Program {
-        ink_version,
-        root,
-        list_defs,
-    })
+    Ok(Program { ink_version, root })
 }
 
 pub(crate) fn program_to_string(program: &Program) -> Result<String, FormatError> {
@@ -47,10 +35,6 @@ pub(crate) fn program_to_value(program: &Program) -> JsonValue {
         JsonValue::Number(program.ink_version.into()),
     );
     obj.insert("root".to_string(), container_to_value(&program.root, true));
-    obj.insert(
-        "listDefs".to_string(),
-        JsonValue::Object(program.list_defs.clone()),
-    );
     JsonValue::Object(obj)
 }
 
@@ -218,9 +202,8 @@ pub(crate) fn object_to_value(object: &Object) -> JsonValue {
         Object::Float(value) => JsonValue::Number(
             Number::from_f64(*value).expect("compiled story float values must be finite"),
         ),
-        Object::List(value) => list_value_to_json(value),
         Object::Void => JsonValue::String("void".to_string()),
-        Object::NativeFunction(name) => JsonValue::String(native_function_token(name).to_string()),
+        Object::NativeFunction(name) => JsonValue::String(name.clone()),
     }
 }
 
@@ -253,9 +236,7 @@ fn string_object_from_token(token: &str) -> Result<Object, FormatError> {
         return Ok(Object::ControlCommand(command));
     }
 
-    Ok(Object::NativeFunction(native_function_name_from_token(
-        token,
-    )))
+    Ok(Object::NativeFunction(token.to_string()))
 }
 
 fn object_from_map(obj: &Map<String, JsonValue>) -> Result<Object, FormatError> {
@@ -305,10 +286,6 @@ fn object_from_map(obj: &Map<String, JsonValue>) -> Result<Object, FormatError> 
 
     if let Some(assignment) = variable_assignment_from_map(obj)? {
         return Ok(assignment);
-    }
-
-    if obj.contains_key("list") {
-        return Ok(Object::List(list_value_from_map(obj)?));
     }
 
     Err(FormatError::new(format!(
@@ -418,55 +395,6 @@ fn variable_assignment_to_value(key: &str, name: &str) -> JsonValue {
     JsonValue::Object(obj)
 }
 
-fn list_value_from_map(obj: &Map<String, JsonValue>) -> Result<ListValue, FormatError> {
-    let list = obj
-        .get("list")
-        .ok_or_else(|| FormatError::new("list value must include list"))?
-        .as_object()
-        .ok_or_else(|| FormatError::new("list must be an object"))?;
-
-    let mut items = Vec::with_capacity(list.len());
-    for (name, value) in list {
-        items.push(ListItemValue {
-            name: name.clone(),
-            value: json_value_to_i32(value, "list item value")?,
-        });
-    }
-
-    let origins = match obj.get("origins") {
-        Some(JsonValue::Array(values)) => values
-            .iter()
-            .map(|value| json_value_to_string(value, "list origin").map(str::to_string))
-            .collect::<Result<Vec<_>, _>>()?,
-        Some(_) => return Err(FormatError::new("origins must be an array")),
-        None => Vec::new(),
-    };
-
-    Ok(ListValue { items, origins })
-}
-
-fn list_value_to_json(value: &ListValue) -> JsonValue {
-    let mut obj = Map::new();
-    let mut items = Map::new();
-    for item in &value.items {
-        items.insert(item.name.clone(), JsonValue::Number(item.value.into()));
-    }
-    obj.insert("list".to_string(), JsonValue::Object(items));
-    if !value.origins.is_empty() {
-        obj.insert(
-            "origins".to_string(),
-            JsonValue::Array(
-                value
-                    .origins
-                    .iter()
-                    .map(|origin| JsonValue::String(origin.clone()))
-                    .collect(),
-            ),
-        );
-    }
-    JsonValue::Object(obj)
-}
-
 fn required_i32(obj: &Map<String, JsonValue>, key: &str) -> Result<i32, FormatError> {
     let value = obj
         .get(key)
@@ -519,8 +447,7 @@ mod tests {
             program.to_json_value(),
             json!({
                 "inkVersion": 1,
-                "root": [["^Line.", "\n", ["done", {"#n": "g-0"}], null], "done", null],
-                "listDefs": {}
+                "root": [["^Line.", "\n", ["done", {"#n": "g-0"}], null], "done", null]
             })
         );
     }
@@ -536,50 +463,11 @@ mod tests {
                     "knot": ["ev", "str", "^value", "/str", "/ev", "end", {"#f": 1}],
                     "global decl": ["ev", 2, {"VAR=": "x"}, "/ev", "end", null]
                 }
-            ],
-            "listDefs": {}
+            ]
         });
 
         let program = program_from_value(input.clone()).expect("format should parse");
 
         assert_eq!(program_to_value(&program), input);
-    }
-
-    #[test]
-    fn roundtrips_list_values_and_native_tokens() {
-        let input = json!({
-            "inkVersion": 1,
-            "root": [
-                "ev",
-                {"list": {"list.a": 1, "list.c": 3}, "origins": ["list"]},
-                "LIST_ALL",
-                "L^",
-                "/ev",
-                "done",
-                null
-            ],
-            "listDefs": {
-                "list": {"a": 1, "b": 2, "c": 3}
-            }
-        });
-
-        let program = program_from_value(input.clone()).expect("format should parse");
-        assert_eq!(program_to_value(&program), input);
-
-        let native_tokens = program
-            .root
-            .content
-            .iter()
-            .filter_map(|object| match object {
-                Object::NativeFunction(name) => Some(name.as_str()),
-                _ => None,
-            });
-        assert_eq!(native_tokens.collect::<Vec<_>>(), vec!["LIST_ALL", "^"]);
-    }
-
-    #[test]
-    fn native_function_escapes_caret_token() {
-        assert_eq!(native_function_token("^"), "L^");
-        assert_eq!(native_function_name_from_token("L^"), "^");
     }
 }

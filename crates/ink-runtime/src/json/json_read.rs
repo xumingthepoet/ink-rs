@@ -64,9 +64,6 @@ fn format_object_to_runtime(object: &format::Object) -> Result<Rc<dyn RTObject>,
             name,
             context_index,
         } => Ok(Rc::new(Value::new_variable_pointer(name, *context_index))),
-        format::Object::List(_) => Err(StoryError::BadJson(
-            "Ink list values are not supported by this runtime.".to_owned(),
-        )),
         format::Object::ControlCommand(command) => {
             let token = command.token();
             ControlCommand::new_from_name(token)
@@ -322,14 +319,14 @@ mod tests {
 
     #[test]
     fn loads_current_story_json_version() {
-        let json = r#"{"inkVersion":1,"root":["done",null],"listDefs":{}}"#;
+        let json = r#"{"inkVersion":1,"root":["done",null]}"#;
 
         assert!(load_from_string(json).is_ok());
     }
 
     #[test]
     fn rejects_non_current_story_json_version() {
-        let json = r#"{"inkVersion":21,"root":["done",null],"listDefs":{}}"#;
+        let json = r#"{"inkVersion":21,"root":["done",null]}"#;
 
         let error = match load_from_string(json) {
             Ok(_) => panic!("expected version mismatch"),

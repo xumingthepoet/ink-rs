@@ -60,8 +60,11 @@ edited for ink-rs language changes.
 
 - status: removed
 - upstream behavior: upstream Ink supports `LIST` declarations for named list
-  origins and list items.
+  origins and list items, along with `LIST_*` builtin functions and list values
+  in the compiled story JSON format.
 - ink-rs behavior: `LIST` declarations produce a removed-feature diagnostic.
+  Compiled story JSON no longer contains `listDefs`, list value objects, or
+  list-specific runtime tokens.
 - rationale: the Rust language surface is being reduced to features that are
   actively maintained and useful for the current project direction.
 - migration guidance: use variables, functions, or host-side data for inventory

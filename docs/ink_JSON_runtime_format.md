@@ -4,15 +4,14 @@ When ink is compiled to JSON, it is converted to a low level format for use by t
 
 ## Top level
 
-At the top level of the JSON file are three properties. `inkVersion` is an
-integer that denotes the format version, `root` is the outer-most Container for
-the entire story, and `listDefs` contains list definitions.
+At the top level of the JSON file are two properties. `inkVersion` is an
+integer that denotes the format version, and `root` is the outer-most Container
+for the entire story.
 
 ```json
 {
     "inkVersion": 1,
-    "root": <root container>,
-    "listDefs": {}
+    "root": <root container>
 }
 ```
 
