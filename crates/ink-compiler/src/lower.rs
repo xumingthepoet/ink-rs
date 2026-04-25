@@ -1,35 +1,33 @@
 use std::collections::{HashMap, HashSet};
 
+mod conditional;
 mod context;
 mod expression;
 mod flow;
 mod indexes;
 pub(crate) mod ir;
 mod path;
+mod sequence;
 mod weave;
 
 use crate::{
     analysis::CheckedStory,
     compiler::StageOutput,
-    parsed::{
-        Choice, Conditional, Divert, DivertTarget, Expression, Object, Sequence, SequenceType,
-        Weave,
-    },
+    parsed::{Choice, Divert, DivertTarget, Expression, Object},
 };
 
+use conditional::lower_conditional_into;
 use context::ChoicePathMode;
 use expression::{lower_expression_into, lower_logic_line_into, lower_output_expression_into};
 use flow::{lower_flow, lower_root_weave};
 use indexes::{ExternalSignatures, LoweringIndexes, RuntimeLenEstimator};
 use ir::{Container, ControlCommand, RuntimeObject, RuntimeProgram};
 use path::{
-    canonical_runtime_path, child_path, compact_path_string, compact_relative_path,
-    is_absolute_runtime_path, is_user_named_path_component, semantic_path_key,
+    canonical_runtime_path, child_path, compact_path_string, is_absolute_runtime_path,
+    is_user_named_path_component, semantic_path_key,
 };
-use weave::{
-    choice_container_prefix, content_list_has_choice, lower_choice_weave,
-    lower_choice_weave_with_initial_content, lower_content_list_into_context, weave_has_choice,
-};
+use sequence::lower_sequence;
+use weave::{choice_container_prefix, lower_choice_weave, lower_content_list_into_context};
 
 pub(crate) fn lower(story: &CheckedStory, count_all_visits: bool) -> StageOutput<RuntimeProgram> {
     let indexes = LoweringIndexes::build(
@@ -313,329 +311,6 @@ fn collect_semantic_path_for_container(
         }
     }
     collect_semantic_paths(container, path, paths);
-}
-
-fn lower_sequence(
-    sequence: &Sequence,
-    choice_labels: &HashMap<String, String>,
-    global_labels: &HashMap<String, String>,
-    global_variables: &HashSet<String>,
-    external_signatures: &ExternalSignatures,
-    constants: &HashMap<String, Expression>,
-    path_mode: &ChoicePathMode,
-    sequence_container_path: &str,
-) -> Container {
-    let mut content = vec![
-        RuntimeObject::ControlCommand(ControlCommand::EvalStart),
-        RuntimeObject::ControlCommand(ControlCommand::VisitIndex),
-    ];
-
-    let sequence_type = sequence.sequence_type();
-    let once = sequence_type.contains(SequenceType::ONCE);
-    let cycle = sequence_type.contains(SequenceType::CYCLE);
-    let stopping = sequence_type.contains(SequenceType::STOPPING);
-    let shuffle = sequence_type.contains(SequenceType::SHUFFLE);
-    let branch_count = sequence.elements().len() + usize::from(once);
-
-    if stopping || once {
-        content.push(RuntimeObject::Int(branch_count.saturating_sub(1) as i32));
-        content.push(RuntimeObject::NativeFunction("MIN".to_string()));
-    } else if cycle {
-        content.push(RuntimeObject::Int(sequence.elements().len() as i32));
-        content.push(RuntimeObject::NativeFunction("%".to_string()));
-    }
-
-    if shuffle {
-        if once || stopping {
-            let last_index = if stopping {
-                sequence.elements().len().saturating_sub(1)
-            } else {
-                sequence.elements().len()
-            };
-            let post_shuffle_noop_index = content.len() + 6;
-            content.extend([
-                RuntimeObject::ControlCommand(ControlCommand::Duplicate),
-                RuntimeObject::Int(last_index as i32),
-                RuntimeObject::NativeFunction("==".to_string()),
-                RuntimeObject::ConditionalDivert {
-                    target: format!(".^.{post_shuffle_noop_index}"),
-                },
-            ]);
-        }
-
-        let element_count_to_shuffle = sequence.elements().len() - usize::from(stopping);
-        content.push(RuntimeObject::Int(element_count_to_shuffle as i32));
-        content.push(RuntimeObject::ControlCommand(
-            ControlCommand::SequenceShuffleIndex,
-        ));
-        if once || stopping {
-            content.push(RuntimeObject::ControlCommand(ControlCommand::NoOp));
-        }
-    }
-
-    content.push(RuntimeObject::ControlCommand(ControlCommand::EvalEnd));
-
-    for index in 0..branch_count {
-        content.extend([
-            RuntimeObject::ControlCommand(ControlCommand::EvalStart),
-            RuntimeObject::ControlCommand(ControlCommand::Duplicate),
-            RuntimeObject::Int(index as i32),
-            RuntimeObject::NativeFunction("==".to_string()),
-            RuntimeObject::ControlCommand(ControlCommand::EvalEnd),
-            RuntimeObject::ConditionalDivert {
-                target: format!(".^.s{index}"),
-            },
-        ]);
-    }
-
-    let post_sequence_index = content.len();
-    content.push(RuntimeObject::ControlCommand(ControlCommand::NoOp));
-
-    let branch_containers = sequence
-        .elements()
-        .iter()
-        .map(Some)
-        .chain((branch_count > sequence.elements().len()).then_some(None))
-        .enumerate()
-        .map(|(index, element)| {
-            let branch_name = format!("s{index}");
-            let branch_path_mode =
-                path_mode.for_sequence_branch(sequence_container_path, &branch_name);
-            let mut branch_content = vec![RuntimeObject::ControlCommand(ControlCommand::Pop)];
-            if let Some(element) = element {
-                if content_list_has_choice(element) {
-                    let element_weave = Weave::new(element.objects().to_vec(), 0);
-                    branch_content = lower_choice_weave_with_initial_content(
-                        &element_weave,
-                        branch_path_mode.clone(),
-                        global_labels,
-                        global_variables,
-                        external_signatures,
-                        constants,
-                        false,
-                        branch_content,
-                    );
-                } else {
-                    lower_content_list_into_context(
-                        &mut branch_content,
-                        element,
-                        &branch_path_mode,
-                        choice_labels,
-                        global_labels,
-                        global_variables,
-                        external_signatures,
-                        constants,
-                    );
-                }
-            }
-            let relative_return_target = format!(".^.^.{post_sequence_index}");
-            let global_return_target = format!("{sequence_container_path}.{post_sequence_index}");
-            let trailing_named_content =
-                if matches!(branch_content.last(), Some(RuntimeObject::NamedContent(_))) {
-                    branch_content.pop()
-                } else {
-                    None
-                };
-            branch_content.push(RuntimeObject::Divert {
-                target: compact_relative_path(&relative_return_target, &global_return_target),
-                variable: false,
-            });
-            if let Some(named_content) = trailing_named_content {
-                branch_content.push(named_content);
-            }
-            Container {
-                content: branch_content,
-                name: Some(branch_name),
-                flags: None,
-                merge_tail_metadata: true,
-            }
-        })
-        .collect::<Vec<_>>();
-    content.push(RuntimeObject::NamedContent(branch_containers));
-
-    Container {
-        content,
-        name: None,
-        flags: Some(5),
-        merge_tail_metadata: true,
-    }
-}
-
-fn lower_conditional_into(
-    content: &mut Vec<RuntimeObject>,
-    conditional: &Conditional,
-    choice_labels: &HashMap<String, String>,
-    global_labels: &HashMap<String, String>,
-    global_variables: &HashSet<String>,
-    external_signatures: &ExternalSignatures,
-    constants: &HashMap<String, Expression>,
-    path_mode: &ChoicePathMode,
-) {
-    if let Some(condition) = conditional.initial_condition() {
-        content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
-        lower_expression_into(
-            content,
-            condition,
-            choice_labels,
-            global_labels,
-            external_signatures,
-            constants,
-            path_mode,
-            false,
-        );
-        content.push(RuntimeObject::ControlCommand(ControlCommand::EvalEnd));
-    }
-
-    let has_initial_condition = conditional.initial_condition().is_some();
-    let switch_like = has_initial_condition
-        && conditional
-            .branches()
-            .iter()
-            .any(|branch| branch.own_condition().is_some());
-    let needs_fallthrough_pop = switch_like
-        && !conditional
-            .branches()
-            .last()
-            .is_some_and(|branch| branch.is_else());
-    let rejoin_index =
-        content.len() + conditional.branches().len() + usize::from(needs_fallthrough_pop);
-    let rejoin_target = path_mode.runtime_index_path(rejoin_index);
-    let branch_rejoin_target = rejoin_target;
-
-    for branch in conditional.branches() {
-        let branch_path_mode = path_mode.for_conditional_branch(content.len());
-        let mut branch_content = Vec::new();
-        let duplicates_stack_value = switch_like && !branch.is_else();
-        if duplicates_stack_value {
-            branch_content.push(RuntimeObject::ControlCommand(ControlCommand::Duplicate));
-        }
-
-        if !branch.is_true_branch() && !branch.is_else() {
-            let needs_eval = branch.own_condition().is_some();
-            if needs_eval {
-                branch_content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
-            }
-            if let Some(condition) = branch.own_condition() {
-                lower_expression_into(
-                    &mut branch_content,
-                    condition,
-                    choice_labels,
-                    global_labels,
-                    external_signatures,
-                    constants,
-                    path_mode,
-                    false,
-                );
-            }
-            if switch_like {
-                branch_content.push(RuntimeObject::NativeFunction("==".to_string()));
-            }
-            if needs_eval {
-                branch_content.push(RuntimeObject::ControlCommand(ControlCommand::EvalEnd));
-            }
-        }
-
-        if branch.is_else() {
-            branch_content.push(RuntimeObject::Divert {
-                target: ".^.b".to_string(),
-                variable: false,
-            });
-        } else {
-            branch_content.push(RuntimeObject::ConditionalDivert {
-                target: ".^.b".to_string(),
-            });
-        }
-
-        if weave_has_choice(branch.content()) {
-            let initial_content = if branch.is_inline() {
-                if duplicates_stack_value || (branch.is_else() && switch_like) {
-                    vec![RuntimeObject::ControlCommand(ControlCommand::Pop)]
-                } else {
-                    Vec::new()
-                }
-            } else {
-                let mut initial_content = Vec::new();
-                if duplicates_stack_value || (branch.is_else() && switch_like) {
-                    initial_content.push(RuntimeObject::ControlCommand(ControlCommand::Pop));
-                }
-                initial_content.push(RuntimeObject::String("\n".to_string()));
-                initial_content
-            };
-            let mut content_container = Vec::new();
-            let mut lowered_branch = lower_choice_weave_with_initial_content(
-                branch.content(),
-                branch_path_mode,
-                global_labels,
-                global_variables,
-                external_signatures,
-                constants,
-                false,
-                initial_content,
-            );
-            let trailing_named_content =
-                if matches!(lowered_branch.last(), Some(RuntimeObject::NamedContent(_))) {
-                    lowered_branch.pop()
-                } else {
-                    None
-                };
-            content_container.extend(lowered_branch);
-            content_container.push(RuntimeObject::Divert {
-                target: branch_rejoin_target.clone(),
-                variable: false,
-            });
-            if let Some(named_content) = trailing_named_content {
-                content_container.push(named_content);
-            }
-            branch_content.push(RuntimeObject::NamedContent(vec![Container {
-                content: content_container,
-                name: Some("b".to_string()),
-                flags: None,
-                merge_tail_metadata: true,
-            }]));
-        } else {
-            let mut content_container = Vec::new();
-            if duplicates_stack_value || (branch.is_else() && switch_like) {
-                content_container.push(RuntimeObject::ControlCommand(ControlCommand::Pop));
-            }
-            if !branch.is_inline() {
-                content_container.push(RuntimeObject::String("\n".to_string()));
-            }
-            for object in branch.content().content() {
-                lower_object_into_with_context(
-                    &mut content_container,
-                    object,
-                    &branch_path_mode,
-                    choice_labels,
-                    global_labels,
-                    global_variables,
-                    external_signatures,
-                    constants,
-                );
-            }
-            content_container.push(RuntimeObject::Divert {
-                target: branch_rejoin_target.clone(),
-                variable: false,
-            });
-            branch_content.push(RuntimeObject::NamedContent(vec![Container {
-                content: content_container,
-                name: Some("b".to_string()),
-                flags: None,
-                merge_tail_metadata: true,
-            }]));
-        }
-
-        content.push(RuntimeObject::Container(Container {
-            content: branch_content,
-            name: None,
-            flags: None,
-            merge_tail_metadata: true,
-        }));
-    }
-
-    if needs_fallthrough_pop {
-        content.push(RuntimeObject::ControlCommand(ControlCommand::Pop));
-    }
-    content.push(RuntimeObject::ControlCommand(ControlCommand::NoOp));
 }
 
 fn lower_object_into_with_context(
