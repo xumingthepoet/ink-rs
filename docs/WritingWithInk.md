@@ -4,6 +4,7 @@
   <summary>Table of Contents</summary>
 
   * [Introduction](#introduction)
+  * [Changed from upstream Ink](#changed-from-upstream-ink)
   * [Part One: The Basics](#part-one-the-basics)
     * [1) Content](#1-content)
     * [2) Choices](#2-choices)
@@ -43,6 +44,24 @@ At its most basic, it can be used to write a Choose Your Own-style story, or a b
 The script aims to be clean and logically ordered, so branching dialogue can be tested "by eye". The flow is described in a declarative fashion where possible.
 
 It's also designed with redrafting in mind; so editing a flow should be fast.
+
+## Changed from upstream Ink
+
+This section records intentional language differences between this Rust
+implementation and upstream inkle Ink. If a syntax or behavior is not listed
+here, assume it is intended to match upstream Ink unless the compiler reports a
+specific unsupported or removed-feature diagnostic.
+
+No intentional language divergences are documented yet.
+
+When adding a divergence, include:
+
+- status: experimental, supported, deprecated, or removed
+- upstream behavior
+- ink-rs behavior
+- rationale
+- migration guidance for existing Ink files
+- tests that cover the new behavior
 
 # Part One: The Basics
 

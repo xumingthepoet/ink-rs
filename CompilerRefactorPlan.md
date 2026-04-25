@@ -100,7 +100,7 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 8 in progress. R015 through R080 are complete. Phase 1
+- Current phase: Phase 8 in progress. R015 through R081 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
@@ -1157,12 +1157,16 @@ Use these checks during phase reviews:
     model, analysis, lowering, emit, runtime, reference implementation, testing,
     and debugging guidance.
 
-- [ ] R081 Add a language divergence documentation location
+- [x] R081 Add a language divergence documentation location
   - Purpose: Intentional language changes need a stable home.
   - Approach: Add a "Changed from upstream Ink" section to
     `docs/WritingWithInk.md` or create a linked language changes document.
   - Acceptance: The first intentional divergence can be documented without
     inventing a new structure.
+  - Completed: Added a `Changed from upstream Ink` section and table-of-contents
+    entry to `docs/WritingWithInk.md`, with the fields future divergences must
+    document: status, upstream behavior, ink-rs behavior, rationale, migration
+    guidance, and tests.
 
 - [ ] R082 Run the removed-feature drill
   - Purpose: Prove that removing a legacy syntax feature is localized and clear.
