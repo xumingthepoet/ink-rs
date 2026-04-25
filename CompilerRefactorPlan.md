@@ -100,7 +100,7 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 8 ready. R015 through R073 are complete. Phase 1
+- Current phase: Phase 8 in progress. R015 through R074 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
@@ -1072,7 +1072,7 @@ Use these checks during phase reviews:
 
 ## Phase 8: Source Preprocessing, Diagnostics, And Documentation
 
-- [ ] R074 Extract include/preprocess logic
+- [x] R074 Extract include/preprocess logic
   - Purpose: Keep `compiler.rs` focused on the pipeline rather than source file
     expansion details.
   - Approach: Move include expansion, recursive include detection, root/flow
@@ -1080,6 +1080,11 @@ Use these checks during phase reviews:
     `source/include.rs`.
   - Acceptance: `Compiler::parse` calls a small preprocessing API, and include
     behavior is unchanged.
+  - Completed: Added `source/preprocess.rs` with `preprocess_includes`,
+    include expansion, recursive include detection, root/flow line ordering,
+    and include parsing helpers. `Compiler::parse` now calls this small source
+    preprocessing API before syntax parsing. Existing compiler tests and
+    `TestInclude` pass unchanged.
 
 - [ ] R075 Add include behavior tests
   - Purpose: Include behavior is a language file-organization surface and must

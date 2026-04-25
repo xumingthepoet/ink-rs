@@ -3,6 +3,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+pub(crate) mod preprocess;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SourceInput {
     pub text: String,
