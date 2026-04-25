@@ -3,9 +3,11 @@ mod context;
 mod flow;
 mod names;
 mod span;
+mod target_symbols;
 mod targets;
 #[cfg(test)]
 mod test_support;
+mod variable_targets;
 mod variables;
 mod warnings;
 
@@ -67,8 +69,10 @@ mod tests {
         ("flow.rs", include_str!("flow.rs")),
         ("names.rs", include_str!("names.rs")),
         ("span.rs", include_str!("span.rs")),
+        ("target_symbols.rs", include_str!("target_symbols.rs")),
         ("targets.rs", include_str!("targets.rs")),
         ("test_support.rs", include_str!("test_support.rs")),
+        ("variable_targets.rs", include_str!("variable_targets.rs")),
         ("variables.rs", include_str!("variables.rs")),
         ("warnings.rs", include_str!("warnings.rs")),
     ];

@@ -100,14 +100,12 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 6 in progress. R015 through R058 are complete. Phase 1
+- Current phase: Phase 6 complete. R015 through R059 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
 - Last focused validation:
-  `cargo test -p ink-compiler
-  analysis::targets::tests::reports_non_function_call_targets` on 2026-04-25,
-  passed.
+  `cargo test -p ink-compiler` on 2026-04-25, passed.
 - Known blockers: none for behavior-preserving refactors.
 
 ## Focused Validation Commands
@@ -886,10 +884,17 @@ Use these checks during phase reviews:
     `analysis/targets.rs` and `CompilerRefactorPlan.md`. Focused diagnostic
     test passes.
 
-- [ ] R059 Review analysis file sizes and responsibilities
+- [x] R059 Review analysis file sizes and responsibilities
   - Purpose: Ensure splitting analysis did not create new dumping grounds.
   - Approach: Check line counts and module responsibilities after extraction.
   - Acceptance: No analysis module is both large and mixed-responsibility.
+  - Completed: Reviewed analysis line counts and responsibilities after Phase
+    6 extraction. `targets.rs` was both the largest file and mixed diagnostic
+    checking with target-symbol and variable-target index construction, so
+    those indexes were moved to `target_symbols.rs` and
+    `variable_targets.rs`. After the split, the larger files are cohesive:
+    `names.rs` owns naming diagnostics, `flow.rs` owns flow diagnostics, and
+    `targets.rs` owns call-target diagnostics. Focused compiler tests pass.
 
 ## Phase 7: Lowering Architecture And Typed Paths
 

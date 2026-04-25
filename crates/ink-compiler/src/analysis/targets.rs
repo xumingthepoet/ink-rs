@@ -1,28 +1,21 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use crate::{
     diagnostic::Diagnostic,
     parsed::{
         visit::{walk_story, ParsedVisitor, VisitContext},
-        ContentList, DivertTarget, Expression, Flow, FlowArgument, Object, Story, Weave,
+        DivertTarget, Expression, Flow, FlowArgument, Object, Story,
     },
     source::SourceSpan,
 };
 
 use super::{
-    context::{
-        FlowContext, FlowSymbol, TargetSymbolIndex, VariableScopeIndex, VariableTargetIndex,
-    },
+    context::{FlowContext, TargetSymbolIndex, VariableScopeIndex, VariableTargetIndex},
     span::object_span,
+    target_symbols::{build_target_symbol_index, resolve_target_symbol},
+    variable_targets::build_variable_target_index,
     variables::build_variable_scope_index,
 };
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-enum TargetSymbolCollectionPhase {
-    #[default]
-    Flows,
-    Labels,
-}
 
 pub(super) fn call_target_diagnostics(story: &Story) -> Vec<Diagnostic> {
     let target_symbols = build_target_symbol_index(story);
@@ -287,205 +280,6 @@ impl ParsedVisitor for CallTargetChecker<'_> {
     }
 }
 
-fn build_target_symbol_index(story: &Story) -> TargetSymbolIndex {
-    #[derive(Default)]
-    struct TargetSymbolVisitor {
-        phase: TargetSymbolCollectionPhase,
-        symbols: TargetSymbolIndex,
-    }
-
-    impl ParsedVisitor for TargetSymbolVisitor {
-        fn visit_flow(&mut self, flow: &Flow, context: &VisitContext) {
-            if self.phase != TargetSymbolCollectionPhase::Flows {
-                return;
-            }
-
-            let Some(flow_path) = &context.current_flow_path else {
-                return;
-            };
-            let symbol = FlowSymbol {
-                is_function: flow.is_function(),
-            };
-
-            self.symbols.entry(flow_path.clone()).or_insert(symbol);
-            if context.parent_flow_path.is_none() {
-                self.symbols
-                    .entry(flow.name().to_string())
-                    .or_insert(symbol);
-            }
-        }
-
-        fn visit_object(&mut self, object: &Object, context: &VisitContext) {
-            if self.phase != TargetSymbolCollectionPhase::Labels {
-                return;
-            }
-
-            match object {
-                Object::Choice(choice) => {
-                    if let Some(identifier) = choice.identifier() {
-                        insert_label_symbol(
-                            &mut self.symbols,
-                            identifier,
-                            context.current_flow_path.as_deref(),
-                        );
-                    }
-                }
-                Object::Gather(gather) => {
-                    if let Some(identifier) = gather.identifier() {
-                        insert_label_symbol(
-                            &mut self.symbols,
-                            identifier,
-                            context.current_flow_path.as_deref(),
-                        );
-                    }
-                }
-                _ => {}
-            }
-        }
-    }
-
-    let mut visitor = TargetSymbolVisitor::default();
-    walk_story(story, &mut visitor);
-    visitor.phase = TargetSymbolCollectionPhase::Labels;
-    walk_story(story, &mut visitor);
-    visitor.symbols
-}
-
-fn insert_label_symbol(
-    symbols: &mut HashMap<String, FlowSymbol>,
-    identifier: &str,
-    flow_path: Option<&str>,
-) {
-    let symbol = FlowSymbol { is_function: false };
-    symbols.entry(identifier.to_string()).or_insert(symbol);
-    if let Some(flow_path) = flow_path {
-        symbols
-            .entry(format!("{flow_path}.{identifier}"))
-            .or_insert(symbol);
-    }
-}
-
-fn build_variable_target_index(story: &Story) -> VariableTargetIndex {
-    let mut names = HashSet::new();
-    collect_variable_targets_in_weave(story.root_weave(), &mut names);
-    for flow in story.flows() {
-        collect_variable_targets_in_flow(flow, &mut names);
-    }
-    names
-}
-
-fn collect_variable_targets_in_flow(flow: &Flow, names: &mut HashSet<String>) {
-    for argument in flow.arguments() {
-        names.insert(argument.name().to_string());
-    }
-    collect_variable_targets_in_weave(flow.weave(), names);
-    for child in flow.child_flows() {
-        collect_variable_targets_in_flow(child, names);
-    }
-}
-
-fn collect_variable_targets_in_weave(weave: &Weave, names: &mut HashSet<String>) {
-    for object in weave.content() {
-        collect_variable_targets_in_object(object, names);
-    }
-}
-
-fn collect_variable_targets_in_content_list(content: &ContentList, names: &mut HashSet<String>) {
-    for object in content.objects() {
-        collect_variable_targets_in_object(object, names);
-    }
-}
-
-fn collect_variable_targets_in_object(object: &Object, names: &mut HashSet<String>) {
-    match object {
-        Object::VariableAssignment(assignment) => {
-            names.insert(assignment.name().to_string());
-            collect_variable_targets_in_expression(assignment.expression(), names);
-        }
-        Object::Choice(choice) => {
-            if let Some(condition) = choice.condition() {
-                collect_variable_targets_in_expression(condition, names);
-            }
-            if let Some(content) = choice.start_content() {
-                collect_variable_targets_in_content_list(content, names);
-            }
-            if let Some(content) = choice.choice_only_content() {
-                collect_variable_targets_in_content_list(content, names);
-            }
-            collect_variable_targets_in_content_list(choice.inner_content(), names);
-        }
-        Object::ContentList(content) => collect_variable_targets_in_content_list(content, names),
-        Object::Conditional(conditional) => {
-            if let Some(condition) = conditional.initial_condition() {
-                collect_variable_targets_in_expression(condition, names);
-            }
-            for branch in conditional.branches() {
-                if let Some(condition) = branch.own_condition() {
-                    collect_variable_targets_in_expression(condition, names);
-                }
-                collect_variable_targets_in_weave(branch.content(), names);
-            }
-        }
-        Object::Expression(expression) | Object::LogicLine(expression) => {
-            collect_variable_targets_in_expression(expression, names);
-        }
-        Object::IncDec(inc_dec) => {
-            collect_variable_targets_in_expression(inc_dec.expression(), names)
-        }
-        Object::Return(ret) => {
-            if let Some(expression) = ret.returned_expression() {
-                collect_variable_targets_in_expression(expression, names);
-            }
-        }
-        Object::Sequence(sequence) => {
-            for content in sequence.elements() {
-                collect_variable_targets_in_content_list(content, names);
-            }
-        }
-        Object::Weave(weave) => collect_variable_targets_in_weave(weave, names),
-        Object::AuthorWarning(_)
-        | Object::ConstantDeclaration(_)
-        | Object::Divert(_)
-        | Object::ExternalDeclaration(_)
-        | Object::Gather(_)
-        | Object::Glue(_)
-        | Object::Tag(_)
-        | Object::Text(_)
-        | Object::TunnelOnwards(_) => {}
-    }
-}
-
-fn collect_variable_targets_in_expression(expression: &Expression, names: &mut HashSet<String>) {
-    match expression {
-        Expression::StringContent(content) => {
-            collect_variable_targets_in_content_list(content, names)
-        }
-        Expression::FunctionCall { args, .. } => {
-            for arg in args {
-                collect_variable_targets_in_expression(arg, names);
-            }
-        }
-        Expression::Binary { left, right, .. } => {
-            collect_variable_targets_in_expression(left, names);
-            collect_variable_targets_in_expression(right, names);
-        }
-        Expression::Unary { expression, .. } => {
-            collect_variable_targets_in_expression(expression, names)
-        }
-        Expression::MultipleCondition(expressions) => {
-            for expression in expressions {
-                collect_variable_targets_in_expression(expression, names);
-            }
-        }
-        Expression::String(_)
-        | Expression::NumberInt(_)
-        | Expression::NumberFloat(_)
-        | Expression::NumberBool(_)
-        | Expression::DivertTarget(_)
-        | Expression::VariableReference(_) => {}
-    }
-}
-
 fn resolve_current_flow_argument<'a>(
     target: &str,
     current_flow_arguments: Option<&'a [FlowArgument]>,
@@ -494,29 +288,6 @@ fn resolve_current_flow_argument<'a>(
     current_flow_arguments?
         .iter()
         .find(|argument| argument.name() == variable_target_name)
-}
-
-fn resolve_target_symbol<'a>(
-    target: &str,
-    current_flow_path: Option<&str>,
-    target_symbols: &'a TargetSymbolIndex,
-) -> Option<&'a FlowSymbol> {
-    if target.contains('.') {
-        return target_symbols.get(target);
-    }
-
-    if let Some(flow_path) = current_flow_path {
-        if let Some(symbol) = target_symbols.get(&format!("{flow_path}.{target}")) {
-            return Some(symbol);
-        }
-        if let Some((parent_flow_path, _)) = flow_path.rsplit_once('.') {
-            if let Some(symbol) = target_symbols.get(&format!("{parent_flow_path}.{target}")) {
-                return Some(symbol);
-            }
-        }
-    }
-
-    target_symbols.get(target)
 }
 
 #[cfg(test)]
