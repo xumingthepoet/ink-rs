@@ -8,6 +8,7 @@ mod rule;
 mod sequence;
 mod state;
 mod text;
+mod variable;
 mod weave;
 
 mod parser;
@@ -17,8 +18,7 @@ pub(crate) use parser::parse;
 use crate::{
     parsed::{
         AuthorWarning, BinaryOperator, Choice, ConstantDeclaration, ContentList, Expression,
-        ExternalDeclaration, FloatLiteral, IncDec, Object, Return, Text, UnaryOperator,
-        VariableAssignment,
+        ExternalDeclaration, FloatLiteral, Object, Return, Text, UnaryOperator,
     },
     source::SourceLine,
 };
@@ -71,26 +71,6 @@ fn is_choice_continuation_boundary(trimmed: &str) -> bool {
         || trimmed.starts_with("->")
         || knot::is_knot_declaration_line(trimmed)
         || knot::is_stitch_declaration_line(trimmed)
-}
-
-fn variable_declaration_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
-    parser.skip_horizontal_whitespace();
-    let span = parser.current_span();
-    parser.match_string("VAR")?;
-    parser.skip_horizontal_whitespace();
-    let name = parser.take_while(is_identifier_continue)?;
-    if !is_identifier(&name) {
-        return None;
-    }
-    parser.skip_horizontal_whitespace();
-    parser.match_string("=")?;
-    parser.skip_horizontal_whitespace();
-    let expression = parse_initial_expression(parser.line_remainder().trim())?;
-    parser.skip_to_end();
-
-    Some(vec![Object::VariableAssignment(VariableAssignment::new(
-        name, expression, true, false, span,
-    ))])
 }
 
 fn constant_declaration_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
@@ -176,7 +156,7 @@ fn return_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
     }
 }
 
-fn expression_contains_function_call(expr: &Expression) -> bool {
+pub(super) fn expression_contains_function_call(expr: &Expression) -> bool {
     match expr {
         Expression::FunctionCall { .. } => true,
         Expression::StringContent(content) => {
@@ -251,115 +231,6 @@ fn object_contains_function_call(object: &Object) -> bool {
         | Object::Gather(_)
         | Object::ExternalDeclaration(_)
         | Object::Tag(_) => false,
-    }
-}
-
-fn temp_declaration_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
-    parser.skip_horizontal_whitespace();
-    let span = parser.current_span();
-    parser.match_string("~")?;
-    parser.skip_horizontal_whitespace();
-    let keyword = parser.take_while(is_identifier_continue)?;
-    if keyword != "temp" {
-        return None;
-    }
-    parser.skip_horizontal_whitespace();
-    let name = parser.take_while(is_identifier_continue)?;
-    if !is_identifier(&name) {
-        return None;
-    }
-    parser.skip_horizontal_whitespace();
-    parser.match_string("=")?;
-    parser.skip_horizontal_whitespace();
-    let expression = parse_initial_expression(parser.line_remainder().trim())?;
-    parser.skip_to_end();
-
-    let assignment = VariableAssignment::new(name, expression, false, true, span.clone());
-    if expression_contains_function_call(assignment.expression()) {
-        Some(vec![Object::ContentList(ContentList::new(vec![
-            Object::VariableAssignment(assignment),
-            Object::Text(Text::new("\n", span)),
-        ]))])
-    } else {
-        Some(vec![Object::VariableAssignment(assignment)])
-    }
-}
-
-fn variable_assignment_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
-    parser.skip_horizontal_whitespace();
-    let span = parser.current_span();
-    parser.match_string("~")?;
-    parser.skip_horizontal_whitespace();
-    let name = parser.take_while(is_identifier_continue)?;
-    if !is_identifier(&name) {
-        return None;
-    }
-    parser.skip_horizontal_whitespace();
-    if parser.match_string("++").is_some() {
-        parser.skip_horizontal_whitespace();
-        if !parser.line_remainder().is_empty() {
-            return None;
-        }
-        parser.skip_to_end();
-        return Some(vec![Object::IncDec(IncDec::new(
-            name,
-            Expression::NumberInt(1),
-            true,
-            span,
-        ))]);
-    }
-    if parser.match_string("--").is_some() {
-        parser.skip_horizontal_whitespace();
-        if !parser.line_remainder().is_empty() {
-            return None;
-        }
-        parser.skip_to_end();
-        return Some(vec![Object::IncDec(IncDec::new(
-            name,
-            Expression::NumberInt(1),
-            false,
-            span,
-        ))]);
-    }
-    if parser.match_string("+=").is_some() {
-        parser.skip_horizontal_whitespace();
-        let expression = parse_initial_expression(parser.line_remainder().trim())?;
-        parser.skip_to_end();
-        let inc = IncDec::new(name, expression, true, span.clone());
-        if expression_contains_function_call(inc.expression()) {
-            return Some(vec![Object::ContentList(ContentList::new(vec![
-                Object::IncDec(inc),
-                Object::Text(Text::new("\n", span)),
-            ]))]);
-        }
-        return Some(vec![Object::IncDec(inc)]);
-    }
-    if parser.match_string("-=").is_some() {
-        parser.skip_horizontal_whitespace();
-        let expression = parse_initial_expression(parser.line_remainder().trim())?;
-        parser.skip_to_end();
-        let dec = IncDec::new(name, expression, false, span.clone());
-        if expression_contains_function_call(dec.expression()) {
-            return Some(vec![Object::ContentList(ContentList::new(vec![
-                Object::IncDec(dec),
-                Object::Text(Text::new("\n", span)),
-            ]))]);
-        }
-        return Some(vec![Object::IncDec(dec)]);
-    }
-    parser.match_string("=")?;
-    parser.skip_horizontal_whitespace();
-    let expression = parse_initial_expression(parser.line_remainder().trim())?;
-    parser.skip_to_end();
-
-    let assignment = VariableAssignment::new(name, expression, false, false, span.clone());
-    if expression_contains_function_call(assignment.expression()) {
-        Some(vec![Object::ContentList(ContentList::new(vec![
-            Object::VariableAssignment(assignment),
-            Object::Text(Text::new("\n", span)),
-        ]))])
-    } else {
-        Some(vec![Object::VariableAssignment(assignment)])
     }
 }
 

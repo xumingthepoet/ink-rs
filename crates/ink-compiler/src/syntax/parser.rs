@@ -11,8 +11,7 @@ use super::{
     author_warning_statement, choice_statement, constant_declaration_statement, divert_statement,
     external_declaration_statement, gather, is_choice_continuation_boundary, knot,
     leading_whitespace_count, logic_line_statement, parse_choice_from_line, return_statement,
-    temp_declaration_statement, text_statement, variable_assignment_statement,
-    variable_declaration_statement,
+    text_statement, variable,
 };
 
 type StatementRule = for<'source> fn(&mut RuleParser<'source>) -> Option<Vec<Object>>;
@@ -99,12 +98,12 @@ impl Parser {
 
         let mut line_parser = RuleParser::new(line);
         let statement_rules: &[StatementRule] = &[
-            variable_declaration_statement,
+            variable::declaration_statement,
             constant_declaration_statement,
             external_declaration_statement,
             return_statement,
-            temp_declaration_statement,
-            variable_assignment_statement,
+            variable::temp_declaration_statement,
+            variable::assignment_statement,
             logic_line_statement,
             choice_statement,
             author_warning_statement,

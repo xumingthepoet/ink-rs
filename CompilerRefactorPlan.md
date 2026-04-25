@@ -100,7 +100,7 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 2 in progress. R015 through R019 are complete. Phase 1
+- Current phase: Phase 2 in progress. R015 through R020 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
@@ -150,6 +150,8 @@ Full validation:
   `crates/ink-compiler/src/syntax/weave.rs`.
 - Gather syntax:
   `crates/ink-compiler/src/syntax/gather.rs`.
+- Variable syntax:
+  `crates/ink-compiler/src/syntax/variable.rs`.
 - Parsed model: `crates/ink-compiler/src/parsed/`.
 - Analysis entry point: `analysis::analyze` in
   `crates/ink-compiler/src/analysis.rs`.
@@ -365,13 +367,17 @@ Use these checks during phase reviews:
     focused tests; `cargo test -p ink-compiler syntax::` and
     `cargo test -p ink-test --test compiler_conformance` pass.
 
-- [ ] R020 Extract `syntax/variable.rs`
+- [x] R020 Extract `syntax/variable.rs`
   - Purpose: Put `VAR`, `temp`, assignment, and inc/dec syntax in one place
     because they are likely language-design pressure points.
   - Approach: Move variable declaration, temporary declaration, assignment, and
     inc/dec statement parsing.
   - Acceptance: Variable fixtures pass, and all variable statement parser
     entry points are owned by one module.
+  - Completed: Global variable declarations, temp declarations, assignments,
+    and inc/dec parsing now live in `syntax/variable.rs` with focused tests;
+    `cargo test -p ink-compiler syntax::` and
+    `cargo test -p ink-test --test compiler_conformance` pass.
 
 - [ ] R021 Extract declaration and logic modules
   - Purpose: Remove remaining unrelated statement parsers from `syntax/mod.rs`.
