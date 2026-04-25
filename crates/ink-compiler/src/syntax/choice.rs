@@ -1,4 +1,8 @@
-use crate::parsed::{Choice, ContentList, Expression};
+use crate::{
+    diagnostic::{Diagnostic, DiagnosticCode},
+    parsed::{Choice, ContentList, Expression},
+    source::SourceSpan,
+};
 
 use super::{is_identifier, rule::RuleParser, scan, text};
 
@@ -31,6 +35,7 @@ pub(super) fn parse_choice(parser: &mut RuleParser<'_>) -> Option<Choice> {
 
     parser.skip_horizontal_whitespace();
 
+    let body_span = parser.current_span();
     let choice_body = parser.line_remainder().to_string();
     parser.skip_to_end();
 
@@ -66,8 +71,16 @@ pub(super) fn parse_choice(parser: &mut RuleParser<'_>) -> Option<Choice> {
         .is_some_and(|divert_index| choice_body[..divert_index].trim().is_empty());
 
     let segments = parse_choice_segments(&choice_body)
-        .map_err(|message| {
-            parser.error(message);
+        .map_err(|error| {
+            let span = SourceSpan::new(
+                body_span.source_name.clone(),
+                body_span.line,
+                body_span.column + error.char_offset,
+            );
+            parser.diagnostic(
+                Diagnostic::error(span, error.message)
+                    .with_code(DiagnosticCode::InvalidChoiceSyntax),
+            );
         })
         .ok()?;
 
@@ -152,10 +165,18 @@ struct ChoiceSegments {
     has_inline_brackets: bool,
 }
 
-fn parse_choice_segments(choice_body: &str) -> Result<ChoiceSegments, &'static str> {
+struct ChoiceSyntaxError {
+    message: &'static str,
+    char_offset: usize,
+}
+
+fn parse_choice_segments(choice_body: &str) -> Result<ChoiceSegments, ChoiceSyntaxError> {
     let Some(open_index) = choice_body.find('[') else {
-        if choice_body.contains(']') {
-            return Err("Expected opening '[' for weave-style option but saw ']'");
+        if let Some(close_index) = choice_body.find(']') {
+            return Err(ChoiceSyntaxError {
+                message: "expected opening `[` for choice-only text before `]`",
+                char_offset: char_offset(choice_body, close_index),
+            });
         }
 
         if let Some(divert_index) = find_top_level_divert(choice_body) {
@@ -178,17 +199,26 @@ fn parse_choice_segments(choice_body: &str) -> Result<ChoiceSegments, &'static s
     let close_index = choice_body[open_index + 1..]
         .find(']')
         .map(|relative| open_index + 1 + relative)
-        .ok_or("Expected closing ']' for weave-style option but saw end of line")?;
+        .ok_or_else(|| ChoiceSyntaxError {
+            message: "expected closing `]` for choice-only text before end of line",
+            char_offset: char_offset(choice_body, open_index),
+        })?;
 
-    if choice_body[open_index + 1..close_index].contains('[')
-        || choice_body[open_index + 1..close_index].contains(']')
+    if let Some(relative_index) =
+        choice_body[open_index + 1..close_index].find(|ch| matches!(ch, '[' | ']'))
     {
-        return Err("unsupported syntax: choice");
+        return Err(ChoiceSyntaxError {
+            message: "nested choice-only brackets are not supported",
+            char_offset: char_offset(choice_body, open_index + 1 + relative_index),
+        });
     }
 
-    if choice_body[close_index + 1..].contains('[') || choice_body[close_index + 1..].contains(']')
+    if let Some(relative_index) = choice_body[close_index + 1..].find(|ch| matches!(ch, '[' | ']'))
     {
-        return Err("unsupported syntax: choice");
+        return Err(ChoiceSyntaxError {
+            message: "multiple choice-only bracket sections are not supported",
+            char_offset: char_offset(choice_body, close_index + 1 + relative_index),
+        });
     }
 
     Ok(ChoiceSegments {
@@ -198,6 +228,10 @@ fn parse_choice_segments(choice_body: &str) -> Result<ChoiceSegments, &'static s
         inner: choice_body[close_index + 1..].to_string(),
         has_inline_brackets: true,
     })
+}
+
+fn char_offset(source: &str, byte_index: usize) -> usize {
+    source[..byte_index].chars().count()
 }
 
 fn find_top_level_divert(source: &str) -> Option<usize> {

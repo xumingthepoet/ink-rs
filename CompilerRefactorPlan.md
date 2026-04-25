@@ -100,7 +100,7 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 8 in progress. R015 through R078 are complete. Phase 1
+- Current phase: Phase 8 in progress. R015 through R079 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
@@ -1134,13 +1134,17 @@ Use these checks during phase reviews:
     report structured expression errors, with a recovery test proving the next
     source line still emits its own diagnostic.
 
-- [ ] R079 Improve choice and inline syntax recovery
+- [x] R079 Improve choice and inline syntax recovery
   - Purpose: Choice bracket and inline brace mistakes are common and should be
     easy to diagnose.
   - Approach: Replace silent `None` paths with specific diagnostics where the
     parser knows the intended construct.
   - Acceptance: Invalid choice/inline tests assert specific messages and useful
     spans.
+  - Completed: Added `InvalidChoiceSyntax` and `InvalidInlineSyntax` diagnostic
+    codes. Choice-only bracket errors now report the bracket column directly,
+    and text lines with unclosed inline `{...}` report a specific inline syntax
+    diagnostic instead of falling back to generic unsupported syntax.
 
 - [ ] R080 Update architecture documentation
   - Purpose: `docs/ArchitectureAndDevOverview.md` should describe the Rust

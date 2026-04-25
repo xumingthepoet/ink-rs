@@ -541,4 +541,38 @@ mod tests {
             "unsupported syntax: list declaration"
         );
     }
+
+    #[test]
+    fn invalid_choice_bracket_reports_specific_error_span() {
+        let output = parse(SourceInput::new("* Hello [choice text"));
+
+        assert_eq!(output.diagnostics.len(), 1, "{:#?}", output.diagnostics);
+        assert_eq!(
+            output.diagnostics[0].code,
+            Some(crate::diagnostic::DiagnosticCode::InvalidChoiceSyntax)
+        );
+        assert_eq!(output.diagnostics[0].line, 1);
+        assert_eq!(output.diagnostics[0].column, 9);
+        assert_eq!(
+            output.diagnostics[0].message,
+            "expected closing `]` for choice-only text before end of line"
+        );
+    }
+
+    #[test]
+    fn invalid_inline_brace_reports_specific_error_span() {
+        let output = parse(SourceInput::new("Line {x + 1"));
+
+        assert_eq!(output.diagnostics.len(), 1, "{:#?}", output.diagnostics);
+        assert_eq!(
+            output.diagnostics[0].code,
+            Some(crate::diagnostic::DiagnosticCode::InvalidInlineSyntax)
+        );
+        assert_eq!(output.diagnostics[0].line, 1);
+        assert_eq!(output.diagnostics[0].column, 6);
+        assert_eq!(
+            output.diagnostics[0].message,
+            "expected closing `}` for inline expression before end of line"
+        );
+    }
 }

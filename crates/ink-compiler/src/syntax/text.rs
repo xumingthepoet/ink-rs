@@ -1,4 +1,5 @@
 use crate::{
+    diagnostic::{Diagnostic, DiagnosticCode},
     parsed::{
         Conditional, ConditionalBranch, ContentList, Glue, Object, Sequence, SequenceType, Tag,
         Text, Weave,
@@ -10,13 +11,33 @@ use super::{rule::RuleParser, scan};
 
 pub(super) fn parse_text_line(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
     let span = parser.current_span();
-    let text = parser.line_remainder().trim_start().to_string();
+    let raw_text = parser.line_remainder().to_string();
+    let leading_whitespace = raw_text
+        .chars()
+        .take_while(|ch| matches!(ch, ' ' | '\t'))
+        .count();
+    let text = raw_text.trim_start().to_string();
 
     if text.is_empty() {
         return None;
     }
 
     if has_unsupported_text_syntax(&text) {
+        return None;
+    }
+
+    if let Some(char_offset) = find_unmatched_open_brace_char_offset(&text) {
+        parser.diagnostic(
+            Diagnostic::error(
+                SourceSpan::new(
+                    span.source_name.clone(),
+                    span.line,
+                    span.column + leading_whitespace + char_offset,
+                ),
+                "expected closing `}` for inline expression before end of line",
+            )
+            .with_code(DiagnosticCode::InvalidInlineSyntax),
+        );
         return None;
     }
 
@@ -50,6 +71,36 @@ fn has_unsupported_text_syntax(text: &str) -> bool {
         || text.starts_with('+')
         || (text.starts_with('-') && !text.starts_with("->"))
         || text.starts_with('~')
+}
+
+fn find_unmatched_open_brace_char_offset(text: &str) -> Option<usize> {
+    let mut byte_offset = 0;
+    while let Some(relative_open) = text[byte_offset..].find('{') {
+        let open_index = byte_offset + relative_open;
+        if is_escaped(text, open_index) {
+            byte_offset = open_index + '{'.len_utf8();
+            continue;
+        }
+
+        let rest = &text[open_index + '{'.len_utf8()..];
+        let Some(close_index) = scan::find_matching_delimiter(rest, '{', '}') else {
+            return Some(text[..open_index].chars().count());
+        };
+        byte_offset = open_index + '{'.len_utf8() + close_index + '}'.len_utf8();
+    }
+    None
+}
+
+fn is_escaped(source: &str, byte_index: usize) -> bool {
+    let mut slash_count = 0;
+    for ch in source[..byte_index].chars().rev() {
+        if ch == '\\' {
+            slash_count += 1;
+        } else {
+            break;
+        }
+    }
+    slash_count % 2 == 1
 }
 
 pub(super) fn parse_inline_content(text: &str, span: &SourceSpan) -> Option<Vec<Object>> {
