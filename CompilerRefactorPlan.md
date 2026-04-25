@@ -100,7 +100,7 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 7 in progress. R015 through R061 are complete. Phase 1
+- Current phase: Phase 7 in progress. R015 through R062 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
@@ -922,13 +922,18 @@ Use these checks during phase reviews:
     of owning the logic inline, with focused path helper tests and compiler
     tests passing.
 
-- [ ] R062 Extract `lower/indexes.rs`
+- [x] R062 Extract `lower/indexes.rs`
   - Purpose: Give constants, labels, globals, external signatures, and counted
     paths a clear owner.
   - Approach: Move index builders into one module and aggregate them in a
     `LoweringIndexes` type.
   - Acceptance: `lower::lower` builds indexes once and passes a clear context
     object to lowering code.
+  - Completed: Added `lower/indexes.rs` with `LoweringIndexes`,
+    `RuntimeLenEstimator`, external signatures, counted-flow paths, global
+    variable declarations, constants, labels, and counted-path builders. The
+    top-level lowering entry point now builds indexes once and passes the
+    index context into root, flow, and global-declaration lowering.
 
 - [ ] R063 Extract `lower/context.rs`
   - Purpose: Make path mode, flow context, local variables, and fallback gather
