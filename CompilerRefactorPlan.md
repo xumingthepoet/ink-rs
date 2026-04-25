@@ -100,7 +100,7 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 7 in progress. R015 through R063 are complete. Phase 1
+- Current phase: Phase 7 in progress. R015 through R064 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
@@ -948,12 +948,17 @@ Use these checks during phase reviews:
     Lowering and index code now call context methods instead of free target
     resolution helpers.
 
-- [ ] R064 Extract `lower/expression.rs`
+- [x] R064 Extract `lower/expression.rs`
   - Purpose: Separate expression bytecode emission from flow/weave structure.
   - Approach: Move expression lowering, function call lowering, operator
     runtime names, and builtin function handling.
   - Acceptance: Expression, string, and function-call JSON fixtures are
     unchanged.
+  - Completed: Added `lower/expression.rs` for output expression, logic-line
+    expression, recursive expression emission, function-call lowering,
+    by-reference argument lowering, operator runtime names, and builtin
+    function dispatch. `lower.rs` now imports expression emission entry points
+    and retains only structural lowering calls.
 
 - [ ] R065 Extract `lower/flow.rs`
   - Purpose: Give knot/stitch/function lowering an owner.
