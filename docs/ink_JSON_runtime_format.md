@@ -1,6 +1,6 @@
 # ink's JSON runtime format
 
-When ink is compiled to JSON, it is converted to a low level format for use by the runtime, and is made up of smaller, simpler building blocks. For an overview of the full pipeline, including a description of the runtime itself see the [Architecture and Development documentation](ArchitectureAndDevOverview.md).
+When ink is compiled to JSON, it is converted to a low level format for use by the runtime, and is made up of smaller, simpler building blocks. For an overview of the full pipeline, including a description of the runtime itself see the [Architecture documentation](Architecture.md).
 
 ## Top level
 
@@ -252,4 +252,3 @@ Examples:
 
 * `building.entrance.3.0` - the first element of a Container at the fourth element of a Container named `entrance` within a Container named `building` of the root Container.
 * `.^.1` - the second element of the parent Container.
-

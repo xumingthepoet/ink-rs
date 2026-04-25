@@ -1,4 +1,4 @@
-# Architecture and Development
+# Architecture
 
 ## Overview
 
@@ -8,12 +8,10 @@ This repository has two main layers:
   into runtime-shaped IR, and emits the JSON story format.
 - `crates/ink-runtime`: loads and runs the JSON story format.
 
-The runtime is already close to the quality target for this project: small
-files, clear ownership, and direct mapping from runtime concepts to modules.
-The compiler is being refactored to the same standard. Compiler behavior should
-still be checked against `ink-csharp/`, but the Rust implementation should use
-Rust-native modules, enums, structs, and explicit state instead of copying the
-C# inheritance model.
+The compiler and runtime are Rust-native implementations. Upstream
+`ink-csharp/` remains a behavioral reference for legacy-compatible features,
+but new implementation work should follow the module boundaries and ownership
+model documented here rather than copying the C# class structure.
 
 The high-level compiler pipeline is:
 
@@ -193,12 +191,28 @@ change explicitly requires a coordinated runtime change.
 ## Reference Implementation
 
 `ink-csharp/` remains the behavioral reference for upstream Ink compatibility.
-Use it when compiler behavior is unclear, especially for parser trial order,
+Use it when legacy behavior is unclear, especially for parser trial order,
 weave structure, path compaction, and JSON shape.
 
 The Rust compiler does not need to copy C# class structure. Prefer Rust-native
 ownership and module boundaries as long as behavior remains compatible for
 features that are still intentionally supported.
+
+## Feature Design Workflow
+
+New language features should start from the Rust architecture, not from
+fixture-specific fixes:
+
+- Define the intended syntax or behavior in `docs/WritingWithInk-updates.md`.
+- Apply the resulting user-facing documentation to
+  `docs/WritingWithInk-latest.md`.
+- Add focused language tests in `crates/ink-test/tests/language.rs` and fixtures
+  under `crates/ink-test/fixtures/language/` when useful.
+- Add parsed-model types before analysis or lowering needs the data.
+- Put semantic checks in `analysis/` and lowering-only runtime shape decisions
+  in `lower/`.
+- Keep runtime changes separate unless the JSON story format or runtime
+  execution behavior genuinely needs to change.
 
 ## Testing And Validation
 
@@ -213,10 +227,11 @@ cargo test --workspace
 make gate
 ```
 
-`make gate` is the project-level gate and includes the C# parity tests. If a
-compiler change intentionally changes language behavior, update tests and
-`docs/WritingWithInk-updates.md` and `docs/WritingWithInk-latest.md` in the
-same change. Do not edit `docs/WritingWithInk-origin.md`.
+`make gate` is the project-level gate and includes the legacy C# compatibility
+tests. If a compiler change intentionally changes language behavior, update the
+tests, `docs/WritingWithInk-updates.md`, and
+`docs/WritingWithInk-latest.md` in the same change. Do not edit
+`docs/WritingWithInk-origin.md`.
 
 ## Debugging Tips
 
