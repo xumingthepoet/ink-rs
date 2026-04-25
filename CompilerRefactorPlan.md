@@ -100,7 +100,7 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 8 in progress. R015 through R076 are complete. Phase 1
+- Current phase: Phase 8 in progress. R015 through R077 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
@@ -1110,13 +1110,17 @@ Use these checks during phase reviews:
     preserve included filenames, covered by a compiler test that reports an
     unsupported syntax diagnostic from `inc.ink`.
 
-- [ ] R077 Add diagnostic categories or codes
+- [x] R077 Add diagnostic categories or codes
   - Purpose: Make parser, analysis, removed-feature, and unsupported-feature
     diagnostics easier to test and maintain.
   - Approach: Extend `Diagnostic` with an optional category/code while
     preserving existing messages initially.
   - Acceptance: Existing tests still pass, and at least one new test asserts a
     category or code.
+  - Completed: Added public `DiagnosticCode` and an optional `code` field on
+    `Diagnostic`. Existing diagnostics default to no code, while
+    `Diagnostic::unsupported` now emits `UnsupportedSyntax`; focused diagnostic,
+    parser, and compiler tests assert the code without changing messages.
 
 - [ ] R078 Improve expression error recovery
   - Purpose: Invalid expressions should not collapse into vague parser failure.

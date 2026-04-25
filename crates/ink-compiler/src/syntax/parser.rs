@@ -507,6 +507,10 @@ mod tests {
             crate::diagnostic::DiagnosticSeverity::Error
         );
         assert_eq!(
+            output.diagnostics[0].code,
+            Some(crate::diagnostic::DiagnosticCode::UnsupportedSyntax)
+        );
+        assert_eq!(
             output.diagnostics[0].message,
             "unsupported syntax: list declaration"
         );

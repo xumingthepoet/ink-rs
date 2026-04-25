@@ -14,7 +14,7 @@ mod source;
 mod syntax;
 
 pub use compiler::{CompiledStory, Compiler, CompilerOptions, StageOutput};
-pub use diagnostic::{Diagnostic, DiagnosticSeverity};
+pub use diagnostic::{Diagnostic, DiagnosticCode, DiagnosticSeverity};
 pub use parsed::{
     Choice, ContentList, Divert, DivertTarget, Object, Story as ParsedStory, Text, Weave,
 };

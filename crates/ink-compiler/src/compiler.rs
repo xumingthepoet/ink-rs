@@ -176,6 +176,8 @@ mod tests {
 
     use serde_json::json;
 
+    use crate::diagnostic::DiagnosticCode;
+
     use super::*;
 
     struct MemoryFileHandler {
@@ -247,6 +249,7 @@ mod tests {
         assert_eq!(output.diagnostics.len(), 1);
         let diagnostic = &output.diagnostics[0];
         assert_eq!(diagnostic.severity, DiagnosticSeverity::Error);
+        assert_eq!(diagnostic.code, Some(DiagnosticCode::UnsupportedSyntax));
         assert_eq!(diagnostic.source_filename.as_deref(), Some("inc.ink"));
         assert_eq!(diagnostic.line, 1);
         assert_eq!(diagnostic.column, 1);
