@@ -100,13 +100,14 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 8 in progress. R015 through R082 are complete. Phase 1
-  is complete except the first real intentional-divergence fixture, which
-  should wait until an actual language change is chosen.
-- Last full validation: `make gate` on 2026-04-25, passed.
-- Last focused validation:
-  `cargo test -p ink-compiler` on 2026-04-25, passed.
-- Known blockers: none for behavior-preserving refactors.
+- Current phase: Compiler refactor plan complete. R001 through R093 are
+  complete, including the first intentional-divergence fixture.
+- Last full validation: `make gate` on 2026-04-25, passed after R093 and R012
+  follow-up cleanup.
+- Last focused validation: `cargo test -p ink-test --test language` on
+  2026-04-25, passed.
+- Known blockers: none. Remaining quality gaps are recorded in
+  `CompilerRefactorQualityReview.md`.
 
 ## Focused Validation Commands
 
@@ -133,11 +134,11 @@ Full validation:
 ## Current Compiler Pipeline Map
 
 - Source input and preprocessing: `Compiler::parse` in
-  `crates/ink-compiler/src/compiler.rs`, with include expansion currently also
-  in `compiler.rs`.
+  `crates/ink-compiler/src/compiler.rs`, delegating include expansion to
+  `crates/ink-compiler/src/source/preprocess.rs`.
 - Comment elimination and source line creation:
   `crates/ink-compiler/src/source.rs`.
-- Parsing entry point and parser driver: `syntax::parse`, re-exported from
+- Parsing entry point and parser driver: `syntax::parse_source`, re-exported from
   `crates/ink-compiler/src/syntax/parser.rs`.
 - Syntax rules and statement parsers: `crates/ink-compiler/src/syntax/mod.rs`
   plus focused submodules under `crates/ink-compiler/src/syntax/`.
@@ -156,7 +157,7 @@ Full validation:
   `crates/ink-compiler/src/syntax/logic.rs`.
 - Parsed model: `crates/ink-compiler/src/parsed/`.
 - Analysis entry point: `analysis::analyze` in
-  `crates/ink-compiler/src/analysis.rs`.
+  `crates/ink-compiler/src/analysis/mod.rs`.
 - Lowering entry point: `lower::lower` in
   `crates/ink-compiler/src/lower.rs`.
 - JSON emission entry point: `emit::emit_json` in
