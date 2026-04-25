@@ -68,134 +68,37 @@ impl SymbolKind {
 }
 
 fn constant_redefinition_diagnostics(story: &Story) -> Vec<Diagnostic> {
-    let mut diagnostics = Vec::new();
-    let mut constants = HashMap::new();
-    collect_constant_redefinition_diagnostics_in_weave(
-        story.root_weave(),
-        &mut constants,
-        &mut diagnostics,
-    );
-    for flow in story.flows() {
-        collect_constant_redefinition_diagnostics_in_flow(flow, &mut constants, &mut diagnostics);
+    #[derive(Default)]
+    struct ConstantRedefinitionVisitor {
+        constants: HashMap<String, Expression>,
+        diagnostics: Vec<Diagnostic>,
     }
-    diagnostics
-}
 
-fn collect_constant_redefinition_diagnostics_in_flow(
-    flow: &Flow,
-    constants: &mut HashMap<String, Expression>,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
-    collect_constant_redefinition_diagnostics_in_weave(flow.weave(), constants, diagnostics);
-    for child in flow.child_flows() {
-        collect_constant_redefinition_diagnostics_in_flow(child, constants, diagnostics);
-    }
-}
-
-fn collect_constant_redefinition_diagnostics_in_weave(
-    weave: &Weave,
-    constants: &mut HashMap<String, Expression>,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
-    for object in weave.content() {
-        collect_constant_redefinition_diagnostics_in_object(object, constants, diagnostics);
-    }
-}
-
-fn collect_constant_redefinition_diagnostics_in_content_list(
-    content: &ContentList,
-    constants: &mut HashMap<String, Expression>,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
-    for object in content.objects() {
-        collect_constant_redefinition_diagnostics_in_object(object, constants, diagnostics);
-    }
-}
-
-fn collect_constant_redefinition_diagnostics_in_object(
-    object: &Object,
-    constants: &mut HashMap<String, Expression>,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
-    match object {
-        Object::ConstantDeclaration(declaration) => {
-            if let Some(existing) = constants.get(declaration.name()) {
-                if existing != declaration.expression() {
-                    diagnostics.push(Diagnostic::error(
-                        declaration.span().clone(),
-                        format!(
-                            "CONST '{}' has been redefined with a different value",
-                            declaration.name()
-                        ),
-                    ));
+    impl ParsedVisitor for ConstantRedefinitionVisitor {
+        fn visit_object(&mut self, object: &Object, _context: &VisitContext) {
+            if let Object::ConstantDeclaration(declaration) = object {
+                if let Some(existing) = self.constants.get(declaration.name()) {
+                    if existing != declaration.expression() {
+                        self.diagnostics.push(Diagnostic::error(
+                            declaration.span().clone(),
+                            format!(
+                                "CONST '{}' has been redefined with a different value",
+                                declaration.name()
+                            ),
+                        ));
+                    }
                 }
-            }
-            constants.insert(
-                declaration.name().to_string(),
-                declaration.expression().clone(),
-            );
-        }
-        Object::Choice(choice) => {
-            if let Some(content) = choice.start_content() {
-                collect_constant_redefinition_diagnostics_in_content_list(
-                    content,
-                    constants,
-                    diagnostics,
-                );
-            }
-            if let Some(content) = choice.choice_only_content() {
-                collect_constant_redefinition_diagnostics_in_content_list(
-                    content,
-                    constants,
-                    diagnostics,
-                );
-            }
-            collect_constant_redefinition_diagnostics_in_content_list(
-                choice.inner_content(),
-                constants,
-                diagnostics,
-            );
-        }
-        Object::Conditional(conditional) => {
-            for branch in conditional.branches() {
-                collect_constant_redefinition_diagnostics_in_weave(
-                    branch.content(),
-                    constants,
-                    diagnostics,
+                self.constants.insert(
+                    declaration.name().to_string(),
+                    declaration.expression().clone(),
                 );
             }
         }
-        Object::Sequence(sequence) => {
-            for element in sequence.elements() {
-                collect_constant_redefinition_diagnostics_in_content_list(
-                    element,
-                    constants,
-                    diagnostics,
-                );
-            }
-        }
-        Object::ContentList(content) => collect_constant_redefinition_diagnostics_in_content_list(
-            content,
-            constants,
-            diagnostics,
-        ),
-        Object::Weave(weave) => {
-            collect_constant_redefinition_diagnostics_in_weave(weave, constants, diagnostics)
-        }
-        Object::AuthorWarning(_)
-        | Object::Divert(_)
-        | Object::Expression(_)
-        | Object::ExternalDeclaration(_)
-        | Object::Gather(_)
-        | Object::Glue(_)
-        | Object::IncDec(_)
-        | Object::LogicLine(_)
-        | Object::Return(_)
-        | Object::Tag(_)
-        | Object::Text(_)
-        | Object::TunnelOnwards(_)
-        | Object::VariableAssignment(_) => {}
     }
+
+    let mut visitor = ConstantRedefinitionVisitor::default();
+    walk_story(story, &mut visitor);
+    visitor.diagnostics
 }
 
 fn naming_diagnostics(story: &Story) -> Vec<Diagnostic> {

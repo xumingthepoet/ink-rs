@@ -100,14 +100,14 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 5 in progress. R015 through R045 are complete. Phase 1
+- Current phase: Phase 5 in progress. R015 through R046 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
 - Last focused validation:
   `cargo test -p ink-compiler`, and
   `cargo test -p ink-test --features csharp-tests --test csharp_tests --
-  TestAuthorWarningsInsideContentListBug` on 2026-04-25, passed.
+  TestConstRedefinition` on 2026-04-25, passed.
 - Known blockers: none for behavior-preserving refactors.
 
 ## Focused Validation Commands
@@ -704,12 +704,18 @@ Use these checks during phase reviews:
     TestAuthorWarningsInsideContentListBug` and `cargo test -p ink-compiler`
     pass.
 
-- [ ] R046 Refactor constant redefinition onto traversal
+- [x] R046 Refactor constant redefinition onto traversal
   - Purpose: Reduce repeated recursion while preserving story-wide constant
     semantics.
   - Approach: Use traversal callbacks to collect `ConstantDeclaration` nodes
     and compare expressions.
   - Acceptance: Constant tests pass, including nested content positions.
+  - Completed: Replaced the constant-redefinition recursion helpers in
+    `analysis.rs` with a `ConstantRedefinitionVisitor` that tracks story-wide
+    constant expressions from `visit_object`. Traversal now owns nested content
+    descent for constants, matching the author-warning pass. `cargo test -p
+    ink-compiler` and `cargo test -p ink-test --features csharp-tests --test
+    csharp_tests -- TestConstRedefinition` pass.
 
 - [ ] R047 Refactor variable scope collection onto traversal
   - Purpose: Make variable visibility easier to change later.
