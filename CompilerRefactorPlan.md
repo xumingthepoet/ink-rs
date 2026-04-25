@@ -100,7 +100,7 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 4 in progress. R015 through R032 are complete. Phase 1
+- Current phase: Phase 4 in progress. R015 through R033 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
@@ -519,7 +519,7 @@ Use these checks during phase reviews:
 
 ## Phase 4: Expression Parser
 
-- [ ] R033 Move expression parsing into `syntax/expression.rs`
+- [x] R033 Move expression parsing into `syntax/expression.rs`
   - Purpose: Give expression syntax a dedicated module before changing its
     internals.
   - Approach: Move `parse_initial_expression`, literal parsing, operator
@@ -527,6 +527,11 @@ Use these checks during phase reviews:
     behavior changes.
   - Acceptance: All expression call sites use the module API, and parse
     snapshots are unchanged.
+  - Completed: Moved expression parsing, operator splitting, function-call
+    parsing, string-expression parsing, and argument splitting into
+    `syntax/expression.rs`; `syntax/mod.rs` now re-exports the expression entry
+    points for existing call sites, and `cargo test -p ink-compiler syntax::`
+    passes.
 
 - [ ] R034 Add expression behavior baseline tests
   - Purpose: Lock current behavior before replacing the parser.
