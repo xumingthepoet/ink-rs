@@ -1,3 +1,9 @@
+//! Shared scanner primitives for syntax modules.
+//!
+//! Top-level syntax scanning belongs here. Parser modules should use these
+//! helpers instead of maintaining local string/escape/nesting state machines;
+//! add a `ScanOptions` mode when a syntax surface needs different rules.
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) struct ScanOptions {
     pub(super) track_strings: bool,

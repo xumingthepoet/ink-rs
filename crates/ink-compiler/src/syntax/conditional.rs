@@ -85,7 +85,8 @@ fn parse_branch_header(trimmed: &str) -> Option<ParsedConditionalBranchHeader<'_
         });
     }
 
-    let (condition_source, inline_content) = split_top_level_once(after_dash, ':')?;
+    let (condition_source, inline_content) =
+        scan::split_top_level_once_with_options(after_dash, ':', scan::ScanOptions::inline_text())?;
     Some(ParsedConditionalBranchHeader {
         builder: ConditionalBranchBuilder {
             is_true_branch: false,
@@ -141,10 +142,6 @@ fn classify_branches(has_initial_condition: bool, branches: &mut [ConditionalBra
 fn non_empty_trimmed(source: &str) -> Option<&str> {
     let trimmed = source.trim();
     (!trimmed.is_empty()).then_some(trimmed)
-}
-
-fn split_top_level_once(source: &str, needle: char) -> Option<(&str, &str)> {
-    scan::split_top_level_once_with_options(source, needle, scan::ScanOptions::inline_text())
 }
 
 impl Parser {

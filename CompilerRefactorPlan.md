@@ -100,7 +100,7 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 3 in progress. R015 through R029 are complete. Phase 1
+- Current phase: Phase 3 in progress. R015 through R031 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
@@ -485,19 +485,27 @@ Use these checks during phase reviews:
     focused coverage for arrows inside arguments and tunnel-onwards override
     targets; `cargo test -p ink-compiler syntax::` passes.
 
-- [ ] R030 Add scanner ownership rules
+- [x] R030 Add scanner ownership rules
   - Purpose: Prevent new syntax modules from adding another local scanner.
   - Approach: Document that top-level scanning must go through `scan.rs` unless
     there is a measured reason not to.
   - Acceptance: The parser module comments or this plan state the rule, and
     `rg` shows no new duplicated scanner helpers.
+  - Completed: `syntax/scan.rs` now documents scanner ownership: syntax
+    modules should add a `ScanOptions` mode instead of local
+    string/escape/nesting state machines; `rg` confirms scanner state lives in
+    `scan.rs` except specialized string-literal parsing.
 
-- [ ] R031 Remove obsolete scanner helpers
+- [x] R031 Remove obsolete scanner helpers
   - Purpose: Avoid old and new scanning paths coexisting.
   - Approach: Delete replaced private helpers from expression, text, choice,
     and divert modules.
   - Acceptance: `cargo check --workspace` passes, and `rg` confirms duplicate
     helper names are gone.
+  - Completed: Removed text/conditional wrapper helpers that only forwarded to
+    `scan.rs`, and deleted the old choice/divert local scan state machines.
+    Expression operator helpers remain only as semantic operator mappers over
+    scanner token matches; `cargo test -p ink-compiler syntax::` passes.
 
 - [ ] R032 Run the scanner changeability drill
   - Purpose: Prove scanner centralization improves future syntax work.

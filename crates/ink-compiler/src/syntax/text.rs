@@ -109,7 +109,7 @@ fn parse_inline_content_inner(
         }
 
         if let Some(rest) = remaining.strip_prefix('{') {
-            let close_index = find_matching_brace(rest)?;
+            let close_index = scan::find_matching_delimiter(rest, '{', '}')?;
             let inner = &rest[..close_index];
             let braced_objects = parse_inline_braced_objects(inner, span, tag_state)?;
             objects.push(Object::ContentList(ContentList::new(braced_objects)));
@@ -135,7 +135,12 @@ fn parse_inline_content_inner(
             break;
         }
 
-        let next_token = find_next_unescaped_inline_token(remaining);
+        let next_token = scan::find_top_level_token_with_options(
+            remaining,
+            &["#", "{", "<>", "->", "<-"],
+            scan::ScanOptions::inline_tokens(),
+        )
+        .map(|(index, _)| index);
 
         match next_token {
             Some(0) => return None,
@@ -176,15 +181,6 @@ fn parse_inline_content_inner(
     }
 }
 
-fn find_next_unescaped_inline_token(source: &str) -> Option<usize> {
-    scan::find_top_level_token_with_options(
-        source,
-        &["#", "{", "<>", "->", "<-"],
-        scan::ScanOptions::inline_tokens(),
-    )
-    .map(|(index, _)| index)
-}
-
 fn unescape_content_text(source: &str) -> String {
     let mut output = String::new();
     let mut chars = source.chars();
@@ -218,10 +214,6 @@ fn parse_inline_braced_objects(
     Some(objects)
 }
 
-fn find_matching_brace(source_after_open: &str) -> Option<usize> {
-    scan::find_matching_delimiter(source_after_open, '{', '}')
-}
-
 fn parse_inline_braced_object(
     source: &str,
     span: &SourceSpan,
@@ -234,9 +226,15 @@ fn parse_inline_braced_object(
         )?));
     }
 
-    if let Some((condition_source, branch_source)) = split_top_level_once(source, ':') {
+    if let Some((condition_source, branch_source)) =
+        scan::split_top_level_once_with_options(source, ':', scan::ScanOptions::inline_text())
+    {
         let condition = super::parse_initial_expression(condition_source.trim())?;
-        let alternatives = split_top_level(branch_source, '|');
+        let alternatives = scan::split_top_level_preserving_whitespace_with_options(
+            branch_source,
+            '|',
+            scan::ScanOptions::inline_text(),
+        );
         if alternatives.len() > 2 {
             return None;
         }
@@ -268,7 +266,9 @@ fn parse_inline_braced_object(
         )));
     }
 
-    if contains_top_level(trimmed, '|') {
+    if scan::split_top_level_once_with_options(trimmed, '|', scan::ScanOptions::inline_text())
+        .is_some()
+    {
         return Some(Object::Sequence(parse_inline_sequence(
             trimmed, span, tag_state,
         )?));
@@ -285,14 +285,18 @@ fn parse_inline_sequence(
     tag_state: &mut InlineTagState,
 ) -> Option<Sequence> {
     let (sequence_type, elements_source) = parse_sequence_type(source.trim_start());
-    let elements = split_top_level(elements_source, '|')
-        .into_iter()
-        .map(|element| {
-            let objects = parse_inline_content_inner(element.trim(), span, true, false, tag_state)
-                .unwrap_or_default();
-            ContentList::new(objects)
-        })
-        .collect::<Vec<_>>();
+    let elements = scan::split_top_level_preserving_whitespace_with_options(
+        elements_source,
+        '|',
+        scan::ScanOptions::inline_text(),
+    )
+    .into_iter()
+    .map(|element| {
+        let objects = parse_inline_content_inner(element.trim(), span, true, false, tag_state)
+            .unwrap_or_default();
+        ContentList::new(objects)
+    })
+    .collect::<Vec<_>>();
 
     Some(Sequence::new(sequence_type, elements))
 }
@@ -338,22 +342,6 @@ pub(super) fn parse_sequence_type_annotation(source: &str) -> Option<(SequenceTy
 
 fn parse_sequence_type(source: &str) -> (SequenceType, &str) {
     parse_sequence_type_annotation(source).unwrap_or((SequenceType::STOPPING, source))
-}
-
-fn contains_top_level(source: &str, needle: char) -> bool {
-    split_top_level_once(source, needle).is_some()
-}
-
-fn split_top_level_once(source: &str, needle: char) -> Option<(&str, &str)> {
-    scan::split_top_level_once_with_options(source, needle, scan::ScanOptions::inline_text())
-}
-
-fn split_top_level(source: &str, separator: char) -> Vec<&str> {
-    scan::split_top_level_preserving_whitespace_with_options(
-        source,
-        separator,
-        scan::ScanOptions::inline_text(),
-    )
 }
 
 fn normalize_divert_separator_whitespace(text: &str) -> String {
