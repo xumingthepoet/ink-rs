@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use crate::diagnostic::{Diagnostic, DiagnosticSeverity};
 
-use super::{eliminate_comments, FileHandler, SourceInput, SourceSpan};
+use super::{eliminate_comments, FileHandler, SourceFile, SourceInput, SourceLine, SourceSpan};
 
 pub(crate) struct PreprocessOptions<'a> {
     pub(crate) source_filename: Option<String>,
@@ -10,7 +10,7 @@ pub(crate) struct PreprocessOptions<'a> {
 }
 
 pub(crate) struct PreprocessOutput {
-    pub(crate) input: Option<SourceInput>,
+    pub(crate) source: Option<SourceFile>,
     pub(crate) diagnostics: Vec<Diagnostic>,
 }
 
@@ -30,10 +30,8 @@ pub(crate) fn preprocess_includes(
     );
 
     PreprocessOutput {
-        input: (!diagnostics_have_errors(&diagnostics)).then(|| SourceInput {
-            text: expanded.into_text(),
-            filename: source_name,
-        }),
+        source: (!diagnostics_have_errors(&diagnostics))
+            .then(|| SourceFile::from_lines(expanded.into_lines())),
         diagnostics,
     }
 }
@@ -105,10 +103,15 @@ fn expand_include_source(
             in_flow = true;
         }
 
+        let source_line = SourceLine {
+            text: line.to_string(),
+            span: SourceSpan::new(source_name.clone(), line_number, 1),
+        };
+
         if in_flow {
-            flow_lines.push(line.to_string());
+            flow_lines.push(source_line);
         } else {
-            root_lines.push(line.to_string());
+            root_lines.push(source_line);
         }
     }
 
@@ -120,17 +123,13 @@ fn expand_include_source(
 
 #[derive(Debug, Default)]
 struct ExpandedInclude {
-    root_lines: Vec<String>,
-    flow_lines: Vec<String>,
+    root_lines: Vec<SourceLine>,
+    flow_lines: Vec<SourceLine>,
 }
 
 impl ExpandedInclude {
-    fn into_text(self) -> String {
-        self.root_lines
-            .into_iter()
-            .chain(self.flow_lines)
-            .collect::<Vec<_>>()
-            .join("\n")
+    fn into_lines(self) -> Vec<SourceLine> {
+        self.root_lines.into_iter().chain(self.flow_lines).collect()
     }
 }
 
@@ -201,6 +200,17 @@ mod tests {
         )
     }
 
+    fn source_text(output: PreprocessOutput) -> String {
+        output
+            .source
+            .unwrap()
+            .lines
+            .into_iter()
+            .map(|line| line.text)
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
     #[test]
     fn root_include_expands_in_place() {
         let file_handler = MemoryFileHandler::new(&[("inc.ink", "Included root.")]);
@@ -208,7 +218,7 @@ mod tests {
         let output = preprocess("A\nINCLUDE inc.ink\nB", Some(&file_handler));
 
         assert_eq!(output.diagnostics, []);
-        assert_eq!(output.input.unwrap().text, "A\nIncluded root.\nB");
+        assert_eq!(source_text(output), "A\nIncluded root.\nB");
     }
 
     #[test]
@@ -222,7 +232,7 @@ mod tests {
 
         assert_eq!(output.diagnostics, []);
         assert_eq!(
-            output.input.unwrap().text,
+            source_text(output),
             "A\nIncluded root.\nB\n= included_flow\nIncluded flow."
         );
     }
@@ -241,7 +251,7 @@ mod tests {
 
         assert_eq!(output.diagnostics, []);
         assert_eq!(
-            output.input.unwrap().text,
+            source_text(output),
             "= knot\nbefore\nIncluded root.\n= included_flow\nIncluded flow.\nafter"
         );
     }
@@ -252,7 +262,7 @@ mod tests {
 
         let output = preprocess("INCLUDE inc.ink", Some(&file_handler));
 
-        assert!(output.input.is_none());
+        assert!(output.source.is_none());
         assert_eq!(output.diagnostics.len(), 1);
         let diagnostic = &output.diagnostics[0];
         assert_eq!(diagnostic.severity, DiagnosticSeverity::Error);
@@ -268,7 +278,7 @@ mod tests {
     fn include_without_file_handler_reports_error() {
         let output = preprocess("INCLUDE missing.ink", None);
 
-        assert!(output.input.is_none());
+        assert!(output.source.is_none());
         assert_eq!(output.diagnostics.len(), 1);
         let diagnostic = &output.diagnostics[0];
         assert_eq!(diagnostic.severity, DiagnosticSeverity::Error);
@@ -287,7 +297,7 @@ mod tests {
 
         let output = preprocess("INCLUDE missing.ink", Some(&file_handler));
 
-        assert!(output.input.is_none());
+        assert!(output.source.is_none());
         assert_eq!(output.diagnostics.len(), 1);
         let diagnostic = &output.diagnostics[0];
         assert_eq!(diagnostic.severity, DiagnosticSeverity::Error);

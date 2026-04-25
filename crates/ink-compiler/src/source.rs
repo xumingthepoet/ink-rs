@@ -61,30 +61,45 @@ pub(crate) struct SourceFile {
 }
 
 impl SourceFile {
+    #[cfg(test)]
     pub fn from_input(input: SourceInput) -> Self {
         let source_name = input.filename;
-        let mut lines = Vec::new();
         let comment_eliminated = eliminate_comments(&input.text);
-
-        for (index, raw_line) in comment_eliminated.lines().enumerate() {
-            let mut text = raw_line.to_string();
-            if index == 0 {
-                text = text.trim_start_matches('\u{feff}').to_string();
-            }
-
-            let is_choice_line = text.trim_start().starts_with(|ch| matches!(ch, '*' | '+'));
-            let text = if is_choice_line {
-                text
-            } else {
-                text.trim_end().to_string()
-            };
-            lines.push(SourceLine {
-                text,
+        let lines = comment_eliminated
+            .lines()
+            .enumerate()
+            .map(|(index, raw_line)| SourceLine {
+                text: raw_line.to_string(),
                 span: SourceSpan::new(source_name.clone(), index + 1, 1),
-            });
-        }
+            })
+            .collect();
+
+        Self::from_lines(lines)
+    }
+
+    pub(crate) fn from_lines(lines: Vec<SourceLine>) -> Self {
+        let lines = lines
+            .into_iter()
+            .enumerate()
+            .map(|(index, line)| SourceLine {
+                text: normalize_line_text(line.text, index),
+                span: line.span,
+            })
+            .collect();
 
         Self { lines }
+    }
+}
+
+fn normalize_line_text(mut text: String, index: usize) -> String {
+    if index == 0 {
+        text = text.trim_start_matches('\u{feff}').to_string();
+    }
+
+    if text.trim_start().starts_with(|ch| matches!(ch, '*' | '+')) {
+        text
+    } else {
+        text.trim_end().to_string()
     }
 }
 

@@ -1,8 +1,10 @@
+#[cfg(test)]
+use crate::source::SourceInput;
 use crate::{
     compiler::StageOutput,
     diagnostic::Diagnostic,
     parsed::{Flow, Object, Story},
-    source::{SourceFile, SourceInput, SourceLine},
+    source::{SourceFile, SourceLine},
 };
 
 use super::rule::RuleParser;
@@ -71,8 +73,13 @@ const STATEMENT_RULES: &[StatementRule] = &[
     },
 ];
 
+#[cfg(test)]
 pub(crate) fn parse(input: SourceInput) -> StageOutput<Story> {
     let source = SourceFile::from_input(input);
+    parse_source(source)
+}
+
+pub(crate) fn parse_source(source: SourceFile) -> StageOutput<Story> {
     let mut parser = Parser::new(source);
     let story = parser.parse_story();
 

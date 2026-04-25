@@ -17,7 +17,9 @@ mod weave;
 
 mod parser;
 
+#[cfg(test)]
 pub(crate) use parser::parse;
+pub(crate) use parser::parse_source;
 
 use crate::{
     parsed::{AuthorWarning, Choice, Object},

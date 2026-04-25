@@ -100,7 +100,7 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 8 in progress. R015 through R075 are complete. Phase 1
+- Current phase: Phase 8 in progress. R015 through R076 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
@@ -1098,13 +1098,17 @@ Use these checks during phase reviews:
     diagnostics, missing file-handler diagnostics, and missing include-file
     diagnostics.
 
-- [ ] R076 Improve include source span strategy
+- [x] R076 Improve include source span strategy
   - Purpose: Diagnostics from included files should point to useful source
     names.
   - Approach: Evaluate whether `SourceInput` needs a richer source map; make
     the smallest practical improvement first.
   - Acceptance: Diagnostics from included content can identify the included
     source name in at least one focused test.
+  - Completed: Changed include preprocessing to return a `SourceFile` with
+    per-line spans instead of a flattened `SourceInput`. Parser diagnostics now
+    preserve included filenames, covered by a compiler test that reports an
+    unsupported syntax diagnostic from `inc.ink`.
 
 - [ ] R077 Add diagnostic categories or codes
   - Purpose: Make parser, analysis, removed-feature, and unsupported-feature

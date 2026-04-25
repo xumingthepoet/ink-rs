@@ -69,14 +69,14 @@ impl Compiler {
                 diagnostics,
             };
         }
-        let Some(input) = preprocessed.input else {
+        let Some(source) = preprocessed.source else {
             return StageOutput {
                 artifact: None,
                 diagnostics,
             };
         };
 
-        let parsed = syntax::parse(input);
+        let parsed = syntax::parse_source(source);
         diagnostics.extend(parsed.diagnostics);
         StageOutput {
             artifact: parsed.artifact,
@@ -167,9 +167,44 @@ fn diagnostics_have_errors(diagnostics: &[Diagnostic]) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use std::{
+        collections::HashMap,
+        io,
+        path::{Path, PathBuf},
+        sync::Arc,
+    };
+
     use serde_json::json;
 
     use super::*;
+
+    struct MemoryFileHandler {
+        files: HashMap<PathBuf, String>,
+    }
+
+    impl MemoryFileHandler {
+        fn new(files: &[(&str, &str)]) -> Self {
+            Self {
+                files: files
+                    .iter()
+                    .map(|(path, contents)| (PathBuf::from(path), contents.to_string()))
+                    .collect(),
+            }
+        }
+    }
+
+    impl FileHandler for MemoryFileHandler {
+        fn resolve_ink_filename(&self, include_name: &str) -> PathBuf {
+            PathBuf::from(include_name)
+        }
+
+        fn load_ink_file_contents(&self, full_filename: &Path) -> io::Result<String> {
+            self.files
+                .get(full_filename)
+                .cloned()
+                .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "include file not found"))
+        }
+    }
 
     #[test]
     fn compiles_plain_text_json() {
@@ -195,5 +230,26 @@ mod tests {
         let output = compiler.compile(SourceInput::new("LIST list = a"));
         assert!(output.artifact.is_none());
         assert_eq!(output.diagnostics.len(), 1);
+    }
+
+    #[test]
+    fn diagnostics_from_included_content_use_include_filename() {
+        let compiler = Compiler::with_options(CompilerOptions {
+            file_handler: Some(Arc::new(MemoryFileHandler::new(&[(
+                "inc.ink",
+                "LIST list = ()",
+            )]))),
+            ..Default::default()
+        });
+
+        let output = compiler.parse(SourceInput::named("INCLUDE inc.ink", "main.ink"));
+
+        assert_eq!(output.diagnostics.len(), 1);
+        let diagnostic = &output.diagnostics[0];
+        assert_eq!(diagnostic.severity, DiagnosticSeverity::Error);
+        assert_eq!(diagnostic.source_filename.as_deref(), Some("inc.ink"));
+        assert_eq!(diagnostic.line, 1);
+        assert_eq!(diagnostic.column, 1);
+        assert_eq!(diagnostic.message, "unsupported syntax: list declaration");
     }
 }
