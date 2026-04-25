@@ -6,8 +6,13 @@ use crate::{
 use super::{is_identifier, is_identifier_continue, scan, text};
 
 pub(super) fn parse_initial_expression(source: &str) -> Option<Expression> {
-    let _ = parse_token_expression(source.trim()).map_err(|error| error.message());
-    parse_expression(source.trim())
+    match parse_token_expression(source.trim()) {
+        Ok(expression) => Some(expression),
+        Err(error) => {
+            let _ = error.message();
+            None
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -205,6 +210,8 @@ fn read_string_literal(source: &str, start: usize) -> (String, usize) {
     let mut literal = String::new();
     let mut index = start + '"'.len_utf8();
     let mut escaped = false;
+    let mut brace_depth = 0;
+    let mut in_nested_string = false;
 
     while index < source.len() {
         let ch = source[index..]
@@ -214,16 +221,39 @@ fn read_string_literal(source: &str, start: usize) -> (String, usize) {
         index += ch.len_utf8();
 
         if escaped {
-            literal.push('\\');
-            literal.push(ch);
+            if brace_depth == 0 {
+                match ch {
+                    'n' => literal.push('\n'),
+                    'r' => literal.push('\r'),
+                    't' => literal.push('\t'),
+                    '"' => literal.push('"'),
+                    '\\' => literal.push('\\'),
+                    other => literal.push(other),
+                }
+            } else {
+                literal.push('\\');
+                literal.push(ch);
+            }
             escaped = false;
             continue;
         }
 
         match ch {
             '\\' => escaped = true,
-            '"' => return (literal, index),
-            _ => literal.push(ch),
+            '"' if brace_depth == 0 => return (literal, index),
+            '"' => {
+                in_nested_string = !in_nested_string;
+                literal.push(ch);
+            }
+            '{' if !in_nested_string => {
+                brace_depth += 1;
+                literal.push(ch);
+            }
+            '}' if !in_nested_string && brace_depth > 0 => {
+                brace_depth -= 1;
+                literal.push(ch);
+            }
+            other => literal.push(other),
         }
     }
 
@@ -354,7 +384,9 @@ impl<'a> TokenExpressionParser<'a> {
                 Ok(Expression::NumberFloat(FloatLiteral::new(parsed)))
             }
             ExpressionTokenKind::StringLiteral(value) => Ok(parse_string_expression(&value)),
-            ExpressionTokenKind::Identifier(name) => self.parse_identifier_or_call(&name),
+            ExpressionTokenKind::Identifier(name) => {
+                self.parse_identifier_or_call(&name, token.span.clone())
+            }
             ExpressionTokenKind::Arrow => self.parse_divert_target(),
             ExpressionTokenKind::Operator(operator)
                 if matches!(operator.as_str(), "-" | "!" | "not") =>
@@ -391,7 +423,11 @@ impl<'a> TokenExpressionParser<'a> {
         }
     }
 
-    fn parse_identifier_or_call(&mut self, name: &str) -> Result<Expression, ExpressionParseError> {
+    fn parse_identifier_or_call(
+        &mut self,
+        name: &str,
+        span: SourceSpan,
+    ) -> Result<Expression, ExpressionParseError> {
         if name == "true" {
             return Ok(Expression::NumberBool(true));
         }
@@ -400,7 +436,24 @@ impl<'a> TokenExpressionParser<'a> {
         }
 
         if !self.match_kind(|kind| matches!(kind, ExpressionTokenKind::OpenParen)) {
+            if !is_path_identifier(name) {
+                return Err(ExpressionParseError::new(
+                    ExpressionParseErrorKind::ExpectedExpression {
+                        found: Some(name.to_string()),
+                    },
+                    span,
+                ));
+            }
             return Ok(Expression::VariableReference(name.to_string()));
+        }
+
+        if !is_identifier(name) {
+            return Err(ExpressionParseError::new(
+                ExpressionParseErrorKind::ExpectedExpression {
+                    found: Some(name.to_string()),
+                },
+                span,
+            ));
         }
 
         let mut args = Vec::new();
@@ -564,154 +617,6 @@ fn describe_token_kind(kind: &ExpressionTokenKind) -> String {
     }
 }
 
-fn parse_expression(source: &str) -> Option<Expression> {
-    let source = strip_enclosing_parentheses(source.trim());
-    if let Some((left, operator, right)) = split_top_level_text_operators(
-        source,
-        &[
-            TextOperator::symbol("&&", BinaryOperator::AndSymbol),
-            TextOperator::symbol("||", BinaryOperator::OrSymbol),
-            TextOperator::word("and", BinaryOperator::And),
-            TextOperator::word("or", BinaryOperator::Or),
-        ],
-    ) {
-        return Some(Expression::Binary {
-            operator,
-            left: Box::new(parse_expression(left)?),
-            right: Box::new(parse_expression(right)?),
-        });
-    }
-    if let Some((left, operator, right)) = split_top_level_word_operator(
-        source,
-        &[
-            ("==", BinaryOperator::Equals),
-            ("!=", BinaryOperator::NotEquals),
-            (">=", BinaryOperator::GreaterThanOrEquals),
-            ("<=", BinaryOperator::LessThanOrEquals),
-            (">", BinaryOperator::GreaterThan),
-            ("<", BinaryOperator::LessThan),
-        ],
-    ) {
-        return Some(Expression::Binary {
-            operator,
-            left: Box::new(parse_expression(left)?),
-            right: Box::new(parse_expression(right)?),
-        });
-    }
-    if let Some((left, operator, right)) =
-        split_top_level_word_operator(source, &[("!?", BinaryOperator::Hasnt)])
-    {
-        return Some(Expression::Binary {
-            operator,
-            left: Box::new(parse_expression(left)?),
-            right: Box::new(parse_expression(right)?),
-        });
-    }
-    if let Some((left, operator, right)) = split_top_level_text_operators(
-        source,
-        &[
-            TextOperator::word("hasnt", BinaryOperator::Hasnt),
-            TextOperator::word("has", BinaryOperator::Has),
-            TextOperator::symbol("?", BinaryOperator::Has),
-        ],
-    ) {
-        return Some(Expression::Binary {
-            operator,
-            left: Box::new(parse_expression(left)?),
-            right: Box::new(parse_expression(right)?),
-        });
-    }
-    if let Some((left, operator, right)) = split_top_level_operator(
-        source,
-        &[("+", BinaryOperator::Add), ("-", BinaryOperator::Subtract)],
-    ) {
-        return Some(Expression::Binary {
-            operator,
-            left: Box::new(parse_expression(left)?),
-            right: Box::new(parse_expression(right)?),
-        });
-    }
-    if let Some((left, operator, right)) =
-        split_top_level_operator(source, &[("*", BinaryOperator::Multiply)])
-    {
-        return Some(Expression::Binary {
-            operator,
-            left: Box::new(parse_expression(left)?),
-            right: Box::new(parse_expression(right)?),
-        });
-    }
-    if let Some((left, operator, right)) =
-        split_top_level_operator(source, &[("/", BinaryOperator::Divide)])
-    {
-        return Some(Expression::Binary {
-            operator,
-            left: Box::new(parse_expression(left)?),
-            right: Box::new(parse_expression(right)?),
-        });
-    }
-    if let Some((left, right)) = split_top_level_word_text_operator(source, "mod") {
-        return Some(Expression::Binary {
-            operator: BinaryOperator::Modulo,
-            left: Box::new(parse_expression(left)?),
-            right: Box::new(parse_expression(right)?),
-        });
-    }
-    if let Some((left, operator, right)) =
-        split_top_level_operator(source, &[("%", BinaryOperator::Modulo)])
-    {
-        return Some(Expression::Binary {
-            operator,
-            left: Box::new(parse_expression(left)?),
-            right: Box::new(parse_expression(right)?),
-        });
-    }
-    if let Some(value) = parse_quoted_string_literal(source) {
-        return Some(parse_string_expression(&value));
-    }
-    if let Some((name, args)) = parse_function_call(source) {
-        return Some(Expression::FunctionCall { name, args });
-    }
-    if let Some(target) = source.strip_prefix("->") {
-        return Some(Expression::DivertTarget(
-            crate::parsed::DivertTarget::from_source(target).to_snapshot_string(),
-        ));
-    }
-    if let Some((operator, inner)) = parse_unary_prefix(source) {
-        return Some(unary_expression(operator, parse_expression(inner)?));
-    }
-    if source == "true" {
-        return Some(Expression::NumberBool(true));
-    }
-    if source == "false" {
-        return Some(Expression::NumberBool(false));
-    }
-    if let Ok(value) = source.parse::<i32>() {
-        return Some(Expression::NumberInt(value));
-    }
-    if source.contains('.') {
-        if let Ok(value) = source.parse::<f64>() {
-            return Some(Expression::NumberFloat(FloatLiteral::new(value)));
-        }
-    }
-    is_path_identifier(source).then(|| Expression::VariableReference(source.to_string()))
-}
-
-fn parse_unary_prefix(source: &str) -> Option<(UnaryOperator, &str)> {
-    if let Some(inner) = source.strip_prefix('-') {
-        return Some((UnaryOperator::Negate, inner.trim_start()));
-    }
-    if let Some(inner) = source.strip_prefix('!') {
-        return Some((UnaryOperator::Not, inner.trim_start()));
-    }
-    if let Some(inner) = source.strip_prefix("not") {
-        let next_is_identifier = inner.chars().next().is_some_and(is_identifier_continue);
-        if !next_is_identifier {
-            return Some((UnaryOperator::Not, inner.trim_start()));
-        }
-    }
-    None
-}
-
 fn unary_expression(operator: UnaryOperator, expression: Expression) -> Expression {
     match (operator, expression) {
         (UnaryOperator::Negate, Expression::NumberInt(value)) => Expression::NumberInt(-value),
@@ -723,29 +628,6 @@ fn unary_expression(operator: UnaryOperator, expression: Expression) -> Expressi
             expression: Box::new(expression),
         },
     }
-}
-
-fn parse_function_call(source: &str) -> Option<(String, Vec<Expression>)> {
-    let open_index = source.find('(')?;
-    if !source.ends_with(')') {
-        return None;
-    }
-
-    let name = source[..open_index].trim();
-    if !is_identifier(name) {
-        return None;
-    }
-
-    let args_source = &source[open_index + 1..source.len() - 1];
-    let args = if args_source.trim().is_empty() {
-        Vec::new()
-    } else {
-        split_top_level_args(args_source)
-            .into_iter()
-            .map(parse_expression)
-            .collect::<Option<Vec<_>>>()?
-    };
-    Some((name.to_string(), args))
 }
 
 fn parse_string_expression(value: &str) -> Expression {
@@ -779,242 +661,6 @@ fn flatten_string_expression_content(objects: Vec<Object>) -> Vec<Object> {
 
 pub(super) fn split_top_level_args(source: &str) -> Vec<&str> {
     scan::split_top_level_with_options(source, ',', scan::ScanOptions::expression())
-}
-
-fn split_top_level_operator<'a>(
-    source: &'a str,
-    operators: &[(&'static str, BinaryOperator)],
-) -> Option<(&'a str, BinaryOperator, &'a str)> {
-    split_top_level_operator_text(source, operators, false, true)
-}
-
-fn split_top_level_word_operator<'a>(
-    source: &'a str,
-    operators: &[(&'static str, BinaryOperator)],
-) -> Option<(&'a str, BinaryOperator, &'a str)> {
-    split_top_level_operator_text(source, operators, false, true)
-}
-
-fn split_top_level_operator_text<'a>(
-    source: &'a str,
-    operators: &[(&'static str, BinaryOperator)],
-    require_word_boundaries: bool,
-    reject_unary_position: bool,
-) -> Option<(&'a str, BinaryOperator, &'a str)> {
-    let tokens = operators
-        .iter()
-        .map(|(operator_text, _)| *operator_text)
-        .collect::<Vec<_>>();
-    scan::top_level_token_matches_with_options(source, &tokens, scan::ScanOptions::expression())
-        .into_iter()
-        .rev()
-        .find_map(|(index, operator_text)| {
-            if require_word_boundaries && !has_word_boundaries(source, index, operator_text.len()) {
-                return None;
-            }
-
-            let (_, operator) = operators
-                .iter()
-                .find(|(candidate, _)| *candidate == operator_text)?;
-            let left = source[..index].trim();
-            let right = source[index + operator_text.len()..].trim();
-
-            if left.is_empty() || right.is_empty() {
-                return None;
-            }
-
-            if reject_unary_position && is_unary_operator_position(source, index) {
-                return None;
-            }
-
-            Some((left, *operator, right))
-        })
-}
-
-fn split_top_level_word_text_operator<'a>(
-    source: &'a str,
-    operator: &str,
-) -> Option<(&'a str, &'a str)> {
-    split_top_level_text_operator_with_boundaries(source, operator, true)
-}
-
-#[derive(Clone, Copy)]
-struct TextOperator {
-    text: &'static str,
-    operator: BinaryOperator,
-    require_word_boundaries: bool,
-}
-
-impl TextOperator {
-    fn symbol(text: &'static str, operator: BinaryOperator) -> Self {
-        Self {
-            text,
-            operator,
-            require_word_boundaries: false,
-        }
-    }
-
-    fn word(text: &'static str, operator: BinaryOperator) -> Self {
-        Self {
-            text,
-            operator,
-            require_word_boundaries: true,
-        }
-    }
-}
-
-fn split_top_level_text_operators<'a>(
-    source: &'a str,
-    operators: &[TextOperator],
-) -> Option<(&'a str, BinaryOperator, &'a str)> {
-    let tokens = operators
-        .iter()
-        .map(|operator| operator.text)
-        .collect::<Vec<_>>();
-    scan::top_level_token_matches_with_options(source, &tokens, scan::ScanOptions::expression())
-        .into_iter()
-        .rev()
-        .find_map(|(index, operator_text)| {
-            let operator = operators
-                .iter()
-                .find(|operator| operator.text == operator_text)?;
-
-            if operator.require_word_boundaries
-                && !has_word_boundaries(source, index, operator.text.len())
-            {
-                return None;
-            }
-
-            let left = source[..index].trim();
-            let right = source[index + operator.text.len()..].trim();
-            if left.is_empty() || right.is_empty() {
-                return None;
-            }
-
-            Some((left, operator.operator, right))
-        })
-}
-
-fn split_top_level_text_operator_with_boundaries<'a>(
-    source: &'a str,
-    operator: &str,
-    require_word_boundaries: bool,
-) -> Option<(&'a str, &'a str)> {
-    scan::top_level_token_matches_with_options(source, &[operator], scan::ScanOptions::expression())
-        .into_iter()
-        .rev()
-        .find_map(|(index, _)| {
-            if require_word_boundaries && !has_word_boundaries(source, index, operator.len()) {
-                return None;
-            }
-
-            let left = source[..index].trim();
-            let right = source[index + operator.len()..].trim();
-            if left.is_empty() || right.is_empty() {
-                return None;
-            }
-
-            Some((left, right))
-        })
-}
-
-fn has_word_boundaries(source: &str, index: usize, length: usize) -> bool {
-    let before = source[..index].chars().next_back();
-    let after = source[index + length..].chars().next();
-    before.is_none_or(|ch| !is_identifier_continue(ch))
-        && after.is_none_or(|ch| !is_identifier_continue(ch))
-}
-
-fn is_unary_operator_position(source: &str, index: usize) -> bool {
-    let left = source[..index].trim_end();
-    let Some(previous) = left.chars().next_back() else {
-        return true;
-    };
-    matches!(
-        previous,
-        '(' | ',' | '+' | '-' | '*' | '/' | '%' | '<' | '>' | '=' | '!' | '?' | '^'
-    )
-}
-
-fn strip_enclosing_parentheses(source: &str) -> &str {
-    let mut current = source.trim();
-    loop {
-        let Some(inner) = current
-            .strip_prefix('(')
-            .and_then(|value| value.strip_suffix(')'))
-        else {
-            return current;
-        };
-        if !parentheses_wrap_entire_expression(current) {
-            return current;
-        }
-        current = inner.trim();
-    }
-}
-
-fn parentheses_wrap_entire_expression(source: &str) -> bool {
-    let Some(after_open) = source.strip_prefix('(') else {
-        return false;
-    };
-    scan::find_matching_delimiter(after_open, '(', ')')
-        .is_some_and(|close_index| close_index + 1 == after_open.len())
-}
-
-fn parse_quoted_string_literal(source: &str) -> Option<String> {
-    let mut chars = source.chars();
-    if chars.next()? != '"' {
-        return None;
-    }
-
-    let mut value = String::new();
-    let mut escaped = false;
-    let mut brace_depth = 0;
-    let mut in_nested_string = false;
-    for ch in chars.by_ref() {
-        if escaped {
-            if brace_depth == 0 {
-                match ch {
-                    'n' => value.push('\n'),
-                    'r' => value.push('\r'),
-                    't' => value.push('\t'),
-                    '"' => value.push('"'),
-                    '\\' => value.push('\\'),
-                    other => value.push(other),
-                }
-            } else {
-                value.push('\\');
-                value.push(ch);
-            }
-            escaped = false;
-            continue;
-        }
-
-        match ch {
-            '\\' => escaped = true,
-            '"' if brace_depth == 0 => {
-                return if chars.as_str().trim().is_empty() {
-                    Some(value)
-                } else {
-                    None
-                };
-            }
-            '"' => {
-                in_nested_string = !in_nested_string;
-                value.push(ch);
-            }
-            '{' if !in_nested_string => {
-                brace_depth += 1;
-                value.push(ch);
-            }
-            '}' if !in_nested_string && brace_depth > 0 => {
-                brace_depth -= 1;
-                value.push(ch);
-            }
-            other => value.push(other),
-        }
-    }
-
-    None
 }
 
 fn is_path_identifier(source: &str) -> bool {

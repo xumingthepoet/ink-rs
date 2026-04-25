@@ -100,13 +100,13 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 4 in progress. R015 through R038 are complete. Phase 1
+- Current phase: Phase 4 in progress. R015 through R040 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
 - Last focused validation:
-  `cargo test -p ink-compiler syntax::expression::tests::` on 2026-04-25,
-  passed.
+  `cargo check -p ink-compiler`, `cargo test -p ink-compiler syntax::`, and
+  `cargo test -p ink-test --test compiler_conformance` on 2026-04-25, passed.
 - Known blockers: none for behavior-preserving refactors.
 
 ## Focused Validation Commands
@@ -599,19 +599,29 @@ Use these checks during phase reviews:
     and trailing unknown tokens with asserted messages and columns;
     `cargo test -p ink-compiler syntax::expression::tests::` passes.
 
-- [ ] R039 Switch compiler entry points to the new expression parser
+- [x] R039 Switch compiler entry points to the new expression parser
   - Purpose: Use the new expression parser in real compiler flows.
   - Approach: Route all expression entry points through the tokenizer-based
     parser.
   - Acceptance: Parser conformance, expression focused tests, and language
     smoke tests pass.
+  - Completed: `parse_initial_expression` now routes through the token-backed
+    expression parser. The switch preserved expression snapshots, parser
+    syntax tests, and compiler conformance JSON snapshots; `cargo check -p
+    ink-compiler`, `cargo test -p ink-compiler syntax::`, and `cargo test -p
+    ink-test --test compiler_conformance` pass.
 
-- [ ] R040 Remove old expression string-splitting parser
+- [x] R040 Remove old expression string-splitting parser
   - Purpose: Avoid maintaining two expression implementations.
   - Approach: Delete old split helpers and old parser branches after the new
     parser is active.
   - Acceptance: No dead parser path remains, and `cargo check --workspace`
     passes.
+  - Completed: Deleted the old recursive string-splitting expression parser,
+    including its operator split helpers, parenthesis stripping, function-call
+    splitting, unary-prefix branch, and standalone quoted-string parser. The
+    expression module now has one parser path plus the shared argument splitter
+    used by divert syntax; `cargo check -p ink-compiler` passes.
 
 - [ ] R041 Run the expression operator drill
   - Purpose: Prove a future operator change is localized.
