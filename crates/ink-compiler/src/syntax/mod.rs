@@ -4,6 +4,7 @@ mod divert;
 mod error;
 mod knot;
 mod rule;
+mod sequence;
 mod state;
 mod text;
 
@@ -21,11 +22,6 @@ use crate::{
 };
 
 use self::rule::RuleParser;
-
-fn is_multiline_sequence_element_start(line: &SourceLine) -> bool {
-    let trimmed = line.text.trim_start();
-    trimmed.starts_with('-') && !trimmed.starts_with("->")
-}
 
 fn group_nested_weaves(objects: Vec<Object>, base_depth: usize) -> Vec<Object> {
     let mut grouped = Vec::new();

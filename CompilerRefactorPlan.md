@@ -100,9 +100,9 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 2 in progress. R015 and R016 are complete. Phase 1 is
-  complete except the first real intentional-divergence fixture, which should
-  wait until an actual language change is chosen.
+- Current phase: Phase 2 in progress. R015 through R017 are complete. Phase 1
+  is complete except the first real intentional-divergence fixture, which
+  should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
 - Last focused validation: `cargo check -p ink-compiler`,
   `cargo test -p ink-compiler syntax::`, and
@@ -144,6 +144,8 @@ Full validation:
   plus focused submodules under `crates/ink-compiler/src/syntax/`.
 - Multiline conditional parsing:
   `crates/ink-compiler/src/syntax/conditional.rs`.
+- Multiline sequence parsing:
+  `crates/ink-compiler/src/syntax/sequence.rs`.
 - Parsed model: `crates/ink-compiler/src/parsed/`.
 - Analysis entry point: `analysis::analyze` in
   `crates/ink-compiler/src/analysis.rs`.
@@ -323,13 +325,17 @@ Use these checks during phase reviews:
     `syntax/conditional.rs`; `cargo test -p ink-compiler syntax::` and
     `cargo test -p ink-test --test compiler_conformance` pass.
 
-- [ ] R017 Extract `syntax/sequence.rs`
+- [x] R017 Extract `syntax/sequence.rs`
   - Purpose: Isolate sequence syntax, which is likely to change or shrink in a
     Rust-first language design.
   - Approach: Move multiline sequence parsing and share sequence type annotation
     parsing with inline text parsing through a narrow API.
   - Acceptance: Sequence fixtures pass, and there is only one implementation
     of sequence type annotation parsing.
+  - Completed: Multiline sequence parsing now lives in `syntax/sequence.rs`
+    while sequence type annotation parsing remains shared through
+    `syntax/text.rs`; `cargo test -p ink-compiler syntax::` and
+    `cargo test -p ink-test --test compiler_conformance` pass.
 
 - [ ] R018 Extract `syntax/weave.rs`
   - Purpose: Make weave grouping explicit instead of hidden in the parser
