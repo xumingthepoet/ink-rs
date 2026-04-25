@@ -100,7 +100,7 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 8 in progress. R015 through R079 are complete. Phase 1
+- Current phase: Phase 8 in progress. R015 through R080 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
@@ -1146,12 +1146,16 @@ Use these checks during phase reviews:
     and text lines with unclosed inline `{...}` report a specific inline syntax
     diagnostic instead of falling back to generic unsupported syntax.
 
-- [ ] R080 Update architecture documentation
+- [x] R080 Update architecture documentation
   - Purpose: `docs/ArchitectureAndDevOverview.md` should describe the Rust
     compiler architecture, not primarily the old C# model.
   - Approach: Rewrite the compiler sections around source, syntax, parsed
     model, analysis, lowering, and emit modules.
   - Acceptance: The documentation matches the post-refactor module layout.
+  - Completed: Rewrote `docs/ArchitectureAndDevOverview.md` around the current
+    Rust compiler pipeline: source preprocessing, diagnostics, syntax, parsed
+    model, analysis, lowering, emit, runtime, reference implementation, testing,
+    and debugging guidance.
 
 - [ ] R081 Add a language divergence documentation location
   - Purpose: Intentional language changes need a stable home.

@@ -2,219 +2,212 @@
 
 ## Overview
 
-The ink pipeline broadly consists of 3 stages:
+This repository has two main layers:
 
- * The ink parser - interprets the ink text files to a hierarchy of objects
- * The runtime code generation
- * The runtime engine itself
+- `crates/ink-compiler`: parses Ink source, checks the parsed story, lowers it
+  into runtime-shaped IR, and emits the JSON story format.
+- `crates/ink-runtime`: loads and runs the JSON story format.
 
-The following is a fairly brief tour of these 3 stages, hopefully enough to give you a foundation for exploring the codebase yourself.
+The runtime is already close to the quality target for this project: small
+files, clear ownership, and direct mapping from runtime concepts to modules.
+The compiler is being refactored to the same standard. Compiler behavior should
+still be checked against `ink-csharp/`, but the Rust implementation should use
+Rust-native modules, enums, structs, and explicit state instead of copying the
+C# inheritance model.
 
-## Ink parser
+The high-level compiler pipeline is:
 
-The parser takes a root ink file (which may reference other ink files), and constructs a hierarchy of `Parsed.Object` objects that closely resemble the structure within the original ink files, as closely as possible to how it was written.
-
-The parser is a hand-written recursive descent parser that inherits from `StringParser`, which allows a hierarchy of parse rules to be built using C# delegates. At the top level, `InkParser.cs` contains a method called `Parse()`, which returns a `Parsed.Story` object.
-
-Within `Parse()`, rules evaluated, each of which may contain more rules. Rules are simply methods that return the result of parsing or `null` if parsing failed (though there are exceptions to this).
-
-Crucially however, parse rules are wrapped in either `ParseObject(rule)` or `Parse<T>(rule)`. These methods know how to rewind the state of the parser when a rule fails. This is important, since the rule may get part way through before it realises that it's not parsing what it wanted. By way of illustration, here's the start of the parse rule for a stitch:
-
-```csharp
-protected object StitchDefinition()
-{
-    // Wrap the 'StitchDeclaration' rule in a Parse(...) call,
-    // so that it will return to the correct point in the ink
-    // file if parsing fails.
-    var decl = Parse(StitchDeclaration);
-    if (decl == null)
-        return null;
-
-    //... (continue parsing the StitchDefinition)
+```text
+SourceInput
+  -> source preprocessing
+  -> syntax parsing
+  -> parsed model
+  -> analysis
+  -> lowering IR
+  -> JSON emit
+  -> runtime Story
 ```
 
-If a rule isn't wrapped in a `Parse` method, then it's an indication that rewinding definitely isn't strictly necessary within the scope, for example if a sub-rule is both optional and atomic. Or, when success and failure of the rule is handled manually.
+`Compiler::compile` in `crates/ink-compiler/src/compiler.rs` wires these stages
+together. Each stage returns a `StageOutput<T>` with an optional artifact and a
+list of `Diagnostic` values.
 
-## StringParser structuring
+## Compiler Pipeline
 
-The base class `StringParser` contains a number of helper methods to help with parsing.
+### Source
 
-Methods like `ParseString`, `ParseSingleCharacter`, `ParseInt`, etc can be used to read text and values at the lowest level.
+Source ownership lives in `crates/ink-compiler/src/source.rs` and
+`crates/ink-compiler/src/source/preprocess.rs`.
 
-Higher level structuring methods can be used to compose rules together. For example:
+- `SourceInput` is the public source entry point.
+- `FileHandler` resolves and loads `INCLUDE` files.
+- `SourceFile` is the compiler-internal line model passed to syntax parsing.
+- `SourceLine` carries normalized line text plus a `SourceSpan`.
+- `preprocess_includes` expands `INCLUDE` statements before syntax parsing,
+  preserves root/flow ordering, detects recursive includes, and keeps per-line
+  source spans for included files.
 
-```csharp
-public List<object> OneOrMore(ParseRule rule)
+Source preprocessing should stay limited to file-level concerns: comments,
+includes, file names, and line spans. It should not parse language constructs.
+
+### Diagnostics
+
+Diagnostics are defined in `crates/ink-compiler/src/diagnostic.rs`.
+
+`Diagnostic` carries:
+
+- severity: error, warning, or author warning
+- optional `DiagnosticCode`
+- message
+- source filename, line, and column
+
+Messages are still important for users, but tests should prefer stable codes
+when a code exists. New parser or analysis errors should get a code when the
+category is likely to be asserted in tests or handled by tools.
+
+### Syntax
+
+Syntax parsing lives in `crates/ink-compiler/src/syntax/`.
+
+The top-level parser is `syntax/parser.rs`. It consumes `SourceFile`, walks
+`SourceLine` values, and dispatches to focused statement rules in a stable
+order. The parser should own syntax decisions and diagnostics for malformed
+source. Lowering should not compensate for syntax shapes that were parsed
+ambiguously.
+
+Important syntax modules:
+
+- `rule.rs`: `RuleParser`, the local parser facade for one source line.
+- `state.rs`: parser state and rule checkpoints.
+- `scan.rs`: shared top-level scanning for strings, braces, parentheses, and
+  escaped separators.
+- `expression.rs`: tokenization and Pratt-style expression parsing.
+- `choice.rs`, `gather.rs`, `weave.rs`: weave-point syntax.
+- `conditional.rs`, `sequence.rs`: braced multiline and inline structures.
+- `text.rs`: inline content, glue, tags, inline diverts, and braced content.
+- `knot.rs`, `variable.rs`, `declaration.rs`, `logic.rs`, `divert.rs`:
+  statement families.
+
+Rules should fail by rewinding parser state unless they intentionally emit a
+diagnostic. Use `RuleParser` and `scan` helpers rather than ad hoc cursor
+management.
+
+### Parsed Model
+
+The parsed model lives in `crates/ink-compiler/src/parsed/`.
+
+Parsed types represent high-level Ink concepts: `Story`, `Flow`, `Weave`,
+`Choice`, `Gather`, `Divert`, `Expression`, `Conditional`, `Sequence`,
+`VariableAssignment`, and related nodes. Parsed objects should preserve semantic
+information that later stages need. Avoid sending raw source strings into
+analysis or lowering when a typed parsed node can own the concept.
+
+`parsed/visit.rs` provides traversal helpers used by analysis and tests. Add to
+the parsed model first when a feature exposes structural data; lowering should
+consume typed structure instead of rediscovering syntax.
+
+### Analysis
+
+Analysis lives in `crates/ink-compiler/src/analysis/`.
+
+This stage checks story-wide semantic rules before lowering:
+
+- `names.rs`: naming collisions and duplicate definitions
+- `variables.rs`: global, temp, and argument indexing
+- `targets.rs`: divert and call target validation
+- `flow.rs`: termination and loose-end checks
+- `constants.rs`: constant collection and redefinition behavior
+- `warnings.rs`: author warnings
+- `target_symbols.rs` and `variable_targets.rs`: typed lookup support
+- `span.rs`: span helpers for diagnostics
+
+Analysis owns semantic diagnostics. Syntax should not know about story-wide
+symbol tables, and lowering should not be the first place a semantic error is
+discovered when analysis can check it.
+
+### Lowering
+
+Lowering lives in `crates/ink-compiler/src/lower.rs` and
+`crates/ink-compiler/src/lower/`.
+
+The lowering stage converts the checked parsed model into runtime-shaped IR in
+`lower/ir.rs`. It is split by responsibility:
+
+- `context.rs`: lowering state, container stack, and scoped state
+- `indexes.rs`: story-wide target, count, variable, and constant indexes
+- `labels.rs`: label index construction
+- `path.rs`: runtime path types and path compaction
+- `flow.rs`: story, knot, stitch, and function containers
+- `weave.rs`: choices, gathers, and weave-point lowering
+- `conditional.rs`: conditional lowering
+- `sequence.rs`: sequence lowering
+- `expression.rs`: expression and command lowering
+
+Lowering should be deterministic and mostly diagnostic-free. If lowering needs
+to know whether a target, variable, or symbol exists, prefer adding a typed
+analysis/index result rather than searching strings locally.
+
+### Emit
+
+`crates/ink-compiler/src/emit.rs` serializes the lowering IR into the runtime
+JSON story format. It should remain a narrow JSON writer. It should not parse
+Ink, validate semantics, or rewrite runtime paths beyond what the lowering IR
+already describes.
+
+## Runtime
+
+The runtime layer in `crates/ink-runtime` loads and executes the JSON format.
+Important modules include:
+
+- `story/`: story execution, navigation, choices, tags, flow, state, errors,
+  external functions, and variable observers
+- `container.rs`, `object.rs`, `path.rs`, `pointer.rs`: runtime object graph and
+  addressing
+- `json/`: JSON tokenizer, reader, and writer support
+- `choice.rs`, `choice_point.rs`, `divert.rs`, `control_command.rs`,
+  `native_function_call.rs`, `value.rs`: runtime instruction/value types
+
+Compiler work should preserve runtime JSON compatibility unless the language
+change explicitly requires a coordinated runtime change.
+
+## Reference Implementation
+
+`ink-csharp/` remains the behavioral reference for upstream Ink compatibility.
+Use it when compiler behavior is unclear, especially for parser trial order,
+weave structure, path compaction, and JSON shape.
+
+The Rust compiler does not need to copy C# class structure. Prefer Rust-native
+ownership and module boundaries as long as behavior remains compatible for
+features that are still intentionally supported.
+
+## Testing And Validation
+
+Use the smallest relevant validation first, then widen:
+
+```text
+cargo fmt --all --check
+cargo check --workspace
+cargo test -p ink-compiler <focused filter>
+cargo test -p ink-test --features csharp-tests --test csharp_tests -- <focused C# test>
+cargo test --workspace
+make gate
 ```
 
-...acts a bit like the `+` operator in regular expressions. So for example, in multiline conditionals, we have:
+`make gate` is the project-level gate and includes the C# parity tests. If a
+compiler change intentionally changes language behavior, update tests and
+`docs/WritingWithInk.md` in the same change.
 
-```csharp
-List<object> multipleConditions = OneOrMore (SingleMultilineCondition)
-```
+## Debugging Tips
 
-Similarly, but even more powerfully, the `Interleave` method patterns of the form ABABA etc. Frequently, this is used to interleave some core content with whitespace. Here's an example that parses the arguments to a flow (e.g. knot, stitch or function), that is a series of identifiers separated by commas:
-
-```csharp
-var flowArguments = Interleave<FlowBase.Argument>(
-    Spaced(FlowDeclArgument),
-    Exclude (String(","))
-);
-```
-
-The above example also demonstrates another concept: rule transformers and builders. In the above example, `Spaced` takes a rule, and produces a new rule that also allows for optional whitespace on either side of the content that is parsed.
-
-The `Exclude` transformer takes a rule, and if it succeeds, prevents its result from being included in the `Interleave`'s returned list (to remove the commas from the parsed results).
-
-The `String` rule is like `ParseString` except that it **constructs rules** rather than parsing immediately, which is useful for conveniently constructing declarative expressions like the one above.
-
-Other transformers and structuring concepts exist, but hopefully this should give you enough of a taste to get started.
-
-## Runtime code generation
-
-The parsed hierarchy closely resembles the ink as it was originally written. However, the data that's loaded by the ink engine at runtime is very different. It's built out of smaller, more fundamental units, sort of like byte code, though not that low level. This content is exported to a JSON based format ready to be loaded by the runtime engine within the game. For more information on this format, [see the documentation](ink_JSON_runtime_format.md).
-
-In the runtime, there's no concept of Knots, Stitches, Weave, or other high level ink structures. Instead, the runtime consists mainly of general purpose `Runtime.Container` objects and content, inheriting from `Runtime.Object`.
-
-These runtime objects are built by the `Parsed.Object` hierarchy, however not immediately. The constructors of `Parsed.Object` objects are kept as lightweight as possible, since the rewinding of the parser when rules fail can potentially cause them to be built and destroyed multiple times before a final successful hierarchy is produced.
-
-Instead, the hard work of converting the parsed hierarchy into runtime code is saved for two steps that are done later:
-
- * Main code generation
- * Resolving of references
-
-In most cases, a single `Parsed.Object` is converted to one or more `Runtime.Object`, through the following method:
-
-```csharp
-public override Runtime.Object GenerateRuntimeObject () {...}
-```
-
-At the top level, this code generation process is kicked off by the `Parsed.Story` in:
-
-```csharp
-public Runtime.Story ExportRuntime()
-```
-
-Once the full runtime hierarchy has been constructed, references are resolved. This has to be done in a separate pass, since the target of references (such as divert targets - knot names etc) may not exist yet until the full hierarchy exists.
-
-Each `Parsed.Object` can implement:
-
-```csharp
-public override void ResolveReferences(Story context)
-```
-
-...in order to participate in this process. For example in `Divert.cs`, the method contains this (as well as other things):
-
-```csharp
-if (targetContent) {
-    runtimeDivert.targetPath = targetContent.runtimePath;
-}
-```
-
-## Runtime ink engine
-
-As mentioned above, the runtime code is built out of smaller, simpler, objects compared to the ink as it's parsed directly.
-
-All the higher level structures, including the story itself, any knots and stitches, and even choices, are built out of containers. Within the containers, content is iterated through sequentially, and appended to the output.
-
-This structure is loaded by the ink engine in a [JSON based format](ink_JSON_runtime_format.md).
-
-### Containers
-
-The `Runtime.Container` is general purpose, and can work as either than array or a dictionary, or both. Therefore, it can have ordered (indexed content) that's designed to be iterated through sequentially, and can also have named content, that's designed to be accessed by a string key.
-
-For example, a `Parsed.Choice` compiles down to a `Runtime.Container` that contains, amongst other things, the initial sequential content that forms the text of the choice, the minimal `Runtime.ChoicePoint` itself, as well as a named sub-container that contains the content that is run when the choice is picked by the player.
-
-### Content
-
-As with ink itself, the runtime engine's fundamental unit is content, rather than code. As such, a simple "Hello world" ink file would be compiled down to a single `Runtime.Container` with a single `Runtime.StringValue` in it (as well as a terminator).
-
-Each piece of content that is encountered is appended to the `outputStream` within the `Runtime.Story`.
-
-### Control commands
-
-Alongside the content that's designed to be seen by the player, additional commands are used to control the flow and evaluation of the content. Some examples, all of which are in the enum `Runtime.ControlCommand.CommandType`:
-
-* `EvalStart` and `EvalEnd`: the content objects between are appended to the `evaluationStack` rather than the `outputStream`. As functions and operators are encountered, they pop values off the stack, process them, and push a value back on the stack. Meanwhile, `EvalOutput` pops a value off the evaluation stack, and pushes it onto the output stream.
-* `ChoiceCount`: how many choices have been produced in the current turn? Push the value to the output stream (or evaluation stack if in evaluation mode).
-* `Done`: Indicates that the current flow is safe to end.
-
-### Story
-
-Some important and useful features of the main runtime engine in `Story.cs`:
-
- * `Continue()` is the top level point where iteration of the content happens, and has this rough structure internally:
-
-```csharp
-while( Step () || TryFollowDefaultInvisibleChoice() ) {}
-```
-
-* `Step()` iterates through a single element of content, and returns `false` if it runs out of content.
-* `PerformLogicAndFlowControl(contentObject)` is called from `Step`, and handles the majority of the non-content objects such Diverts, Control Commands, etc.
-
-## Compiler development and debugging tips
-
-While testing modifications to the compiler, it's useful to run the **InkTestBed** project. Inside this project `InkTestBed.cs` contains a suite of useful tools.
-
-The main entry point is `Run()`. By default it simply calls `Play()`, which will load up a pre-existing `test.ink` (that you can put your test ink in). `Play()` has a basic choice loop that also serves as a good introduction to some of the built in convenience functions.
-
-However if you want to automatate the testing of a particular flow, you could write something like:
-
-```csharp
-void Run ()
-{
-    CompileFile();
-
-    ContinueMaximally ();
-    Choose(0);
-
-    ContinueMaximally ();
-    Choose(1);
-
-    ContinueMaximally ();
-}
-```
-
-`BuildStringOfHierarchy()` is a method in `Runtime.Story` that's useful when debugging. If you add it as a Watch expression while debugging the ink engine, you can see a representation of the runtime hierarchy, as well as an arrow that points at where execution currently is in the hierarchy. For example, the following ink:
-
-    This is a test.
-    * [A choice]
-    - The end -> DONE
-
-...is at the time of writing represented, somewhat verbosely, as:
-
-    [
-        [
-            This is a test.
-    ,
-            [
-                EvalStart,  <---
-                BeginString,
-                A choice,
-                EndString,
-                EvalEnd,
-                Choice: ->  line 2
-                -- named: --
-                [ (c)
-                    Divert (line 3)
-                ]
-            ]
-            -- named: --
-            [ (g-0)
-                The end
-    ,
-                Done
-            ]
-        ],
-        End
-    ]
-
-The `<---` is the pointer to the current object being evaluated.
-
-In this representation, containers are represented as:
-
-    [
-        ...content...
-        -- named: --
-        ...named content...
-    ]
+- Start with the stage that owns the behavior: source, syntax, parsed model,
+  analysis, lowering, emit, or runtime.
+- For syntax failures, inspect `syntax/parser.rs` rule order and the focused
+  rule module before changing lowering.
+- For malformed inline content or expression behavior, prefer `scan.rs` and
+  `expression.rs` helpers over new one-off string splitting.
+- For target or path problems, inspect analysis indexes and `lower/path.rs`
+  before changing emitted JSON.
+- For runtime output differences, compare the lowering IR and then the emitted
+  JSON. Avoid hardcoding JSON fragments to satisfy one fixture.
+- When upstream behavior is unclear, inspect `ink-csharp/compiler` first and
+  record only durable findings in `AGENTS.md` working notes.
