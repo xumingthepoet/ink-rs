@@ -100,7 +100,7 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 4 in progress. R015 through R037 are complete. Phase 1
+- Current phase: Phase 4 in progress. R015 through R038 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
@@ -584,13 +584,20 @@ Use these checks during phase reviews:
     the old parser result pending R039; `cargo test -p ink-compiler
     syntax::expression::tests::` passes.
 
-- [ ] R038 Add structured expression parse errors
+- [x] R038 Add structured expression parse errors
   - Purpose: Avoid silent `None` failures that collapse into vague unsupported
     syntax diagnostics.
   - Approach: Return parse error kinds and spans from expression parsing, then
     let statement parsers decide recovery.
   - Acceptance: Invalid expression tests assert a useful diagnostic message and
     location.
+  - Completed: The token-backed expression parser now returns
+    `ExpressionParseError` with a stable kind and `SourceSpan`, while the
+    public compiler expression adapter still preserves old behavior until the
+    R039 switch. Focused tests cover missing right operands, missing closing
+    parentheses, missing divert targets, malformed function-call separators,
+    and trailing unknown tokens with asserted messages and columns;
+    `cargo test -p ink-compiler syntax::expression::tests::` passes.
 
 - [ ] R039 Switch compiler entry points to the new expression parser
   - Purpose: Use the new expression parser in real compiler flows.

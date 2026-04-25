@@ -6,8 +6,7 @@ use crate::{
 use super::{is_identifier, is_identifier_continue, scan, text};
 
 pub(super) fn parse_initial_expression(source: &str) -> Option<Expression> {
-    let tokens = tokenize_expression(source.trim());
-    let _ = TokenExpressionParser::new(&tokens).parse();
+    let _ = parse_token_expression(source.trim()).map_err(|error| error.message());
     parse_expression(source.trim())
 }
 
@@ -29,6 +28,93 @@ enum ExpressionTokenKind {
     CloseParen,
     Comma,
     Arrow,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ExpressionParseError {
+    kind: ExpressionParseErrorKind,
+    span: SourceSpan,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum ExpressionParseErrorKind {
+    ExpectedExpression {
+        found: Option<String>,
+    },
+    ExpectedRightOperand {
+        operator: String,
+        found: Option<String>,
+    },
+    ExpectedCloseParen {
+        found: Option<String>,
+    },
+    ExpectedCommaOrCallCloseParen {
+        name: String,
+        found: Option<String>,
+    },
+    ExpectedDivertTarget {
+        found: Option<String>,
+    },
+    UnexpectedTrailingToken {
+        found: String,
+    },
+    InvalidIntegerLiteral {
+        value: String,
+    },
+    InvalidFloatLiteral {
+        value: String,
+    },
+}
+
+impl ExpressionParseError {
+    fn new(kind: ExpressionParseErrorKind, span: SourceSpan) -> Self {
+        Self { kind, span }
+    }
+
+    fn message(&self) -> String {
+        match &self.kind {
+            ExpressionParseErrorKind::ExpectedExpression { found } => {
+                format!("expected expression{}", found_clause(found))
+            }
+            ExpressionParseErrorKind::ExpectedRightOperand { operator, found } => {
+                format!(
+                    "expected expression after operator `{operator}`{}",
+                    found_clause(found)
+                )
+            }
+            ExpressionParseErrorKind::ExpectedCloseParen { found } => {
+                format!(
+                    "expected `)` to close parenthesized expression{}",
+                    found_clause(found)
+                )
+            }
+            ExpressionParseErrorKind::ExpectedCommaOrCallCloseParen { name, found } => {
+                format!(
+                    "expected `,` or `)` in call to `{name}`{}",
+                    found_clause(found)
+                )
+            }
+            ExpressionParseErrorKind::ExpectedDivertTarget { found } => {
+                format!("expected divert target after `->`{}", found_clause(found))
+            }
+            ExpressionParseErrorKind::UnexpectedTrailingToken { found } => {
+                format!("unexpected token `{found}` after expression")
+            }
+            ExpressionParseErrorKind::InvalidIntegerLiteral { value } => {
+                format!("invalid integer literal `{value}`")
+            }
+            ExpressionParseErrorKind::InvalidFloatLiteral { value } => {
+                format!("invalid float literal `{value}`")
+            }
+        }
+    }
+}
+
+fn found_clause(found: &Option<String>) -> String {
+    match found {
+        Some(found) => format!(", found `{found}`"),
+        None => " before end of input".to_string(),
+    }
 }
 
 fn tokenize_expression(source: &str) -> Vec<ExpressionToken> {
@@ -188,27 +274,45 @@ fn classify_word_token(word: &str) -> ExpressionTokenKind {
 struct TokenExpressionParser<'a> {
     tokens: &'a [ExpressionToken],
     index: usize,
+    eof_span: SourceSpan,
 }
 
 impl<'a> TokenExpressionParser<'a> {
-    fn new(tokens: &'a [ExpressionToken]) -> Self {
-        Self { tokens, index: 0 }
+    fn new(tokens: &'a [ExpressionToken], eof_span: SourceSpan) -> Self {
+        Self {
+            tokens,
+            index: 0,
+            eof_span,
+        }
     }
 
-    fn parse(mut self) -> Option<Expression> {
+    fn parse(mut self) -> Result<Expression, ExpressionParseError> {
         let expression = self.parse_expression(0)?;
-        (self.index == self.tokens.len()).then_some(expression)
+        if let Some(token) = self.peek() {
+            return Err(ExpressionParseError::new(
+                ExpressionParseErrorKind::UnexpectedTrailingToken {
+                    found: describe_token_kind(&token.kind),
+                },
+                token.span.clone(),
+            ));
+        }
+        Ok(expression)
     }
 
-    fn parse_expression(&mut self, minimum_precedence: u8) -> Option<Expression> {
+    fn parse_expression(
+        &mut self,
+        minimum_precedence: u8,
+    ) -> Result<Expression, ExpressionParseError> {
         let mut left = self.parse_prefix()?;
 
-        while let Some((operator, precedence)) = self.current_binary_operator() {
+        while let Some((operator, precedence, operator_text)) = self.current_binary_operator() {
             if precedence < minimum_precedence {
                 break;
             }
             self.index += 1;
-            let right = self.parse_expression(precedence + 1)?;
+            let right = self
+                .parse_expression(precedence + 1)
+                .map_err(|error| error.for_right_operand(operator_text))?;
             left = Expression::Binary {
                 operator,
                 left: Box::new(left),
@@ -216,19 +320,40 @@ impl<'a> TokenExpressionParser<'a> {
             };
         }
 
-        Some(left)
+        Ok(left)
     }
 
-    fn parse_prefix(&mut self) -> Option<Expression> {
-        let kind = self.advance()?.kind.clone();
+    fn parse_prefix(&mut self) -> Result<Expression, ExpressionParseError> {
+        let Some(token) = self.advance() else {
+            return Err(
+                self.error_at_eof(ExpressionParseErrorKind::ExpectedExpression { found: None })
+            );
+        };
+        let kind = token.kind.clone();
         match kind {
             ExpressionTokenKind::IntLiteral(value) => {
-                Some(Expression::NumberInt(value.parse::<i32>().ok()?))
+                let parsed = value.parse::<i32>().map_err(|_| {
+                    ExpressionParseError::new(
+                        ExpressionParseErrorKind::InvalidIntegerLiteral {
+                            value: value.clone(),
+                        },
+                        token.span.clone(),
+                    )
+                })?;
+                Ok(Expression::NumberInt(parsed))
             }
-            ExpressionTokenKind::FloatLiteral(value) => Some(Expression::NumberFloat(
-                FloatLiteral::new(value.parse().ok()?),
-            )),
-            ExpressionTokenKind::StringLiteral(value) => Some(parse_string_expression(&value)),
+            ExpressionTokenKind::FloatLiteral(value) => {
+                let parsed = value.parse().map_err(|_| {
+                    ExpressionParseError::new(
+                        ExpressionParseErrorKind::InvalidFloatLiteral {
+                            value: value.clone(),
+                        },
+                        token.span.clone(),
+                    )
+                })?;
+                Ok(Expression::NumberFloat(FloatLiteral::new(parsed)))
+            }
+            ExpressionTokenKind::StringLiteral(value) => Ok(parse_string_expression(&value)),
             ExpressionTokenKind::Identifier(name) => self.parse_identifier_or_call(&name),
             ExpressionTokenKind::Arrow => self.parse_divert_target(),
             ExpressionTokenKind::Operator(operator)
@@ -237,35 +362,50 @@ impl<'a> TokenExpressionParser<'a> {
                 let unary_operator = match operator.as_str() {
                     "-" => UnaryOperator::Negate,
                     "!" | "not" => UnaryOperator::Not,
-                    _ => return None,
+                    _ => {
+                        return Err(ExpressionParseError::new(
+                            ExpressionParseErrorKind::ExpectedExpression {
+                                found: Some(operator),
+                            },
+                            token.span.clone(),
+                        ))
+                    }
                 };
                 let expression = self.parse_expression(10)?;
-                Some(unary_expression(unary_operator, expression))
+                Ok(unary_expression(unary_operator, expression))
             }
             ExpressionTokenKind::OpenParen => {
                 let expression = self.parse_expression(0)?;
-                self.expect_kind(|kind| matches!(kind, ExpressionTokenKind::CloseParen))?;
-                Some(expression)
+                self.expect_kind(
+                    |kind| matches!(kind, ExpressionTokenKind::CloseParen),
+                    |found| ExpressionParseErrorKind::ExpectedCloseParen { found },
+                )?;
+                Ok(expression)
             }
-            _ => None,
+            other => Err(ExpressionParseError::new(
+                ExpressionParseErrorKind::ExpectedExpression {
+                    found: Some(describe_token_kind(&other)),
+                },
+                token.span.clone(),
+            )),
         }
     }
 
-    fn parse_identifier_or_call(&mut self, name: &str) -> Option<Expression> {
+    fn parse_identifier_or_call(&mut self, name: &str) -> Result<Expression, ExpressionParseError> {
         if name == "true" {
-            return Some(Expression::NumberBool(true));
+            return Ok(Expression::NumberBool(true));
         }
         if name == "false" {
-            return Some(Expression::NumberBool(false));
+            return Ok(Expression::NumberBool(false));
         }
 
         if !self.match_kind(|kind| matches!(kind, ExpressionTokenKind::OpenParen)) {
-            return Some(Expression::VariableReference(name.to_string()));
+            return Ok(Expression::VariableReference(name.to_string()));
         }
 
         let mut args = Vec::new();
         if self.match_kind(|kind| matches!(kind, ExpressionTokenKind::CloseParen)) {
-            return Some(Expression::FunctionCall {
+            return Ok(Expression::FunctionCall {
                 name: name.to_string(),
                 args,
             });
@@ -276,52 +416,68 @@ impl<'a> TokenExpressionParser<'a> {
             if self.match_kind(|kind| matches!(kind, ExpressionTokenKind::Comma)) {
                 continue;
             }
-            self.expect_kind(|kind| matches!(kind, ExpressionTokenKind::CloseParen))?;
+            self.expect_kind(
+                |kind| matches!(kind, ExpressionTokenKind::CloseParen),
+                |found| ExpressionParseErrorKind::ExpectedCommaOrCallCloseParen {
+                    name: name.to_string(),
+                    found,
+                },
+            )?;
             break;
         }
 
-        Some(Expression::FunctionCall {
+        Ok(Expression::FunctionCall {
             name: name.to_string(),
             args,
         })
     }
 
-    fn parse_divert_target(&mut self) -> Option<Expression> {
-        let kind = self.advance()?.kind.clone();
-        let ExpressionTokenKind::Identifier(target) = kind else {
-            return None;
+    fn parse_divert_target(&mut self) -> Result<Expression, ExpressionParseError> {
+        let Some(token) = self.advance() else {
+            return Err(
+                self.error_at_eof(ExpressionParseErrorKind::ExpectedDivertTarget { found: None })
+            );
         };
-        Some(Expression::DivertTarget(
+        let kind = token.kind.clone();
+        let ExpressionTokenKind::Identifier(target) = kind else {
+            return Err(ExpressionParseError::new(
+                ExpressionParseErrorKind::ExpectedDivertTarget {
+                    found: Some(describe_token_kind(&kind)),
+                },
+                token.span.clone(),
+            ));
+        };
+        Ok(Expression::DivertTarget(
             crate::parsed::DivertTarget::from_source(&target).to_snapshot_string(),
         ))
     }
 
-    fn current_binary_operator(&self) -> Option<(BinaryOperator, u8)> {
+    fn current_binary_operator(&self) -> Option<(BinaryOperator, u8, &'static str)> {
         let token = self.peek()?;
         let ExpressionTokenKind::Operator(operator) = &token.kind else {
             return None;
         };
         match operator.as_str() {
-            "&&" => Some((BinaryOperator::AndSymbol, 1)),
-            "||" => Some((BinaryOperator::OrSymbol, 1)),
-            "and" => Some((BinaryOperator::And, 1)),
-            "or" => Some((BinaryOperator::Or, 1)),
-            "==" => Some((BinaryOperator::Equals, 2)),
-            "!=" => Some((BinaryOperator::NotEquals, 2)),
-            ">=" => Some((BinaryOperator::GreaterThanOrEquals, 2)),
-            "<=" => Some((BinaryOperator::LessThanOrEquals, 2)),
-            ">" => Some((BinaryOperator::GreaterThan, 2)),
-            "<" => Some((BinaryOperator::LessThan, 2)),
-            "!?" => Some((BinaryOperator::Hasnt, 3)),
-            "hasnt" => Some((BinaryOperator::Hasnt, 4)),
-            "has" => Some((BinaryOperator::Has, 4)),
-            "?" => Some((BinaryOperator::Has, 4)),
-            "+" => Some((BinaryOperator::Add, 5)),
-            "-" => Some((BinaryOperator::Subtract, 5)),
-            "*" => Some((BinaryOperator::Multiply, 6)),
-            "/" => Some((BinaryOperator::Divide, 7)),
-            "mod" => Some((BinaryOperator::Modulo, 8)),
-            "%" => Some((BinaryOperator::Modulo, 9)),
+            "&&" => Some((BinaryOperator::AndSymbol, 1, "&&")),
+            "||" => Some((BinaryOperator::OrSymbol, 1, "||")),
+            "and" => Some((BinaryOperator::And, 1, "and")),
+            "or" => Some((BinaryOperator::Or, 1, "or")),
+            "==" => Some((BinaryOperator::Equals, 2, "==")),
+            "!=" => Some((BinaryOperator::NotEquals, 2, "!=")),
+            ">=" => Some((BinaryOperator::GreaterThanOrEquals, 2, ">=")),
+            "<=" => Some((BinaryOperator::LessThanOrEquals, 2, "<=")),
+            ">" => Some((BinaryOperator::GreaterThan, 2, ">")),
+            "<" => Some((BinaryOperator::LessThan, 2, "<")),
+            "!?" => Some((BinaryOperator::Hasnt, 3, "!?")),
+            "hasnt" => Some((BinaryOperator::Hasnt, 4, "hasnt")),
+            "has" => Some((BinaryOperator::Has, 4, "has")),
+            "?" => Some((BinaryOperator::Has, 4, "?")),
+            "+" => Some((BinaryOperator::Add, 5, "+")),
+            "-" => Some((BinaryOperator::Subtract, 5, "-")),
+            "*" => Some((BinaryOperator::Multiply, 6, "*")),
+            "/" => Some((BinaryOperator::Divide, 7, "/")),
+            "mod" => Some((BinaryOperator::Modulo, 8, "mod")),
+            "%" => Some((BinaryOperator::Modulo, 9, "%")),
             _ => None,
         }
     }
@@ -348,12 +504,63 @@ impl<'a> TokenExpressionParser<'a> {
     fn expect_kind(
         &mut self,
         matches: impl FnOnce(&ExpressionTokenKind) -> bool,
-    ) -> Option<&'a ExpressionToken> {
+        error_kind: impl FnOnce(Option<String>) -> ExpressionParseErrorKind,
+    ) -> Result<&'a ExpressionToken, ExpressionParseError> {
         if self.peek().is_some_and(|token| matches(&token.kind)) {
-            self.advance()
+            Ok(self.advance().expect("peek already checked token"))
         } else {
-            None
+            let (found, span) = self.found_token_or_eof();
+            Err(ExpressionParseError::new(error_kind(found), span))
         }
+    }
+
+    fn found_token_or_eof(&self) -> (Option<String>, SourceSpan) {
+        self.peek()
+            .map(|token| (Some(describe_token_kind(&token.kind)), token.span.clone()))
+            .unwrap_or_else(|| (None, self.eof_span.clone()))
+    }
+
+    fn error_at_eof(&self, kind: ExpressionParseErrorKind) -> ExpressionParseError {
+        ExpressionParseError::new(kind, self.eof_span.clone())
+    }
+}
+
+impl ExpressionParseError {
+    fn for_right_operand(self, operator: &str) -> Self {
+        match self.kind {
+            ExpressionParseErrorKind::ExpectedExpression { found } => ExpressionParseError::new(
+                ExpressionParseErrorKind::ExpectedRightOperand {
+                    operator: operator.to_string(),
+                    found,
+                },
+                self.span,
+            ),
+            _ => self,
+        }
+    }
+}
+
+fn parse_token_expression(source: &str) -> Result<Expression, ExpressionParseError> {
+    let source = source.trim();
+    let tokens = tokenize_expression(source);
+    TokenExpressionParser::new(&tokens, end_span(source)).parse()
+}
+
+fn end_span(source: &str) -> SourceSpan {
+    SourceSpan::new(None, 1, source.chars().count() + 1)
+}
+
+fn describe_token_kind(kind: &ExpressionTokenKind) -> String {
+    match kind {
+        ExpressionTokenKind::Identifier(value)
+        | ExpressionTokenKind::IntLiteral(value)
+        | ExpressionTokenKind::FloatLiteral(value)
+        | ExpressionTokenKind::Operator(value) => value.clone(),
+        ExpressionTokenKind::StringLiteral(_) => "string literal".to_string(),
+        ExpressionTokenKind::OpenParen => "(".to_string(),
+        ExpressionTokenKind::CloseParen => ")".to_string(),
+        ExpressionTokenKind::Comma => ",".to_string(),
+        ExpressionTokenKind::Arrow => "->".to_string(),
     }
 }
 
@@ -827,13 +1034,17 @@ mod tests {
     }
 
     fn token_parser_snapshot(source: &str) -> String {
-        let tokens = tokenize_expression(source);
-        let expression = TokenExpressionParser::new(&tokens)
-            .parse()
-            .unwrap_or_else(|| panic!("expected token parser expression for {source:?}"));
+        let expression = parse_token_expression(source)
+            .unwrap_or_else(|_| panic!("expected token parser expression for {source:?}"));
         let mut output = String::new();
         expression.write_parse_snapshot(&mut output, 0);
         output
+    }
+
+    fn token_parser_error(source: &str) -> (String, usize) {
+        let error = parse_token_expression(source)
+            .expect_err("expected token parser to report a structured expression error");
+        (error.message(), error.span.column)
     }
 
     fn token(kind: ExpressionTokenKind, byte_index: usize, column: usize) -> ExpressionToken {
@@ -1060,6 +1271,41 @@ mod tests {
 
         for (source, expected) in cases {
             assert_eq!(token_parser_snapshot(source), expected, "source: {source}");
+        }
+    }
+
+    #[test]
+    fn token_parser_reports_structured_errors_with_spans() {
+        let cases = [
+            (
+                "1 +",
+                "expected expression after operator `+` before end of input",
+                4,
+            ),
+            (
+                "(1 + 2",
+                "expected `)` to close parenthesized expression before end of input",
+                7,
+            ),
+            (
+                "->",
+                "expected divert target after `->` before end of input",
+                3,
+            ),
+            (
+                "foo(1 2)",
+                "expected `,` or `)` in call to `foo`, found `2`",
+                7,
+            ),
+            ("1 $ 2", "unexpected token `$` after expression", 3),
+        ];
+
+        for (source, message, column) in cases {
+            assert_eq!(
+                token_parser_error(source),
+                (message.to_string(), column),
+                "source: {source}"
+            );
         }
     }
 }
