@@ -100,13 +100,13 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 4 in progress. R015 through R040 are complete. Phase 1
+- Current phase: Phase 4 in progress. R015 through R041 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
 - Last focused validation:
-  `cargo check -p ink-compiler`, `cargo test -p ink-compiler syntax::`, and
-  `cargo test -p ink-test --test compiler_conformance` on 2026-04-25, passed.
+  `cargo test -p ink-compiler syntax::expression::tests::` on 2026-04-25,
+  passed.
 - Known blockers: none for behavior-preserving refactors.
 
 ## Focused Validation Commands
@@ -623,12 +623,19 @@ Use these checks during phase reviews:
     expression module now has one parser path plus the shared argument splitter
     used by divert syntax; `cargo check -p ink-compiler` passes.
 
-- [ ] R041 Run the expression operator drill
+- [x] R041 Run the expression operator drill
   - Purpose: Prove a future operator change is localized.
   - Approach: Add or temporarily prototype one operator or alias and record the
     touched files.
   - Acceptance: The drill touches expression tokenizer/parser, lowering if
     needed, tests, and docs only.
+  - Completed: Consolidated expression binary operator metadata into
+    `BINARY_OPERATOR_RULES`, then used the existing `!?` alias as the drill
+    case to prove tokenizer lookup and parser precedence lookup share one
+    owner. The retained code change touched only
+    `crates/ink-compiler/src/syntax/expression.rs` plus this plan; no lowering
+    or docs were needed because no new language behavior was kept. Focused
+    expression tests pass.
 
 - [ ] R042 Review expression AST fit
   - Purpose: Decide whether the current `Expression` enum still supports future
