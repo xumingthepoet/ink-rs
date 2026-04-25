@@ -100,22 +100,24 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 5 in progress. R015 through R048 are complete. Phase 1
+- Current phase: Phase 5 in progress. R015 through R049 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
 - Last focused validation:
   `cargo test -p ink-compiler`, and
   `cargo test -p ink-test --features csharp-tests --test csharp_tests --
+  TestFunctionCallRestrictions`, and
+  `cargo test -p ink-test --features csharp-tests --test csharp_tests --
   TestDivert`, and
   `cargo test -p ink-test --features csharp-tests --test csharp_tests --
-  TestGather`, and
+  TestVariable`, and
   `cargo test -p ink-test --features csharp-tests --test csharp_tests --
-  TestReadCount`, and
+  TestRequireVariableTargetsTyped`, and
   `cargo test -p ink-test --features csharp-tests --test csharp_tests --
-  TestStitch`, and
+  TestWrongVariableDivertTargetReference`, and
   `cargo test -p ink-test --features csharp-tests --test csharp_tests --
-  TestPath` on 2026-04-25, passed.
+  TestDisallowEmptyDiverts` on 2026-04-25, passed.
 - Known blockers: none for behavior-preserving refactors.
 
 ## Focused Validation Commands
@@ -755,13 +757,21 @@ Use these checks during phase reviews:
     csharp-tests --test csharp_tests -- TestDivert`, `TestGather`,
     `TestReadCount`, `TestStitch`, and `TestPath` pass.
 
-- [ ] R049 Refactor call-target diagnostics onto traversal
+- [x] R049 Refactor call-target diagnostics onto traversal
   - Purpose: Reduce long recursive parameter lists and make target checking
     easier to modify.
   - Approach: Encapsulate shared indexes in a checker struct that runs through
     traversal.
   - Acceptance: Call/divert/variable diagnostics pass, and checker call sites
     no longer pass many unrelated parameters through every recursion layer.
+  - Completed: Replaced the call-target object/content recursion helpers with
+    `CallTargetChecker`, a parsed visitor that owns diagnostics plus the target
+    symbol, variable-target, variable-scope, and flow-argument indexes. The
+    checker uses `VisitContext.current_flow_path` for target and variable
+    visibility, records current-flow arguments from `visit_flow`, and leaves
+    expression recursion local so existing expression-owner spans are preserved.
+    Focused function-call, divert-target, variable-target, unresolved-variable,
+    and empty-divert C# tests pass.
 
 - [ ] R050 Refactor flow-control diagnostics onto traversal where useful
   - Purpose: Keep loose-end and function-return rules close to flow semantics.

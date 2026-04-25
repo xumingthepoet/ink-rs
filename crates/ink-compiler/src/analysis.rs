@@ -627,30 +627,6 @@ fn build_variable_scope_index(story: &Story) -> VariableScopeIndex {
     visitor.index
 }
 
-fn check_variable_reference(
-    name: &str,
-    span: &SourceSpan,
-    target_symbols: &HashMap<String, FlowSymbol>,
-    variable_scopes: &VariableScopeIndex,
-    diagnostics: &mut Vec<Diagnostic>,
-    current_flow_path: Option<&str>,
-) {
-    if name.contains('.')
-        || resolve_target_symbol(name, current_flow_path, target_symbols).is_some()
-    {
-        return;
-    }
-
-    if variable_scopes.contains_visible_variable(name, current_flow_path) {
-        return;
-    }
-
-    diagnostics.push(Diagnostic::error(
-        span.clone(),
-        format!("Unresolved variable: {name}"),
-    ));
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct FlowSymbol {
     is_function: bool,
@@ -667,30 +643,268 @@ fn call_target_diagnostics(story: &Story) -> Vec<Diagnostic> {
     let target_symbols = build_target_symbol_index(story);
     let variable_targets = build_variable_target_index(story);
     let variable_scopes = build_variable_scope_index(story);
-    let mut diagnostics = Vec::new();
+    let mut checker = CallTargetChecker::new(&target_symbols, &variable_targets, &variable_scopes);
+    walk_story(story, &mut checker);
+    checker.diagnostics
+}
 
-    check_call_targets_in_weave(
-        story.root_weave(),
-        &target_symbols,
-        &variable_targets,
-        &variable_scopes,
-        &mut diagnostics,
-        None,
-        None,
-        false,
-    );
-    for flow in story.flows() {
-        check_call_targets_in_flow(
-            flow,
-            None,
-            &target_symbols,
-            &variable_targets,
-            &variable_scopes,
-            &mut diagnostics,
-        );
+struct CallTargetChecker<'a> {
+    target_symbols: &'a HashMap<String, FlowSymbol>,
+    variable_targets: &'a HashSet<String>,
+    variable_scopes: &'a VariableScopeIndex,
+    diagnostics: Vec<Diagnostic>,
+    arguments_by_flow_path: HashMap<String, Vec<FlowArgument>>,
+    functions_by_flow_path: HashMap<String, bool>,
+}
+
+impl<'a> CallTargetChecker<'a> {
+    fn new(
+        target_symbols: &'a HashMap<String, FlowSymbol>,
+        variable_targets: &'a HashSet<String>,
+        variable_scopes: &'a VariableScopeIndex,
+    ) -> Self {
+        Self {
+            target_symbols,
+            variable_targets,
+            variable_scopes,
+            diagnostics: Vec::new(),
+            arguments_by_flow_path: HashMap::new(),
+            functions_by_flow_path: HashMap::new(),
+        }
     }
 
-    diagnostics
+    fn current_flow_path<'context>(
+        &self,
+        context: &'context VisitContext,
+    ) -> Option<&'context str> {
+        context.current_flow_path.as_deref()
+    }
+
+    fn current_flow_arguments(&self, context: &VisitContext) -> Option<&[FlowArgument]> {
+        self.current_flow_path(context).and_then(|flow_path| {
+            self.arguments_by_flow_path
+                .get(flow_path)
+                .map(Vec::as_slice)
+        })
+    }
+
+    fn current_flow_is_function(&self, context: &VisitContext) -> bool {
+        self.current_flow_path(context)
+            .and_then(|flow_path| self.functions_by_flow_path.get(flow_path))
+            .copied()
+            .unwrap_or(false)
+    }
+
+    fn check_plain_divert_target(
+        &mut self,
+        target: &str,
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) {
+        let current_flow_path = self.current_flow_path(context);
+        if let Some(symbol) = resolve_target_symbol(target, current_flow_path, self.target_symbols)
+        {
+            if symbol.is_function {
+                self.diagnostics.push(Diagnostic::error(
+                    span.clone(),
+                    format!(
+                        "{target} can't be diverted to. It can only be called as a function since it's been marked as such: '{target}(...)'"
+                    ),
+                ));
+            }
+        } else if let Some((name, is_divert_target)) =
+            resolve_current_flow_argument(target, self.current_flow_arguments(context))
+                .map(|argument| (argument.name().to_string(), argument.is_divert_target()))
+        {
+            if !is_divert_target {
+                self.diagnostics.push(Diagnostic::error(
+                    span.clone(),
+                    format!(
+                        "Since '{name}' is used as a variable divert target, it should be marked as: -> {name}"
+                    ),
+                ));
+            }
+        } else if !self.variable_targets.contains(target) {
+            self.diagnostics.push(Diagnostic::error(
+                span.clone(),
+                format!("target not found: '{target}'"),
+            ));
+        }
+    }
+
+    fn check_expression(
+        &mut self,
+        expression: &Expression,
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) {
+        match expression {
+            Expression::FunctionCall { name, args } => {
+                if let Some(symbol) = resolve_target_symbol(
+                    name,
+                    self.current_flow_path(context),
+                    self.target_symbols,
+                ) {
+                    if !symbol.is_function {
+                        self.diagnostics.push(Diagnostic::error(
+                            span.clone(),
+                            format!(
+                                "{name} hasn't been marked as a function, but it's being called as one. Do you need to delcare the knot as '== function {name} =='?"
+                            ),
+                        ));
+                    }
+                }
+                for arg in args {
+                    self.check_expression(arg, span, context);
+                }
+            }
+            Expression::Binary { left, right, .. } => {
+                self.check_expression(left, span, context);
+                self.check_expression(right, span, context);
+            }
+            Expression::Unary { expression, .. } => {
+                self.check_expression(expression, span, context);
+            }
+            Expression::MultipleCondition(expressions) => {
+                for expression in expressions {
+                    self.check_expression(expression, span, context);
+                }
+            }
+            Expression::DivertTarget(target) => {
+                self.check_divert_target_value(target, span, context);
+            }
+            Expression::VariableReference(name) => {
+                self.check_variable_reference(name, span, context);
+            }
+            Expression::StringContent(_)
+            | Expression::String(_)
+            | Expression::NumberInt(_)
+            | Expression::NumberFloat(_)
+            | Expression::NumberBool(_) => {}
+        }
+    }
+
+    fn check_variable_reference(&mut self, name: &str, span: &SourceSpan, context: &VisitContext) {
+        let current_flow_path = self.current_flow_path(context);
+        if name.contains('.')
+            || resolve_target_symbol(name, current_flow_path, self.target_symbols).is_some()
+        {
+            return;
+        }
+
+        if self
+            .variable_scopes
+            .contains_visible_variable(name, current_flow_path)
+        {
+            return;
+        }
+
+        self.diagnostics.push(Diagnostic::error(
+            span.clone(),
+            format!("Unresolved variable: {name}"),
+        ));
+    }
+
+    fn check_divert_target_value(
+        &mut self,
+        target: &str,
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) {
+        let variable_name = target.split('.').next().unwrap_or(target);
+        if self
+            .variable_scopes
+            .contains_visible_variable(variable_name, self.current_flow_path(context))
+        {
+            self.diagnostics.push(Diagnostic::error(
+                span.clone(),
+                format!(
+                    "Since '{variable_name}' is a variable, it shouldn't be preceded by '->' here."
+                ),
+            ));
+        }
+    }
+}
+
+impl ParsedVisitor for CallTargetChecker<'_> {
+    fn visit_flow(&mut self, flow: &Flow, context: &VisitContext) {
+        let Some(flow_path) = self.current_flow_path(context) else {
+            return;
+        };
+        self.arguments_by_flow_path
+            .entry(flow_path.to_string())
+            .or_insert_with(|| flow.arguments().to_vec());
+        self.functions_by_flow_path
+            .entry(flow_path.to_string())
+            .or_insert(flow.is_function());
+    }
+
+    fn visit_object(&mut self, object: &Object, context: &VisitContext) {
+        match object {
+            Object::Divert(divert) => {
+                match divert.target() {
+                    DivertTarget::Empty => self.diagnostics.push(Diagnostic::error(
+                        divert.span().clone(),
+                        "Empty diverts (->) are only valid on choices",
+                    )),
+                    DivertTarget::Path(target) if !self.current_flow_is_function(context) => {
+                        self.check_plain_divert_target(target, divert.span(), context);
+                    }
+                    DivertTarget::Path(_) | DivertTarget::Done | DivertTarget::End => {}
+                }
+                for argument in divert.arguments() {
+                    self.check_expression(argument, divert.span(), context);
+                }
+            }
+            Object::ConstantDeclaration(declaration) => {
+                self.check_expression(declaration.expression(), declaration.span(), context);
+            }
+            Object::Expression(expression) | Object::LogicLine(expression) => {
+                self.check_expression(expression, &object_span(object), context);
+            }
+            Object::VariableAssignment(assignment) => {
+                self.check_expression(assignment.expression(), assignment.span(), context);
+            }
+            Object::IncDec(inc_dec) => {
+                self.check_expression(inc_dec.expression(), inc_dec.span(), context);
+            }
+            Object::Return(ret) => {
+                if let Some(expression) = ret.returned_expression() {
+                    self.check_expression(expression, ret.span(), context);
+                }
+            }
+            Object::Conditional(conditional) => {
+                let span = object_span(object);
+                if let Some(condition) = conditional.initial_condition() {
+                    self.check_expression(condition, &span, context);
+                }
+                for branch in conditional.branches() {
+                    if let Some(condition) = branch.own_condition() {
+                        self.check_expression(condition, &span, context);
+                    }
+                }
+            }
+            Object::Choice(choice) => {
+                if let Some(condition) = choice.condition() {
+                    self.check_expression(condition, choice.span(), context);
+                }
+            }
+            Object::TunnelOnwards(tunnel_onwards) => {
+                for argument in tunnel_onwards.arguments() {
+                    self.check_expression(argument, tunnel_onwards.span(), context);
+                }
+            }
+            Object::AuthorWarning(_)
+            | Object::ContentList(_)
+            | Object::ExternalDeclaration(_)
+            | Object::Gather(_)
+            | Object::Glue(_)
+            | Object::Sequence(_)
+            | Object::Tag(_)
+            | Object::Text(_)
+            | Object::Weave(_) => {}
+        }
+    }
 }
 
 fn build_target_symbol_index(story: &Story) -> HashMap<String, FlowSymbol> {
@@ -892,383 +1106,12 @@ fn collect_variable_targets_in_expression(expression: &Expression, names: &mut H
     }
 }
 
-fn check_call_targets_in_flow(
-    flow: &Flow,
-    parent_path: Option<&str>,
-    target_symbols: &HashMap<String, FlowSymbol>,
-    variable_targets: &HashSet<String>,
-    variable_scopes: &VariableScopeIndex,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
-    let flow_path = parent_path
-        .map(|parent| format!("{parent}.{}", flow.name()))
-        .unwrap_or_else(|| flow.name().to_string());
-    check_call_targets_in_weave(
-        flow.weave(),
-        target_symbols,
-        variable_targets,
-        variable_scopes,
-        diagnostics,
-        Some(&flow_path),
-        Some(flow),
-        flow.is_function(),
-    );
-    for child in flow.child_flows() {
-        check_call_targets_in_flow(
-            child,
-            Some(&flow_path),
-            target_symbols,
-            variable_targets,
-            variable_scopes,
-            diagnostics,
-        );
-    }
-}
-
-fn check_call_targets_in_weave(
-    weave: &Weave,
-    target_symbols: &HashMap<String, FlowSymbol>,
-    variable_targets: &HashSet<String>,
-    variable_scopes: &VariableScopeIndex,
-    diagnostics: &mut Vec<Diagnostic>,
-    current_flow_path: Option<&str>,
-    current_flow: Option<&Flow>,
-    inside_function: bool,
-) {
-    for object in weave.content() {
-        check_call_targets_in_object(
-            object,
-            target_symbols,
-            variable_targets,
-            variable_scopes,
-            diagnostics,
-            current_flow_path,
-            current_flow,
-            inside_function,
-        );
-    }
-}
-
-fn check_call_targets_in_content_list(
-    content: &ContentList,
-    target_symbols: &HashMap<String, FlowSymbol>,
-    variable_targets: &HashSet<String>,
-    variable_scopes: &VariableScopeIndex,
-    diagnostics: &mut Vec<Diagnostic>,
-    current_flow_path: Option<&str>,
-    current_flow: Option<&Flow>,
-    inside_function: bool,
-) {
-    for object in content.objects() {
-        check_call_targets_in_object(
-            object,
-            target_symbols,
-            variable_targets,
-            variable_scopes,
-            diagnostics,
-            current_flow_path,
-            current_flow,
-            inside_function,
-        );
-    }
-}
-
-fn check_call_targets_in_object(
-    object: &Object,
-    target_symbols: &HashMap<String, FlowSymbol>,
-    variable_targets: &HashSet<String>,
-    variable_scopes: &VariableScopeIndex,
-    diagnostics: &mut Vec<Diagnostic>,
-    current_flow_path: Option<&str>,
-    current_flow: Option<&Flow>,
-    inside_function: bool,
-) {
-    match object {
-        Object::Divert(divert) => {
-            match divert.target() {
-                DivertTarget::Empty => diagnostics.push(Diagnostic::error(
-                    divert.span().clone(),
-                    "Empty diverts (->) are only valid on choices",
-                )),
-                DivertTarget::Path(target) if !inside_function => {
-                    check_plain_divert_target(
-                        target,
-                        divert.span(),
-                        target_symbols,
-                        variable_targets,
-                        diagnostics,
-                        current_flow_path,
-                        current_flow,
-                    );
-                }
-                DivertTarget::Path(_) | DivertTarget::Done | DivertTarget::End => {}
-            }
-            for argument in divert.arguments() {
-                check_call_targets_in_expression(
-                    argument,
-                    divert.span(),
-                    target_symbols,
-                    variable_targets,
-                    variable_scopes,
-                    diagnostics,
-                    current_flow_path,
-                    current_flow,
-                    inside_function,
-                );
-            }
-        }
-        Object::ConstantDeclaration(declaration) => check_call_targets_in_expression(
-            declaration.expression(),
-            declaration.span(),
-            target_symbols,
-            variable_targets,
-            variable_scopes,
-            diagnostics,
-            current_flow_path,
-            current_flow,
-            inside_function,
-        ),
-        Object::Expression(expression) | Object::LogicLine(expression) => {
-            check_call_targets_in_expression(
-                expression,
-                &object_span(object),
-                target_symbols,
-                variable_targets,
-                variable_scopes,
-                diagnostics,
-                current_flow_path,
-                current_flow,
-                inside_function,
-            );
-        }
-        Object::VariableAssignment(assignment) => check_call_targets_in_expression(
-            assignment.expression(),
-            assignment.span(),
-            target_symbols,
-            variable_targets,
-            variable_scopes,
-            diagnostics,
-            current_flow_path,
-            current_flow,
-            inside_function,
-        ),
-        Object::IncDec(inc_dec) => check_call_targets_in_expression(
-            inc_dec.expression(),
-            inc_dec.span(),
-            target_symbols,
-            variable_targets,
-            variable_scopes,
-            diagnostics,
-            current_flow_path,
-            current_flow,
-            inside_function,
-        ),
-        Object::Return(ret) => {
-            if let Some(expression) = ret.returned_expression() {
-                check_call_targets_in_expression(
-                    expression,
-                    ret.span(),
-                    target_symbols,
-                    variable_targets,
-                    variable_scopes,
-                    diagnostics,
-                    current_flow_path,
-                    current_flow,
-                    inside_function,
-                );
-            }
-        }
-        Object::ContentList(content) => check_call_targets_in_content_list(
-            content,
-            target_symbols,
-            variable_targets,
-            variable_scopes,
-            diagnostics,
-            current_flow_path,
-            current_flow,
-            inside_function,
-        ),
-        Object::Conditional(conditional) => {
-            if let Some(condition) = conditional.initial_condition() {
-                check_call_targets_in_expression(
-                    condition,
-                    &object_span(object),
-                    target_symbols,
-                    variable_targets,
-                    variable_scopes,
-                    diagnostics,
-                    current_flow_path,
-                    current_flow,
-                    inside_function,
-                );
-            }
-            for branch in conditional.branches() {
-                if let Some(condition) = branch.own_condition() {
-                    check_call_targets_in_expression(
-                        condition,
-                        &object_span(object),
-                        target_symbols,
-                        variable_targets,
-                        variable_scopes,
-                        diagnostics,
-                        current_flow_path,
-                        current_flow,
-                        inside_function,
-                    );
-                }
-                check_call_targets_in_weave(
-                    branch.content(),
-                    target_symbols,
-                    variable_targets,
-                    variable_scopes,
-                    diagnostics,
-                    current_flow_path,
-                    current_flow,
-                    inside_function,
-                );
-            }
-        }
-        Object::Choice(choice) => {
-            if let Some(condition) = choice.condition() {
-                check_call_targets_in_expression(
-                    condition,
-                    choice.span(),
-                    target_symbols,
-                    variable_targets,
-                    variable_scopes,
-                    diagnostics,
-                    current_flow_path,
-                    current_flow,
-                    inside_function,
-                );
-            }
-            if let Some(content) = choice.start_content() {
-                check_call_targets_in_content_list(
-                    content,
-                    target_symbols,
-                    variable_targets,
-                    variable_scopes,
-                    diagnostics,
-                    current_flow_path,
-                    current_flow,
-                    inside_function,
-                );
-            }
-            if let Some(content) = choice.choice_only_content() {
-                check_call_targets_in_content_list(
-                    content,
-                    target_symbols,
-                    variable_targets,
-                    variable_scopes,
-                    diagnostics,
-                    current_flow_path,
-                    current_flow,
-                    inside_function,
-                );
-            }
-            check_call_targets_in_content_list(
-                choice.inner_content(),
-                target_symbols,
-                variable_targets,
-                variable_scopes,
-                diagnostics,
-                current_flow_path,
-                current_flow,
-                inside_function,
-            );
-        }
-        Object::Sequence(sequence) => {
-            for element in sequence.elements() {
-                check_call_targets_in_content_list(
-                    element,
-                    target_symbols,
-                    variable_targets,
-                    variable_scopes,
-                    diagnostics,
-                    current_flow_path,
-                    current_flow,
-                    inside_function,
-                );
-            }
-        }
-        Object::TunnelOnwards(tunnel_onwards) => {
-            for argument in tunnel_onwards.arguments() {
-                check_call_targets_in_expression(
-                    argument,
-                    tunnel_onwards.span(),
-                    target_symbols,
-                    variable_targets,
-                    variable_scopes,
-                    diagnostics,
-                    current_flow_path,
-                    current_flow,
-                    inside_function,
-                );
-            }
-        }
-        Object::Weave(weave) => check_call_targets_in_weave(
-            weave,
-            target_symbols,
-            variable_targets,
-            variable_scopes,
-            diagnostics,
-            current_flow_path,
-            current_flow,
-            inside_function,
-        ),
-        Object::AuthorWarning(_)
-        | Object::ExternalDeclaration(_)
-        | Object::Gather(_)
-        | Object::Glue(_)
-        | Object::Tag(_)
-        | Object::Text(_) => {}
-    }
-}
-
-fn check_plain_divert_target(
-    target: &str,
-    span: &SourceSpan,
-    target_symbols: &HashMap<String, FlowSymbol>,
-    variable_targets: &HashSet<String>,
-    diagnostics: &mut Vec<Diagnostic>,
-    current_flow_path: Option<&str>,
-    current_flow: Option<&Flow>,
-) {
-    if let Some(symbol) = resolve_target_symbol(target, current_flow_path, target_symbols) {
-        if symbol.is_function {
-            diagnostics.push(Diagnostic::error(
-                span.clone(),
-                format!(
-                    "{target} can't be diverted to. It can only be called as a function since it's been marked as such: '{target}(...)'"
-                ),
-            ));
-        }
-    } else if let Some(argument) = resolve_current_flow_argument(target, current_flow) {
-        if !argument.is_divert_target() {
-            diagnostics.push(Diagnostic::error(
-                span.clone(),
-                format!(
-                    "Since '{}' is used as a variable divert target, it should be marked as: -> {}",
-                    argument.name(),
-                    argument.name()
-                ),
-            ));
-        }
-    } else if !variable_targets.contains(target) {
-        diagnostics.push(Diagnostic::error(
-            span.clone(),
-            format!("target not found: '{target}'"),
-        ));
-    }
-}
-
 fn resolve_current_flow_argument<'a>(
     target: &str,
-    current_flow: Option<&'a Flow>,
+    current_flow_arguments: Option<&'a [FlowArgument]>,
 ) -> Option<&'a FlowArgument> {
     let variable_target_name = target.split('.').next()?;
-    current_flow?
-        .arguments()
+    current_flow_arguments?
         .iter()
         .find(|argument| argument.name() == variable_target_name)
 }
@@ -1294,145 +1137,6 @@ fn resolve_target_symbol<'a>(
     }
 
     target_symbols.get(target)
-}
-
-fn check_call_targets_in_expression(
-    expression: &Expression,
-    span: &SourceSpan,
-    target_symbols: &HashMap<String, FlowSymbol>,
-    variable_targets: &HashSet<String>,
-    variable_scopes: &VariableScopeIndex,
-    diagnostics: &mut Vec<Diagnostic>,
-    current_flow_path: Option<&str>,
-    current_flow: Option<&Flow>,
-    inside_function: bool,
-) {
-    match expression {
-        Expression::FunctionCall { name, args } => {
-            if let Some(symbol) = resolve_target_symbol(name, current_flow_path, target_symbols) {
-                if !symbol.is_function {
-                    diagnostics.push(Diagnostic::error(
-                        span.clone(),
-                        format!(
-                            "{name} hasn't been marked as a function, but it's being called as one. Do you need to delcare the knot as '== function {name} =='?"
-                        ),
-                    ));
-                }
-            }
-            for arg in args {
-                check_call_targets_in_expression(
-                    arg,
-                    span,
-                    target_symbols,
-                    variable_targets,
-                    variable_scopes,
-                    diagnostics,
-                    current_flow_path,
-                    current_flow,
-                    inside_function,
-                );
-            }
-        }
-        Expression::StringContent(content) => check_call_targets_in_content_list(
-            content,
-            target_symbols,
-            variable_targets,
-            variable_scopes,
-            diagnostics,
-            current_flow_path,
-            current_flow,
-            inside_function,
-        ),
-        Expression::Binary { left, right, .. } => {
-            check_call_targets_in_expression(
-                left,
-                span,
-                target_symbols,
-                variable_targets,
-                variable_scopes,
-                diagnostics,
-                current_flow_path,
-                current_flow,
-                inside_function,
-            );
-            check_call_targets_in_expression(
-                right,
-                span,
-                target_symbols,
-                variable_targets,
-                variable_scopes,
-                diagnostics,
-                current_flow_path,
-                current_flow,
-                inside_function,
-            );
-        }
-        Expression::Unary { expression, .. } => {
-            check_call_targets_in_expression(
-                expression,
-                span,
-                target_symbols,
-                variable_targets,
-                variable_scopes,
-                diagnostics,
-                current_flow_path,
-                current_flow,
-                inside_function,
-            );
-        }
-        Expression::MultipleCondition(expressions) => {
-            for expression in expressions {
-                check_call_targets_in_expression(
-                    expression,
-                    span,
-                    target_symbols,
-                    variable_targets,
-                    variable_scopes,
-                    diagnostics,
-                    current_flow_path,
-                    current_flow,
-                    inside_function,
-                );
-            }
-        }
-        Expression::String(_)
-        | Expression::NumberInt(_)
-        | Expression::NumberFloat(_)
-        | Expression::NumberBool(_) => {}
-        Expression::DivertTarget(target) => check_divert_target_value(
-            target,
-            span,
-            variable_scopes,
-            diagnostics,
-            current_flow_path,
-        ),
-        Expression::VariableReference(name) => check_variable_reference(
-            name,
-            span,
-            target_symbols,
-            variable_scopes,
-            diagnostics,
-            current_flow_path,
-        ),
-    }
-}
-
-fn check_divert_target_value(
-    target: &str,
-    span: &SourceSpan,
-    variable_scopes: &VariableScopeIndex,
-    diagnostics: &mut Vec<Diagnostic>,
-    current_flow_path: Option<&str>,
-) {
-    let variable_name = target.split('.').next().unwrap_or(target);
-    if variable_scopes.contains_visible_variable(variable_name, current_flow_path) {
-        diagnostics.push(Diagnostic::error(
-            span.clone(),
-            format!(
-                "Since '{variable_name}' is a variable, it shouldn't be preceded by '->' here."
-            ),
-        ));
-    }
 }
 
 fn check_flow(flow: &Flow, diagnostics: &mut Vec<Diagnostic>) {
