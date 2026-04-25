@@ -4,11 +4,9 @@ use crate::parsed::{
     Choice, ContentList, Expression, Flow, FlowArgument, Object, Story, VariableAssignment, Weave,
 };
 
+use super::context::ChoicePathMode;
 use super::path::child_path;
-use super::{
-    collect_flow_local_variables, is_flow_sibling_stitch, resolve_single_stitch_target,
-    scoped_label_target, weave_has_weave_points, ChoicePathMode,
-};
+use super::{collect_flow_local_variables, weave_has_weave_points};
 
 #[derive(Debug)]
 pub(super) struct LoweringIndexes<'a> {
@@ -568,12 +566,12 @@ fn collect_counted_paths_in_expression(
                     path_mode,
                     paths,
                 );
-            } else if let Some(target) = scoped_label_target(name, global_labels, path_mode) {
+            } else if let Some(target) = path_mode.scoped_label_target(name, global_labels) {
                 paths.visits.insert(target.clone());
-            } else if is_flow_sibling_stitch(name, path_mode) {
+            } else if path_mode.is_flow_sibling_stitch(name) {
                 paths
                     .visits
-                    .insert(resolve_single_stitch_target(name, path_mode));
+                    .insert(path_mode.resolve_single_stitch_target(name));
             }
         }
         Expression::StringContent(content) => {
@@ -662,11 +660,13 @@ fn insert_counted_divert_target(
     count_visits: bool,
     count_turns: bool,
 ) {
-    let counted_target = scoped_label_target(target, global_labels, path_mode)
+    let counted_target = path_mode
+        .scoped_label_target(target, global_labels)
         .cloned()
         .or_else(|| {
-            is_flow_sibling_stitch(target, path_mode)
-                .then(|| resolve_single_stitch_target(target, path_mode))
+            path_mode
+                .is_flow_sibling_stitch(target)
+                .then(|| path_mode.resolve_single_stitch_target(target))
         })
         .unwrap_or_else(|| target.to_string());
     if count_visits {

@@ -100,7 +100,7 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 7 in progress. R015 through R062 are complete. Phase 1
+- Current phase: Phase 7 in progress. R015 through R063 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
@@ -935,13 +935,18 @@ Use these checks during phase reviews:
     top-level lowering entry point now builds indexes once and passes the
     index context into root, flow, and global-declaration lowering.
 
-- [ ] R063 Extract `lower/context.rs`
+- [x] R063 Extract `lower/context.rs`
   - Purpose: Make path mode, flow context, local variables, and fallback gather
     behavior explicit.
   - Approach: Move `ChoicePathMode` and related context operations into a
     dedicated module.
   - Acceptance: Flow/weave/expression lowering access context through methods,
     not by manually inspecting many enum fields everywhere.
+  - Completed: Added `lower/context.rs` as the owner for `ChoicePathMode`,
+    flow-local checks, runtime index paths, scoped label lookup, sibling-stitch
+    resolution, fallback gather behavior, and choice/gather target helpers.
+    Lowering and index code now call context methods instead of free target
+    resolution helpers.
 
 - [ ] R064 Extract `lower/expression.rs`
   - Purpose: Separate expression bytecode emission from flow/weave structure.

@@ -1,0 +1,453 @@
+use std::collections::{HashMap, HashSet};
+
+use super::path::child_path;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum ChoicePathMode {
+    Root,
+    RootGather {
+        gather_name: String,
+    },
+    NestedRoot {
+        container_path: String,
+        gather_target: String,
+        allow_ancestor_fallback: bool,
+    },
+    Flow {
+        flow_name: String,
+        container_path: String,
+        parent_flow_name: Option<String>,
+        sibling_stitch_names: Vec<String>,
+        local_variables: HashSet<String>,
+        self_target_relative: bool,
+        fallback_gather_target: Option<String>,
+    },
+}
+
+impl ChoicePathMode {
+    pub(super) fn for_choice_nested_content(
+        &self,
+        choice_container_name: &str,
+        gather_container_name: &str,
+        has_following_gather: bool,
+    ) -> Self {
+        match self {
+            ChoicePathMode::Root => ChoicePathMode::NestedRoot {
+                container_path: format!("0.{choice_container_name}"),
+                gather_target: format!("0.{gather_container_name}"),
+                allow_ancestor_fallback: true,
+            },
+            ChoicePathMode::RootGather { gather_name } => ChoicePathMode::NestedRoot {
+                container_path: format!("0.{gather_name}.{choice_container_name}"),
+                gather_target: format!("0.{gather_container_name}"),
+                allow_ancestor_fallback: true,
+            },
+            ChoicePathMode::NestedRoot {
+                container_path,
+                gather_target,
+                allow_ancestor_fallback,
+            } => ChoicePathMode::NestedRoot {
+                container_path: format!("{container_path}.{choice_container_name}"),
+                gather_target: if has_following_gather {
+                    format!("{container_path}.{gather_container_name}")
+                } else {
+                    gather_target.clone()
+                },
+                allow_ancestor_fallback: *allow_ancestor_fallback,
+            },
+            ChoicePathMode::Flow {
+                flow_name,
+                container_path,
+                parent_flow_name,
+                sibling_stitch_names,
+                local_variables,
+                ..
+            } => ChoicePathMode::Flow {
+                flow_name: flow_name.clone(),
+                container_path: format!("{container_path}.{choice_container_name}"),
+                parent_flow_name: parent_flow_name.clone(),
+                sibling_stitch_names: sibling_stitch_names.clone(),
+                local_variables: local_variables.clone(),
+                self_target_relative: true,
+                fallback_gather_target: if has_following_gather {
+                    Some(child_path(container_path, gather_container_name))
+                } else {
+                    self.fallback_gather_target()
+                },
+            },
+        }
+    }
+
+    pub(super) fn for_nested_weave(&self, container_index: usize) -> Self {
+        match self {
+            ChoicePathMode::NestedRoot {
+                container_path,
+                gather_target,
+                allow_ancestor_fallback,
+            } => ChoicePathMode::NestedRoot {
+                container_path: format!("{container_path}.{container_index}"),
+                gather_target: gather_target.clone(),
+                allow_ancestor_fallback: *allow_ancestor_fallback,
+            },
+            ChoicePathMode::Root => ChoicePathMode::NestedRoot {
+                container_path: format!("0.{container_index}"),
+                gather_target: "0.g-0".to_string(),
+                allow_ancestor_fallback: true,
+            },
+            ChoicePathMode::RootGather { gather_name } => ChoicePathMode::NestedRoot {
+                container_path: format!("0.{gather_name}.{container_index}"),
+                gather_target: "0.g-0".to_string(),
+                allow_ancestor_fallback: true,
+            },
+            ChoicePathMode::Flow {
+                flow_name,
+                container_path,
+                parent_flow_name,
+                sibling_stitch_names,
+                local_variables,
+                self_target_relative,
+                fallback_gather_target,
+            } => ChoicePathMode::Flow {
+                flow_name: flow_name.clone(),
+                container_path: format!("{container_path}.{container_index}"),
+                parent_flow_name: parent_flow_name.clone(),
+                sibling_stitch_names: sibling_stitch_names.clone(),
+                local_variables: local_variables.clone(),
+                self_target_relative: *self_target_relative,
+                fallback_gather_target: fallback_gather_target.clone(),
+            },
+        }
+    }
+
+    pub(super) fn for_gather(&self, gather_name: &str) -> Self {
+        match self {
+            ChoicePathMode::Root => ChoicePathMode::RootGather {
+                gather_name: gather_name.to_string(),
+            },
+            ChoicePathMode::NestedRoot {
+                container_path,
+                gather_target,
+                allow_ancestor_fallback,
+            } => ChoicePathMode::NestedRoot {
+                container_path: format!("{container_path}.{gather_name}"),
+                gather_target: gather_target.clone(),
+                allow_ancestor_fallback: *allow_ancestor_fallback,
+            },
+            ChoicePathMode::Flow {
+                flow_name,
+                container_path,
+                parent_flow_name,
+                sibling_stitch_names,
+                local_variables,
+                self_target_relative,
+                fallback_gather_target,
+            } => ChoicePathMode::Flow {
+                flow_name: flow_name.clone(),
+                container_path: format!("{container_path}.{gather_name}"),
+                parent_flow_name: parent_flow_name.clone(),
+                sibling_stitch_names: sibling_stitch_names.clone(),
+                local_variables: local_variables.clone(),
+                self_target_relative: *self_target_relative,
+                fallback_gather_target: fallback_gather_target.clone(),
+            },
+            other => other.clone(),
+        }
+    }
+
+    pub(super) fn for_conditional_branch(&self, branch_index: usize) -> Self {
+        let container_path = format!("{}.b", self.runtime_index_path(branch_index));
+        match self {
+            ChoicePathMode::Root | ChoicePathMode::RootGather { .. } => {
+                ChoicePathMode::NestedRoot {
+                    container_path,
+                    gather_target: "0.g-0".to_string(),
+                    allow_ancestor_fallback: false,
+                }
+            }
+            ChoicePathMode::NestedRoot { gather_target, .. } => ChoicePathMode::NestedRoot {
+                container_path,
+                gather_target: gather_target.clone(),
+                allow_ancestor_fallback: false,
+            },
+            ChoicePathMode::Flow {
+                flow_name,
+                parent_flow_name,
+                sibling_stitch_names,
+                local_variables,
+                ..
+            } => ChoicePathMode::Flow {
+                flow_name: flow_name.clone(),
+                container_path,
+                parent_flow_name: parent_flow_name.clone(),
+                sibling_stitch_names: sibling_stitch_names.clone(),
+                local_variables: local_variables.clone(),
+                self_target_relative: true,
+                fallback_gather_target: None,
+            },
+        }
+    }
+
+    pub(super) fn for_sequence_branch(
+        &self,
+        sequence_container_path: &str,
+        branch_name: &str,
+    ) -> Self {
+        let container_path = format!("{sequence_container_path}.{branch_name}");
+        match self {
+            ChoicePathMode::Root | ChoicePathMode::RootGather { .. } => {
+                ChoicePathMode::NestedRoot {
+                    container_path,
+                    gather_target: "0.g-0".to_string(),
+                    allow_ancestor_fallback: false,
+                }
+            }
+            ChoicePathMode::NestedRoot { gather_target, .. } => ChoicePathMode::NestedRoot {
+                container_path,
+                gather_target: gather_target.clone(),
+                allow_ancestor_fallback: false,
+            },
+            ChoicePathMode::Flow {
+                flow_name,
+                parent_flow_name,
+                sibling_stitch_names,
+                local_variables,
+                self_target_relative,
+                ..
+            } => ChoicePathMode::Flow {
+                flow_name: flow_name.clone(),
+                container_path,
+                parent_flow_name: parent_flow_name.clone(),
+                sibling_stitch_names: sibling_stitch_names.clone(),
+                local_variables: local_variables.clone(),
+                self_target_relative: *self_target_relative,
+                fallback_gather_target: None,
+            },
+        }
+    }
+
+    pub(super) fn fallback_gather_target(&self) -> Option<String> {
+        match self {
+            ChoicePathMode::NestedRoot {
+                gather_target,
+                allow_ancestor_fallback,
+                ..
+            } => allow_ancestor_fallback.then(|| gather_target.clone()),
+            ChoicePathMode::Flow {
+                fallback_gather_target,
+                ..
+            } => fallback_gather_target.clone(),
+            _ => None,
+        }
+    }
+
+    pub(super) fn set_flow_fallback_gather_target(&mut self, target: String) {
+        if let ChoicePathMode::Flow {
+            fallback_gather_target,
+            ..
+        } = self
+        {
+            *fallback_gather_target = Some(target);
+        }
+    }
+
+    pub(super) fn should_include_choice_gather(&self) -> bool {
+        matches!(
+            self,
+            ChoicePathMode::Root | ChoicePathMode::RootGather { .. }
+        ) || self.fallback_gather_target().is_some()
+    }
+
+    pub(super) fn is_root(&self) -> bool {
+        matches!(self, ChoicePathMode::Root)
+    }
+
+    pub(super) fn is_nested_root(&self) -> bool {
+        matches!(self, ChoicePathMode::NestedRoot { .. })
+    }
+
+    pub(super) fn is_local_variable(&self, name: &str) -> bool {
+        match self {
+            ChoicePathMode::Flow {
+                local_variables, ..
+            } => local_variables.contains(name),
+            _ => false,
+        }
+    }
+
+    pub(super) fn runtime_index_path(&self, index: usize) -> String {
+        match self {
+            ChoicePathMode::Root => format!("0.{index}"),
+            ChoicePathMode::RootGather { gather_name } => format!("0.{gather_name}.{index}"),
+            ChoicePathMode::NestedRoot { container_path, .. }
+            | ChoicePathMode::Flow { container_path, .. } => format!("{container_path}.{index}"),
+        }
+    }
+
+    pub(super) fn sequence_container_path(&self, content_index: usize) -> String {
+        self.runtime_index_path(content_index)
+    }
+
+    pub(super) fn absolute_child_path(&self, child: &str) -> String {
+        child_path(&self.container_path(), child)
+    }
+
+    pub(super) fn container_path(&self) -> String {
+        match self {
+            ChoicePathMode::Root => "0".to_string(),
+            ChoicePathMode::RootGather { gather_name } => format!("0.{gather_name}"),
+            ChoicePathMode::NestedRoot { container_path, .. }
+            | ChoicePathMode::Flow { container_path, .. } => container_path.clone(),
+        }
+    }
+
+    pub(super) fn choice_point_target(&self, choice_index: usize) -> String {
+        self.absolute_child_path(&format!("c-{choice_index}"))
+    }
+
+    pub(super) fn outer_return_target(&self, choice_point_index: usize) -> String {
+        self.runtime_index_path(choice_point_index)
+    }
+
+    pub(super) fn choice_content_return_target(&self, choice_container_name: &str) -> String {
+        self.absolute_child_path(choice_container_name)
+    }
+
+    pub(super) fn start_content_target(&self, choice_point_index: usize) -> String {
+        format!("{}.s", self.runtime_index_path(choice_point_index))
+    }
+
+    pub(super) fn gather_target(
+        &self,
+        gather_container_name: &str,
+        has_following_gather: bool,
+    ) -> String {
+        match self {
+            ChoicePathMode::Root => format!("0.{gather_container_name}"),
+            ChoicePathMode::RootGather { .. } => self.absolute_child_path(gather_container_name),
+            ChoicePathMode::NestedRoot { .. } if has_following_gather => {
+                self.absolute_child_path(gather_container_name)
+            }
+            ChoicePathMode::NestedRoot { gather_target, .. } => gather_target.clone(),
+            ChoicePathMode::Flow {
+                container_path,
+                fallback_gather_target,
+                ..
+            } if has_following_gather || fallback_gather_target.is_none() => {
+                child_path(container_path, gather_container_name)
+            }
+            ChoicePathMode::Flow {
+                fallback_gather_target,
+                ..
+            } => fallback_gather_target
+                .clone()
+                .unwrap_or_else(|| gather_container_name.to_string()),
+        }
+    }
+
+    /// Resolve a divert target path, converting absolute flow names to relative
+    /// paths when the target is a sibling stitch or child stitch inside a
+    /// choice container.
+    pub(super) fn resolve_divert_target(&self, target: &str) -> String {
+        match self {
+            ChoicePathMode::Root
+            | ChoicePathMode::RootGather { .. }
+            | ChoicePathMode::NestedRoot { .. } => target.to_string(),
+            ChoicePathMode::Flow {
+                parent_flow_name,
+                flow_name,
+                sibling_stitch_names,
+                ..
+            } => {
+                if let Some((first_part, second_part)) = target.split_once('.') {
+                    if parent_flow_name.is_none()
+                        && first_part == flow_name
+                        && sibling_stitch_names.iter().any(|name| name == second_part)
+                    {
+                        return self.resolve_single_stitch_target(second_part);
+                    }
+                    return target.to_string();
+                }
+
+                self.resolve_single_stitch_target(target)
+            }
+        }
+    }
+
+    pub(super) fn resolve_label_target(&self, label_target: &str) -> String {
+        let _ = self;
+        label_target.to_string()
+    }
+
+    pub(super) fn scoped_label_target<'a>(
+        &self,
+        target: &str,
+        global_labels: &'a HashMap<String, String>,
+    ) -> Option<&'a String> {
+        if target.contains('.') {
+            return global_labels.get(target);
+        }
+
+        self.current_flow_path()
+            .and_then(|flow_path| global_labels.get(&format!("{flow_path}.{target}")))
+            .or_else(|| global_labels.get(target))
+    }
+
+    fn current_flow_path(&self) -> Option<String> {
+        match self {
+            ChoicePathMode::Flow {
+                flow_name,
+                parent_flow_name,
+                ..
+            } => Some(
+                parent_flow_name
+                    .as_ref()
+                    .map(|parent| format!("{parent}.{flow_name}"))
+                    .unwrap_or_else(|| flow_name.clone()),
+            ),
+            _ => None,
+        }
+    }
+
+    pub(super) fn is_flow_sibling_stitch(&self, name: &str) -> bool {
+        matches!(
+            self,
+            ChoicePathMode::Flow {
+                sibling_stitch_names,
+                ..
+            } if sibling_stitch_names.iter().any(|s| s == name)
+        )
+    }
+
+    /// Resolve a single stitch name to a relative path if applicable.
+    pub(super) fn resolve_single_stitch_target(&self, target: &str) -> String {
+        match self {
+            ChoicePathMode::Root
+            | ChoicePathMode::RootGather { .. }
+            | ChoicePathMode::NestedRoot { .. } => target.to_string(),
+            ChoicePathMode::Flow {
+                sibling_stitch_names,
+                parent_flow_name,
+                flow_name,
+                self_target_relative,
+                ..
+            } => {
+                if parent_flow_name.is_some() {
+                    let parent_flow_name = parent_flow_name.as_deref().unwrap();
+                    if sibling_stitch_names.iter().any(|s| s == target) {
+                        format!("{parent_flow_name}.{target}")
+                    } else if target == parent_flow_name {
+                        parent_flow_name.to_string()
+                    } else {
+                        target.to_string()
+                    }
+                } else if sibling_stitch_names.iter().any(|s| s == target) {
+                    format!("{flow_name}.{target}")
+                } else if *self_target_relative && target == *flow_name {
+                    target.to_string()
+                } else {
+                    target.to_string()
+                }
+            }
+        }
+    }
+}
