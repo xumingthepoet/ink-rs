@@ -5,7 +5,7 @@ use crate::parsed::{BinaryOperator, Expression, FlowArgument};
 use super::context::ChoicePathMode;
 use super::indexes::{CallSignature, ExternalSignatures};
 use super::ir::{ControlCommand, RuntimeObject};
-use super::lower_content_list_into_context;
+use super::weave::lower_content_list_into_context;
 
 pub(super) fn lower_output_expression_into(
     content: &mut Vec<RuntimeObject>,

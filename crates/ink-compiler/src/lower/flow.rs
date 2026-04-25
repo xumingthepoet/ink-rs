@@ -5,10 +5,11 @@ use crate::parsed::{ContentList, Expression, Flow, Object, Weave};
 use super::context::ChoicePathMode;
 use super::indexes::{CountedFlowPaths, ExternalSignatures, LoweringIndexes};
 use super::ir::{Container, RuntimeObject};
-use super::{
-    done_container, ends_with_flow_terminator, lower_choice_weave, lower_linear_weave,
-    lower_linear_weave_into_context, weave_has_choice, weave_has_weave_points,
+use super::weave::{
+    lower_choice_weave, lower_linear_weave, lower_linear_weave_into_context, weave_has_choice,
+    weave_has_weave_points,
 };
+use super::{done_container, ends_with_flow_terminator};
 
 pub(super) fn lower_root_weave(
     weave: &Weave,

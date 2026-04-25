@@ -100,7 +100,7 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 7 in progress. R015 through R065 are complete. Phase 1
+- Current phase: Phase 7 in progress. R015 through R066 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
@@ -972,12 +972,17 @@ Use these checks during phase reviews:
     The flow module calls existing weave lowering entry points without owning
     choice/gather section internals.
 
-- [ ] R066 Extract `lower/weave.rs`
+- [x] R066 Extract `lower/weave.rs`
   - Purpose: Give choice/gather/weave lowering an owner.
   - Approach: Move linear weave lowering, choice weave lowering, weave section
     lowering, choice container creation, and gather container handling.
   - Acceptance: Choice, gather, and weave fixtures are unchanged, and weave
     lowering can be tested without reading flow lowering.
+  - Completed: Added `lower/weave.rs` for linear weave lowering, choice weave
+    lowering, weave section traversal, gather container placement, choice
+    container creation, local weave labels, content-list lowering entry points,
+    and weave helper predicates. Flow, expression, indexes, and remaining
+    structural lowering now import weave entry points directly.
 
 - [ ] R067 Extract sequence and conditional lowering if still large
   - Purpose: Keep `lower/weave.rs` from becoming the new god file.

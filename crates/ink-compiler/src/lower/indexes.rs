@@ -7,7 +7,7 @@ use crate::parsed::{
 use super::context::ChoicePathMode;
 use super::flow::collect_flow_local_variables;
 use super::path::child_path;
-use super::weave_has_weave_points;
+use super::weave::weave_has_weave_points;
 
 #[derive(Debug)]
 pub(super) struct LoweringIndexes<'a> {
