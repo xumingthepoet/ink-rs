@@ -1179,11 +1179,15 @@ Use these checks during phase reviews:
     diagnostics, compiler/parser/language tests, and the `Changed from upstream
     Ink` docs section, without involving lowering or fixture-specific branches.
 
-- [ ] R083 Review public compiler API after refactor
+- [x] R083 Review public compiler API after refactor
   - Purpose: Keep external API stable and clear while internals change.
   - Approach: Review `lib.rs`, `Compiler`, `CompilerOptions`, `StageOutput`,
     and exported parsed/lower types.
   - Acceptance: Public API changes are intentional, documented, and tested.
+  - Completed: Re-exported stage artifact types that were already part of the
+    public compiler stage surface, documented the intended API boundary in
+    `ArchitectureAndDevOverview.md`, and added `compiler_api.rs` coverage for
+    stage artifacts, compiler options, and diagnostic codes.
 
 ## Phase 9: Runtime-Level Quality Review
 

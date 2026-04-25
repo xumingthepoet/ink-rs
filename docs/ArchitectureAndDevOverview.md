@@ -154,6 +154,26 @@ JSON story format. It should remain a narrow JSON writer. It should not parse
 Ink, validate semantics, or rewrite runtime paths beyond what the lowering IR
 already describes.
 
+## Public Compiler API
+
+The public API is intentionally small and re-exported from `ink_compiler`:
+
+- `Compiler`, `CompilerOptions`, `StageOutput<T>`, and `CompiledStory` are the
+  main entry points.
+- `SourceInput`, `SourceSpan`, `FileHandler`, and `eliminate_comments` cover
+  source integration.
+- `Diagnostic`, `DiagnosticSeverity`, and `DiagnosticCode` are the stable
+  diagnostic surface.
+- `ParsedStory` and parsed node types are exported for tools that inspect
+  syntax output.
+- `CheckedStory`, `RuntimeProgram`, `RuntimeContainer`, `RuntimeObject`, and
+  `RuntimeControlCommand` are exported because stage methods and
+  `CompiledStory::program` expose them.
+
+Internal modules such as `syntax`, `analysis`, `lower`, and `emit` stay
+private. External callers should use `Compiler` stages rather than depending on
+module internals.
+
 ## Runtime
 
 The runtime layer in `crates/ink-runtime` loads and executes the JSON format.
