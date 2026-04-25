@@ -22,7 +22,7 @@ use expression::{lower_expression_into, lower_logic_line_into, lower_output_expr
 use flow::{lower_flow, lower_root_weave};
 use indexes::{ExternalSignatures, LoweringIndexes, RuntimeLenEstimator};
 use ir::{Container, ControlCommand, RuntimeObject, RuntimeProgram};
-use path::compact_path_strings_in_container;
+use path::{compact_path_strings_in_container, LabelIndex};
 use sequence::lower_sequence;
 use weave::{choice_container_prefix, lower_choice_weave, lower_content_list_into_context};
 
@@ -126,7 +126,7 @@ fn estimated_choice_content_len(choice: &Choice, constants: &HashMap<String, Exp
         choice.inner_content(),
         &ChoicePathMode::Root,
         &HashMap::new(),
-        &HashMap::new(),
+        &LabelIndex::new(),
         &HashSet::new(),
         &HashMap::new(),
         constants,
@@ -148,7 +148,7 @@ fn estimated_runtime_len_for_label_collection(
         object,
         &ChoicePathMode::Root,
         &HashMap::new(),
-        &HashMap::new(),
+        &LabelIndex::new(),
         &HashSet::new(),
         &HashMap::new(),
         constants,
@@ -162,7 +162,7 @@ fn lower_object_into_with_context(
     object: &Object,
     path_mode: &ChoicePathMode,
     choice_labels: &HashMap<String, String>,
-    global_labels: &HashMap<String, String>,
+    global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
@@ -185,7 +185,7 @@ fn lower_object_into_with_context_count(
     object: &Object,
     path_mode: &ChoicePathMode,
     choice_labels: &HashMap<String, String>,
-    global_labels: &HashMap<String, String>,
+    global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
@@ -342,7 +342,7 @@ fn lower_variable_assignment_into(
     assignment: &crate::parsed::VariableAssignment,
     path_mode: &ChoicePathMode,
     choice_labels: &HashMap<String, String>,
-    global_labels: &HashMap<String, String>,
+    global_labels: &LabelIndex,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
 ) {
@@ -383,7 +383,7 @@ fn lower_inc_dec_into(
     inc_dec: &crate::parsed::IncDec,
     path_mode: &ChoicePathMode,
     choice_labels: &HashMap<String, String>,
-    global_labels: &HashMap<String, String>,
+    global_labels: &LabelIndex,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
 ) {
@@ -419,7 +419,7 @@ fn push_divert_with_context(
     divert: &Divert,
     path_mode: &ChoicePathMode,
     choice_labels: &HashMap<String, String>,
-    global_labels: &HashMap<String, String>,
+    global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
@@ -453,7 +453,7 @@ fn push_divert_with_context(
                 runtime_divert(choice_target.clone(), false, divert.is_tunnel())
             } else if let Some(label_target) = path_mode
                 .scoped_label_target(target, global_labels)
-                .filter(|label_target| label_target.as_str() != target)
+                .filter(|label_target| *label_target != target)
             {
                 runtime_divert(
                     path_mode.resolve_label_target(label_target),
@@ -490,7 +490,7 @@ fn lower_tunnel_onwards_into(
     tunnel_onwards: &crate::parsed::TunnelOnwards,
     path_mode: &ChoicePathMode,
     choice_labels: &HashMap<String, String>,
-    global_labels: &HashMap<String, String>,
+    global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
@@ -515,7 +515,7 @@ fn lower_tunnel_onwards_into(
                     content.push(RuntimeObject::DivertTarget(choice_target.clone()));
                 } else if let Some(label_target) = path_mode
                     .scoped_label_target(target, global_labels)
-                    .filter(|label_target| label_target.as_str() != target)
+                    .filter(|label_target| *label_target != target)
                 {
                     content.push(RuntimeObject::DivertTarget(
                         path_mode.resolve_label_target(label_target),

@@ -5,7 +5,7 @@ use crate::parsed::{Expression, Sequence, SequenceType, Weave};
 use super::context::ChoicePathMode;
 use super::indexes::ExternalSignatures;
 use super::ir::{Container, ControlCommand, RuntimeObject};
-use super::path::compact_relative_path;
+use super::path::{compact_relative_path, LabelIndex};
 use super::weave::{
     content_list_has_choice, lower_choice_weave_with_initial_content,
     lower_content_list_into_context,
@@ -14,7 +14,7 @@ use super::weave::{
 pub(super) fn lower_sequence(
     sequence: &Sequence,
     choice_labels: &HashMap<String, String>,
-    global_labels: &HashMap<String, String>,
+    global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,

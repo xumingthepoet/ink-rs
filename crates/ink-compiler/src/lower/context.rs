@@ -1,6 +1,6 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
-use super::path::child_path;
+use super::path::{child_path, LabelIndex};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum ChoicePathMode {
@@ -381,8 +381,8 @@ impl ChoicePathMode {
     pub(super) fn scoped_label_target<'a>(
         &self,
         target: &str,
-        global_labels: &'a HashMap<String, String>,
-    ) -> Option<&'a String> {
+        global_labels: &'a LabelIndex,
+    ) -> Option<&'a str> {
         if target.contains('.') {
             return global_labels.get(target);
         }

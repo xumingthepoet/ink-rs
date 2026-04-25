@@ -6,13 +6,13 @@ use crate::parsed::{
 
 use super::context::ChoicePathMode;
 use super::flow::collect_flow_local_variables;
-use super::path::child_path;
+use super::path::{child_path, LabelIndex, RuntimePath};
 use super::weave::weave_has_weave_points;
 
 #[derive(Debug)]
 pub(super) struct LoweringIndexes<'a> {
     pub(super) constants: HashMap<String, Expression>,
-    pub(super) global_labels: HashMap<String, String>,
+    pub(super) global_labels: LabelIndex,
     pub(super) global_variables: HashSet<String>,
     pub(super) variable_declarations: Vec<&'a VariableAssignment>,
     pub(super) external_signatures: ExternalSignatures,
@@ -302,7 +302,7 @@ fn collect_external_signatures_in_object(object: &Object, signatures: &mut Exter
 
 fn build_counted_flow_paths(
     story: &Story,
-    global_labels: &HashMap<String, String>,
+    global_labels: &LabelIndex,
     constants: &HashMap<String, Expression>,
 ) -> CountedFlowPaths {
     let mut paths = CountedFlowPaths::default();
@@ -333,7 +333,7 @@ fn build_counted_flow_paths(
 
 pub(super) fn collect_counted_paths_in_weave(
     weave: &Weave,
-    global_labels: &HashMap<String, String>,
+    global_labels: &LabelIndex,
     constants: &HashMap<String, Expression>,
     path_mode: &ChoicePathMode,
     paths: &mut CountedFlowPaths,
@@ -347,7 +347,7 @@ fn collect_counted_paths_in_flow(
     flow: &Flow,
     parent_flow_name: Option<&str>,
     sibling_stitch_names: &[String],
-    global_labels: &HashMap<String, String>,
+    global_labels: &LabelIndex,
     constants: &HashMap<String, Expression>,
     paths: &mut CountedFlowPaths,
 ) {
@@ -389,7 +389,7 @@ fn collect_counted_paths_in_flow(
 
 fn collect_counted_paths_in_content_list(
     content_list: &ContentList,
-    global_labels: &HashMap<String, String>,
+    global_labels: &LabelIndex,
     constants: &HashMap<String, Expression>,
     path_mode: &ChoicePathMode,
     paths: &mut CountedFlowPaths,
@@ -401,7 +401,7 @@ fn collect_counted_paths_in_content_list(
 
 fn collect_counted_paths_in_object(
     object: &Object,
-    global_labels: &HashMap<String, String>,
+    global_labels: &LabelIndex,
     constants: &HashMap<String, Expression>,
     path_mode: &ChoicePathMode,
     paths: &mut CountedFlowPaths,
@@ -552,7 +552,7 @@ fn collect_counted_paths_in_object(
 
 fn collect_counted_paths_in_expression(
     expression: &Expression,
-    global_labels: &HashMap<String, String>,
+    global_labels: &LabelIndex,
     constants: &HashMap<String, Expression>,
     path_mode: &ChoicePathMode,
     paths: &mut CountedFlowPaths,
@@ -568,7 +568,7 @@ fn collect_counted_paths_in_expression(
                     paths,
                 );
             } else if let Some(target) = path_mode.scoped_label_target(name, global_labels) {
-                paths.visits.insert(target.clone());
+                paths.visits.insert(target.to_string());
             } else if path_mode.is_flow_sibling_stitch(name) {
                 paths
                     .visits
@@ -655,7 +655,7 @@ fn collect_counted_paths_in_expression(
 
 fn insert_counted_divert_target(
     target: &str,
-    global_labels: &HashMap<String, String>,
+    global_labels: &LabelIndex,
     path_mode: &ChoicePathMode,
     paths: &mut CountedFlowPaths,
     count_visits: bool,
@@ -663,7 +663,7 @@ fn insert_counted_divert_target(
 ) {
     let counted_target = path_mode
         .scoped_label_target(target, global_labels)
-        .cloned()
+        .map(str::to_string)
         .or_else(|| {
             path_mode
                 .is_flow_sibling_stitch(target)
@@ -682,8 +682,8 @@ fn build_label_index(
     story: &Story,
     constants: &HashMap<String, Expression>,
     estimator: &RuntimeLenEstimator,
-) -> HashMap<String, String> {
-    let mut labels = HashMap::new();
+) -> LabelIndex {
+    let mut labels = LabelIndex::new();
     collect_weave_labels(
         story.root_weave(),
         "0",
@@ -703,14 +703,14 @@ fn collect_flow_labels(
     parent_flow_name: Option<&str>,
     constants: &HashMap<String, Expression>,
     estimator: &RuntimeLenEstimator,
-    labels: &mut HashMap<String, String>,
+    labels: &mut LabelIndex,
 ) {
     let flow_path = parent_flow_name
         .map(|parent| format!("{parent}.{}", flow.name()))
         .unwrap_or_else(|| flow.name().to_string());
-    labels.insert(flow_path.clone(), flow_path.clone());
+    labels.insert(flow_path.clone(), RuntimePath::new(flow_path.clone()));
     if parent_flow_name.is_none() {
-        labels.insert(flow.name().to_string(), flow_path.clone());
+        labels.insert(flow.name().to_string(), RuntimePath::new(flow_path.clone()));
     }
     let weave_container_path = if weave_has_weave_points(flow.weave()) {
         format!("{}.{}", flow_path, flow.arguments().len())
@@ -736,7 +736,7 @@ fn collect_weave_labels(
     flow_alias_prefix: Option<&str>,
     constants: &HashMap<String, Expression>,
     estimator: &RuntimeLenEstimator,
-    labels: &mut HashMap<String, String>,
+    labels: &mut LabelIndex,
 ) {
     let mut choice_count = 0;
     let mut gather_count = 0;
@@ -821,17 +821,23 @@ fn collect_weave_labels(
 }
 
 fn insert_label_aliases(
-    labels: &mut HashMap<String, String>,
+    labels: &mut LabelIndex,
     identifier: &str,
     container_path: &str,
     flow_alias_prefix: Option<&str>,
     target_path: &str,
 ) {
-    labels.insert(identifier.to_string(), target_path.to_string());
+    labels.insert(identifier.to_string(), RuntimePath::new(target_path));
     if let Some(flow_path) = flow_alias_prefix {
-        labels.insert(format!("{flow_path}.{identifier}"), target_path.to_string());
+        labels.insert(
+            format!("{flow_path}.{identifier}"),
+            RuntimePath::new(target_path),
+        );
     }
     if let Some(flow_path) = container_path.strip_suffix(".0") {
-        labels.insert(format!("{flow_path}.{identifier}"), target_path.to_string());
+        labels.insert(
+            format!("{flow_path}.{identifier}"),
+            RuntimePath::new(target_path),
+        );
     }
 }

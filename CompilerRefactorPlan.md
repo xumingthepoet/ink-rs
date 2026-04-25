@@ -100,7 +100,7 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 7 in progress. R015 through R068 are complete. Phase 1
+- Current phase: Phase 7 in progress. R015 through R069 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
@@ -1008,13 +1008,18 @@ Use these checks during phase reviews:
     relative path compaction. `lower.rs` now calls one path compaction entry
     point after building the root container.
 
-- [ ] R069 Introduce typed path wrappers
+- [x] R069 Introduce typed path wrappers
   - Purpose: Reduce confusion between flow paths, runtime paths, semantic label
     keys, and target paths.
   - Approach: Add `FlowPath`, `RuntimePath`, and `TargetPath` or equivalent
     wrappers where they reduce ambiguity.
   - Acceptance: Key lowering indexes no longer use `HashMap<String, String>`
     for conceptually different path kinds.
+  - Completed: Added `RuntimePath`, `LabelAlias`, and `LabelIndex` in
+    `lower/path.rs`. `LoweringIndexes.global_labels` now uses `LabelIndex`
+    instead of exposing `HashMap<String, String>`, and label resolution APIs
+    accept the typed index. Local choice-label maps remain raw strings and are
+    scheduled for the follow-up typed-map pass.
 
 - [ ] R070 Replace label and target maps with typed maps
   - Purpose: Make path resolution safer and easier to change.

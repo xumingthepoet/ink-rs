@@ -5,13 +5,14 @@ use crate::parsed::{BinaryOperator, Expression, FlowArgument};
 use super::context::ChoicePathMode;
 use super::indexes::{CallSignature, ExternalSignatures};
 use super::ir::{ControlCommand, RuntimeObject};
+use super::path::LabelIndex;
 use super::weave::lower_content_list_into_context;
 
 pub(super) fn lower_output_expression_into(
     content: &mut Vec<RuntimeObject>,
     expression: &Expression,
     choice_labels: &HashMap<String, String>,
-    global_labels: &HashMap<String, String>,
+    global_labels: &LabelIndex,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
     path_mode: &ChoicePathMode,
@@ -35,7 +36,7 @@ pub(super) fn lower_logic_line_into(
     content: &mut Vec<RuntimeObject>,
     expression: &Expression,
     choice_labels: &HashMap<String, String>,
-    global_labels: &HashMap<String, String>,
+    global_labels: &LabelIndex,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
     path_mode: &ChoicePathMode,
@@ -60,7 +61,7 @@ pub(super) fn lower_expression_into(
     content: &mut Vec<RuntimeObject>,
     expression: &Expression,
     choice_labels: &HashMap<String, String>,
-    global_labels: &HashMap<String, String>,
+    global_labels: &LabelIndex,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
     path_mode: &ChoicePathMode,
@@ -84,7 +85,7 @@ fn lower_expression_into_with_constants(
     content: &mut Vec<RuntimeObject>,
     expression: &Expression,
     choice_labels: &HashMap<String, String>,
-    global_labels: &HashMap<String, String>,
+    global_labels: &LabelIndex,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
     path_mode: &ChoicePathMode,
@@ -119,7 +120,7 @@ fn lower_expression_into_with_constants(
                 choice_target.clone()
             } else if let Some(label_target) = path_mode
                 .scoped_label_target(target, global_labels)
-                .filter(|label_target| label_target.as_str() != target)
+                .filter(|label_target| *label_target != target)
             {
                 path_mode.resolve_label_target(label_target)
             } else {
@@ -251,7 +252,7 @@ fn lower_function_call_into(
     name: &str,
     args: &[Expression],
     choice_labels: &HashMap<String, String>,
-    global_labels: &HashMap<String, String>,
+    global_labels: &LabelIndex,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
     path_mode: &ChoicePathMode,
@@ -458,7 +459,7 @@ fn lower_function_arg_into(
     arg: &Expression,
     expected_arg: Option<&FlowArgument>,
     choice_labels: &HashMap<String, String>,
-    global_labels: &HashMap<String, String>,
+    global_labels: &LabelIndex,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
     path_mode: &ChoicePathMode,

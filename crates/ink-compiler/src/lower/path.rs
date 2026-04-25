@@ -1,6 +1,71 @@
-use std::collections::HashMap;
+use std::{borrow::Borrow, collections::HashMap, fmt};
 
 use super::ir::{Container, RuntimeObject};
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub(super) struct RuntimePath(String);
+
+impl RuntimePath {
+    pub(super) fn new(path: impl Into<String>) -> Self {
+        Self(path.into())
+    }
+
+    pub(super) fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl fmt::Display for RuntimePath {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub(super) struct LabelAlias(String);
+
+impl LabelAlias {
+    fn new(alias: impl Into<String>) -> Self {
+        Self(alias.into())
+    }
+}
+
+impl Borrow<str> for LabelAlias {
+    fn borrow(&self) -> &str {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub(super) struct LabelIndex {
+    labels: HashMap<LabelAlias, RuntimePath>,
+}
+
+impl LabelIndex {
+    pub(super) fn new() -> Self {
+        Self::default()
+    }
+
+    pub(super) fn insert(&mut self, alias: impl Into<String>, target: impl Into<RuntimePath>) {
+        self.labels.insert(LabelAlias::new(alias), target.into());
+    }
+
+    pub(super) fn get(&self, alias: &str) -> Option<&str> {
+        self.labels.get(alias).map(RuntimePath::as_str)
+    }
+}
+
+impl From<String> for RuntimePath {
+    fn from(path: String) -> Self {
+        Self::new(path)
+    }
+}
+
+impl From<&str> for RuntimePath {
+    fn from(path: &str) -> Self {
+        Self::new(path)
+    }
+}
 
 pub(super) fn child_path(parent: &str, child: &str) -> String {
     if parent.is_empty() {
@@ -307,6 +372,14 @@ mod tests {
             canonical_runtime_path("knot.label", &semantic_paths),
             Some("knot.0.label".to_string())
         );
+    }
+
+    #[test]
+    fn label_index_returns_runtime_paths_by_alias() {
+        let mut labels = LabelIndex::new();
+        labels.insert("short_label", RuntimePath::new("knot.0.label"));
+
+        assert_eq!(labels.get("short_label"), Some("knot.0.label"));
     }
 
     #[test]

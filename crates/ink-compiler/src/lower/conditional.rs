@@ -7,13 +7,14 @@ use super::expression::lower_expression_into;
 use super::indexes::ExternalSignatures;
 use super::ir::{Container, ControlCommand, RuntimeObject};
 use super::lower_object_into_with_context;
+use super::path::LabelIndex;
 use super::weave::{lower_choice_weave_with_initial_content, weave_has_choice};
 
 pub(super) fn lower_conditional_into(
     content: &mut Vec<RuntimeObject>,
     conditional: &Conditional,
     choice_labels: &HashMap<String, String>,
-    global_labels: &HashMap<String, String>,
+    global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,

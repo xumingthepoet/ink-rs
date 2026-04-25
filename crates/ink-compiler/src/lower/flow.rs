@@ -5,6 +5,7 @@ use crate::parsed::{ContentList, Expression, Flow, Object, Weave};
 use super::context::ChoicePathMode;
 use super::indexes::{CountedFlowPaths, ExternalSignatures, LoweringIndexes};
 use super::ir::{Container, RuntimeObject};
+use super::path::LabelIndex;
 use super::weave::{
     lower_choice_weave, lower_linear_weave, lower_linear_weave_into_context, weave_has_choice,
     weave_has_weave_points,
@@ -69,7 +70,7 @@ fn lower_flow_with_context(
     flow: &Flow,
     parent_knot_name: Option<&str>,
     sibling_stitch_names: &[String],
-    global_labels: &HashMap<String, String>,
+    global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,

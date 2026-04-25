@@ -6,7 +6,7 @@ use super::context::ChoicePathMode;
 use super::expression::lower_expression_into;
 use super::indexes::{collect_counted_paths_in_weave, CountedFlowPaths, ExternalSignatures};
 use super::ir::{Container, ControlCommand, RuntimeObject};
-use super::path::child_path;
+use super::path::{child_path, LabelIndex};
 use super::{
     done_container, ends_with_end_or_done, lower_object_into_with_context,
     lower_object_into_with_context_count,
@@ -82,7 +82,7 @@ pub(super) fn content_list_has_choice(content_list: &ContentList) -> bool {
 
 pub(super) fn lower_linear_weave(
     weave: &Weave,
-    global_labels: &HashMap<String, String>,
+    global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
@@ -99,7 +99,7 @@ pub(super) fn lower_linear_weave(
 
 fn lower_linear_weave_with_context(
     weave: &Weave,
-    global_labels: &HashMap<String, String>,
+    global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
@@ -121,7 +121,7 @@ fn lower_linear_weave_with_context(
 pub(super) fn lower_linear_weave_into_context(
     content: &mut Vec<RuntimeObject>,
     weave: &Weave,
-    global_labels: &HashMap<String, String>,
+    global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
@@ -145,7 +145,7 @@ pub(super) fn lower_linear_weave_into_context(
 pub(super) fn lower_choice_weave(
     weave: &Weave,
     path_mode: ChoicePathMode,
-    global_labels: &HashMap<String, String>,
+    global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
@@ -166,7 +166,7 @@ pub(super) fn lower_choice_weave(
 pub(super) fn lower_choice_weave_with_initial_content(
     weave: &Weave,
     path_mode: ChoicePathMode,
-    global_labels: &HashMap<String, String>,
+    global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
@@ -406,7 +406,7 @@ fn lower_weave_section(
     choice_count: &mut usize,
     needs_terminal_gather: &mut bool,
     choice_labels: &mut HashMap<String, String>,
-    global_labels: &HashMap<String, String>,
+    global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
@@ -536,7 +536,7 @@ fn lower_choice_in_section(
     choice_count: &mut usize,
     needs_terminal_gather: &mut bool,
     choice_labels: &mut HashMap<String, String>,
-    global_labels: &HashMap<String, String>,
+    global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
@@ -722,7 +722,7 @@ fn choice_outer(
     choice_point_index: usize,
     path_mode: &ChoicePathMode,
     choice_labels: &HashMap<String, String>,
-    global_labels: &HashMap<String, String>,
+    global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
@@ -861,7 +861,7 @@ fn lower_content_list_with_context(
     content_list: &ContentList,
     path_mode: &ChoicePathMode,
     choice_labels: &HashMap<String, String>,
-    global_labels: &HashMap<String, String>,
+    global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
@@ -885,7 +885,7 @@ pub(super) fn lower_content_list_into_context(
     content_list: &ContentList,
     path_mode: &ChoicePathMode,
     choice_labels: &HashMap<String, String>,
-    global_labels: &HashMap<String, String>,
+    global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
