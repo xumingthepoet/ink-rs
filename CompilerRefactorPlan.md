@@ -100,14 +100,22 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 5 complete. R015 through R051 are complete. Phase 1 is
-  complete except the first real intentional-divergence fixture, which should
-  wait until an actual language change is chosen.
+- Current phase: Phase 6 in progress. R015 through R052 are complete. Phase 1
+  is complete except the first real intentional-divergence fixture, which
+  should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
 - Last focused validation:
-  `rg -n "format!\\(\".*\\{.*\\}\\.\"|split\\('\\.'\\)|rsplit_once\\('\\.'\\)|to_snapshot_string\\(|DivertTarget::Path\\(|String\\)"`
-  over compiler analysis, lowering, parsed, and syntax modules on
-  2026-04-25, completed for the R051 ownership review.
+  `cargo test -p ink-compiler`, and
+  `cargo test -p ink-test --features csharp-tests --test csharp_tests --
+  TestConst`, and
+  `cargo test -p ink-test --features csharp-tests --test csharp_tests --
+  TestArgument`, and
+  `cargo test -p ink-test --features csharp-tests --test csharp_tests --
+  TestTemp`, and
+  `cargo test -p ink-test --features csharp-tests --test csharp_tests --
+  TestDivert`, and
+  `cargo test -p ink-test --features csharp-tests --test csharp_tests --
+  TestFunction` on 2026-04-25, passed.
 - Known blockers: none for behavior-preserving refactors.
 
 ## Focused Validation Commands
@@ -799,7 +807,7 @@ Use these checks during phase reviews:
 
 ## Phase 6: Analysis Pass Architecture
 
-- [ ] R052 Split `analysis.rs` into pass modules
+- [x] R052 Split `analysis.rs` into pass modules
   - Purpose: Remove the current analysis god file and give each semantic check
     an owner.
   - Approach: Create `analysis/mod.rs`, `analysis/constants.rs`,
@@ -807,6 +815,12 @@ Use these checks during phase reviews:
     `analysis/flow.rs`.
   - Acceptance: `analysis/mod.rs` only orchestrates pass ordering, and focused
     analysis tests pass.
+  - Completed: Moved `analysis.rs` to `analysis/mod.rs` and extracted pass
+    owners into `constants`, `warnings`, `names`, `variables`, `targets`, and
+    `flow`, with a small `span` helper module for shared source-span lookup.
+    `analysis/mod.rs` now declares modules and orchestrates pass ordering only.
+    Focused compiler, constant, naming, temp/scope, divert/target, and function
+    flow-control tests pass.
 
 - [ ] R053 Add `analysis/context.rs`
   - Purpose: Share symbol, variable, and flow context types without duplicating
