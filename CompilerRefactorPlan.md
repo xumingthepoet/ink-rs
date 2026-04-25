@@ -100,7 +100,7 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 4 in progress. R015 through R034 are complete. Phase 1
+- Current phase: Phase 4 in progress. R015 through R035 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
@@ -546,12 +546,17 @@ Use these checks during phase reviews:
     syntax::expression::tests::parses_current_expression_behavior_baseline`
     passes.
 
-- [ ] R035 Introduce expression token types
+- [x] R035 Introduce expression token types
   - Purpose: Move away from string splitting toward a parser that can evolve.
   - Approach: Define token enum variants for identifiers, literals, operators,
     parentheses, commas, arrows, and string literals.
   - Acceptance: Tokenizer tests cover all token categories used by existing
     expression syntax.
+  - Completed: Added `ExpressionToken` and a tokenizer covering identifiers,
+    int/float/string literals, operators, parentheses, commas, arrows, word
+    operators, symbol operators, and dotted paths. The expression entry point
+    now tokenizes without changing parse behavior, and `cargo test -p
+    ink-compiler syntax::expression::tests::` passes.
 
 - [ ] R036 Preserve expression source spans
   - Purpose: Improve diagnostics and make parser errors easier to maintain.

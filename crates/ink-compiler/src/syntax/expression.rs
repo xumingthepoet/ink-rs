@@ -3,7 +3,155 @@ use crate::parsed::{BinaryOperator, ContentList, Expression, FloatLiteral, Objec
 use super::{is_identifier, is_identifier_continue, scan, text};
 
 pub(super) fn parse_initial_expression(source: &str) -> Option<Expression> {
+    let _tokens = tokenize_expression(source.trim());
     parse_expression(source.trim())
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum ExpressionToken {
+    Identifier(String),
+    IntLiteral(String),
+    FloatLiteral(String),
+    StringLiteral(String),
+    Operator(String),
+    OpenParen,
+    CloseParen,
+    Comma,
+    Arrow,
+}
+
+fn tokenize_expression(source: &str) -> Vec<ExpressionToken> {
+    let mut tokens = Vec::new();
+    let mut index = 0;
+
+    while index < source.len() {
+        let rest = &source[index..];
+        let ch = rest.chars().next().expect("index is inside source");
+
+        if ch.is_whitespace() {
+            index += ch.len_utf8();
+            continue;
+        }
+
+        if rest.starts_with("->") {
+            tokens.push(ExpressionToken::Arrow);
+            index += "->".len();
+            continue;
+        }
+
+        if let Some(operator) = match_operator(rest) {
+            tokens.push(ExpressionToken::Operator(operator.to_string()));
+            index += operator.len();
+            continue;
+        }
+
+        match ch {
+            '(' => {
+                tokens.push(ExpressionToken::OpenParen);
+                index += ch.len_utf8();
+            }
+            ')' => {
+                tokens.push(ExpressionToken::CloseParen);
+                index += ch.len_utf8();
+            }
+            ',' => {
+                tokens.push(ExpressionToken::Comma);
+                index += ch.len_utf8();
+            }
+            '"' => {
+                let (literal, next_index) = read_string_literal(source, index);
+                tokens.push(ExpressionToken::StringLiteral(literal));
+                index = next_index;
+            }
+            _ if is_token_word_start(ch) => {
+                let (word, next_index) = read_token_word(source, index);
+                tokens.push(classify_word_token(word));
+                index = next_index;
+            }
+            _ => {
+                tokens.push(ExpressionToken::Operator(ch.to_string()));
+                index += ch.len_utf8();
+            }
+        }
+    }
+
+    tokens
+}
+
+fn match_operator(source: &str) -> Option<&'static str> {
+    ["&&", "||", "==", "!=", ">=", "<=", "!?"]
+        .into_iter()
+        .find(|operator| source.starts_with(operator))
+}
+
+fn read_string_literal(source: &str, start: usize) -> (String, usize) {
+    let mut literal = String::new();
+    let mut index = start + '"'.len_utf8();
+    let mut escaped = false;
+
+    while index < source.len() {
+        let ch = source[index..]
+            .chars()
+            .next()
+            .expect("index is inside source");
+        index += ch.len_utf8();
+
+        if escaped {
+            literal.push('\\');
+            literal.push(ch);
+            escaped = false;
+            continue;
+        }
+
+        match ch {
+            '\\' => escaped = true,
+            '"' => return (literal, index),
+            _ => literal.push(ch),
+        }
+    }
+
+    if escaped {
+        literal.push('\\');
+    }
+
+    (literal, index)
+}
+
+fn is_token_word_start(ch: char) -> bool {
+    is_identifier_continue(ch)
+}
+
+fn read_token_word(source: &str, start: usize) -> (&str, usize) {
+    let mut end = start;
+
+    for (relative_index, ch) in source[start..].char_indices() {
+        if is_identifier_continue(ch) || ch == '.' {
+            end = start + relative_index + ch.len_utf8();
+        } else {
+            break;
+        }
+    }
+
+    (&source[start..end], end)
+}
+
+fn classify_word_token(word: &str) -> ExpressionToken {
+    if matches!(word, "and" | "or" | "has" | "hasnt" | "mod" | "not") {
+        return ExpressionToken::Operator(word.to_string());
+    }
+
+    if word.chars().all(|ch| ch.is_ascii_digit()) {
+        return ExpressionToken::IntLiteral(word.to_string());
+    }
+
+    if word.contains('.')
+        && word.chars().all(|ch| ch.is_ascii_digit() || ch == '.')
+        && word.parse::<f64>().is_ok()
+    {
+        return ExpressionToken::FloatLiteral(word.to_string());
+    }
+
+    ExpressionToken::Identifier(word.to_string())
 }
 
 fn parse_expression(source: &str) -> Option<Expression> {
@@ -537,5 +685,74 @@ mod tests {
         for (source, expected) in cases {
             assert_eq!(snapshot(source), expected, "source: {source}");
         }
+    }
+
+    #[test]
+    fn tokenizer_covers_expression_token_categories() {
+        let tokens = tokenize_expression(r#"foo(1, 2.5, "a,b", -> knot, list ? item)"#);
+
+        assert_eq!(
+            tokens,
+            vec![
+                ExpressionToken::Identifier("foo".to_string()),
+                ExpressionToken::OpenParen,
+                ExpressionToken::IntLiteral("1".to_string()),
+                ExpressionToken::Comma,
+                ExpressionToken::FloatLiteral("2.5".to_string()),
+                ExpressionToken::Comma,
+                ExpressionToken::StringLiteral("a,b".to_string()),
+                ExpressionToken::Comma,
+                ExpressionToken::Arrow,
+                ExpressionToken::Identifier("knot".to_string()),
+                ExpressionToken::Comma,
+                ExpressionToken::Identifier("list".to_string()),
+                ExpressionToken::Operator("?".to_string()),
+                ExpressionToken::Identifier("item".to_string()),
+                ExpressionToken::CloseParen,
+            ]
+        );
+    }
+
+    #[test]
+    fn tokenizer_keeps_word_operators_distinct_from_identifiers() {
+        let tokens = tokenize_expression("not ready and notebook or list hasnt item mod 2");
+
+        assert_eq!(
+            tokens,
+            vec![
+                ExpressionToken::Operator("not".to_string()),
+                ExpressionToken::Identifier("ready".to_string()),
+                ExpressionToken::Operator("and".to_string()),
+                ExpressionToken::Identifier("notebook".to_string()),
+                ExpressionToken::Operator("or".to_string()),
+                ExpressionToken::Identifier("list".to_string()),
+                ExpressionToken::Operator("hasnt".to_string()),
+                ExpressionToken::Identifier("item".to_string()),
+                ExpressionToken::Operator("mod".to_string()),
+                ExpressionToken::IntLiteral("2".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn tokenizer_covers_symbol_operators_and_paths() {
+        let tokens = tokenize_expression("a.b >= c && x != y || z <= 3");
+
+        assert_eq!(
+            tokens,
+            vec![
+                ExpressionToken::Identifier("a.b".to_string()),
+                ExpressionToken::Operator(">=".to_string()),
+                ExpressionToken::Identifier("c".to_string()),
+                ExpressionToken::Operator("&&".to_string()),
+                ExpressionToken::Identifier("x".to_string()),
+                ExpressionToken::Operator("!=".to_string()),
+                ExpressionToken::Identifier("y".to_string()),
+                ExpressionToken::Operator("||".to_string()),
+                ExpressionToken::Identifier("z".to_string()),
+                ExpressionToken::Operator("<=".to_string()),
+                ExpressionToken::IntLiteral("3".to_string()),
+            ]
+        );
     }
 }
