@@ -100,7 +100,7 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 7 in progress. R015 through R067 are complete. Phase 1
+- Current phase: Phase 7 in progress. R015 through R068 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
@@ -995,13 +995,18 @@ Use these checks during phase reviews:
     branch evaluation and branch content containers. `lower.rs` now delegates
     sequence and conditional objects through narrow module entry points.
 
-- [ ] R068 Move path compaction fully into `lower/path.rs`
+- [x] R068 Move path compaction fully into `lower/path.rs`
   - Purpose: Treat path compaction and semantic path canonicalization as a path
     subsystem.
   - Approach: Move compaction, semantic path indexing, absolute/relative path
     checks, and user-named component logic.
   - Acceptance: Path unit tests cover relative and canonical behavior, and JSON
     paths are unchanged.
+  - Completed: Moved runtime target compaction, semantic path indexing, named
+    content traversal, and canonical target replacement into `lower/path.rs`.
+    Added a path unit test covering indexed target canonicalization followed by
+    relative path compaction. `lower.rs` now calls one path compaction entry
+    point after building the root container.
 
 - [ ] R069 Introduce typed path wrappers
   - Purpose: Reduce confusion between flow paths, runtime paths, semantic label
