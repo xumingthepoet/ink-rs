@@ -100,7 +100,7 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 7 in progress. R015 through R064 are complete. Phase 1
+- Current phase: Phase 7 in progress. R015 through R065 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
@@ -960,12 +960,17 @@ Use these checks during phase reviews:
     function dispatch. `lower.rs` now imports expression emission entry points
     and retains only structural lowering calls.
 
-- [ ] R065 Extract `lower/flow.rs`
+- [x] R065 Extract `lower/flow.rs`
   - Purpose: Give knot/stitch/function lowering an owner.
   - Approach: Move root flow lowering, child flow lowering, argument
     assignment, local collection needed by flow context, and auto-divert logic.
   - Acceptance: Knot, stitch, and function fixtures are unchanged, and flow
     lowering does not contain choice section internals.
+  - Completed: Added `lower/flow.rs` for root weave entry lowering, flow and
+    child-flow lowering, flow argument assignment, flow-local variable
+    collection, flow container flags, and child-stitch auto-divert behavior.
+    The flow module calls existing weave lowering entry points without owning
+    choice/gather section internals.
 
 - [ ] R066 Extract `lower/weave.rs`
   - Purpose: Give choice/gather/weave lowering an owner.
