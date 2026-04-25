@@ -309,6 +309,20 @@ mod tests {
     }
 
     #[test]
+    fn matching_delimiter_drill_handles_nested_parentheses_and_string_text() {
+        let source = r#"(outer("(not close)", inner(1, 2))) + rest"#;
+        let source_after_open = &source[1..];
+        let close_index = find_matching_delimiter(source_after_open, '(', ')')
+            .expect("expected matching close parenthesis");
+
+        assert_eq!(
+            &source_after_open[..close_index],
+            r#"outer("(not close)", inner(1, 2))"#
+        );
+        assert_eq!(&source_after_open[close_index + 1..], " + rest");
+    }
+
+    #[test]
     fn inline_text_options_treat_escaped_separator_as_text() {
         let parts = split_top_level_with_options(
             r#"escaped \| separator | split"#,

@@ -100,7 +100,7 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 3 in progress. R015 through R031 are complete. Phase 1
+- Current phase: Phase 4 in progress. R015 through R032 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
@@ -507,12 +507,15 @@ Use these checks during phase reviews:
     Expression operator helpers remain only as semantic operator mappers over
     scanner token matches; `cargo test -p ink-compiler syntax::` passes.
 
-- [ ] R032 Run the scanner changeability drill
+- [x] R032 Run the scanner changeability drill
   - Purpose: Prove scanner centralization improves future syntax work.
   - Approach: Add one focused scanner test for a new nested delimiter case and
     verify only scanner tests and scanner code change.
   - Acceptance: The drill does not require edits in expression/text/choice
     parser internals.
+  - Completed: Added a nested-parentheses delimiter drill entirely in
+    `syntax/scan.rs`; no expression/text/choice/divert parser internals needed
+    edits, and `cargo test -p ink-compiler syntax::scan::tests::` passes.
 
 ## Phase 4: Expression Parser
 
