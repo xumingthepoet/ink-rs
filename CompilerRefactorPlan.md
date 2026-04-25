@@ -100,16 +100,22 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 5 in progress. R015 through R047 are complete. Phase 1
+- Current phase: Phase 5 in progress. R015 through R048 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
 - Last focused validation:
   `cargo test -p ink-compiler`, and
   `cargo test -p ink-test --features csharp-tests --test csharp_tests --
-  TestTemp`, and
+  TestDivert`, and
   `cargo test -p ink-test --features csharp-tests --test csharp_tests --
-  TestVariable` on 2026-04-25, passed.
+  TestGather`, and
+  `cargo test -p ink-test --features csharp-tests --test csharp_tests --
+  TestReadCount`, and
+  `cargo test -p ink-test --features csharp-tests --test csharp_tests --
+  TestStitch`, and
+  `cargo test -p ink-test --features csharp-tests --test csharp_tests --
+  TestPath` on 2026-04-25, passed.
 - Known blockers: none for behavior-preserving refactors.
 
 ## Focused Validation Commands
@@ -734,11 +740,20 @@ Use these checks during phase reviews:
     -p ink-test --features csharp-tests --test csharp_tests -- TestVariable`
     pass.
 
-- [ ] R048 Refactor target symbol collection onto traversal
+- [x] R048 Refactor target symbol collection onto traversal
   - Purpose: Centralize labels, flow symbols, choice identifiers, and gather
     identifiers.
   - Approach: Use traversal context to build target indexes.
   - Acceptance: Divert, gather, read-count, and stitch resolution tests pass.
+  - Completed: Replaced target-symbol recursion helpers in `analysis.rs` with
+    a two-phase `TargetSymbolVisitor` over `parsed::visit`. The first traversal
+    registers flow/function symbols from `visit_flow`; the second traversal
+    registers choice and gather labels from `visit_object` using
+    `VisitContext.current_flow_path`. The two-phase order preserves the old
+    `or_insert` precedence where flow symbols win before labels are added.
+    `cargo test -p ink-compiler`, `cargo test -p ink-test --features
+    csharp-tests --test csharp_tests -- TestDivert`, `TestGather`,
+    `TestReadCount`, `TestStitch`, and `TestPath` pass.
 
 - [ ] R049 Refactor call-target diagnostics onto traversal
   - Purpose: Reduce long recursive parameter lists and make target checking

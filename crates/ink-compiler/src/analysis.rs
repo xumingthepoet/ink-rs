@@ -656,6 +656,13 @@ struct FlowSymbol {
     is_function: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+enum TargetSymbolCollectionPhase {
+    #[default]
+    Flows,
+    Labels,
+}
+
 fn call_target_diagnostics(story: &Story) -> Vec<Diagnostic> {
     let target_symbols = build_target_symbol_index(story);
     let variable_targets = build_variable_target_index(story);
@@ -687,124 +694,67 @@ fn call_target_diagnostics(story: &Story) -> Vec<Diagnostic> {
 }
 
 fn build_target_symbol_index(story: &Story) -> HashMap<String, FlowSymbol> {
-    let mut symbols = HashMap::new();
-    for flow in story.flows() {
-        collect_flow_symbol(flow, None, &mut symbols);
-    }
-    collect_target_symbols_in_weave(story.root_weave(), None, &mut symbols);
-    for flow in story.flows() {
-        collect_target_symbols_in_flow(flow, None, &mut symbols);
-    }
-    symbols
-}
-
-fn collect_flow_symbol(
-    flow: &Flow,
-    parent_path: Option<&str>,
-    symbols: &mut HashMap<String, FlowSymbol>,
-) {
-    let path = parent_path
-        .map(|parent| format!("{parent}.{}", flow.name()))
-        .unwrap_or_else(|| flow.name().to_string());
-    let symbol = FlowSymbol {
-        is_function: flow.is_function(),
-    };
-
-    symbols.entry(path.clone()).or_insert(symbol);
-    if parent_path.is_none() {
-        symbols.entry(flow.name().to_string()).or_insert(symbol);
+    #[derive(Default)]
+    struct TargetSymbolVisitor {
+        phase: TargetSymbolCollectionPhase,
+        symbols: HashMap<String, FlowSymbol>,
     }
 
-    for child in flow.child_flows() {
-        collect_flow_symbol(child, Some(&path), symbols);
-    }
-}
-
-fn collect_target_symbols_in_flow(
-    flow: &Flow,
-    parent_path: Option<&str>,
-    symbols: &mut HashMap<String, FlowSymbol>,
-) {
-    let flow_path = parent_path
-        .map(|parent| format!("{parent}.{}", flow.name()))
-        .unwrap_or_else(|| flow.name().to_string());
-    collect_target_symbols_in_weave(flow.weave(), Some(&flow_path), symbols);
-    for child in flow.child_flows() {
-        collect_target_symbols_in_flow(child, Some(&flow_path), symbols);
-    }
-}
-
-fn collect_target_symbols_in_weave(
-    weave: &Weave,
-    flow_path: Option<&str>,
-    symbols: &mut HashMap<String, FlowSymbol>,
-) {
-    for object in weave.content() {
-        collect_target_symbols_in_object(object, flow_path, symbols);
-    }
-}
-
-fn collect_target_symbols_in_content_list(
-    content: &ContentList,
-    flow_path: Option<&str>,
-    symbols: &mut HashMap<String, FlowSymbol>,
-) {
-    for object in content.objects() {
-        collect_target_symbols_in_object(object, flow_path, symbols);
-    }
-}
-
-fn collect_target_symbols_in_object(
-    object: &Object,
-    flow_path: Option<&str>,
-    symbols: &mut HashMap<String, FlowSymbol>,
-) {
-    match object {
-        Object::Choice(choice) => {
-            if let Some(identifier) = choice.identifier() {
-                insert_label_symbol(symbols, identifier, flow_path);
+    impl ParsedVisitor for TargetSymbolVisitor {
+        fn visit_flow(&mut self, flow: &Flow, context: &VisitContext) {
+            if self.phase != TargetSymbolCollectionPhase::Flows {
+                return;
             }
-            if let Some(content) = choice.start_content() {
-                collect_target_symbols_in_content_list(content, flow_path, symbols);
-            }
-            if let Some(content) = choice.choice_only_content() {
-                collect_target_symbols_in_content_list(content, flow_path, symbols);
-            }
-            collect_target_symbols_in_content_list(choice.inner_content(), flow_path, symbols);
-        }
-        Object::Gather(gather) => {
-            if let Some(identifier) = gather.identifier() {
-                insert_label_symbol(symbols, identifier, flow_path);
+
+            let Some(flow_path) = &context.current_flow_path else {
+                return;
+            };
+            let symbol = FlowSymbol {
+                is_function: flow.is_function(),
+            };
+
+            self.symbols.entry(flow_path.clone()).or_insert(symbol);
+            if context.parent_flow_path.is_none() {
+                self.symbols
+                    .entry(flow.name().to_string())
+                    .or_insert(symbol);
             }
         }
-        Object::ContentList(content) => {
-            collect_target_symbols_in_content_list(content, flow_path, symbols)
-        }
-        Object::Conditional(conditional) => {
-            for branch in conditional.branches() {
-                collect_target_symbols_in_weave(branch.content(), flow_path, symbols);
+
+        fn visit_object(&mut self, object: &Object, context: &VisitContext) {
+            if self.phase != TargetSymbolCollectionPhase::Labels {
+                return;
+            }
+
+            match object {
+                Object::Choice(choice) => {
+                    if let Some(identifier) = choice.identifier() {
+                        insert_label_symbol(
+                            &mut self.symbols,
+                            identifier,
+                            context.current_flow_path.as_deref(),
+                        );
+                    }
+                }
+                Object::Gather(gather) => {
+                    if let Some(identifier) = gather.identifier() {
+                        insert_label_symbol(
+                            &mut self.symbols,
+                            identifier,
+                            context.current_flow_path.as_deref(),
+                        );
+                    }
+                }
+                _ => {}
             }
         }
-        Object::Sequence(sequence) => {
-            for content in sequence.elements() {
-                collect_target_symbols_in_content_list(content, flow_path, symbols);
-            }
-        }
-        Object::Weave(weave) => collect_target_symbols_in_weave(weave, flow_path, symbols),
-        Object::AuthorWarning(_)
-        | Object::ConstantDeclaration(_)
-        | Object::Divert(_)
-        | Object::Expression(_)
-        | Object::ExternalDeclaration(_)
-        | Object::Glue(_)
-        | Object::IncDec(_)
-        | Object::LogicLine(_)
-        | Object::Return(_)
-        | Object::Tag(_)
-        | Object::Text(_)
-        | Object::TunnelOnwards(_)
-        | Object::VariableAssignment(_) => {}
     }
+
+    let mut visitor = TargetSymbolVisitor::default();
+    walk_story(story, &mut visitor);
+    visitor.phase = TargetSymbolCollectionPhase::Labels;
+    walk_story(story, &mut visitor);
+    visitor.symbols
 }
 
 fn insert_label_symbol(
