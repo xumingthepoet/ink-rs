@@ -127,7 +127,7 @@ pub(super) fn lower_linear_weave_into_context(
     constants: &HashMap<String, Expression>,
     path_mode: &ChoicePathMode,
 ) {
-    let choice_labels = HashMap::new();
+    let choice_labels = LabelIndex::new();
     for object in weave.content() {
         lower_object_into_with_context(
             content,
@@ -405,7 +405,7 @@ fn lower_weave_section(
     named_content: &mut Vec<Container>,
     choice_count: &mut usize,
     needs_terminal_gather: &mut bool,
-    choice_labels: &mut HashMap<String, String>,
+    choice_labels: &mut LabelIndex,
     global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
@@ -535,7 +535,7 @@ fn lower_choice_in_section(
     named_content: &mut Vec<Container>,
     choice_count: &mut usize,
     needs_terminal_gather: &mut bool,
-    choice_labels: &mut HashMap<String, String>,
+    choice_labels: &mut LabelIndex,
     global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
@@ -656,11 +656,8 @@ fn lower_choice_in_section(
     }
 }
 
-fn collect_local_weave_labels(
-    objects: &[Object],
-    path_mode: &ChoicePathMode,
-) -> HashMap<String, String> {
-    let mut labels = HashMap::new();
+fn collect_local_weave_labels(objects: &[Object], path_mode: &ChoicePathMode) -> LabelIndex {
+    let mut labels = LabelIndex::new();
     let mut choice_count = 0;
     let mut gather_count = 0;
     let base_container_path = path_mode.container_path();
@@ -721,7 +718,7 @@ fn choice_outer(
     choice_container_path: &str,
     choice_point_index: usize,
     path_mode: &ChoicePathMode,
-    choice_labels: &HashMap<String, String>,
+    choice_labels: &LabelIndex,
     global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
@@ -860,7 +857,7 @@ pub(super) fn choice_container_prefix(
 fn lower_content_list_with_context(
     content_list: &ContentList,
     path_mode: &ChoicePathMode,
-    choice_labels: &HashMap<String, String>,
+    choice_labels: &LabelIndex,
     global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
@@ -884,7 +881,7 @@ pub(super) fn lower_content_list_into_context(
     content: &mut Vec<RuntimeObject>,
     content_list: &ContentList,
     path_mode: &ChoicePathMode,
-    choice_labels: &HashMap<String, String>,
+    choice_labels: &LabelIndex,
     global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,

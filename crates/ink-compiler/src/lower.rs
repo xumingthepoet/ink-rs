@@ -88,7 +88,7 @@ fn lower_global_declarations(indexes: &LoweringIndexes<'_>) -> Option<Container>
         return None;
     }
 
-    let choice_labels = HashMap::new();
+    let choice_labels = LabelIndex::new();
     let mut content = vec![RuntimeObject::ControlCommand(ControlCommand::EvalStart)];
     for declaration in declarations {
         lower_expression_into(
@@ -125,7 +125,7 @@ fn estimated_choice_content_len(choice: &Choice, constants: &HashMap<String, Exp
         &mut content,
         choice.inner_content(),
         &ChoicePathMode::Root,
-        &HashMap::new(),
+        &LabelIndex::new(),
         &LabelIndex::new(),
         &HashSet::new(),
         &HashMap::new(),
@@ -147,7 +147,7 @@ fn estimated_runtime_len_for_label_collection(
         &mut content,
         object,
         &ChoicePathMode::Root,
-        &HashMap::new(),
+        &LabelIndex::new(),
         &LabelIndex::new(),
         &HashSet::new(),
         &HashMap::new(),
@@ -161,7 +161,7 @@ fn lower_object_into_with_context(
     content: &mut Vec<RuntimeObject>,
     object: &Object,
     path_mode: &ChoicePathMode,
-    choice_labels: &HashMap<String, String>,
+    choice_labels: &LabelIndex,
     global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
@@ -184,7 +184,7 @@ fn lower_object_into_with_context_count(
     content: &mut Vec<RuntimeObject>,
     object: &Object,
     path_mode: &ChoicePathMode,
-    choice_labels: &HashMap<String, String>,
+    choice_labels: &LabelIndex,
     global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
@@ -341,7 +341,7 @@ fn lower_variable_assignment_into(
     content: &mut Vec<RuntimeObject>,
     assignment: &crate::parsed::VariableAssignment,
     path_mode: &ChoicePathMode,
-    choice_labels: &HashMap<String, String>,
+    choice_labels: &LabelIndex,
     global_labels: &LabelIndex,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
@@ -382,7 +382,7 @@ fn lower_inc_dec_into(
     content: &mut Vec<RuntimeObject>,
     inc_dec: &crate::parsed::IncDec,
     path_mode: &ChoicePathMode,
-    choice_labels: &HashMap<String, String>,
+    choice_labels: &LabelIndex,
     global_labels: &LabelIndex,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
@@ -418,7 +418,7 @@ fn push_divert_with_context(
     content: &mut Vec<RuntimeObject>,
     divert: &Divert,
     path_mode: &ChoicePathMode,
-    choice_labels: &HashMap<String, String>,
+    choice_labels: &LabelIndex,
     global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
@@ -450,7 +450,7 @@ fn push_divert_with_context(
         DivertTarget::End => content.push(RuntimeObject::ControlCommand(ControlCommand::End)),
         DivertTarget::Path(target) => {
             let resolved_target = if let Some(choice_target) = choice_labels.get(target) {
-                runtime_divert(choice_target.clone(), false, divert.is_tunnel())
+                runtime_divert(choice_target.to_string(), false, divert.is_tunnel())
             } else if let Some(label_target) = path_mode
                 .scoped_label_target(target, global_labels)
                 .filter(|label_target| *label_target != target)
@@ -489,7 +489,7 @@ fn lower_tunnel_onwards_into(
     content: &mut Vec<RuntimeObject>,
     tunnel_onwards: &crate::parsed::TunnelOnwards,
     path_mode: &ChoicePathMode,
-    choice_labels: &HashMap<String, String>,
+    choice_labels: &LabelIndex,
     global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
@@ -512,7 +512,7 @@ fn lower_tunnel_onwards_into(
         match target {
             DivertTarget::Path(target) => {
                 if let Some(choice_target) = choice_labels.get(target) {
-                    content.push(RuntimeObject::DivertTarget(choice_target.clone()));
+                    content.push(RuntimeObject::DivertTarget(choice_target.to_string()));
                 } else if let Some(label_target) = path_mode
                     .scoped_label_target(target, global_labels)
                     .filter(|label_target| *label_target != target)

@@ -100,7 +100,7 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 7 in progress. R015 through R069 are complete. Phase 1
+- Current phase: Phase 7 in progress. R015 through R070 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
@@ -1021,12 +1021,17 @@ Use these checks during phase reviews:
     accept the typed index. Local choice-label maps remain raw strings and are
     scheduled for the follow-up typed-map pass.
 
-- [ ] R070 Replace label and target maps with typed maps
+- [x] R070 Replace label and target maps with typed maps
   - Purpose: Make path resolution safer and easier to change.
   - Approach: Replace raw label maps gradually, starting from label indexes and
     divert target resolution.
   - Acceptance: Path-related tests pass, and remaining raw string maps are
     documented as intentional or scheduled follow-ups.
+  - Completed: Replaced local choice/gather label maps with `LabelIndex` as
+    well as the global label index. Expression, divert, sequence, conditional,
+    and weave lowering now resolve label aliases through the typed path index.
+    Remaining raw maps in lowering are for non-path data such as constants and
+    external signatures.
 
 - [ ] R071 Add runtime container builder helpers
   - Purpose: Reduce noisy direct vector manipulation in lowering without hiding

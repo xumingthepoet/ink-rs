@@ -13,7 +13,7 @@ use super::weave::{
 
 pub(super) fn lower_sequence(
     sequence: &Sequence,
-    choice_labels: &HashMap<String, String>,
+    choice_labels: &LabelIndex,
     global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,

@@ -13,7 +13,7 @@ use super::weave::{lower_choice_weave_with_initial_content, weave_has_choice};
 pub(super) fn lower_conditional_into(
     content: &mut Vec<RuntimeObject>,
     conditional: &Conditional,
-    choice_labels: &HashMap<String, String>,
+    choice_labels: &LabelIndex,
     global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,

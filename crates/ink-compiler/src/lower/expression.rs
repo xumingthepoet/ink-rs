@@ -11,7 +11,7 @@ use super::weave::lower_content_list_into_context;
 pub(super) fn lower_output_expression_into(
     content: &mut Vec<RuntimeObject>,
     expression: &Expression,
-    choice_labels: &HashMap<String, String>,
+    choice_labels: &LabelIndex,
     global_labels: &LabelIndex,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
@@ -35,7 +35,7 @@ pub(super) fn lower_output_expression_into(
 pub(super) fn lower_logic_line_into(
     content: &mut Vec<RuntimeObject>,
     expression: &Expression,
-    choice_labels: &HashMap<String, String>,
+    choice_labels: &LabelIndex,
     global_labels: &LabelIndex,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
@@ -60,7 +60,7 @@ pub(super) fn lower_logic_line_into(
 pub(super) fn lower_expression_into(
     content: &mut Vec<RuntimeObject>,
     expression: &Expression,
-    choice_labels: &HashMap<String, String>,
+    choice_labels: &LabelIndex,
     global_labels: &LabelIndex,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
@@ -84,7 +84,7 @@ pub(super) fn lower_expression_into(
 fn lower_expression_into_with_constants(
     content: &mut Vec<RuntimeObject>,
     expression: &Expression,
-    choice_labels: &HashMap<String, String>,
+    choice_labels: &LabelIndex,
     global_labels: &LabelIndex,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
@@ -117,7 +117,7 @@ fn lower_expression_into_with_constants(
         Expression::NumberBool(value) => content.push(RuntimeObject::Bool(*value)),
         Expression::DivertTarget(target) => {
             let resolved_target = if let Some(choice_target) = choice_labels.get(target) {
-                choice_target.clone()
+                choice_target.to_string()
             } else if let Some(label_target) = path_mode
                 .scoped_label_target(target, global_labels)
                 .filter(|label_target| *label_target != target)
@@ -149,7 +149,7 @@ fn lower_expression_into_with_constants(
 
             if let Some(choice_target) = choice_labels.get(name) {
                 let _ = has_start_content;
-                content.push(RuntimeObject::ReadCount(choice_target.clone()));
+                content.push(RuntimeObject::ReadCount(choice_target.to_string()));
             } else if let Some(label_target) = path_mode.scoped_label_target(name, global_labels) {
                 content.push(RuntimeObject::ReadCount(
                     path_mode.resolve_label_target(label_target),
@@ -251,7 +251,7 @@ fn lower_function_call_into(
     content: &mut Vec<RuntimeObject>,
     name: &str,
     args: &[Expression],
-    choice_labels: &HashMap<String, String>,
+    choice_labels: &LabelIndex,
     global_labels: &LabelIndex,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
@@ -458,7 +458,7 @@ fn lower_function_arg_into(
     content: &mut Vec<RuntimeObject>,
     arg: &Expression,
     expected_arg: Option<&FlowArgument>,
-    choice_labels: &HashMap<String, String>,
+    choice_labels: &LabelIndex,
     global_labels: &LabelIndex,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
