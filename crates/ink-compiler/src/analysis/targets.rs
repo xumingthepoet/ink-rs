@@ -518,3 +518,25 @@ fn resolve_target_symbol<'a>(
 
     target_symbols.get(target)
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::diagnostic::DiagnosticSeverity;
+
+    use super::{
+        super::test_support::{assert_single_diagnostic, parse_story},
+        *,
+    };
+
+    #[test]
+    fn reports_missing_divert_targets() {
+        let story = parse_story("-> missing");
+        let diagnostics = call_target_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "target not found: 'missing'",
+        );
+    }
+}

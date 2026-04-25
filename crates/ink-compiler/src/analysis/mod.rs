@@ -4,6 +4,8 @@ mod flow;
 mod names;
 mod span;
 mod targets;
+#[cfg(test)]
+mod test_support;
 mod variables;
 mod warnings;
 

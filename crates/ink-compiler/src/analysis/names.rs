@@ -465,3 +465,25 @@ fn name_conflict_diagnostic(
         ),
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::diagnostic::DiagnosticSeverity;
+
+    use super::{
+        super::test_support::{assert_single_diagnostic, parse_story},
+        *,
+    };
+
+    #[test]
+    fn reports_duplicate_flow_arguments() {
+        let story = parse_story("== knot(a, a) ==\n-> DONE");
+        let diagnostics = naming_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Multiple arguments with the same name: 'a'",
+        );
+    }
+}

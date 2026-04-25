@@ -100,16 +100,12 @@ needs work.
 
 ## Current Refactor Status
 
-- Current phase: Phase 6 in progress. R015 through R054 are complete. Phase 1
+- Current phase: Phase 6 in progress. R015 through R055 are complete. Phase 1
   is complete except the first real intentional-divergence fixture, which
   should wait until an actual language change is chosen.
 - Last full validation: `make gate` on 2026-04-25, passed.
 - Last focused validation:
-  `cargo test -p ink-compiler`, and
-  `cargo test -p ink-test --features csharp-tests --test csharp_tests --
-  TestFunction`, and
-  `cargo test -p ink-test --features csharp-tests --test csharp_tests --
-  TestLooseEnds` on 2026-04-25, passed.
+  `cargo test -p ink-compiler` on 2026-04-25, passed.
 - Known blockers: none for behavior-preserving refactors.
 
 ## Focused Validation Commands
@@ -841,12 +837,16 @@ Use these checks during phase reviews:
     flow checks, then target/variable resolution. Focused compiler, function,
     and loose-end tests pass.
 
-- [ ] R055 Add focused tests per analysis pass
+- [x] R055 Add focused tests per analysis pass
   - Purpose: Make each analysis pass locally verifiable.
   - Approach: Add tests for constants, names, variables, targets, and flow
     rules.
   - Acceptance: Each pass has at least one direct test that would fail if the
     pass were removed.
+  - Completed: Added shared analysis test support plus direct unit tests for
+    constant redefinition, author warning conversion, naming collisions,
+    variable scope indexing, flow loose-end warnings, and missing target
+    diagnostics. Focused compiler tests pass.
 
 - [ ] R056 Decide whether checked story should carry indexes
   - Purpose: Avoid rebuilding the same indexes in analysis and lowering if they

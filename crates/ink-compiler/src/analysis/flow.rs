@@ -335,3 +335,25 @@ fn object_terminates_flow(object: &Object) -> bool {
         | Object::VariableAssignment(_) => false,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::diagnostic::DiagnosticSeverity;
+
+    use super::{
+        super::test_support::{assert_single_diagnostic, parse_story},
+        *,
+    };
+
+    #[test]
+    fn reports_loose_end_warnings_for_unterminated_knots() {
+        let story = parse_story("== knot ==\nLine.");
+        let diagnostics = flow_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Warning,
+            "Apparent loose end exists where the flow runs out. Do you need a '-> DONE' statement, choice or divert?",
+        );
+    }
+}
