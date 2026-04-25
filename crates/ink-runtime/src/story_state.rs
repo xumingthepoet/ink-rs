@@ -25,7 +25,7 @@ use crate::{
 use rand::Rng;
 use serde_json::{json, Map};
 
-pub const INK_SAVE_STATE_VERSION: u32 = 10;
+pub const INK_SAVE_STATE_VERSION: u32 = 1;
 
 static DEFAULT_FLOW_NAME: &str = "DEFAULT_FLOW";
 
@@ -1437,8 +1437,6 @@ mod tests {
 
     use crate::story::Story;
 
-    use super::INK_SAVE_STATE_VERSION;
-
     const SIMPLE_STORY_JSON: &str = r#"{"inkVersion":1,"root":["done",null],"listDefs":{}}"#;
 
     #[test]
@@ -1446,7 +1444,7 @@ mod tests {
         let mut story = Story::new(SIMPLE_STORY_JSON).expect("valid story");
         let mut save: serde_json::Value =
             serde_json::from_str(&story.save_state().expect("save state")).expect("valid save");
-        save["inkSaveVersion"] = json!(INK_SAVE_STATE_VERSION - 1);
+        save["inkSaveVersion"] = json!(0);
 
         let error = story
             .load_state(&save.to_string())
