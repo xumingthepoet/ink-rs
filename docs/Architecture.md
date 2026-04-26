@@ -5,7 +5,7 @@
 This repository has two main layers:
 
 - `crates/ink-compiler`: parses Ink source, checks the parsed story, lowers it
-  into runtime-shaped IR, and emits the JSON story format.
+  into `ink_story_json_format::Program`, and emits the JSON story format.
 - `crates/ink-runtime`: loads and runs the JSON story format.
 
 The compiler and runtime are Rust-native implementations. Upstream
@@ -21,7 +21,7 @@ SourceInput
   -> syntax parsing
   -> parsed model
   -> analysis
-  -> lowering IR
+  -> format Program
   -> JSON emit
   -> runtime Story
 ```
@@ -128,8 +128,9 @@ discovered when analysis can check it.
 Lowering lives in `crates/ink-compiler/src/lower.rs` and
 `crates/ink-compiler/src/lower/`.
 
-The lowering stage converts the checked parsed model into runtime-shaped IR in
-`lower/ir.rs`. It is split by responsibility:
+The lowering stage converts the checked parsed model into the compiled-story
+format model: `ink_story_json_format::Program`, `Container`, and `Object`
+values. It is split by responsibility:
 
 - `context.rs`: lowering state, container stack, and scoped state
 - `indexes.rs`: story-wide target, count, variable, and constant indexes
@@ -147,10 +148,11 @@ analysis/index result rather than searching strings locally.
 
 ### Emit
 
-`crates/ink-compiler/src/emit.rs` serializes the lowering IR into the runtime
-JSON story format. It should remain a narrow JSON writer. It should not parse
-Ink, validate semantics, or rewrite runtime paths beyond what the lowering IR
-already describes.
+`crates/ink-compiler/src/emit.rs` serializes the lowered
+`ink_story_json_format::Program` into the runtime JSON story format through the
+format crate codec. It should remain a narrow JSON writer. It should not parse
+Ink, validate semantics, or rewrite runtime paths beyond what the lowered format
+model already describes.
 
 ## Public Compiler API
 
@@ -181,7 +183,8 @@ Important modules include:
   external functions, and variable observers
 - `container.rs`, `object.rs`, `path.rs`, `pointer.rs`: runtime object graph and
   addressing
-- `json/`: JSON tokenizer, reader, and writer support
+- `json/`: compiled-story JSON loading through `ink-story-json-format` plus
+  runtime save-state JSON reader/writer support
 - `choice.rs`, `choice_point.rs`, `divert.rs`, `control_command.rs`,
   `native_function_call.rs`, `value.rs`: runtime instruction/value types
 
@@ -243,7 +246,7 @@ tests, `docs/WritingWithInk-updates.md`, and
   `expression.rs` helpers over new one-off string splitting.
 - For target or path problems, inspect analysis indexes and `lower/path.rs`
   before changing emitted JSON.
-- For runtime output differences, compare the lowering IR and then the emitted
-  JSON. Avoid hardcoding JSON fragments to satisfy one fixture.
+- For runtime output differences, compare the lowered format `Program` and then
+  the emitted JSON. Avoid hardcoding JSON fragments to satisfy one fixture.
 - When upstream behavior is unclear, inspect `ink-csharp/compiler` first and
-  record only durable findings in `AGENTS.md` working notes.
+  record only durable findings in `Notes.md`.

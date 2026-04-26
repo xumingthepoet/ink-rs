@@ -6,43 +6,39 @@ The upstream reference lives in `ink-csharp/`.
 
 ## Project Goal
 
-- Complete the compiled story JSON format refactor tracked by the active plan
+- Continue the compiled story JSON format refactor tracked by the active plan
   under `docs/current_plan/`, when one exists.
-- Add `crates/ink-story-json-format` as the single typed owner of compiled
+- Keep `crates/ink-story-json-format` as the single typed owner of compiled
   story JSON data structures, token names, memory-to-JSON serialization, and
   JSON-to-memory deserialization.
-- Make both `crates/ink-compiler` and `crates/ink-runtime` depend directly on
+- Keep both `crates/ink-compiler` and `crates/ink-runtime` depending directly on
   `ink-story-json-format`.
-- Remove duplicate compiled-story JSON schemas from compiler lowering/emit code
-  and runtime JSON reader/writer code.
-- Delete migration adapters and wrappers before considering the refactor done:
-  the compiler should lower directly into format crate data, and the runtime
-  should load compiled story JSON through the format crate and consume that data
-  directly when constructing its execution graph.
+- Remove remaining duplicate compiled-story JSON schemas from compiler
+  lowering/emit code and runtime JSON reader/writer code.
+- Keep the compiler lowering directly into format crate data, and keep runtime
+  compiled-story loading going through the format crate before constructing the
+  runtime execution graph.
 - Preserve compatibility with the existing JSON story format unless an explicit,
   documented runtime-format change is required.
 
 ## Current State
 
 - The runtime layer has already been ported from a third-party implementation and is passing tests.
-- The compiler currently lowers into compiler-owned runtime-shaped IR and then
-  emits compiled story JSON.
-- The runtime currently parses compiled story JSON into executable runtime
-  objects with a separate JSON reader and token mapping.
-- The main active project work is to introduce a shared compiled story JSON
-  format crate and converge compiler output plus runtime loading onto it.
-- Runtime execution objects should remain runtime-owned. The new format crate is
-  only the wire-format memory model and JSON codec.
-- Do not treat the current compiler `lower::ir` or runtime JSON reader shape as
-  something to preserve at all costs. If rewriting the affected path is clearer
-  and better supports the final format boundary, prefer it.
+- The shared format crate exists and owns the compiled story JSON wire model and
+  codec for `Program`, `Container`, and `Object`.
+- The compiler lowers checked stories directly into
+  `ink_story_json_format::Program`; JSON emission serializes that format model.
+- The runtime loads compiled story JSON through `ink-story-json-format`, then
+  converts the format model into runtime-owned execution objects.
+- Runtime execution objects remain runtime-owned. The format crate is only the
+  wire-format memory model and JSON codec, not the runtime object graph.
+- Runtime save-state JSON still uses runtime-owned reader/writer support.
 
 ## Repository Layout
 
 - `crates/ink-runtime`: runtime story engine
 - `crates/ink-compiler`: parser, parsed model, and JSON export pipeline
-- `crates/ink-story-json-format`: target shared compiled story JSON format
-  crate for this refactor
+- `crates/ink-story-json-format`: shared compiled story JSON format crate
 - `crates/ink-test`: conformance and integration tests
 - `ink-csharp/compiler`: historical C# compiler reference
 - `ink-csharp/ink-engine-runtime`: historical C# runtime reference
@@ -64,7 +60,7 @@ The upstream reference lives in `ink-csharp/`.
 - Prefer design notes and tests before broad language changes; avoid speculative
   refactors that are not tied to a concrete language goal.
 - For the current format refactor, keep changes focused on the compiler JSON
-  output path, the runtime compiled-story JSON loading path, and the new format
+  output path, the runtime compiled-story JSON loading path, and the format
   crate. Avoid unrelated parser, language, or runtime execution changes.
 - If the existing compiler architecture blocks progress, rewrite the affected area instead of extending a fragile partial port.
 - For unchanged legacy features, preserve existing behavior unless there is a

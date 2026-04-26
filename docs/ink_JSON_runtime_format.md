@@ -119,7 +119,10 @@ These are mathematical, logical, and dynamic-value functions that pop arguments 
 
 `"FIELD"` and `"INDEX"` read object fields and array elements. `"SET_FIELD"` and `"SET_INDEX"` return updated object or array values; assignment instructions store the updated value back into the target variable. `"LEN"` returns an array length as an integer. `"ARRAY_REMOVE"` returns a copy of the array with the requested zero-based item removed; assignment lowering stores that updated array back into the source lvalue.
 
-Booleans are supported only in the C-style - i.e. as integers where non-zero is treated as "true" and zero as "false". The true result of a boolean operation is pushed to the evaluation stack as `1`.
+Boolean values are represented as JSON booleans and runtime `bool` values. Some
+numeric operations still accept C-style truthiness where non-zero integers or
+floats are treated as true, but comparison and logical operations push boolean
+results to the evaluation stack.
 
 ## Divert
 
