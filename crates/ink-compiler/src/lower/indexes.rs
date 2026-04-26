@@ -1,7 +1,8 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::parsed::{
-    Choice, ContentList, Expression, Flow, FlowArgument, Object, Story, VariableAssignment, Weave,
+    Choice, ContentList, Expression, Flow, FlowArgument, Object, Story, TypeName,
+    VariableAssignment, Weave,
 };
 
 use super::context::ChoicePathMode;
@@ -12,7 +13,7 @@ use super::weave::weave_has_weave_points;
 
 #[derive(Debug)]
 pub(super) struct LoweringIndexes<'a> {
-    pub(super) constants: HashMap<String, Expression>,
+    pub(super) constants: ConstantValues,
     pub(super) global_labels: LabelIndex,
     pub(super) global_variables: HashSet<String>,
     pub(super) variable_declarations: Vec<&'a VariableAssignment>,
@@ -23,9 +24,9 @@ pub(super) struct LoweringIndexes<'a> {
 
 pub(super) struct RuntimeLenEstimator {
     pub(super) choice_content_len:
-        fn(&Choice, &HashMap<String, Expression>, &StructDefinitions, &HashSet<String>) -> usize,
+        fn(&Choice, &ConstantValues, &StructDefinitions, &HashSet<String>) -> usize,
     pub(super) object_len:
-        fn(&Object, &HashMap<String, Expression>, &StructDefinitions, &HashSet<String>) -> usize,
+        fn(&Object, &ConstantValues, &StructDefinitions, &HashSet<String>) -> usize,
 }
 
 impl<'a> LoweringIndexes<'a> {
@@ -65,6 +66,30 @@ pub(super) struct CountedFlowPaths {
 
 pub(super) type ExternalSignatures = HashMap<String, CallSignature>;
 pub(super) type StructDefinitions = HashMap<String, Vec<(String, crate::parsed::TypeName)>>;
+pub(super) type ConstantValues = HashMap<String, ConstantValue>;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct ConstantValue {
+    expression: Expression,
+    declared_type: TypeName,
+}
+
+impl ConstantValue {
+    fn new(expression: Expression, declared_type: TypeName) -> Self {
+        Self {
+            expression,
+            declared_type,
+        }
+    }
+
+    pub(super) fn expression(&self) -> &Expression {
+        &self.expression
+    }
+
+    pub(super) fn declared_type(&self) -> &TypeName {
+        &self.declared_type
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum CallSignature {
@@ -225,7 +250,7 @@ fn collect_variable_declarations_in_flow<'a>(
     }
 }
 
-fn build_constant_values(story: &Story) -> HashMap<String, Expression> {
+fn build_constant_values(story: &Story) -> ConstantValues {
     let mut constants = HashMap::new();
     collect_constant_values_in_objects(story.root_weave().content(), &mut constants);
     for flow in story.flows() {
@@ -234,7 +259,7 @@ fn build_constant_values(story: &Story) -> HashMap<String, Expression> {
     constants
 }
 
-fn collect_constant_values_in_flow(flow: &Flow, constants: &mut HashMap<String, Expression>) {
+fn collect_constant_values_in_flow(flow: &Flow, constants: &mut ConstantValues) {
     collect_constant_values_in_objects(flow.weave().content(), constants);
     for child in flow.child_flows() {
         collect_constant_values_in_flow(child, constants);
@@ -243,24 +268,27 @@ fn collect_constant_values_in_flow(flow: &Flow, constants: &mut HashMap<String, 
 
 fn collect_constant_values_in_content_list(
     content_list: &ContentList,
-    constants: &mut HashMap<String, Expression>,
+    constants: &mut ConstantValues,
 ) {
     collect_constant_values_in_objects(content_list.objects(), constants);
 }
 
-fn collect_constant_values_in_objects(
-    objects: &[Object],
-    constants: &mut HashMap<String, Expression>,
-) {
+fn collect_constant_values_in_objects(objects: &[Object], constants: &mut ConstantValues) {
     for object in objects {
         collect_constant_values_in_object(object, constants);
     }
 }
 
-fn collect_constant_values_in_object(object: &Object, constants: &mut HashMap<String, Expression>) {
+fn collect_constant_values_in_object(object: &Object, constants: &mut ConstantValues) {
     match object {
         Object::ConstantDeclaration(constant) => {
-            constants.insert(constant.name().to_string(), constant.expression().clone());
+            constants.insert(
+                constant.name().to_string(),
+                ConstantValue::new(
+                    constant.expression().clone(),
+                    constant.declared_type().clone(),
+                ),
+            );
         }
         Object::ContentList(content_list) => {
             collect_constant_values_in_content_list(content_list, constants);
@@ -387,7 +415,7 @@ fn collect_external_signatures_in_object(object: &Object, signatures: &mut Exter
 fn build_counted_flow_paths(
     story: &Story,
     global_labels: &LabelIndex,
-    constants: &HashMap<String, Expression>,
+    constants: &ConstantValues,
     global_variables: &HashSet<String>,
 ) -> CountedFlowPaths {
     let mut paths = CountedFlowPaths::default();
@@ -421,7 +449,7 @@ fn build_counted_flow_paths(
 pub(super) fn collect_counted_paths_in_weave(
     weave: &Weave,
     global_labels: &LabelIndex,
-    constants: &HashMap<String, Expression>,
+    constants: &ConstantValues,
     global_variables: &HashSet<String>,
     path_mode: &ChoicePathMode,
     paths: &mut CountedFlowPaths,
@@ -443,7 +471,7 @@ fn collect_counted_paths_in_flow(
     parent_flow_name: Option<&str>,
     sibling_stitch_names: &[String],
     global_labels: &LabelIndex,
-    constants: &HashMap<String, Expression>,
+    constants: &ConstantValues,
     global_variables: &HashSet<String>,
     paths: &mut CountedFlowPaths,
 ) {
@@ -494,7 +522,7 @@ fn collect_counted_paths_in_flow(
 fn collect_counted_paths_in_content_list(
     content_list: &ContentList,
     global_labels: &LabelIndex,
-    constants: &HashMap<String, Expression>,
+    constants: &ConstantValues,
     global_variables: &HashSet<String>,
     path_mode: &ChoicePathMode,
     paths: &mut CountedFlowPaths,
@@ -514,7 +542,7 @@ fn collect_counted_paths_in_content_list(
 fn collect_counted_paths_in_object(
     object: &Object,
     global_labels: &LabelIndex,
-    constants: &HashMap<String, Expression>,
+    constants: &ConstantValues,
     global_variables: &HashSet<String>,
     path_mode: &ChoicePathMode,
     paths: &mut CountedFlowPaths,
@@ -696,7 +724,7 @@ fn collect_counted_paths_in_object(
 fn collect_counted_paths_in_expression(
     expression: &Expression,
     global_labels: &LabelIndex,
-    constants: &HashMap<String, Expression>,
+    constants: &ConstantValues,
     global_variables: &HashSet<String>,
     path_mode: &ChoicePathMode,
     paths: &mut CountedFlowPaths,
@@ -705,7 +733,7 @@ fn collect_counted_paths_in_expression(
         Expression::VariableReference(name) => {
             if let Some(constant) = constants.get(name) {
                 collect_counted_paths_in_expression(
-                    constant,
+                    constant.expression(),
                     global_labels,
                     constants,
                     global_variables,

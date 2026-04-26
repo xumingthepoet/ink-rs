@@ -1,12 +1,12 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use ink_story_json_format::{Container, ControlCommand, Object as RuntimeObject};
 
-use crate::parsed::{Conditional, Expression};
+use crate::parsed::Conditional;
 
 use super::context::ChoicePathMode;
 use super::expression::lower_expression_into;
-use super::indexes::{ExternalSignatures, StructDefinitions};
+use super::indexes::{ConstantValues, ExternalSignatures, StructDefinitions};
 use super::lower_object_into_with_context;
 use super::path::LabelIndex;
 use super::weave::{lower_choice_weave_with_initial_content, weave_has_choice};
@@ -19,7 +19,7 @@ pub(super) fn lower_conditional_into(
     global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
-    constants: &HashMap<String, Expression>,
+    constants: &ConstantValues,
     struct_definitions: &StructDefinitions,
     path_mode: &ChoicePathMode,
 ) {

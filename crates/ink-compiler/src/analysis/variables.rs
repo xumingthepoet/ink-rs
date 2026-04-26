@@ -1,6 +1,6 @@
 use crate::parsed::{
     visit::{walk_story, ParsedVisitor, VisitContext},
-    Expression, Flow, Object, Story, TypeName,
+    Flow, Object, Story,
 };
 
 use super::context::VariableScopeIndex;
@@ -30,7 +30,7 @@ pub(super) fn build_variable_scope_index(story: &Story) -> VariableScopeIndex {
                 Object::ConstantDeclaration(declaration) => {
                     self.index.insert_global(
                         declaration.name().to_string(),
-                        literal_constant_type(declaration.expression()),
+                        Some(declaration.declared_type().clone()),
                     );
                 }
                 Object::VariableAssignment(assignment) if assignment.is_global() => {
@@ -66,18 +66,10 @@ pub(super) fn build_variable_scope_index(story: &Story) -> VariableScopeIndex {
     visitor.index
 }
 
-fn literal_constant_type(expression: &Expression) -> Option<TypeName> {
-    match expression {
-        Expression::NumberInt(_) => Some(TypeName::int()),
-        Expression::NumberFloat(_) => Some(TypeName::float()),
-        Expression::NumberBool(_) => Some(TypeName::bool()),
-        Expression::String(_) | Expression::StringContent(_) => Some(TypeName::string()),
-        _ => None,
-    }
-}
-
 #[cfg(test)]
 mod tests {
+    use crate::parsed::TypeName;
+
     use super::{super::test_support::parse_story, *};
 
     #[test]
@@ -131,9 +123,9 @@ mod tests {
     }
 
     #[test]
-    fn indexes_non_literal_constants_without_inferring_types() {
+    fn indexes_constant_declared_types() {
         let story = parse_story(
-            "CONST derived = other\n\
+            "CONST derived: int = other\n\
              == knot(arg) ==\n\
              -> DONE",
         );
@@ -142,7 +134,7 @@ mod tests {
 
         assert_eq!(
             index.visible_variable_declared_type("derived", None),
-            Some(None)
+            Some(Some(&TypeName::int()))
         );
         assert_eq!(
             index.visible_variable_declared_type("arg", Some("knot")),

@@ -1,11 +1,11 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use ink_story_json_format::{Container, ControlCommand, Object as RuntimeObject};
 
-use crate::parsed::{Expression, Sequence, SequenceType, Weave};
+use crate::parsed::{Sequence, SequenceType, Weave};
 
 use super::context::ChoicePathMode;
-use super::indexes::{ExternalSignatures, StructDefinitions};
+use super::indexes::{ConstantValues, ExternalSignatures, StructDefinitions};
 use super::named_container;
 use super::path::{compact_relative_path, LabelIndex};
 use super::weave::{
@@ -19,7 +19,7 @@ pub(super) fn lower_sequence(
     global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
-    constants: &HashMap<String, Expression>,
+    constants: &ConstantValues,
     struct_definitions: &StructDefinitions,
     path_mode: &ChoicePathMode,
     sequence_container_path: &str,

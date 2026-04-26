@@ -25,6 +25,28 @@ Each entry should include:
 - migration guidance
 - tests
 
+## 2026-04-26: CONST Declarations Require Explicit Types
+
+- status: supported
+- upstream behavior: upstream Ink constants are dynamically typed and declared
+  with `CONST name = value`.
+- ink-rs behavior: constants use `CONST name: Type = value`. Supported constant
+  types are the same maintained value types as globals and temps: `int`,
+  `float`, `bool`, `string`, user `STRUCT` types, arrays written as `T[]`, and
+  nested arrays. Constant initializers are checked against the declared type,
+  and struct defaults are applied when typed struct constants omit fields.
+- documentation effect: `WritingWithInk-latest.md` updates the changed-from-
+  upstream section and all constants examples to use explicit types.
+- rationale: constants participate in expression type checking and lowering.
+  Requiring a declared type keeps composite constants unambiguous, especially
+  for empty arrays and partial struct literals.
+- migration guidance: rewrite `CONST NAME = value` as `CONST NAME: Type =
+  value`.
+- tests: `typed_constants_support_struct_and_array_values` and
+  `untyped_constant_declaration_reports_missing_type` in
+  `crates/ink-test/tests/language.rs`, plus compiler parser, initializer,
+  struct literal, and array literal unit tests.
+
 ## 2026-04-26: Global VAR Declarations Restricted To Story Top Level
 
 - status: removed

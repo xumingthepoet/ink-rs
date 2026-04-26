@@ -1936,7 +1936,7 @@ After thread 2 choice ({name})
             for range in ranges.iter_mut() {
                 let identifier = generate_identifier_from_character_range(range, None);
                 let story_str = format!(
-                    "\nCONST pi{0} = 3.1415\nCONST a{0} = \"World\"\nCONST b{0} = 3\n",
+                    "\nCONST pi{0}: float = 3.1415\nCONST a{0}: string = \"World\"\nCONST b{0}: int = 3\n",
                     identifier
                 );
                 let compiled_story = suite
@@ -1976,7 +1976,7 @@ After thread 2 choice ({name})
             for range in ranges.iter_mut() {
                 let identifier = generate_identifier_from_character_range(range, None);
                 let story_str = format!(
-                    "\nCONST {0}pi = 3.1415\nCONST {0}a = \"World\"\nCONST {0}b = 3\n",
+                    "\nCONST {0}pi: float = 3.1415\nCONST {0}a: string = \"World\"\nCONST {0}b: int = 3\n",
                     identifier
                 );
                 let compiled_story = suite
@@ -2921,7 +2921,7 @@ Shuffle once: {f_shuffle_once()} {f_shuffle_once()} {f_shuffle_once()} {f_shuffl
                     r#"
 VAR x: int = c
 
-CONST c = 5
+CONST c: int = 5
 
 {x}
 "#,
@@ -4068,7 +4068,7 @@ Second line.
                     r#"
 {x}
 VAR x: string = kX
-CONST kX = "hi"
+CONST kX: string = "hi"
 "#,
                     false,
                     false,
@@ -5526,17 +5526,17 @@ The second line.
         let mut suite = CSharpTestSuite::new(TestMode::Normal);
         suite.compile_string_without_runtime(
             r#"
-CONST pi = 3.1415
-CONST pi = 3.1415
+CONST pi: float = 3.1415
+CONST pi: float = 3.1415
 
-CONST x = "Hello"
-CONST x = "World"
+CONST x: string = "Hello"
+CONST x: string = "World"
 
-CONST y = 3
-CONST y = 3.0
+CONST y: int = 3
+CONST y: float = 3.0
 
-CONST z = -> somewhere
-CONST z = -> elsewhere
+CONST z: bool = true
+CONST z: bool = false
 
 == somewhere ==
 -> DONE
@@ -6504,7 +6504,7 @@ VAR gatherCount: int = 0
 -> END
 
 VAR X: int = 1
-CONST Y = 2
+CONST Y: int = 2
 "#,
             true,
         );
@@ -7054,7 +7054,7 @@ This is place 2.
             let mut story = suite
                 .compile_string(
                     r#"
-CONST CONST_STR = "ConstantString"
+CONST CONST_STR: string = "ConstantString"
 VAR varStr: string = CONST_STR
 {varStr == CONST_STR:success}
 "#,

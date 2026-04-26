@@ -1,11 +1,13 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use ink_story_json_format::{ControlCommand, Object as RuntimeObject};
 
 use crate::parsed::{AssignmentTarget, BinaryOperator, Expression, FlowArgument};
 
 use super::context::ChoicePathMode;
-use super::indexes::{CallSignature, ExternalSignatures, StructDefinitions};
+use super::indexes::{
+    CallSignature, ConstantValue, ConstantValues, ExternalSignatures, StructDefinitions,
+};
 use super::path::LabelIndex;
 use super::value::lower_value_literal;
 use super::weave::lower_content_list_into_context;
@@ -21,7 +23,7 @@ pub(super) fn lower_output_expression_into(
     global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
-    constants: &HashMap<String, Expression>,
+    constants: &ConstantValues,
     struct_definitions: &StructDefinitions,
     path_mode: &ChoicePathMode,
 ) {
@@ -49,7 +51,7 @@ pub(super) fn lower_logic_line_into(
     global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
-    constants: &HashMap<String, Expression>,
+    constants: &ConstantValues,
     struct_definitions: &StructDefinitions,
     path_mode: &ChoicePathMode,
 ) {
@@ -78,7 +80,7 @@ pub(super) fn lower_expression_into(
     global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
-    constants: &HashMap<String, Expression>,
+    constants: &ConstantValues,
     struct_definitions: &StructDefinitions,
     path_mode: &ChoicePathMode,
     has_start_content: bool,
@@ -106,7 +108,7 @@ fn lower_expression_into_with_constants(
     global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
-    constants: &HashMap<String, Expression>,
+    constants: &ConstantValues,
     struct_definitions: &StructDefinitions,
     path_mode: &ChoicePathMode,
     has_start_content: bool,
@@ -152,7 +154,7 @@ fn lower_expression_into_with_constants(
         Expression::VariableReference(name) => {
             if let Some(constant) = constants.get(name) {
                 if visiting_constants.insert(name.clone()) {
-                    lower_expression_into_with_constants(
+                    lower_constant_expression_into(
                         content,
                         constant,
                         choice_labels,
@@ -348,6 +350,43 @@ fn lower_expression_into_with_constants(
     }
 }
 
+fn lower_constant_expression_into(
+    content: &mut Vec<RuntimeObject>,
+    constant: &ConstantValue,
+    choice_labels: &LabelIndex,
+    global_labels: &LabelIndex,
+    global_variables: &HashSet<String>,
+    external_signatures: &ExternalSignatures,
+    constants: &ConstantValues,
+    struct_definitions: &StructDefinitions,
+    path_mode: &ChoicePathMode,
+    has_start_content: bool,
+    visiting_constants: &mut HashSet<String>,
+) {
+    if let Some(value) = lower_value_literal(
+        constant.expression(),
+        Some(constant.declared_type()),
+        struct_definitions,
+    ) {
+        content.push(value);
+        return;
+    }
+
+    lower_expression_into_with_constants(
+        content,
+        constant.expression(),
+        choice_labels,
+        global_labels,
+        global_variables,
+        external_signatures,
+        constants,
+        struct_definitions,
+        path_mode,
+        has_start_content,
+        visiting_constants,
+    );
+}
+
 fn lower_dotted_reference_path_into(
     content: &mut Vec<RuntimeObject>,
     name: &str,
@@ -408,7 +447,7 @@ fn lower_function_call_into(
     global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
-    constants: &HashMap<String, Expression>,
+    constants: &ConstantValues,
     struct_definitions: &StructDefinitions,
     path_mode: &ChoicePathMode,
     has_start_content: bool,
@@ -612,7 +651,7 @@ fn lower_array_remove_call_into(
     global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
-    constants: &HashMap<String, Expression>,
+    constants: &ConstantValues,
     struct_definitions: &StructDefinitions,
     path_mode: &ChoicePathMode,
     visiting_constants: &mut HashSet<String>,
@@ -690,7 +729,7 @@ pub(super) fn lower_function_arg_into(
     global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
-    constants: &HashMap<String, Expression>,
+    constants: &ConstantValues,
     struct_definitions: &StructDefinitions,
     path_mode: &ChoicePathMode,
     has_start_content: bool,

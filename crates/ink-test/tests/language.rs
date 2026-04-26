@@ -290,6 +290,30 @@ fn empty_struct_arrays_load_as_values_at_runtime() {
 }
 
 #[test]
+fn typed_constants_support_struct_and_array_values() {
+    let compiled = compile_language_source(
+        "typed-constants.ink",
+        concat!(
+            "STRUCT Stats {\n",
+            "hp: int\n",
+            "ready: bool\n",
+            "}\n",
+            "CONST default_stats: Stats = { hp: 7 }\n",
+            "CONST party: Stats[] = [{ hp: 1 }, {}]\n",
+            "VAR copied_stats: Stats = default_stats\n",
+            "VAR copied_party: Stats[] = party\n",
+            "{default_stats}|{party}|{copied_stats}|{copied_party}\n",
+            "-> DONE",
+        ),
+    );
+
+    assert_story_output(
+        &compiled,
+        "{hp: 7, ready: false}|[{hp: 1, ready: false}, {hp: 0, ready: false}]|{hp: 7, ready: false}|[{hp: 1, ready: false}, {hp: 0, ready: false}]\n",
+    );
+}
+
+#[test]
 fn struct_literals_run_at_runtime() {
     let compiled = compile_language_source(
         "struct-literals.ink",
@@ -733,6 +757,20 @@ fn untyped_global_declaration_reports_missing_type() {
         &diagnostics,
         DiagnosticSeverity::Error,
         "Variable 'score' is missing a type",
+    );
+}
+
+#[test]
+fn untyped_constant_declaration_reports_missing_type() {
+    let diagnostics = diagnostics_for_language_source(
+        "untyped-constant.ink",
+        concat!("CONST score = 1\n", "-> DONE"),
+    );
+
+    assert_diagnostic(
+        &diagnostics,
+        DiagnosticSeverity::Error,
+        "Constant 'score' is missing a type",
     );
 }
 

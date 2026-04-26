@@ -28,7 +28,9 @@ use expression::{
     lower_output_expression_into,
 };
 use flow::{lower_flow, lower_root_weave};
-use indexes::{ExternalSignatures, LoweringIndexes, RuntimeLenEstimator, StructDefinitions};
+use indexes::{
+    ConstantValues, ExternalSignatures, LoweringIndexes, RuntimeLenEstimator, StructDefinitions,
+};
 use path::{compact_path_strings_in_container, LabelIndex};
 use sequence::lower_sequence;
 use value::{lower_value_literal, runtime_default_for_type};
@@ -142,7 +144,7 @@ fn lower_global_declarations(indexes: &LoweringIndexes<'_>) -> Option<Container>
 
 fn estimated_choice_content_len(
     choice: &Choice,
-    constants: &HashMap<String, Expression>,
+    constants: &ConstantValues,
     struct_definitions: &StructDefinitions,
     global_variables: &HashSet<String>,
 ) -> usize {
@@ -166,7 +168,7 @@ fn estimated_choice_content_len(
 
 fn estimated_runtime_len_for_label_collection(
     object: &Object,
-    constants: &HashMap<String, Expression>,
+    constants: &ConstantValues,
     struct_definitions: &StructDefinitions,
     global_variables: &HashSet<String>,
 ) -> usize {
@@ -198,7 +200,7 @@ fn lower_object_into_with_context(
     global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
-    constants: &HashMap<String, Expression>,
+    constants: &ConstantValues,
     struct_definitions: &StructDefinitions,
 ) {
     lower_object_into_with_context_count(
@@ -223,7 +225,7 @@ fn lower_object_into_with_context_count(
     global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
-    constants: &HashMap<String, Expression>,
+    constants: &ConstantValues,
     struct_definitions: &StructDefinitions,
     count_all_visits: bool,
 ) {
@@ -405,7 +407,7 @@ fn lower_assignment_initializer_into(
     global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
-    constants: &HashMap<String, Expression>,
+    constants: &ConstantValues,
     path_mode: &ChoicePathMode,
     struct_definitions: &StructDefinitions,
 ) -> bool {
@@ -485,7 +487,7 @@ fn lower_assignment_path_component_key_into(
     global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
-    constants: &HashMap<String, Expression>,
+    constants: &ConstantValues,
     path_mode: &ChoicePathMode,
     struct_definitions: &StructDefinitions,
 ) {
@@ -519,7 +521,7 @@ fn lower_assignment_path_read_into(
     global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
-    constants: &HashMap<String, Expression>,
+    constants: &ConstantValues,
     path_mode: &ChoicePathMode,
     struct_definitions: &StructDefinitions,
 ) {
@@ -553,7 +555,7 @@ fn lower_assignment_update_value_into(
     global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
-    constants: &HashMap<String, Expression>,
+    constants: &ConstantValues,
     path_mode: &ChoicePathMode,
     struct_definitions: &StructDefinitions,
 ) {
@@ -640,7 +642,7 @@ fn lower_assignment_path_update_value_into(
     global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
-    constants: &HashMap<String, Expression>,
+    constants: &ConstantValues,
     path_mode: &ChoicePathMode,
     struct_definitions: &StructDefinitions,
 ) {
@@ -713,7 +715,7 @@ fn lower_cached_assignment_indexes_into<'a>(
     global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
-    constants: &HashMap<String, Expression>,
+    constants: &ConstantValues,
     path_mode: &ChoicePathMode,
     struct_definitions: &StructDefinitions,
 ) -> Vec<AssignmentPathComponent<'a>> {
@@ -770,7 +772,7 @@ fn lower_tail_recursive_return_into(
     global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
-    constants: &HashMap<String, Expression>,
+    constants: &ConstantValues,
     struct_definitions: &StructDefinitions,
 ) -> bool {
     let Some(flow_name) = path_mode.current_flow_name() else {
@@ -833,7 +835,7 @@ fn lower_variable_assignment_into(
     global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
-    constants: &HashMap<String, Expression>,
+    constants: &ConstantValues,
     struct_definitions: &StructDefinitions,
 ) {
     if assignment.is_global() {
@@ -906,7 +908,7 @@ fn lower_inc_dec_into(
     global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
-    constants: &HashMap<String, Expression>,
+    constants: &ConstantValues,
     struct_definitions: &StructDefinitions,
 ) {
     let Some(name) = inc_dec.target().variable_name() else {
@@ -985,7 +987,7 @@ fn push_divert_with_context(
     global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
-    constants: &HashMap<String, Expression>,
+    constants: &ConstantValues,
     struct_definitions: &StructDefinitions,
 ) {
     if !divert.arguments().is_empty() {
@@ -1059,7 +1061,7 @@ fn lower_tunnel_onwards_into(
     global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
-    constants: &HashMap<String, Expression>,
+    constants: &ConstantValues,
     struct_definitions: &StructDefinitions,
 ) {
     content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));

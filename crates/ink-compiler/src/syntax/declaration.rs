@@ -17,13 +17,27 @@ pub(super) fn constant_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Obje
         return None;
     }
     parser.skip_horizontal_whitespace();
+    if parser.match_string(":").is_none() {
+        parser.error(format!("Constant '{name}' is missing a type"));
+        parser.skip_to_end();
+        return None;
+    }
+    let declared_type = type_name::parse_type_name(parser)?;
+    if declared_type.is_void() {
+        parser.error("Constants cannot be declared with type void");
+        return None;
+    }
+    parser.skip_horizontal_whitespace();
     parser.match_string("=")?;
     parser.skip_horizontal_whitespace();
     let expression = parse_expression_remainder(parser)?;
     parser.skip_to_end();
 
     Some(vec![Object::ConstantDeclaration(ConstantDeclaration::new(
-        name, expression, span,
+        name,
+        declared_type,
+        expression,
+        span,
     ))])
 }
 
@@ -153,7 +167,7 @@ mod tests {
 
     #[test]
     fn parses_constant_declaration() {
-        let line = line("CONST max_score = 5");
+        let line = line("CONST max_score: int = 5");
         let mut parser = RuleParser::new(&line);
         let objects = constant_statement(&mut parser).expect("expected constant declaration");
 
@@ -162,6 +176,37 @@ mod tests {
             panic!("expected constant declaration");
         };
         assert_eq!(declaration.name(), "max_score");
+        assert_eq!(declaration.declared_type(), &TypeName::int());
+    }
+
+    #[test]
+    fn rejects_untyped_constant_declaration() {
+        let line = line("CONST max_score = 5");
+        let mut parser = RuleParser::new(&line);
+
+        assert!(constant_statement(&mut parser).is_none());
+        let diagnostics = parser.finish();
+        assert_eq!(diagnostics.len(), 1, "{diagnostics:#?}");
+        assert_eq!(diagnostics[0].severity, DiagnosticSeverity::Error);
+        assert_eq!(
+            diagnostics[0].message,
+            "Constant 'max_score' is missing a type"
+        );
+    }
+
+    #[test]
+    fn rejects_void_constant_declaration() {
+        let line = line("CONST value: void = 5");
+        let mut parser = RuleParser::new(&line);
+
+        assert!(constant_statement(&mut parser).is_none());
+        let diagnostics = parser.finish();
+        assert_eq!(diagnostics.len(), 1, "{diagnostics:#?}");
+        assert_eq!(diagnostics[0].severity, DiagnosticSeverity::Error);
+        assert_eq!(
+            diagnostics[0].message,
+            "Constants cannot be declared with type void"
+        );
     }
 
     #[test]

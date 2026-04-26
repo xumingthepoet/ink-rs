@@ -1,13 +1,14 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use ink_story_json_format::{Container, ControlCommand, NamedContainer, Object as RuntimeObject};
 
-use crate::parsed::{Choice, ContentList, Expression, Object, Weave};
+use crate::parsed::{Choice, ContentList, Object, Weave};
 
 use super::context::ChoicePathMode;
 use super::expression::lower_expression_into;
 use super::indexes::{
-    collect_counted_paths_in_weave, CountedFlowPaths, ExternalSignatures, StructDefinitions,
+    collect_counted_paths_in_weave, ConstantValues, CountedFlowPaths, ExternalSignatures,
+    StructDefinitions,
 };
 use super::path::{child_path, LabelIndex};
 use super::{
@@ -88,7 +89,7 @@ pub(super) fn lower_linear_weave(
     global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
-    constants: &HashMap<String, Expression>,
+    constants: &ConstantValues,
     struct_definitions: &StructDefinitions,
 ) -> Vec<RuntimeObject> {
     lower_linear_weave_with_context(
@@ -107,7 +108,7 @@ fn lower_linear_weave_with_context(
     global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
-    constants: &HashMap<String, Expression>,
+    constants: &ConstantValues,
     struct_definitions: &StructDefinitions,
     path_mode: &ChoicePathMode,
 ) -> Vec<RuntimeObject> {
@@ -131,7 +132,7 @@ pub(super) fn lower_linear_weave_into_context(
     global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
-    constants: &HashMap<String, Expression>,
+    constants: &ConstantValues,
     struct_definitions: &StructDefinitions,
     path_mode: &ChoicePathMode,
 ) {
@@ -157,7 +158,7 @@ pub(super) fn lower_choice_weave(
     global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
-    constants: &HashMap<String, Expression>,
+    constants: &ConstantValues,
     struct_definitions: &StructDefinitions,
     count_all_visits: bool,
 ) -> Container {
@@ -180,7 +181,7 @@ pub(super) fn lower_choice_weave_with_initial_content(
     global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
-    constants: &HashMap<String, Expression>,
+    constants: &ConstantValues,
     struct_definitions: &StructDefinitions,
     count_all_visits: bool,
     initial_content: Vec<RuntimeObject>,
@@ -416,7 +417,7 @@ fn lower_weave_section(
     global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
-    constants: &HashMap<String, Expression>,
+    constants: &ConstantValues,
     struct_definitions: &StructDefinitions,
     gather_count: usize,
     path_mode: &ChoicePathMode,
@@ -550,7 +551,7 @@ fn lower_choice_in_section(
     global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
-    constants: &HashMap<String, Expression>,
+    constants: &ConstantValues,
     struct_definitions: &StructDefinitions,
     gather_count: usize,
     path_mode: &ChoicePathMode,
@@ -736,7 +737,7 @@ fn choice_outer(
     global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
-    constants: &HashMap<String, Expression>,
+    constants: &ConstantValues,
     struct_definitions: &StructDefinitions,
 ) -> ChoiceOuter {
     let mut outer_content = Vec::new();
@@ -864,7 +865,7 @@ fn lower_content_list_with_context(
     global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
-    constants: &HashMap<String, Expression>,
+    constants: &ConstantValues,
     struct_definitions: &StructDefinitions,
 ) -> Vec<RuntimeObject> {
     let mut content = Vec::new();
@@ -890,7 +891,7 @@ pub(super) fn lower_content_list_into_context(
     global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
-    constants: &HashMap<String, Expression>,
+    constants: &ConstantValues,
     struct_definitions: &StructDefinitions,
 ) {
     for object in content_list.objects() {

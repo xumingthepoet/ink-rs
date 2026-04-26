@@ -2,7 +2,7 @@ use crate::{
     diagnostic::Diagnostic,
     parsed::{
         visit::{walk_story, ParsedVisitor, VisitContext},
-        DefaultValue, Object, Story, TypeName, VariableAssignment,
+        ConstantDeclaration, DefaultValue, Object, Story, TypeName, VariableAssignment,
     },
 };
 
@@ -96,12 +96,48 @@ impl<'a> VariableInitializerChecker<'a> {
             Err(_) => {}
         }
     }
+
+    fn check_constant(&mut self, declaration: &ConstantDeclaration, context: &VisitContext) {
+        match infer_expression_type(
+            declaration.expression(),
+            self.variable_scopes,
+            self.struct_types,
+            self.target_symbols,
+            context.current_flow_path.as_deref(),
+        ) {
+            Ok(actual_type) if &actual_type != declaration.declared_type() => {
+                self.diagnostics.push(Diagnostic::error(
+                    declaration.span().clone(),
+                    format!(
+                        "Initializer for constant '{}' has type {} but declared type is {}",
+                        declaration.name(),
+                        actual_type.display_name(),
+                        declaration.declared_type().display_name()
+                    ),
+                ));
+            }
+            Ok(_) => {}
+            Err(error) if declaration.declared_type().primitive_type().is_some() => {
+                self.diagnostics.push(Diagnostic::error(
+                    declaration.span().clone(),
+                    format!(
+                        "Cannot type-check initializer for constant '{}': {}",
+                        declaration.name(),
+                        error.message()
+                    ),
+                ));
+            }
+            Err(_) => {}
+        }
+    }
 }
 
 impl ParsedVisitor for VariableInitializerChecker<'_> {
     fn visit_object(&mut self, object: &Object, context: &VisitContext) {
-        if let Object::VariableAssignment(assignment) = object {
-            self.check_assignment(assignment, context);
+        match object {
+            Object::ConstantDeclaration(declaration) => self.check_constant(declaration, context),
+            Object::VariableAssignment(assignment) => self.check_assignment(assignment, context),
+            _ => {}
         }
     }
 }
@@ -142,7 +178,8 @@ mod tests {
     #[test]
     fn accepts_valid_primitive_initializers() {
         let story = parse_story(
-            "VAR score: int = 10\n\
+            "CONST max_score: int = 10\n\
+             VAR score: int = max_score\n\
              VAR ratio: float = 1.5\n\
              VAR ready: bool = true\n\
              VAR label: string = \"start\"\n\
@@ -152,6 +189,19 @@ mod tests {
         );
 
         assert_eq!(variable_initializer_diagnostics(&story), []);
+    }
+
+    #[test]
+    fn reports_invalid_constant_initializer_type() {
+        let story = parse_story("CONST score: int = \"high\"\n-> DONE");
+
+        let diagnostics = variable_initializer_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Initializer for constant 'score' has type string but declared type is int",
+        );
     }
 
     #[test]

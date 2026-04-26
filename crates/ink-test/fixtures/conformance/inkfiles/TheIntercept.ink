@@ -16,16 +16,16 @@ VAR losttemper: bool = false
 VAR admitblackmail: bool = false
 
 // what kind of clue did we pass to Hooper?
-CONST NONE = 0
-CONST STRAIGHT = 1
-CONST CHESS = 2
-CONST CROSSWORD = 3
+CONST NONE: int = 0
+CONST STRAIGHT: int = 1
+CONST CHESS: int = 2
+CONST CROSSWORD: int = 3
 VAR hooperClueType: int = NONE
 
 VAR hooperConfessed: bool = false
 
-CONST SHOE = 1
-CONST BUCKET = 2
+CONST SHOE: int = 1
+CONST BUCKET: int = 2
 VAR smashingWindowItem: int = NONE
 
 VAR notraitor: bool = false

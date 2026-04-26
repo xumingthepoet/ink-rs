@@ -4,7 +4,8 @@ use crate::{
     diagnostic::Diagnostic,
     parsed::{
         visit::{walk_story, ParsedVisitor, VisitContext},
-        Expression, Object, Story, StructLiteralField, TypeName, VariableAssignment,
+        ConstantDeclaration, Expression, Object, Story, StructLiteralField, TypeName,
+        VariableAssignment,
     },
     source::SourceSpan,
 };
@@ -78,6 +79,16 @@ impl<'a> ArrayLiteralChecker<'a> {
                 context,
             );
         }
+    }
+
+    fn check_constant(&mut self, declaration: &ConstantDeclaration, context: &VisitContext) {
+        self.check_expression_for_arrays(
+            declaration.expression(),
+            declaration.declared_type(),
+            declaration.name(),
+            declaration.span(),
+            context,
+        );
     }
 
     fn visible_declared_type(&self, name: &str, context: &VisitContext) -> Option<TypeName> {
@@ -347,8 +358,10 @@ impl<'a> ArrayLiteralChecker<'a> {
 
 impl ParsedVisitor for ArrayLiteralChecker<'_> {
     fn visit_object(&mut self, object: &Object, context: &VisitContext) {
-        if let Object::VariableAssignment(assignment) = object {
-            self.check_assignment(assignment, context);
+        match object {
+            Object::ConstantDeclaration(declaration) => self.check_constant(declaration, context),
+            Object::VariableAssignment(assignment) => self.check_assignment(assignment, context),
+            _ => {}
         }
     }
 
@@ -392,7 +405,8 @@ mod tests {
     #[test]
     fn accepts_primitive_array_literals() {
         let story = parse_story(
-            "VAR scores: int[] = [1, 2, 3]\n\
+            "CONST default_scores: int[] = [1, 2, 3]\n\
+             VAR scores: int[] = [1, 2, 3]\n\
              -> DONE",
         );
 

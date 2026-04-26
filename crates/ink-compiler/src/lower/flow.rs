@@ -1,11 +1,13 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use ink_story_json_format::{Container, Object as RuntimeObject};
 
-use crate::parsed::{ContentList, Expression, Flow, Object, Weave};
+use crate::parsed::{ContentList, Flow, Object, Weave};
 
 use super::context::ChoicePathMode;
-use super::indexes::{CountedFlowPaths, ExternalSignatures, LoweringIndexes, StructDefinitions};
+use super::indexes::{
+    ConstantValues, CountedFlowPaths, ExternalSignatures, LoweringIndexes, StructDefinitions,
+};
 use super::path::LabelIndex;
 use super::weave::{
     lower_choice_weave, lower_linear_weave, lower_linear_weave_into_context, weave_has_choice,
@@ -82,7 +84,7 @@ fn lower_flow_with_context(
     global_labels: &LabelIndex,
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
-    constants: &HashMap<String, Expression>,
+    constants: &ConstantValues,
     struct_definitions: &StructDefinitions,
     counted_flow_paths: &CountedFlowPaths,
     count_all_visits: bool,

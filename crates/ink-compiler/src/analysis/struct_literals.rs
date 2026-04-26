@@ -4,7 +4,8 @@ use crate::{
     diagnostic::Diagnostic,
     parsed::{
         visit::{walk_story, ParsedVisitor, VisitContext},
-        Expression, Object, Story, StructLiteralField, TypeName, VariableAssignment,
+        ConstantDeclaration, Expression, Object, Story, StructLiteralField, TypeName,
+        VariableAssignment,
     },
     source::SourceSpan,
 };
@@ -70,6 +71,16 @@ impl<'a> StructLiteralChecker<'a> {
             &expected_type,
             assignment.name(),
             assignment.span(),
+            context,
+        );
+    }
+
+    fn check_constant(&mut self, declaration: &ConstantDeclaration, context: &VisitContext) {
+        self.check_expression_against_type(
+            declaration.expression(),
+            declaration.declared_type(),
+            declaration.name(),
+            declaration.span(),
             context,
         );
     }
@@ -240,8 +251,10 @@ impl<'a> StructLiteralChecker<'a> {
 
 impl ParsedVisitor for StructLiteralChecker<'_> {
     fn visit_object(&mut self, object: &Object, context: &VisitContext) {
-        if let Object::VariableAssignment(assignment) = object {
-            self.check_assignment(assignment, context);
+        match object {
+            Object::ConstantDeclaration(declaration) => self.check_constant(declaration, context),
+            Object::VariableAssignment(assignment) => self.check_assignment(assignment, context),
+            _ => {}
         }
     }
 }
@@ -276,6 +289,7 @@ mod tests {
              hp: int\n\
              name: string\n\
              }\n\
+             CONST default_player: Player = { hp: 5, name: \"Lin\" }\n\
              VAR player: Player = { hp: 10, name: \"Ada\" }\n\
              -> DONE",
         );

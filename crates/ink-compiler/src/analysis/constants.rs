@@ -4,14 +4,14 @@ use crate::{
     diagnostic::Diagnostic,
     parsed::{
         visit::{walk_story, ParsedVisitor, VisitContext},
-        Expression, Object, Story,
+        Expression, Object, Story, TypeName,
     },
 };
 
 pub(super) fn constant_redefinition_diagnostics(story: &Story) -> Vec<Diagnostic> {
     #[derive(Default)]
     struct ConstantRedefinitionVisitor {
-        constants: HashMap<String, Expression>,
+        constants: HashMap<String, (TypeName, Expression)>,
         diagnostics: Vec<Diagnostic>,
     }
 
@@ -19,11 +19,13 @@ pub(super) fn constant_redefinition_diagnostics(story: &Story) -> Vec<Diagnostic
         fn visit_object(&mut self, object: &Object, _context: &VisitContext) {
             if let Object::ConstantDeclaration(declaration) = object {
                 if let Some(existing) = self.constants.get(declaration.name()) {
-                    if existing != declaration.expression() {
+                    if existing.0 != *declaration.declared_type()
+                        || existing.1 != *declaration.expression()
+                    {
                         self.diagnostics.push(Diagnostic::error(
                             declaration.span().clone(),
                             format!(
-                                "CONST '{}' has been redefined with a different value",
+                                "CONST '{}' has been redefined with a different type or value",
                                 declaration.name()
                             ),
                         ));
@@ -31,7 +33,10 @@ pub(super) fn constant_redefinition_diagnostics(story: &Story) -> Vec<Diagnostic
                 }
                 self.constants.insert(
                     declaration.name().to_string(),
-                    declaration.expression().clone(),
+                    (
+                        declaration.declared_type().clone(),
+                        declaration.expression().clone(),
+                    ),
                 );
             }
         }
@@ -53,20 +58,32 @@ mod tests {
 
     #[test]
     fn reports_changed_constant_redefinition() {
-        let story = parse_story("CONST score = 1\nCONST score = 2");
+        let story = parse_story("CONST score: int = 1\nCONST score: int = 2");
         let diagnostics = constant_redefinition_diagnostics(&story);
 
         assert_single_diagnostic(
             &diagnostics,
             DiagnosticSeverity::Error,
-            "CONST 'score' has been redefined with a different value",
+            "CONST 'score' has been redefined with a different type or value",
         );
     }
 
     #[test]
     fn allows_same_value_constant_redefinition() {
-        let story = parse_story("CONST score = 1\nCONST score = 1");
+        let story = parse_story("CONST score: int = 1\nCONST score: int = 1");
 
         assert!(constant_redefinition_diagnostics(&story).is_empty());
+    }
+
+    #[test]
+    fn reports_changed_constant_redefinition_type() {
+        let story = parse_story("CONST score: int = 1\nCONST score: string = \"1\"");
+        let diagnostics = constant_redefinition_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "CONST 'score' has been redefined with a different type or value",
+        );
     }
 }

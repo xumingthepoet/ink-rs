@@ -1,14 +1,14 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
-use crate::parsed::{Expression, Flow, Object, Story, Weave};
+use crate::parsed::{Flow, Object, Story, Weave};
 
-use super::indexes::{RuntimeLenEstimator, StructDefinitions};
+use super::indexes::{ConstantValues, RuntimeLenEstimator, StructDefinitions};
 use super::path::{child_path, LabelIndex, RuntimePath};
 use super::weave::weave_has_weave_points;
 
 pub(super) fn build_label_index(
     story: &Story,
-    constants: &HashMap<String, Expression>,
+    constants: &ConstantValues,
     struct_definitions: &StructDefinitions,
     global_variables: &HashSet<String>,
     estimator: &RuntimeLenEstimator,
@@ -41,7 +41,7 @@ pub(super) fn build_label_index(
 fn collect_flow_labels(
     flow: &Flow,
     parent_flow_name: Option<&str>,
-    constants: &HashMap<String, Expression>,
+    constants: &ConstantValues,
     struct_definitions: &StructDefinitions,
     global_variables: &HashSet<String>,
     estimator: &RuntimeLenEstimator,
@@ -86,7 +86,7 @@ fn collect_weave_labels(
     weave: &Weave,
     container_path: &str,
     flow_alias_prefix: Option<&str>,
-    constants: &HashMap<String, Expression>,
+    constants: &ConstantValues,
     struct_definitions: &StructDefinitions,
     global_variables: &HashSet<String>,
     estimator: &RuntimeLenEstimator,

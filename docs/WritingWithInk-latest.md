@@ -60,16 +60,16 @@ edited for ink-rs language changes.
 
 - status: supported
 - upstream behavior: upstream Ink infers variable, temporary variable,
-  function, and external value shapes dynamically from runtime values, and
-  permits `VAR` declarations anywhere in the parsed story.
+  constant, function, and external value shapes dynamically from runtime values,
+  and permits `VAR` declarations anywhere in the parsed story.
 - ink-rs behavior: `VAR` declarations must appear at the story top level,
   outside knots, stitches, functions, choices, conditionals, and sequences.
-  `VAR` and `temp` declarations require `name: Type`, function parameters
-  require `name: Type`, functions require `-> ReturnType`, and `EXTERNAL`
-  declarations require typed arguments and returns. Supported source types are
-  `int`, `float`, `bool`, `string`, user `STRUCT` types, arrays written as
-  `T[]`, nested arrays, and `void` return types for functions and externals
-  that do not return values.
+  `VAR`, `CONST`, and `temp` declarations require `name: Type`, function
+  parameters require `name: Type`, functions require `-> ReturnType`, and
+  `EXTERNAL` declarations require typed arguments and returns. Supported source
+  types are `int`, `float`, `bool`, `string`, user `STRUCT` types, arrays
+  written as `T[]`, nested arrays, and `void` return types for functions and
+  externals that do not return values.
 - ink-rs behavior: structs are declared with `STRUCT Name { field: Type }`,
   object literals use `{ field: value }`, arrays use `[a, b]`, field access uses
   `value.field`, and index access uses `array[index]`. Array and struct values
@@ -80,10 +80,10 @@ edited for ink-rs language changes.
   callstack for that recursive step.
 - migration guidance: move nested `VAR` declarations to the story top level, or
   replace local executable state with typed `temp` declarations. Add explicit
-  types to all `VAR`, `temp`, function, and `EXTERNAL` declarations. Use direct
-  diverts instead of storing divert targets in variables; divert-target values
-  are still accepted in the existing flow APIs such as `TURNS_SINCE(-> knot)`
-  and tunnel parameters.
+  types to all `VAR`, `CONST`, `temp`, function, and `EXTERNAL` declarations.
+  Use direct diverts instead of storing divert targets in variables;
+  divert-target values are still accepted in the existing flow APIs such as
+  `TURNS_SINCE(-> knot)` and tunnel parameters.
 - tests: typed value behavior is covered by `crates/ink-test/tests/language.rs`
   and the compiler, runtime, and JSON format unit tests.
 
@@ -1943,11 +1943,13 @@ Wrapping up simple operations in function can also provide a simple place to put
 
 Interactive stories often rely on state machines, tracking what stage some higher level process has reached. There are lots of ways to do this, but the most conveninent is to use constants.
 
+In ink-rs, every constant declaration must include an explicit type using `CONST name: Type = value`. Constants can use the same maintained value types as variables, including structs and arrays such as `Player` and `Player[]`.
+
 Sometimes, it's convenient to define constants to be strings, so you can print them out, for gameplay or debugging purposes.
 
-	CONST HASTINGS = "Hastings"
-	CONST POIROT = "Poirot"
-	CONST JAPP = "Japp"
+	CONST HASTINGS: string = "Hastings"
+	CONST POIROT: string = "Poirot"
+	CONST JAPP: string = "Japp"
 
 	VAR current_chief_suspect: string = HASTINGS
 
@@ -1959,16 +1961,16 @@ Sometimes, it's convenient to define constants to be strings, so you can print t
 
 Sometimes giving them values is useful:
 
-	CONST PI = 3.14
-	CONST VALUE_OF_TEN_POUND_NOTE = 10
+	CONST PI: float = 3.14
+	CONST VALUE_OF_TEN_POUND_NOTE: int = 10
 
 And sometimes the numbers are useful in other ways:
 
-	CONST LOBBY = 1
-	CONST STAIRCASE = 2
-	CONST HALLWAY = 3
+	CONST LOBBY: int = 1
+	CONST STAIRCASE: int = 2
+	CONST HALLWAY: int = 3
 
-	CONST HELD_BY_AGENT = -1
+	CONST HELD_BY_AGENT: int = -1
 
 	VAR secret_agent_location: int = LOBBY
 	VAR suitcase_location: int = HALLWAY
@@ -2214,8 +2216,8 @@ In a normal story, threads might never be needed.
 
 But for games with lots of independent moving parts, threads quickly become essential. Imagine a game in which characters move independently around a map: the main story hub for a room might look like the following:
 
-	CONST HALLWAY = 1
-	CONST OFFICE = 2
+	CONST HALLWAY: int = 1
+	CONST OFFICE: int = 2
 
 	VAR player_location: int = HALLWAY
 	VAR generals_location: int = HALLWAY

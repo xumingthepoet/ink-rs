@@ -1,18 +1,25 @@
 use crate::source::SourceSpan;
 
-use super::{push_indent, Expression};
+use super::{push_indent, Expression, TypeName};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConstantDeclaration {
     name: String,
+    declared_type: TypeName,
     expression: Expression,
     span: SourceSpan,
 }
 
 impl ConstantDeclaration {
-    pub fn new(name: impl Into<String>, expression: Expression, span: SourceSpan) -> Self {
+    pub fn new(
+        name: impl Into<String>,
+        declared_type: TypeName,
+        expression: Expression,
+        span: SourceSpan,
+    ) -> Self {
         Self {
             name: name.into(),
+            declared_type,
             expression,
             span,
         }
@@ -26,6 +33,10 @@ impl ConstantDeclaration {
         &self.expression
     }
 
+    pub fn declared_type(&self) -> &TypeName {
+        &self.declared_type
+    }
+
     pub fn span(&self) -> &SourceSpan {
         &self.span
     }
@@ -35,7 +46,9 @@ impl ConstantDeclaration {
         push_indent(out, indent);
         out.push_str("ConstantDeclaration(name=\"");
         out.push_str(&self.name);
-        out.push_str("\")");
+        out.push_str("\", type=");
+        out.push_str(&self.declared_type.snapshot_name());
+        out.push(')');
         out.push('\n');
         self.expression.write_parse_snapshot(out, indent + 2);
     }

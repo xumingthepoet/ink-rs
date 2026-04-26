@@ -70,6 +70,27 @@ The upstream reference lives in `ink-csharp/`.
   changes, then apply those updates to `docs/WritingWithInk-latest.md`.
 - Do not edit `docs/WritingWithInk-origin.md`; it is the upstream C# snapshot.
 
+## User Assumption Checks
+
+- When the user proposes a language or architecture change based on a claimed
+  current behavior, verify the premise before changing code. The owner's desired
+  behavior remains authoritative only after the premise is checked and any
+  intended divergence is explicit.
+- If the premise is wrong, say so directly. Explain the actual behavior with a
+  minimal example, point out the inaccurate wording, and identify any ambiguous
+  part of the request. Do not implement a code change just to match an
+  incorrect premise.
+- Example: `VAR smashingWindowItem: int = NONE` is not "default int
+  initialization with NONE". It is explicit initialization from a constant
+  reference, assuming `CONST NONE: int = 0` exists. Default initialization is the
+  omitted-initializer form `VAR smashingWindowItem: int`.
+- Failure mode to avoid: if the user says this form "must be disallowed" because
+  they confused a constant reference with default initialization, do not
+  accommodate that hallucinated premise by adding restrictions. The correct
+  response is to stop, state that the premise is incorrect, explain that the
+  request is ambiguous or misstated, and ask for confirmation only if they still
+  want an intentional language change after the correction.
+
 ## Continuation Workflow
 
 - If the user sends a continuation prompt such as `continue`, `go on`, `keep
@@ -173,7 +194,7 @@ before marking a change done is:
 - [2026-04-24 08:50 CST] [👍9][👎0] Function calls and string expressions are expressions: lower call arguments before the runtime command/user function token. External declarations only register signatures; matching calls lower to `x()` with `exArgs`. Divert-target arguments used as values count visits and turns unless direct `TURNS_SINCE`/`READ_COUNT` gives a narrower purpose. String expressions lower as `str ... /str` and can contain nested mixed text/logic.
 - [2026-04-24 09:34 CST] [👍13][👎0] Weave handling needs a current runtime-container model. Grouping derives base indentation from the first weave point, not always depth 1. Gathers are structural weave points even without choices. Root weave participates in weave-point naming before flow weaves. After gathers, content and choices stay in that gather; inside flows, linear weave objects carry flow/stitch container paths. Branch rejoin diverts use C#-style compact paths. Named content metadata must stay as the container tail.
 - [2026-04-24 08:31 CST] [👍7][👎0] Braced inline or multiline content is not always a sequence. Try sequence annotations, then `condition: content` conditionals, then expression/default sequences. A multiline conditional closing brace can have same-line suffix; parse suffix as inline content and nested multiline logic before adding newline. Keep expression content as `ev ... out /ev`.
-- [2026-04-25 00:35 CST] [👍15][👎0] Diagnostics and compiler-pipeline behavior belong over parsed-model semantics. Story-wide `CONST` redefinition only errors when values change; constant refs expand during expression lowering before path indexes are planned. Flow args used as variable divert targets must be marked `->`, but expression divert targets that resolve to variables must omit `->`; direct divert statements still use `-> var`. Sealed conditional/sequence loose choices are analysis errors. `TODO:` is an AuthorWarning node and is ignored by loose-end termination. `INCLUDE` inserts non-flow content at the include site and appends included flows to story end.
+- [2026-04-25 00:35 CST] [👍15][👎0] Diagnostics and compiler-pipeline behavior belong over parsed-model semantics. `CONST` declarations require explicit types; redefinition only errors when type or value changes, and constant refs expand during expression lowering before path indexes are planned. Flow args used as variable divert targets must be marked `->`, but expression divert targets that resolve to variables must omit `->`; direct divert statements still use `-> var`. Sealed conditional/sequence loose choices are analysis errors. `TODO:` is an AuthorWarning node and is ignored by loose-end termination. `INCLUDE` inserts non-flow content at the include site and appends included flows to story end.
 - [2026-04-24 09:06 CST] [👍14][👎0] Preserve C# trial order/type shape in syntax. Route parser alternatives through `RuleParser` or the multiline rule checkpoint so failed trials rewind cursor/index and diagnostics. Comment elimination is a source prepass. Identifiers may start with digits but cannot be all digits. Braced logic tries sequence annotations, then conditionals, then expression/default sequence. Inline content tokenization pauses on glue, braces, tags, and both divert arrows (`->`, `<-`). Choice parsing separates visible content before trailing diverts.
 - [2026-04-24 09:31 CST] [👍5][👎0] Read/turn-count resolution needs a story-level target index for flow and weave labels, but metadata pre-scans must still carry path-mode context so sibling stitches get counted. Count metadata belongs on the target's container-for-counting, including choice inner containers; local labels still win for same-weave `CNT?` paths.
 - [2026-04-24 08:38 CST] [👍5][👎0] Expression operators should be parsed into `Expression::Binary` and lowered by emitting operands followed by the runtime native function token. Split only at top-level operators, respecting quoted strings. Operators with the same C# precedence split as one group to preserve left associativity. Contains operators `?`/`has` and `!?`/`hasnt` lower to native `?`/`!?`.
