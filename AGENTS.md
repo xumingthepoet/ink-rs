@@ -6,8 +6,8 @@ The upstream reference lives in `ink-csharp/`.
 
 ## Project Goal
 
-- Complete the compiled story JSON format refactor described in
-  `CompiledStoryJsonFormatRefactor.md`.
+- Complete the compiled story JSON format refactor tracked by the active plan
+  under `docs/current_plan/`, when one exists.
 - Add `crates/ink-story-json-format` as the single typed owner of compiled
   story JSON data structures, token names, memory-to-JSON serialization, and
   JSON-to-memory deserialization.
@@ -47,6 +47,14 @@ The upstream reference lives in `ink-csharp/`.
 - `ink-csharp/compiler`: historical C# compiler reference
 - `ink-csharp/ink-engine-runtime`: historical C# runtime reference
 - `ink-csharp/tests`: historical C# test corpus
+- `docs/current_plan`: active implementation plan workspace
+- `docs/finished_plans`: completed implementation plans
+- `docs/WritingWithInk-updates.md`: ink-rs syntax and semantic change log
+- `docs/WritingWithInk-latest.md`: current maintained writing guide
+- `docs/WritingWithInk-origin.md`: upstream C# writing guide snapshot
+- `docs/Architecture.md`: ink-rs architecture notes
+- `docs/ink_JSON_runtime_format.md`: compiled story JSON format notes
+- `Notes.md`: durable working notes that change more often than this file
 
 ## Working Rules
 
@@ -64,10 +72,20 @@ The upstream reference lives in `ink-csharp/`.
 - When behavior intentionally diverges from upstream Ink, update tests and
   documentation in the same change.
 - Avoid broad unrelated edits when working on compiler or language behavior.
-- Keep `CompiledStoryJsonFormatRefactor.md` synchronized with the active format
-  refactor plan.
+- Write repository-authored documentation in English. Avoid non-English prose in
+  docs; describe localized user prompts generically unless exact text is
+  required.
+- Keep project terminology synchronized across `AGENTS.md`, `Notes.md`, `docs/`,
+  tests, diagnostics, and code-facing comments. When renaming a concept,
+  directory, or workflow term, update related documentation references in the
+  same change.
+- Keep active plan details in `docs/current_plan/`; do not add one-off plan file
+  names to `AGENTS.md`.
 - Keep `docs/WritingWithInk-updates.md` synchronized with syntax and semantic
   changes, then apply those updates to `docs/WritingWithInk-latest.md`.
+- Store active implementation plans under `docs/current_plan/`. When a plan is
+  complete, move it to `docs/finished_plans/`. Do not update `AGENTS.md` for
+  each new plan unless the planning workflow itself changes.
 - Do not edit `docs/WritingWithInk-origin.md`; it is the upstream C# snapshot.
 
 ## User Assumption Checks
@@ -94,10 +112,18 @@ The upstream reference lives in `ink-csharp/`.
 ## Continuation Workflow
 
 - If the user sends a continuation prompt such as `continue`, `go on`, `keep
-  going`, `next`, `继续`, `继续吧`, or similar without replacing the task,
-  interpret it as: continue the compiled story JSON format refactor from
-  `CompiledStoryJsonFormatRefactor.md` and validate it with the smallest
-  relevant tests, then `make gate` when the change is ready.
+  going`, `next`, or a localized equivalent without replacing the task,
+  interpret it as: continue the active implementation plan in
+  `docs/current_plan/` if one exists, otherwise continue the current project goal
+  from the repository state and durable notes.
+- Active plan directories under `docs/current_plan/` should contain the task
+  instructions for that plan. They may also contain a progress file that must be
+  kept synchronized while development proceeds; follow the plan's own files for
+  the exact progress-tracking convention.
+- When an active plan is complete, move its plan directory from
+  `docs/current_plan/` to `docs/finished_plans/`.
+- Validate continuation work with the smallest relevant tests first, then
+  `make gate` when the change is ready.
 - `make gate` is still the full project gate. If intentional language changes
   make legacy C# compatibility tests obsolete, update or replace those tests as
   part of the same language-change work rather than hiding failures.
