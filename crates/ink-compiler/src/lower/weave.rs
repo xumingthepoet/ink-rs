@@ -201,6 +201,7 @@ pub(super) fn lower_choice_weave_with_initial_content(
         weave,
         global_labels,
         constants,
+        global_variables,
         &path_mode,
         &mut counted_paths,
     );
@@ -784,6 +785,7 @@ fn choice_outer(
             condition,
             choice_labels,
             global_labels,
+            global_variables,
             external_signatures,
             constants,
             struct_definitions,

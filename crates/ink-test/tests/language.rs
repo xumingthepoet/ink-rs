@@ -274,6 +274,22 @@ fn array_literals_run_at_runtime() {
 }
 
 #[test]
+fn empty_struct_arrays_load_as_values_at_runtime() {
+    let compiled = compile_language_source(
+        "empty-struct-array.ink",
+        concat!(
+            "STRUCT Marker {\n",
+            "}\n",
+            "VAR markers: Marker[] = [{}, {}]\n",
+            "{LEN(markers)}\n",
+            "-> DONE",
+        ),
+    );
+
+    assert_story_output(&compiled, "2\n");
+}
+
+#[test]
 fn struct_literals_run_at_runtime() {
     let compiled = compile_language_source(
         "struct-literals.ink",
@@ -320,6 +336,30 @@ fn field_access_reads_struct_fields_at_runtime() {
     assert_json_sequence(
         &compiled.program.to_json_value(),
         vec![json!({"VAR?": "state"}), json!("^hp"), json!("FIELD")],
+    );
+}
+
+#[test]
+fn field_access_prefers_visible_variables_over_matching_story_paths() {
+    let compiled = compile_language_source(
+        "field-access-label-shadow.ink",
+        concat!(
+            "STRUCT Player {\n",
+            "hp: int\n",
+            "}\n",
+            "VAR player: Player = { hp: 7 }\n",
+            "{player.hp}\n",
+            "-> DONE\n",
+            "== player ==\n",
+            "= hp\n",
+            "-> DONE",
+        ),
+    );
+
+    assert_story_output(&compiled, "7\n");
+    assert_json_sequence(
+        &compiled.program.to_json_value(),
+        vec![json!({"VAR?": "player"}), json!("^hp"), json!("FIELD")],
     );
 }
 

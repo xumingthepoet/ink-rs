@@ -19,6 +19,7 @@ pub(super) fn lower_output_expression_into(
     expression: &Expression,
     choice_labels: &LabelIndex,
     global_labels: &LabelIndex,
+    global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
     struct_definitions: &StructDefinitions,
@@ -30,6 +31,7 @@ pub(super) fn lower_output_expression_into(
         expression,
         choice_labels,
         global_labels,
+        global_variables,
         external_signatures,
         constants,
         struct_definitions,
@@ -45,6 +47,7 @@ pub(super) fn lower_logic_line_into(
     expression: &Expression,
     choice_labels: &LabelIndex,
     global_labels: &LabelIndex,
+    global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
     struct_definitions: &StructDefinitions,
@@ -56,6 +59,7 @@ pub(super) fn lower_logic_line_into(
         expression,
         choice_labels,
         global_labels,
+        global_variables,
         external_signatures,
         constants,
         struct_definitions,
@@ -72,6 +76,7 @@ pub(super) fn lower_expression_into(
     expression: &Expression,
     choice_labels: &LabelIndex,
     global_labels: &LabelIndex,
+    global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
     struct_definitions: &StructDefinitions,
@@ -84,6 +89,7 @@ pub(super) fn lower_expression_into(
         expression,
         choice_labels,
         global_labels,
+        global_variables,
         external_signatures,
         constants,
         struct_definitions,
@@ -98,6 +104,7 @@ fn lower_expression_into_with_constants(
     expression: &Expression,
     choice_labels: &LabelIndex,
     global_labels: &LabelIndex,
+    global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
     struct_definitions: &StructDefinitions,
@@ -119,7 +126,7 @@ fn lower_expression_into_with_constants(
                 path_mode,
                 choice_labels,
                 global_labels,
-                &HashSet::new(),
+                global_variables,
                 external_signatures,
                 constants,
                 struct_definitions,
@@ -150,6 +157,7 @@ fn lower_expression_into_with_constants(
                         constant,
                         choice_labels,
                         global_labels,
+                        global_variables,
                         external_signatures,
                         constants,
                         struct_definitions,
@@ -162,16 +170,20 @@ fn lower_expression_into_with_constants(
                 }
             }
 
-            if !lower_dotted_reference_path_into(
-                content,
-                name,
-                choice_labels,
-                global_labels,
-                path_mode,
-                has_start_content,
-            ) {
-                content.push(RuntimeObject::VariableReference(name.clone()));
+            if !name_is_visible_variable(name, global_variables, path_mode)
+                && lower_dotted_reference_path_into(
+                    content,
+                    name,
+                    choice_labels,
+                    global_labels,
+                    path_mode,
+                    has_start_content,
+                )
+            {
+                return;
             }
+
+            content.push(RuntimeObject::VariableReference(name.clone()));
         }
         Expression::FunctionCall { name, args } => {
             lower_function_call_into(
@@ -180,6 +192,7 @@ fn lower_expression_into_with_constants(
                 args,
                 choice_labels,
                 global_labels,
+                global_variables,
                 external_signatures,
                 constants,
                 struct_definitions,
@@ -195,7 +208,11 @@ fn lower_expression_into_with_constants(
         }
         Expression::FieldAccess { base, field } => {
             if let Some(path) = expression.dotted_path() {
-                if lower_dotted_reference_path_into(
+                if !dotted_path_starts_with_visible_variable(
+                    expression,
+                    global_variables,
+                    path_mode,
+                ) && lower_dotted_reference_path_into(
                     content,
                     &path,
                     choice_labels,
@@ -212,6 +229,7 @@ fn lower_expression_into_with_constants(
                 base,
                 choice_labels,
                 global_labels,
+                global_variables,
                 external_signatures,
                 constants,
                 struct_definitions,
@@ -228,6 +246,7 @@ fn lower_expression_into_with_constants(
                 base,
                 choice_labels,
                 global_labels,
+                global_variables,
                 external_signatures,
                 constants,
                 struct_definitions,
@@ -240,6 +259,7 @@ fn lower_expression_into_with_constants(
                 index,
                 choice_labels,
                 global_labels,
+                global_variables,
                 external_signatures,
                 constants,
                 struct_definitions,
@@ -259,6 +279,7 @@ fn lower_expression_into_with_constants(
                 left,
                 choice_labels,
                 global_labels,
+                global_variables,
                 external_signatures,
                 constants,
                 struct_definitions,
@@ -271,6 +292,7 @@ fn lower_expression_into_with_constants(
                 right,
                 choice_labels,
                 global_labels,
+                global_variables,
                 external_signatures,
                 constants,
                 struct_definitions,
@@ -291,6 +313,7 @@ fn lower_expression_into_with_constants(
                 expression,
                 choice_labels,
                 global_labels,
+                global_variables,
                 external_signatures,
                 constants,
                 struct_definitions,
@@ -309,6 +332,7 @@ fn lower_expression_into_with_constants(
                     expression,
                     choice_labels,
                     global_labels,
+                    global_variables,
                     external_signatures,
                     constants,
                     struct_definitions,
@@ -351,12 +375,38 @@ fn lower_dotted_reference_path_into(
     }
 }
 
+fn dotted_path_starts_with_visible_variable(
+    expression: &Expression,
+    global_variables: &HashSet<String>,
+    path_mode: &ChoicePathMode,
+) -> bool {
+    expression_root_variable_name(expression)
+        .is_some_and(|name| name_is_visible_variable(name, global_variables, path_mode))
+}
+
+fn name_is_visible_variable(
+    name: &str,
+    global_variables: &HashSet<String>,
+    path_mode: &ChoicePathMode,
+) -> bool {
+    path_mode.is_local_variable(name) || global_variables.contains(name)
+}
+
+fn expression_root_variable_name(expression: &Expression) -> Option<&str> {
+    match expression {
+        Expression::VariableReference(name) => Some(name),
+        Expression::FieldAccess { base, .. } => expression_root_variable_name(base),
+        _ => None,
+    }
+}
+
 fn lower_function_call_into(
     content: &mut Vec<RuntimeObject>,
     name: &str,
     args: &[Expression],
     choice_labels: &LabelIndex,
     global_labels: &LabelIndex,
+    global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
     struct_definitions: &StructDefinitions,
@@ -371,6 +421,7 @@ fn lower_function_call_into(
                 args,
                 choice_labels,
                 global_labels,
+                global_variables,
                 external_signatures,
                 constants,
                 struct_definitions,
@@ -388,6 +439,7 @@ fn lower_function_call_into(
                     None,
                     choice_labels,
                     global_labels,
+                    global_variables,
                     external_signatures,
                     constants,
                     struct_definitions,
@@ -406,6 +458,7 @@ fn lower_function_call_into(
                     None,
                     choice_labels,
                     global_labels,
+                    global_variables,
                     external_signatures,
                     constants,
                     struct_definitions,
@@ -424,6 +477,7 @@ fn lower_function_call_into(
                     None,
                     choice_labels,
                     global_labels,
+                    global_variables,
                     external_signatures,
                     constants,
                     struct_definitions,
@@ -442,6 +496,7 @@ fn lower_function_call_into(
                     None,
                     choice_labels,
                     global_labels,
+                    global_variables,
                     external_signatures,
                     constants,
                     struct_definitions,
@@ -460,6 +515,7 @@ fn lower_function_call_into(
                     None,
                     choice_labels,
                     global_labels,
+                    global_variables,
                     external_signatures,
                     constants,
                     struct_definitions,
@@ -482,6 +538,7 @@ fn lower_function_call_into(
                     None,
                     choice_labels,
                     global_labels,
+                    global_variables,
                     external_signatures,
                     constants,
                     struct_definitions,
@@ -511,6 +568,7 @@ fn lower_function_call_into(
                     expected_args.get(index),
                     choice_labels,
                     global_labels,
+                    global_variables,
                     external_signatures,
                     constants,
                     struct_definitions,
@@ -531,6 +589,7 @@ fn lower_function_call_into(
                     None,
                     choice_labels,
                     global_labels,
+                    global_variables,
                     external_signatures,
                     constants,
                     struct_definitions,
@@ -551,6 +610,7 @@ fn lower_array_remove_call_into(
     args: &[Expression],
     choice_labels: &LabelIndex,
     global_labels: &LabelIndex,
+    global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
     struct_definitions: &StructDefinitions,
@@ -576,6 +636,7 @@ fn lower_array_remove_call_into(
         &components,
         choice_labels,
         global_labels,
+        global_variables,
         external_signatures,
         constants,
         path_mode,
@@ -589,6 +650,7 @@ fn lower_array_remove_call_into(
             index_expression,
             choice_labels,
             global_labels,
+            global_variables,
             external_signatures,
             constants,
             struct_definitions,
@@ -608,6 +670,7 @@ fn lower_array_remove_call_into(
             },
             choice_labels,
             global_labels,
+            global_variables,
             external_signatures,
             constants,
             path_mode,
@@ -625,6 +688,7 @@ pub(super) fn lower_function_arg_into(
     expected_arg: Option<&FlowArgument>,
     choice_labels: &LabelIndex,
     global_labels: &LabelIndex,
+    global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
     struct_definitions: &StructDefinitions,
@@ -656,6 +720,7 @@ pub(super) fn lower_function_arg_into(
         arg,
         choice_labels,
         global_labels,
+        global_variables,
         external_signatures,
         constants,
         struct_definitions,

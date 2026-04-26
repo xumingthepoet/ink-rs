@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::parsed::{Expression, Flow, Object, Story, Weave};
 
@@ -10,6 +10,7 @@ pub(super) fn build_label_index(
     story: &Story,
     constants: &HashMap<String, Expression>,
     struct_definitions: &StructDefinitions,
+    global_variables: &HashSet<String>,
     estimator: &RuntimeLenEstimator,
 ) -> LabelIndex {
     let mut labels = LabelIndex::new();
@@ -19,6 +20,7 @@ pub(super) fn build_label_index(
         None,
         constants,
         struct_definitions,
+        global_variables,
         estimator,
         &mut labels,
     );
@@ -28,6 +30,7 @@ pub(super) fn build_label_index(
             None,
             constants,
             struct_definitions,
+            global_variables,
             estimator,
             &mut labels,
         );
@@ -40,6 +43,7 @@ fn collect_flow_labels(
     parent_flow_name: Option<&str>,
     constants: &HashMap<String, Expression>,
     struct_definitions: &StructDefinitions,
+    global_variables: &HashSet<String>,
     estimator: &RuntimeLenEstimator,
     labels: &mut LabelIndex,
 ) {
@@ -61,6 +65,7 @@ fn collect_flow_labels(
         Some(&flow_path),
         constants,
         struct_definitions,
+        global_variables,
         estimator,
         labels,
     );
@@ -70,6 +75,7 @@ fn collect_flow_labels(
             Some(&flow_path),
             constants,
             struct_definitions,
+            global_variables,
             estimator,
             labels,
         );
@@ -82,6 +88,7 @@ fn collect_weave_labels(
     flow_alias_prefix: Option<&str>,
     constants: &HashMap<String, Expression>,
     struct_definitions: &StructDefinitions,
+    global_variables: &HashSet<String>,
     estimator: &RuntimeLenEstimator,
     labels: &mut LabelIndex,
 ) {
@@ -105,7 +112,12 @@ fn collect_weave_labels(
                 let choice_path = format!("{current_container_path}.c-{choice_count}");
                 previous_choice_content = Some((
                     choice_path,
-                    (estimator.choice_content_len)(choice, constants, struct_definitions),
+                    (estimator.choice_content_len)(
+                        choice,
+                        constants,
+                        struct_definitions,
+                        global_variables,
+                    ),
                 ));
                 choice_count += 1;
                 last_section_had_choice = true;
@@ -142,6 +154,7 @@ fn collect_weave_labels(
                         flow_alias_prefix,
                         constants,
                         struct_definitions,
+                        global_variables,
                         estimator,
                         labels,
                     );
@@ -153,6 +166,7 @@ fn collect_weave_labels(
                         flow_alias_prefix,
                         constants,
                         struct_definitions,
+                        global_variables,
                         estimator,
                         labels,
                     );
@@ -160,7 +174,12 @@ fn collect_weave_labels(
             }
             _ => {
                 if let Some((_, next_index)) = previous_choice_content.as_mut() {
-                    *next_index += (estimator.object_len)(object, constants, struct_definitions);
+                    *next_index += (estimator.object_len)(
+                        object,
+                        constants,
+                        struct_definitions,
+                        global_variables,
+                    );
                 }
             }
         }

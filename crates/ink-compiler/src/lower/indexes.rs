@@ -23,19 +23,27 @@ pub(super) struct LoweringIndexes<'a> {
 
 pub(super) struct RuntimeLenEstimator {
     pub(super) choice_content_len:
-        fn(&Choice, &HashMap<String, Expression>, &StructDefinitions) -> usize,
-    pub(super) object_len: fn(&Object, &HashMap<String, Expression>, &StructDefinitions) -> usize,
+        fn(&Choice, &HashMap<String, Expression>, &StructDefinitions, &HashSet<String>) -> usize,
+    pub(super) object_len:
+        fn(&Object, &HashMap<String, Expression>, &StructDefinitions, &HashSet<String>) -> usize,
 }
 
 impl<'a> LoweringIndexes<'a> {
     pub(super) fn build(story: &'a Story, estimator: RuntimeLenEstimator) -> Self {
         let constants = build_constant_values(story);
         let struct_definitions = build_struct_definitions(story);
-        let global_labels = build_label_index(story, &constants, &struct_definitions, &estimator);
         let variable_declarations = collect_story_variable_declarations(story);
         let global_variables = build_global_variable_names(&variable_declarations);
+        let global_labels = build_label_index(
+            story,
+            &constants,
+            &struct_definitions,
+            &global_variables,
+            &estimator,
+        );
         let external_signatures = build_external_signatures(story);
-        let counted_flow_paths = build_counted_flow_paths(story, &global_labels, &constants);
+        let counted_flow_paths =
+            build_counted_flow_paths(story, &global_labels, &constants, &global_variables);
 
         Self {
             constants,
@@ -380,12 +388,14 @@ fn build_counted_flow_paths(
     story: &Story,
     global_labels: &LabelIndex,
     constants: &HashMap<String, Expression>,
+    global_variables: &HashSet<String>,
 ) -> CountedFlowPaths {
     let mut paths = CountedFlowPaths::default();
     collect_counted_paths_in_weave(
         story.root_weave(),
         global_labels,
         constants,
+        global_variables,
         &ChoicePathMode::Root,
         &mut paths,
     );
@@ -401,6 +411,7 @@ fn build_counted_flow_paths(
             &child_stitch_names,
             global_labels,
             constants,
+            global_variables,
             &mut paths,
         );
     }
@@ -411,11 +422,19 @@ pub(super) fn collect_counted_paths_in_weave(
     weave: &Weave,
     global_labels: &LabelIndex,
     constants: &HashMap<String, Expression>,
+    global_variables: &HashSet<String>,
     path_mode: &ChoicePathMode,
     paths: &mut CountedFlowPaths,
 ) {
     for object in weave.content() {
-        collect_counted_paths_in_object(object, global_labels, constants, path_mode, paths);
+        collect_counted_paths_in_object(
+            object,
+            global_labels,
+            constants,
+            global_variables,
+            path_mode,
+            paths,
+        );
     }
 }
 
@@ -425,6 +444,7 @@ fn collect_counted_paths_in_flow(
     sibling_stitch_names: &[String],
     global_labels: &LabelIndex,
     constants: &HashMap<String, Expression>,
+    global_variables: &HashSet<String>,
     paths: &mut CountedFlowPaths,
 ) {
     let flow_path = parent_flow_name
@@ -444,7 +464,14 @@ fn collect_counted_paths_in_flow(
         self_target_relative: false,
         fallback_gather_target: None,
     };
-    collect_counted_paths_in_weave(flow.weave(), global_labels, constants, &path_mode, paths);
+    collect_counted_paths_in_weave(
+        flow.weave(),
+        global_labels,
+        constants,
+        global_variables,
+        &path_mode,
+        paths,
+    );
 
     let child_stitch_names = flow
         .child_flows()
@@ -458,6 +485,7 @@ fn collect_counted_paths_in_flow(
             &child_stitch_names,
             global_labels,
             constants,
+            global_variables,
             paths,
         );
     }
@@ -467,11 +495,19 @@ fn collect_counted_paths_in_content_list(
     content_list: &ContentList,
     global_labels: &LabelIndex,
     constants: &HashMap<String, Expression>,
+    global_variables: &HashSet<String>,
     path_mode: &ChoicePathMode,
     paths: &mut CountedFlowPaths,
 ) {
     for object in content_list.objects() {
-        collect_counted_paths_in_object(object, global_labels, constants, path_mode, paths);
+        collect_counted_paths_in_object(
+            object,
+            global_labels,
+            constants,
+            global_variables,
+            path_mode,
+            paths,
+        );
     }
 }
 
@@ -479,6 +515,7 @@ fn collect_counted_paths_in_object(
     object: &Object,
     global_labels: &LabelIndex,
     constants: &HashMap<String, Expression>,
+    global_variables: &HashSet<String>,
     path_mode: &ChoicePathMode,
     paths: &mut CountedFlowPaths,
 ) {
@@ -488,6 +525,7 @@ fn collect_counted_paths_in_object(
                 content_list,
                 global_labels,
                 constants,
+                global_variables,
                 path_mode,
                 paths,
             );
@@ -497,6 +535,7 @@ fn collect_counted_paths_in_object(
                 expression,
                 global_labels,
                 constants,
+                global_variables,
                 path_mode,
                 paths,
             );
@@ -507,6 +546,7 @@ fn collect_counted_paths_in_object(
                     condition,
                     global_labels,
                     constants,
+                    global_variables,
                     path_mode,
                     paths,
                 );
@@ -517,6 +557,7 @@ fn collect_counted_paths_in_object(
                         condition,
                         global_labels,
                         constants,
+                        global_variables,
                         path_mode,
                         paths,
                     );
@@ -525,6 +566,7 @@ fn collect_counted_paths_in_object(
                     branch.content(),
                     global_labels,
                     constants,
+                    global_variables,
                     path_mode,
                     paths,
                 );
@@ -536,6 +578,7 @@ fn collect_counted_paths_in_object(
                     condition,
                     global_labels,
                     constants,
+                    global_variables,
                     path_mode,
                     paths,
                 );
@@ -545,6 +588,7 @@ fn collect_counted_paths_in_object(
                     content,
                     global_labels,
                     constants,
+                    global_variables,
                     path_mode,
                     paths,
                 );
@@ -554,6 +598,7 @@ fn collect_counted_paths_in_object(
                     content,
                     global_labels,
                     constants,
+                    global_variables,
                     path_mode,
                     paths,
                 );
@@ -562,6 +607,7 @@ fn collect_counted_paths_in_object(
                 choice.inner_content(),
                 global_labels,
                 constants,
+                global_variables,
                 path_mode,
                 paths,
             );
@@ -572,6 +618,7 @@ fn collect_counted_paths_in_object(
                     argument,
                     global_labels,
                     constants,
+                    global_variables,
                     path_mode,
                     paths,
                 );
@@ -583,6 +630,7 @@ fn collect_counted_paths_in_object(
                     element,
                     global_labels,
                     constants,
+                    global_variables,
                     path_mode,
                     paths,
                 );
@@ -605,6 +653,7 @@ fn collect_counted_paths_in_object(
                         expression,
                         global_labels,
                         constants,
+                        global_variables,
                         path_mode,
                         paths,
                     ),
@@ -617,14 +666,20 @@ fn collect_counted_paths_in_object(
                     expr,
                     global_labels,
                     constants,
+                    global_variables,
                     path_mode,
                     paths,
                 );
             }
         }
-        Object::Weave(weave) => {
-            collect_counted_paths_in_weave(weave, global_labels, constants, path_mode, paths)
-        }
+        Object::Weave(weave) => collect_counted_paths_in_weave(
+            weave,
+            global_labels,
+            constants,
+            global_variables,
+            path_mode,
+            paths,
+        ),
         Object::AuthorWarning(_)
         | Object::Text(_)
         | Object::ConstantDeclaration(_)
@@ -642,6 +697,7 @@ fn collect_counted_paths_in_expression(
     expression: &Expression,
     global_labels: &LabelIndex,
     constants: &HashMap<String, Expression>,
+    global_variables: &HashSet<String>,
     path_mode: &ChoicePathMode,
     paths: &mut CountedFlowPaths,
 ) {
@@ -652,15 +708,18 @@ fn collect_counted_paths_in_expression(
                     constant,
                     global_labels,
                     constants,
+                    global_variables,
                     path_mode,
                     paths,
                 );
-            } else if let Some(target) = path_mode.scoped_label_target(name, global_labels) {
-                paths.visits.insert(target.to_string());
-            } else if path_mode.is_flow_sibling_stitch(name) {
-                paths
-                    .visits
-                    .insert(path_mode.resolve_single_stitch_target(name));
+            } else if !name_is_visible_variable(name, global_variables, path_mode) {
+                if let Some(target) = path_mode.scoped_label_target(name, global_labels) {
+                    paths.visits.insert(target.to_string());
+                } else if path_mode.is_flow_sibling_stitch(name) {
+                    paths
+                        .visits
+                        .insert(path_mode.resolve_single_stitch_target(name));
+                }
             }
         }
         Expression::StringContent(content) => {
@@ -668,6 +727,7 @@ fn collect_counted_paths_in_expression(
                 content,
                 global_labels,
                 constants,
+                global_variables,
                 path_mode,
                 paths,
             );
@@ -701,6 +761,7 @@ fn collect_counted_paths_in_expression(
                         arg,
                         global_labels,
                         constants,
+                        global_variables,
                         path_mode,
                         paths,
                     ),
@@ -713,6 +774,7 @@ fn collect_counted_paths_in_expression(
                     element,
                     global_labels,
                     constants,
+                    global_variables,
                     path_mode,
                     paths,
                 );
@@ -724,6 +786,7 @@ fn collect_counted_paths_in_expression(
                     field.expression(),
                     global_labels,
                     constants,
+                    global_variables,
                     path_mode,
                     paths,
                 );
@@ -731,18 +794,38 @@ fn collect_counted_paths_in_expression(
         }
         Expression::FieldAccess { .. } => {
             if let Some(path) = expression.dotted_path() {
-                if let Some(target) = path_mode.scoped_label_target(&path, global_labels) {
-                    paths.visits.insert(target.to_string());
-                } else if path_mode.is_flow_sibling_stitch(&path) {
-                    paths
-                        .visits
-                        .insert(path_mode.resolve_single_stitch_target(&path));
+                if !dotted_path_starts_with_visible_variable(
+                    expression,
+                    global_variables,
+                    path_mode,
+                ) {
+                    if let Some(target) = path_mode.scoped_label_target(&path, global_labels) {
+                        paths.visits.insert(target.to_string());
+                    } else if path_mode.is_flow_sibling_stitch(&path) {
+                        paths
+                            .visits
+                            .insert(path_mode.resolve_single_stitch_target(&path));
+                    }
                 }
             }
         }
         Expression::IndexAccess { base, index } => {
-            collect_counted_paths_in_expression(base, global_labels, constants, path_mode, paths);
-            collect_counted_paths_in_expression(index, global_labels, constants, path_mode, paths);
+            collect_counted_paths_in_expression(
+                base,
+                global_labels,
+                constants,
+                global_variables,
+                path_mode,
+                paths,
+            );
+            collect_counted_paths_in_expression(
+                index,
+                global_labels,
+                constants,
+                global_variables,
+                path_mode,
+                paths,
+            );
         }
         Expression::MultipleCondition(args) => {
             for arg in args {
@@ -750,20 +833,36 @@ fn collect_counted_paths_in_expression(
                     arg,
                     global_labels,
                     constants,
+                    global_variables,
                     path_mode,
                     paths,
                 );
             }
         }
         Expression::Binary { left, right, .. } => {
-            collect_counted_paths_in_expression(left, global_labels, constants, path_mode, paths);
-            collect_counted_paths_in_expression(right, global_labels, constants, path_mode, paths);
+            collect_counted_paths_in_expression(
+                left,
+                global_labels,
+                constants,
+                global_variables,
+                path_mode,
+                paths,
+            );
+            collect_counted_paths_in_expression(
+                right,
+                global_labels,
+                constants,
+                global_variables,
+                path_mode,
+                paths,
+            );
         }
         Expression::Unary { expression, .. } => {
             collect_counted_paths_in_expression(
                 expression,
                 global_labels,
                 constants,
+                global_variables,
                 path_mode,
                 paths,
             );
@@ -775,6 +874,31 @@ fn collect_counted_paths_in_expression(
         | Expression::NumberInt(_)
         | Expression::NumberFloat(_)
         | Expression::NumberBool(_) => {}
+    }
+}
+
+fn dotted_path_starts_with_visible_variable(
+    expression: &Expression,
+    global_variables: &HashSet<String>,
+    path_mode: &ChoicePathMode,
+) -> bool {
+    expression_root_variable_name(expression)
+        .is_some_and(|name| name_is_visible_variable(name, global_variables, path_mode))
+}
+
+fn name_is_visible_variable(
+    name: &str,
+    global_variables: &HashSet<String>,
+    path_mode: &ChoicePathMode,
+) -> bool {
+    path_mode.is_local_variable(name) || global_variables.contains(name)
+}
+
+fn expression_root_variable_name(expression: &Expression) -> Option<&str> {
+    match expression {
+        Expression::VariableReference(name) => Some(name),
+        Expression::FieldAccess { base, .. } => expression_root_variable_name(base),
+        _ => None,
     }
 }
 

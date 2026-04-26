@@ -64,6 +64,11 @@ pub(crate) fn container_from_value(
 
     match terminator {
         JsonValue::Null => {}
+        JsonValue::Object(obj) if obj.is_empty() => {
+            return Err(FormatError::new(
+                "container terminator object must contain metadata or named content",
+            ));
+        }
         JsonValue::Object(obj) => {
             for (key, value) in obj {
                 match key.as_str() {
@@ -577,6 +582,19 @@ mod tests {
         assert_eq!(
             parsed,
             Object::ValueArray(vec![Object::ValueObject(fields)])
+        );
+    }
+
+    #[test]
+    fn parses_arrays_of_empty_objects_as_dynamic_values() {
+        let parsed = Object::from_json_value(json!([{}, {}])).unwrap();
+
+        assert_eq!(
+            parsed,
+            Object::ValueArray(vec![
+                Object::ValueObject(BTreeMap::new()),
+                Object::ValueObject(BTreeMap::new())
+            ])
         );
     }
 }
