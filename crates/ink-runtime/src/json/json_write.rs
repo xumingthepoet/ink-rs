@@ -256,25 +256,3 @@ fn write_choice_tags(choice: &Choice) -> serde_json::Value {
 
     serde_json::Value::Array(tags)
 }
-
-pub(crate) fn write_list_rt_objs(
-    objs: &[Rc<dyn RTObject>],
-) -> Result<serde_json::Value, StoryError> {
-    let mut c_array: Vec<serde_json::Value> = Vec::new();
-
-    for o in objs {
-        c_array.push(write_rtobject(o.clone())?);
-    }
-
-    Ok(serde_json::Value::Array(c_array))
-}
-
-pub(crate) fn write_int_dictionary(map: &HashMap<String, i32>) -> serde_json::Value {
-    let mut jobj: Map<String, serde_json::Value> = Map::new();
-
-    for (key, val) in map {
-        jobj.insert(key.clone(), json!(*val));
-    }
-
-    serde_json::Value::Object(jobj)
-}

@@ -340,18 +340,6 @@ pub(crate) fn jobject_to_hashmap_values(
     Ok(dict)
 }
 
-pub(crate) fn jobject_to_int_hashmap(
-    jobj: &Map<String, serde_json::Value>,
-) -> Result<HashMap<String, i32>, StoryError> {
-    let mut dict: HashMap<String, i32> = HashMap::new();
-
-    for (k, v) in jobj.iter() {
-        dict.insert(k.clone(), v.as_i64().unwrap() as i32);
-    }
-
-    Ok(dict)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

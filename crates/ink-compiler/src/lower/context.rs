@@ -320,14 +320,6 @@ impl ChoicePathMode {
         self.runtime_index_path(choice_point_index)
     }
 
-    pub(super) fn choice_content_return_target(&self, choice_container_name: &str) -> String {
-        self.absolute_child_path(choice_container_name)
-    }
-
-    pub(super) fn start_content_target(&self, choice_point_index: usize) -> String {
-        format!("{}.s", self.runtime_index_path(choice_point_index))
-    }
-
     pub(super) fn gather_target(
         &self,
         gather_container_name: &str,
@@ -412,16 +404,6 @@ impl ChoicePathMode {
             ),
             _ => None,
         }
-    }
-
-    pub(super) fn is_flow_sibling_stitch(&self, name: &str) -> bool {
-        matches!(
-            self,
-            ChoicePathMode::Flow {
-                sibling_stitch_names,
-                ..
-            } if sibling_stitch_names.iter().any(|s| s == name)
-        )
     }
 
     /// Resolve a single stitch name to a relative path if applicable.

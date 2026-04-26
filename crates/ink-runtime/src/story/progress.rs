@@ -687,17 +687,7 @@ impl Story {
     }
 
     pub(crate) fn visit_container(&mut self, container: &Rc<Container>, at_start: bool) {
-        if !container.counting_at_start_only || at_start {
-            if container.visits_should_be_counted {
-                self.get_state_mut()
-                    .increment_visit_count_for_container(container);
-            }
-
-            if container.turn_index_should_be_counted {
-                self.get_state_mut()
-                    .record_turn_index_visit_to_container(container);
-            }
-        }
+        let _ = (container, at_start);
     }
 
     /// The vector of [`Choice`](crate::choice::Choice) objects available at

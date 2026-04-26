@@ -1,4 +1,4 @@
-use crate::conformance::api::{story::Story, story_error::StoryError};
+use crate::conformance::api::{Story, StoryError};
 use std::env;
 
 use crate::conformance::common;

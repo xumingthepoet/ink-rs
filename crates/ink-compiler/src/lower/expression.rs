@@ -167,19 +167,6 @@ fn lower_expression_into_with_constants(
                 }
             }
 
-            if !name_is_visible_variable(name, global_variables, path_mode)
-                && lower_dotted_reference_path_into(
-                    content,
-                    name,
-                    choice_labels,
-                    global_labels,
-                    path_mode,
-                    has_start_content,
-                )
-            {
-                return;
-            }
-
             content.push(RuntimeObject::VariableReference(name.clone()));
         }
         Expression::FunctionCall { name, args } => {
@@ -211,23 +198,6 @@ fn lower_expression_into_with_constants(
             }
         }
         Expression::FieldAccess { base, field } => {
-            if let Some(path) = expression.dotted_path() {
-                if !dotted_path_starts_with_visible_variable(
-                    expression,
-                    global_variables,
-                    path_mode,
-                ) && lower_dotted_reference_path_into(
-                    content,
-                    &path,
-                    choice_labels,
-                    global_labels,
-                    path_mode,
-                    has_start_content,
-                ) {
-                    return;
-                }
-            }
-
             lower_expression_into_with_constants(
                 content,
                 base,
@@ -392,58 +362,6 @@ fn lower_constant_expression_into(
     );
 }
 
-fn lower_dotted_reference_path_into(
-    content: &mut Vec<RuntimeObject>,
-    name: &str,
-    choice_labels: &LabelIndex,
-    global_labels: &LabelIndex,
-    path_mode: &ChoicePathMode,
-    has_start_content: bool,
-) -> bool {
-    if let Some(choice_target) = choice_labels.get(name) {
-        let _ = has_start_content;
-        content.push(RuntimeObject::ReadCount(choice_target.to_string()));
-        true
-    } else if let Some(label_target) = path_mode.scoped_label_target(name, global_labels) {
-        content.push(RuntimeObject::ReadCount(
-            path_mode.resolve_label_target(label_target),
-        ));
-        true
-    } else if path_mode.is_flow_sibling_stitch(name) {
-        content.push(RuntimeObject::ReadCount(
-            path_mode.resolve_single_stitch_target(name),
-        ));
-        true
-    } else {
-        false
-    }
-}
-
-fn dotted_path_starts_with_visible_variable(
-    expression: &Expression,
-    global_variables: &HashSet<String>,
-    path_mode: &ChoicePathMode,
-) -> bool {
-    expression_root_variable_name(expression)
-        .is_some_and(|name| name_is_visible_variable(name, global_variables, path_mode))
-}
-
-fn name_is_visible_variable(
-    name: &str,
-    global_variables: &HashSet<String>,
-    path_mode: &ChoicePathMode,
-) -> bool {
-    path_mode.is_local_variable(name) || global_variables.contains(name)
-}
-
-fn expression_root_variable_name(expression: &Expression) -> Option<&str> {
-    match expression {
-        Expression::VariableReference(name) => Some(name),
-        Expression::FieldAccess { base, .. } => expression_root_variable_name(base),
-        _ => None,
-    }
-}
-
 fn lower_function_call_into(
     content: &mut Vec<RuntimeObject>,
     name: &str,
@@ -472,46 +390,6 @@ fn lower_function_call_into(
                 path_mode,
                 visiting_constants,
             );
-        }
-        "CHOICE_COUNT" => content.push(RuntimeObject::ControlCommand(ControlCommand::ChoiceCount)),
-        "TURNS" => content.push(RuntimeObject::ControlCommand(ControlCommand::Turns)),
-        "TURNS_SINCE" => {
-            if let Some(arg) = args.first() {
-                lower_function_arg_into(
-                    content,
-                    arg,
-                    None,
-                    choice_labels,
-                    global_labels,
-                    global_variables,
-                    external_signatures,
-                    constants,
-                    struct_definitions,
-                    path_mode,
-                    has_start_content,
-                    visiting_constants,
-                );
-            }
-            content.push(RuntimeObject::ControlCommand(ControlCommand::TurnsSince));
-        }
-        "READ_COUNT" => {
-            if let Some(arg) = args.first() {
-                lower_function_arg_into(
-                    content,
-                    arg,
-                    None,
-                    choice_labels,
-                    global_labels,
-                    global_variables,
-                    external_signatures,
-                    constants,
-                    struct_definitions,
-                    path_mode,
-                    has_start_content,
-                    visiting_constants,
-                );
-            }
-            content.push(RuntimeObject::ControlCommand(ControlCommand::ReadCount));
         }
         "RANDOM" => {
             for arg in args {

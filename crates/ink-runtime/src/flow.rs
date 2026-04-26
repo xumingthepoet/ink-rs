@@ -37,14 +37,7 @@ impl Flow {
         let mut flow = Self {
             name: name.to_string(),
             callstack: Rc::new(RefCell::new(CallStack::new(main_content_container.clone()))),
-            output_stream: json_read::jarray_to_runtime_obj_list(
-                j_obj
-                    .get("outputStream")
-                    .ok_or(StoryError::BadJson("outputStream not found.".to_owned()))?
-                    .as_array()
-                    .unwrap(),
-                false,
-            )?,
+            output_stream: Vec::new(),
             current_choices: json_read::jarray_to_runtime_obj_list(
                 j_obj
                     .get("currentChoices")
@@ -79,10 +72,6 @@ impl Flow {
         flow.insert(
             "callstack".to_owned(),
             self.callstack.borrow().write_json()?,
-        );
-        flow.insert(
-            "outputStream".to_owned(),
-            json_write::write_list_rt_objs(&self.output_stream)?,
         );
 
         // choiceThreads: optional

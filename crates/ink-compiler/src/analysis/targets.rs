@@ -11,36 +11,25 @@ use crate::{
 };
 
 use super::{
-    context::{
-        FlowContext, FlowSymbol, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex,
-        VariableTargetIndex,
-    },
+    context::{FlowContext, FlowSymbol, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
     expression_types::{infer_expression_type, typed_builtin_return_type},
     span::object_span,
     structs::build_struct_type_index,
     target_symbols::{build_target_symbol_index, resolve_target_symbol},
-    variable_targets::build_variable_target_index,
     variables::build_variable_scope_index,
 };
 
 pub(super) fn call_target_diagnostics(story: &Story) -> Vec<Diagnostic> {
     let target_symbols = build_target_symbol_index(story);
-    let variable_targets = build_variable_target_index(story);
     let variable_scopes = build_variable_scope_index(story);
     let struct_types = build_struct_type_index(story);
-    let mut checker = CallTargetChecker::new(
-        &target_symbols,
-        &variable_targets,
-        &variable_scopes,
-        &struct_types,
-    );
+    let mut checker = CallTargetChecker::new(&target_symbols, &variable_scopes, &struct_types);
     walk_story(story, &mut checker);
     checker.diagnostics
 }
 
 struct CallTargetChecker<'a> {
     target_symbols: &'a TargetSymbolIndex,
-    variable_targets: &'a VariableTargetIndex,
     variable_scopes: &'a VariableScopeIndex,
     struct_types: &'a StructTypeIndex,
     diagnostics: Vec<Diagnostic>,
@@ -50,13 +39,11 @@ struct CallTargetChecker<'a> {
 impl<'a> CallTargetChecker<'a> {
     fn new(
         target_symbols: &'a TargetSymbolIndex,
-        variable_targets: &'a VariableTargetIndex,
         variable_scopes: &'a VariableScopeIndex,
         struct_types: &'a StructTypeIndex,
     ) -> Self {
         Self {
             target_symbols,
-            variable_targets,
             variable_scopes,
             struct_types,
             diagnostics: Vec::new(),
@@ -94,30 +81,13 @@ impl<'a> CallTargetChecker<'a> {
         let DivertTarget::Path(target) = divert.target() else {
             return;
         };
-        if let Some(expression) = self.dynamic_divert_target_expression(divert, context) {
-            self.check_expression(&expression, divert.span(), context);
+
+        if self.check_plain_divert_target_expression(divert, context) {
             return;
         }
 
         let span = divert.span();
         let current_flow_path = self.current_flow_path(context);
-        if is_simple_target_name(target) {
-            if let Some(Some(declared_type)) = self
-                .variable_scopes
-                .visible_variable_declared_type(target, current_flow_path)
-            {
-                if declared_type != &TypeName::divert_target() {
-                    self.diagnostics.push(Diagnostic::error(
-                        span.clone(),
-                        format!(
-                            "Variable '{target}' has type {} but cannot be used as a divert target",
-                            declared_type.display_name()
-                        ),
-                    ));
-                    return;
-                }
-            }
-        }
         if let Some(symbol) = resolve_target_symbol(target, current_flow_path, self.target_symbols)
         {
             if symbol.is_function() {
@@ -140,7 +110,7 @@ impl<'a> CallTargetChecker<'a> {
                     ),
                 ));
             }
-        } else if !self.variable_targets.contains(target) {
+        } else {
             self.diagnostics.push(Diagnostic::error(
                 span.clone(),
                 format!("target not found: '{target}'"),
@@ -148,13 +118,13 @@ impl<'a> CallTargetChecker<'a> {
         }
     }
 
-    fn dynamic_divert_target_expression(
-        &self,
+    fn check_plain_divert_target_expression(
+        &mut self,
         divert: &crate::parsed::Divert,
         context: &VisitContext,
-    ) -> Option<Expression> {
+    ) -> bool {
         let DivertTarget::Path(target) = divert.target() else {
-            return None;
+            return false;
         };
         let current_flow_path = self.current_flow_path(context);
 
@@ -163,30 +133,72 @@ impl<'a> CallTargetChecker<'a> {
                 |symbol| symbol.is_function() && symbol.return_type() == &TypeName::divert_target(),
             )
         {
-            return Some(Expression::FunctionCall {
-                name: target.clone(),
-                args: divert.arguments().to_vec(),
-            });
+            let args = divert
+                .arguments()
+                .iter()
+                .map(Expression::to_source_string)
+                .collect::<Vec<_>>()
+                .join(", ");
+            self.diagnostics.push(Diagnostic::error(
+                divert.span().clone(),
+                format!(
+                    "Static divert targets must be knot or stitch paths. Use `-> {{{target}({args})}}` for a divert-target expression."
+                ),
+            ));
+            return true;
         }
 
-        let expression = parse_initial_expression(target)?;
-        if !expression_starts_with_visible_variable(
-            &expression,
-            self.variable_scopes,
-            current_flow_path,
-        ) {
-            return None;
+        let Some(expression) = parse_initial_expression(target) else {
+            return false;
+        };
+
+        if let Some(root) = expression_root_variable_name(&expression) {
+            if self
+                .variable_scopes
+                .contains_visible_variable(root, current_flow_path)
+            {
+                self.diagnostics.push(Diagnostic::error(
+                    divert.span().clone(),
+                    format!(
+                        "Static divert targets must be knot or stitch paths. Use `-> {{{target}}}` for a divert-target expression."
+                    ),
+                ));
+                return true;
+            }
         }
 
+        false
+    }
+
+    fn check_dynamic_divert_target(
+        &mut self,
+        expression: &Expression,
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) {
+        self.check_expression(expression, span, context);
         match infer_expression_type(
-            &expression,
+            expression,
             self.variable_scopes,
             self.struct_types,
             self.target_symbols,
-            current_flow_path,
+            self.current_flow_path(context),
         ) {
-            Ok(actual_type) if actual_type == TypeName::divert_target() => Some(expression),
-            _ => None,
+            Ok(actual_type) if actual_type == TypeName::divert_target() => {}
+            Ok(actual_type) => self.diagnostics.push(Diagnostic::error(
+                span.clone(),
+                format!(
+                    "Dynamic divert target has type {} but expected ->",
+                    actual_type.display_name()
+                ),
+            )),
+            Err(error) => self.diagnostics.push(Diagnostic::error(
+                span.clone(),
+                format!(
+                    "Cannot type-check dynamic divert target: {}",
+                    error.message()
+                ),
+            )),
         }
     }
 
@@ -258,6 +270,13 @@ impl<'a> CallTargetChecker<'a> {
             return;
         }
 
+        if is_runtime_builtin_function(name) {
+            for arg in args {
+                self.check_expression(arg, span, context);
+            }
+            return;
+        }
+
         let symbol =
             resolve_target_symbol(name, self.current_flow_path(context), self.target_symbols)
                 .cloned();
@@ -273,6 +292,11 @@ impl<'a> CallTargetChecker<'a> {
             } else {
                 self.check_function_call_signature(name, args, &symbol, span, context);
             }
+        } else {
+            self.diagnostics.push(Diagnostic::error(
+                span.clone(),
+                format!("Function '{name}' is not declared"),
+            ));
         }
 
         for arg in args {
@@ -290,52 +314,7 @@ impl<'a> CallTargetChecker<'a> {
         match name {
             "ARRAY_REMOVE" => self.check_array_remove_call(args, span, context),
             "LEN" => self.check_len_call(args, span, context),
-            "READ_COUNT" | "TURNS_SINCE" => {
-                self.check_count_builtin_call(name, args, span, context)
-            }
             _ => {}
-        }
-    }
-
-    fn check_count_builtin_call(
-        &mut self,
-        name: &str,
-        args: &[Expression],
-        span: &SourceSpan,
-        context: &VisitContext,
-    ) {
-        if args.len() != 1 {
-            self.diagnostics.push(Diagnostic::error(
-                span.clone(),
-                format!("Builtin '{name}' expects 1 argument but got {}", args.len()),
-            ));
-            return;
-        }
-
-        match infer_expression_type(
-            &args[0],
-            self.variable_scopes,
-            self.struct_types,
-            self.target_symbols,
-            self.current_flow_path(context),
-        ) {
-            Ok(actual_type) if actual_type != TypeName::divert_target() => {
-                self.diagnostics.push(Diagnostic::error(
-                    span.clone(),
-                    format!(
-                        "Builtin '{name}' argument has type {} but expected ->",
-                        actual_type.display_name()
-                    ),
-                ));
-            }
-            Ok(_) => {}
-            Err(error) => self.diagnostics.push(Diagnostic::error(
-                span.clone(),
-                format!(
-                    "Cannot type-check argument for builtin '{name}': {}",
-                    error.message()
-                ),
-            )),
         }
     }
 
@@ -510,9 +489,7 @@ impl<'a> CallTargetChecker<'a> {
 
     fn check_variable_reference(&mut self, name: &str, span: &SourceSpan, context: &VisitContext) {
         let current_flow_path = self.current_flow_path(context);
-        if name.contains('.')
-            || resolve_target_symbol(name, current_flow_path, self.target_symbols).is_some()
-        {
+        if name.contains('.') {
             return;
         }
 
@@ -560,27 +537,21 @@ fn is_mutable_lvalue(expression: &Expression) -> bool {
     }
 }
 
-fn expression_starts_with_visible_variable(
-    expression: &Expression,
-    variable_scopes: &VariableScopeIndex,
-    current_flow_path: Option<&str>,
-) -> bool {
-    match expression {
-        Expression::VariableReference(name) => {
-            variable_scopes.contains_visible_variable(name, current_flow_path)
-        }
-        Expression::FieldAccess { base, .. } | Expression::IndexAccess { base, .. } => {
-            expression_starts_with_visible_variable(base, variable_scopes, current_flow_path)
-        }
-        _ => false,
-    }
+fn is_runtime_builtin_function(name: &str) -> bool {
+    matches!(
+        name,
+        "RANDOM" | "SEED_RANDOM" | "MIN" | "MAX" | "POW" | "FLOOR" | "CEILING" | "INT" | "FLOAT"
+    )
 }
 
-fn is_simple_target_name(target: &str) -> bool {
-    matches!(
-        parse_initial_expression(target),
-        Some(Expression::VariableReference(name)) if name == target
-    )
+fn expression_root_variable_name(expression: &Expression) -> Option<&str> {
+    match expression {
+        Expression::VariableReference(name) => Some(name),
+        Expression::FieldAccess { base, .. } | Expression::IndexAccess { base, .. } => {
+            expression_root_variable_name(base)
+        }
+        _ => None,
+    }
 }
 
 impl ParsedVisitor for CallTargetChecker<'_> {
@@ -601,6 +572,9 @@ impl ParsedVisitor for CallTargetChecker<'_> {
                         divert.span().clone(),
                         "Empty diverts (->) are only valid on choices",
                     )),
+                    DivertTarget::Dynamic(expression) => {
+                        self.check_dynamic_divert_target(expression, divert.span(), context);
+                    }
                     DivertTarget::Path(_) if !self.current_flow_is_function(context) => {
                         self.check_plain_divert_target(divert, context);
                     }
@@ -648,6 +622,9 @@ impl ParsedVisitor for CallTargetChecker<'_> {
             Object::TunnelOnwards(tunnel_onwards) => {
                 for argument in tunnel_onwards.arguments() {
                     self.check_expression(argument, tunnel_onwards.span(), context);
+                }
+                if let Some(DivertTarget::Dynamic(expression)) = tunnel_onwards.override_target() {
+                    self.check_dynamic_divert_target(expression, tunnel_onwards.span(), context);
                 }
             }
             Object::AuthorWarning(_)
@@ -822,67 +799,6 @@ mod tests {
         );
 
         assert_eq!(super::super::run_analysis_passes(&story), []);
-    }
-
-    #[test]
-    fn accepts_count_builtins_as_int_expressions() {
-        let story = parse_story(
-            "VAR target: -> = -> knot\n\
-             VAR visits: int = READ_COUNT(target)\n\
-             VAR turns: int = TURNS_SINCE(-> knot)\n\
-             VAR picked_visits: int = READ_COUNT(pick())\n\
-             VAR param_turns: int = since(target)\n\
-             -> DONE\n\
-             == function pick() => -> ==\n\
-             ~ return target\n\
-             == function since(x: ->) => int ==\n\
-             ~ return TURNS_SINCE(x)\n\
-             == knot ==\n\
-             -> DONE",
-        );
-
-        assert_eq!(super::super::run_analysis_passes(&story), []);
-    }
-
-    #[test]
-    fn reports_count_builtin_argument_count_mismatch() {
-        let story = parse_story(
-            "VAR visits: int = READ_COUNT()\n\
-             -> DONE",
-        );
-
-        let diagnostics = call_target_diagnostics(&story);
-
-        assert_single_diagnostic(
-            &diagnostics,
-            DiagnosticSeverity::Error,
-            "Builtin 'READ_COUNT' expects 1 argument but got 0",
-        );
-    }
-
-    #[test]
-    fn reports_count_builtin_non_target_arguments() {
-        let cases = [
-            (
-                "VAR value: int = 1\n\
-                 VAR visits: int = READ_COUNT(value)\n\
-                 -> DONE",
-                "Builtin 'READ_COUNT' argument has type int but expected ->",
-            ),
-            (
-                "VAR label: string = \"knot\"\n\
-                 VAR turns: int = TURNS_SINCE(label)\n\
-                 -> DONE",
-                "Builtin 'TURNS_SINCE' argument has type string but expected ->",
-            ),
-        ];
-
-        for (source, expected_message) in cases {
-            let story = parse_story(source);
-            let diagnostics = call_target_diagnostics(&story);
-
-            assert_single_diagnostic(&diagnostics, DiagnosticSeverity::Error, expected_message);
-        }
     }
 
     #[test]

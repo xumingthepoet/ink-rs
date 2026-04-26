@@ -4,10 +4,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use crate::conformance::api::{
-    story::{external_functions::ExternalFunction, variable_observer::VariableObserver, Story},
-    value_type::ValueType,
-};
+use crate::conformance::api::{ExternalFunction, Story, ValueType, VariableObserver};
 
 use crate::conformance::common;
 
@@ -264,19 +261,6 @@ fn jump_stitch_test() -> Result<(), Box<dyn Error>> {
     story.choose_path_string("two.stwo", true, None);
     common::next_all(&mut story, &mut text);
     assert_eq!("Two.2", text.get(0).unwrap());
-
-    Ok(())
-}
-
-#[test]
-fn read_visit_counts_test() -> Result<(), Box<dyn Error>> {
-    let json_string = common::get_json_string("inkfiles/runtime/read-visit-counts.ink.json");
-    let mut story = Story::new(&json_string);
-    let mut text: Vec<String> = Vec::new();
-
-    common::next_all(&mut story, &mut text);
-    assert_eq!(4, story.get_visit_count_at_path_string("two.s2")?);
-    assert_eq!(5, story.get_visit_count_at_path_string("two")?);
 
     Ok(())
 }

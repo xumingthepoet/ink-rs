@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std::fs;
 
 use crate::conformance::api::Story;
@@ -79,9 +77,4 @@ pub fn run_story(
 pub fn get_json_string(filename: &str) -> String {
     let path = ink_test::fixture_root().join("conformance").join(filename);
     fs::read_to_string(path).expect("fixture json must exist")
-}
-
-pub fn is_ended(story: &Story) -> bool {
-    let story = story.clone();
-    !story.can_continue() && story.get_current_choices().is_empty()
 }

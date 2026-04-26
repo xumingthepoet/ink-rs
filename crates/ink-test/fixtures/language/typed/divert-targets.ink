@@ -8,22 +8,22 @@ next: ->
 
 VAR route: Route = { next: -> struct_target }
 
--> next
+-> {next}
 
 == here
 Here.
--> pick_struct()
+-> {pick_struct()}
 
 == function pick_struct() => -> ==
 ~ return route.next
 
 == struct_target
 Struct.
--> targets[0]
+-> {targets[0]}
 
 == array_target
 Array.
--> pick_fallback()
+-> {pick_fallback()}
 
 == function pick_fallback() => -> ==
 ~ return fallback

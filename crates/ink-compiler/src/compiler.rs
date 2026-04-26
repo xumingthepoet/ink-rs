@@ -177,8 +177,6 @@ mod tests {
 
     use serde_json::json;
 
-    use crate::diagnostic::DiagnosticCode;
-
     use super::*;
 
     struct MemoryFileHandler {
@@ -227,11 +225,15 @@ mod tests {
     }
 
     #[test]
-    fn unsupported_syntax_blocks_compile() {
+    fn current_syntax_errors_block_compile() {
         let compiler = Compiler::default();
-        let output = compiler.compile(SourceInput::new("LIST list = a"));
+        let output = compiler.compile(SourceInput::new("VAR score = 1"));
         assert!(output.artifact.is_none());
         assert_eq!(output.diagnostics.len(), 1);
+        assert_eq!(
+            output.diagnostics[0].message,
+            "Variable 'score' is missing a type"
+        );
     }
 
     #[test]
@@ -239,7 +241,7 @@ mod tests {
         let compiler = Compiler::with_options(CompilerOptions {
             file_handler: Some(Arc::new(MemoryFileHandler::new(&[(
                 "inc.ink",
-                "LIST list = ()",
+                "VAR score = 1",
             )]))),
             ..Default::default()
         });
@@ -249,13 +251,10 @@ mod tests {
         assert_eq!(output.diagnostics.len(), 1);
         let diagnostic = &output.diagnostics[0];
         assert_eq!(diagnostic.severity, DiagnosticSeverity::Error);
-        assert_eq!(diagnostic.code, Some(DiagnosticCode::RemovedFeature));
+        assert_eq!(diagnostic.code, None);
         assert_eq!(diagnostic.source_filename.as_deref(), Some("inc.ink"));
         assert_eq!(diagnostic.line, 1);
-        assert_eq!(diagnostic.column, 1);
-        assert_eq!(
-            diagnostic.message,
-            "removed feature: LIST declarations. Use variables, functions, or host data instead."
-        );
+        assert_eq!(diagnostic.column, 11);
+        assert_eq!(diagnostic.message, "Variable 'score' is missing a type");
     }
 }

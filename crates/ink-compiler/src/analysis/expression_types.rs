@@ -171,7 +171,6 @@ pub(super) fn typed_builtin_return_type(name: &str) -> Option<TypeName> {
     match name {
         "ARRAY_REMOVE" => Some(TypeName::void()),
         "LEN" => Some(TypeName::int()),
-        "READ_COUNT" | "TURNS_SINCE" => Some(TypeName::int()),
         _ => None,
     }
 }

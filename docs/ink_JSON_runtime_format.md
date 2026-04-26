@@ -31,9 +31,13 @@ Although containers primarily behave like arrays, they also have additional attr
 
 Possible flags used by `#f`:
 
- * **0x1** - Visits: The story should keep a record of the number of visits to this container.
- * **0x2** - Turns: The story should keep a record of the number of the turn index that this container was lasted visited.
- * **0x4** - CountStartOnly: For the above numbers, the story should only record changes when the story visits the very first subelement, rather than random entry at any point. Used to distinguish the different behaviour between knots and stitches (random access), versus gather points and choices (count start only).
+ * **0x1** - Visits: legacy compiled-story metadata for visit counts.
+ * **0x2** - Turns: legacy compiled-story metadata for turn counts.
+ * **0x4** - CountStartOnly: legacy metadata for count-at-start behavior.
+
+ink-rs no longer exposes visit or turn counts in the source language or save
+state. These flags remain documented because the compiled-story JSON model can
+still represent them for legacy compiled-story compatibility.
 
 Examples:
 
@@ -102,10 +106,10 @@ Control commands are special instructions to the text engine to perform various 
 * `"str"` - Begin string evaluation mode. Adds a marker to the output stream, and goes into content mode (from evaluation mode). Must have already been in evaluation mode when this is encountered. See below for explanation.
 * `"/str"` - End string evaluation mode. All content after the previous Begin marker is concatenated together, removed from the output stream, and appended as a string value to the evaluation stack. Re-enters evaluation mode immediately afterwards.
 * `"nop"` - No-operation. Does nothing, but is useful as an addressable piece of content to divert to.
-* `"choiceCnt"` - Pushes an integer with the current number of choices to the evaluation stack.
-* `"turn"` - Pushes an integer with the current turn number to the evaluation stack.
-* `"turns"` - Pops from the evaluation stack, expecting to see a divert target for a knot, stitch, gather or choice. Pushes an integer with the number of turns since that target was last visited by the story engine.
-* `"visit"` - Pushes an integer with the number of visits to the current container by the story engine.
+* `"choiceCnt"` - Legacy compiled-story command that pushes the current generated choice count. ink-rs source no longer emits `CHOICE_COUNT`.
+* `"turn"` - Legacy compiled-story command. The current runtime keeps no turn counter and pushes `0`.
+* `"turns"` - Legacy compiled-story command. The current runtime keeps no turn index state and pushes `-1` for known divert targets.
+* `"visit"` - Legacy compiled-story command. The current runtime keeps no visit-count state and pushes `-1` as a sequence index fallback.
 * `"seq"` - Pops an integer, expected to be the number of elements in a sequence that's being entered. In return, it pushes an integer with the next sequence shuffle index to the evaluation stack. This shuffle index is derived from the number of elements in the sequence, the number of elements in it, and the story's random seed from when it was first begun.
 * `"thread"` - Clones/starts a new thread, as used with the `<- knot` syntax in ink. This essentially clones the entire callstack, branching it.
 * `"done"` - Tries to close/pop the active thread, otherwise marks the story flow safe to exit without a loose end warning.
@@ -153,13 +157,16 @@ Example:
 
 * `{"VAR?": "danger"}` - Get an existing global or temporary variable named `danger` and push its value to the evaluation stack.
 
-## Read count
+## Legacy read count
 
-Obtain the read count of a particular named knot, stitch, choice or gather. Note that this is implemented as a Variable Reference with particular flag in the C# ink runtime.
+Compiled-story JSON can still represent the C# read-count lookup shape. ink-rs
+source no longer emits this for `READ_COUNT` or `{knot}` shorthand, and runtime
+save JSON no longer stores visit counts. Runtime lookups therefore return the
+legacy fallback count rather than maintained authored state.
 
 Example:
 
-* `{"CNT?": "the_hall.light_switch"}` - gets the read count of the container at the given path. For example, it might be a stitch named `light_switch` in a knot called `the_hall`.
+* `{"CNT?": "the_hall.light_switch"}` - legacy compiled-story read-count lookup for the container at the given path.
 
 
 ## ChoicePoint
@@ -180,12 +187,12 @@ The path when chosen is the target path of a Container of content, and is assign
 The `flg` field is a bitfield of flags:
 
  * **0x1 - Has condition?**: Set if the story should pop a value from the evaluation stack in order to determine whether a choice instance should be created at all.
- * **0x2 - Has start content?** - According to square bracket notation, is there any leading content before any square brackets? If so, this content should be popped from the evaluation stack.
- * **0x4 - Has choice-only content?** - According to square bracket notation, is there any content between the square brackets? If so, this content should be popped from the evaluation stack.
+ * **0x2 - Has start content?** - Choice display text should be popped from the evaluation stack.
+ * **0x4 - Has choice-only content?** - Legacy square-bracket choice text should be popped from the evaluation stack if present in compiled-story JSON. ink-rs source no longer accepts this syntax.
  * **0x8 - Is invisible default?** - When this is enabled, the choice isn't provided to the game (isn't presented to the player), and instead is automatically followed if there are no other choices generated.
- * **0x10 - Once only?** - Defaults to true. This is the difference between the `*` and `+` choice bullets in ink. If once only (`*`), the choice is only displayed if its target container's read count is zero.
+ * **0x10 - Once only?** - Legacy flag retained in the compiled-story shape. The current runtime ignores it and treats `*` and `+` choices as repeatable.
 
-Example of the full JSON output, including the ChoicePoint object, when generating an actual ink choice from `* Hello[.], world.`. Most of the complexity is derived from the fact that content can be dynamic, and the square bracket notation that requires repetition.
+Example of the legacy full JSON output, including the ChoicePoint object, when generating an upstream-style ink choice from `* Hello[.], world.`. Current ink-rs source does not accept choice square brackets, but the runtime data shape can still describe older compiled content.
 
 ```jsonc
 // Outer container
@@ -194,8 +201,8 @@ Example of the full JSON output, including the ChoicePoint object, when generati
   // Evaluate choice text.
   // Starts by calling a "function" labelled
   // 's', which is the start content for the choice.
-  // We use a small Container so that it can be
-  // be re-used, and so the visit counts will be correct.
+  // Legacy C# output used a small Container so that it could be
+  // re-used for visit-count behavior.
   "ev",
   "str",
   {
@@ -203,7 +210,7 @@ Example of the full JSON output, including the ChoicePoint object, when generati
   },
   "/str",
 
-  // Evaluate content inside square brackets (simply '.')
+  // Evaluate legacy content inside square brackets (simply '.')
   "str",
   "^.",
   "/str",
@@ -215,8 +222,8 @@ Example of the full JSON output, including the ChoicePoint object, when generati
   //  - linked to own container named 'c'
   //  - Flags 22 are:
   //     * 0x2  - has start content
-  //     * 0x4  - has choice-only content
-  //     * 0x10 - once only
+  //     * 0x4  - has legacy choice-only content
+  //     * 0x10 - legacy once-only flag ignored by ink-rs runtime
   {
     "*": ".^.c",
     "flg": 22

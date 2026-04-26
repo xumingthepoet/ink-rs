@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::BTreeMap, rc::Rc};
 
-use ink_compiler::{Compiler, Diagnostic, DiagnosticCode, DiagnosticSeverity, SourceInput};
+use ink_compiler::{Compiler, Diagnostic, DiagnosticSeverity, SourceInput};
 use ink_runtime::{
     story::{external_functions::ExternalFunction, Story},
     value_type::ValueType,
@@ -45,15 +45,6 @@ fn assert_diagnostic(
             .any(|diagnostic| diagnostic.severity == severity
                 && diagnostic.message.contains(message_fragment)),
         "expected {severity:?} diagnostic containing {message_fragment:?}, got {diagnostics:#?}"
-    );
-}
-
-fn assert_diagnostic_code(diagnostics: &[Diagnostic], code: DiagnosticCode) {
-    assert!(
-        diagnostics
-            .iter()
-            .any(|diagnostic| diagnostic.code == Some(code)),
-        "expected diagnostic code {code:?}, got {diagnostics:#?}"
     );
 }
 
@@ -140,6 +131,384 @@ fn typed_array_fixture_runs() {
 fn typed_divert_target_fixture_runs() {
     let compiled = compile_language_fixture("typed/divert-targets.ink");
     assert_story_output(&compiled, "Here.\nStruct.\nArray.\nFallback.\n");
+}
+
+#[test]
+fn explicit_dynamic_diverts_run_at_runtime() {
+    let compiled = compile_language_source(
+        "explicit-dynamic-diverts.ink",
+        concat!(
+            "VAR next: -> = -> first\n",
+            "CONST fallback: -> = -> const_target\n",
+            "CONST const_targets: ->[] = [-> const_array_target]\n",
+            "VAR targets: ->[] = [-> array_target]\n",
+            "STRUCT Route {\n",
+            "next: ->\n",
+            "}\n",
+            "VAR route: Route = { next: -> struct_target }\n",
+            "CONST const_route: Route = { next: -> const_struct_target }\n",
+            "-> {next}\n",
+            "== first ==\n",
+            "First.\n",
+            "-> {route.next}\n",
+            "== struct_target ==\n",
+            "Struct.\n",
+            "-> {targets[0]}\n",
+            "== array_target ==\n",
+            "Array.\n",
+            "-> {fallback}\n",
+            "== const_target ==\n",
+            "Const.\n",
+            "-> {const_route.next}\n",
+            "== const_struct_target ==\n",
+            "Const struct.\n",
+            "-> {const_targets[0]}\n",
+            "== const_array_target ==\n",
+            "Const array.\n",
+            "-> {pick(true)}\n",
+            "== function pick(flag: bool) => -> ==\n",
+            "{ flag:\n",
+            "    ~ return -> final\n",
+            "- else:\n",
+            "    ~ return -> first\n",
+            "}\n",
+            "== final ==\n",
+            "Final.\n",
+            "-> END",
+        ),
+    );
+
+    assert_story_output(
+        &compiled,
+        "First.\nStruct.\nArray.\nConst.\nConst struct.\nConst array.\nFinal.\n",
+    );
+}
+
+#[test]
+fn explicit_dynamic_diverts_support_arguments() {
+    let compiled = compile_language_source(
+        "explicit-dynamic-divert-args.ink",
+        concat!(
+            "VAR next: -> = -> target\n",
+            "VAR value: int = 5\n",
+            "-> {next}(value)\n",
+            "== target(x: int) ==\n",
+            "Value {x}.\n",
+            "-> END",
+        ),
+    );
+
+    assert_story_output(&compiled, "Value 5.\n");
+}
+
+#[test]
+fn explicit_dynamic_tunnels_run_at_runtime() {
+    let compiled = compile_language_source(
+        "explicit-dynamic-tunnel.ink",
+        concat!(
+            "VAR next: -> = -> tunnel\n",
+            "-> {next} ->\n",
+            "After.\n",
+            "-> DONE\n",
+            "== tunnel ==\n",
+            "Inside.\n",
+            "->->",
+        ),
+    );
+
+    assert_story_output(&compiled, "Inside.\nAfter.\n");
+}
+
+#[test]
+fn static_diverts_to_variables_report_current_syntax_error() {
+    let cases = [
+        (
+            "old-global-divert.ink",
+            concat!(
+                "VAR next: -> = -> target\n",
+                "-> next\n",
+                "== target ==\n",
+                "-> DONE"
+            ),
+        ),
+        (
+            "old-const-divert.ink",
+            concat!(
+                "CONST next: -> = -> target\n",
+                "-> next\n",
+                "== target ==\n",
+                "-> DONE"
+            ),
+        ),
+        (
+            "old-param-divert.ink",
+            concat!(
+                "-> start(-> target)\n",
+                "== start(next: ->) ==\n",
+                "-> next\n",
+                "== target ==\n",
+                "-> DONE"
+            ),
+        ),
+        (
+            "old-temp-divert.ink",
+            concat!(
+                "~ temp next: -> = -> target\n",
+                "-> next\n",
+                "== target ==\n",
+                "-> DONE"
+            ),
+        ),
+    ];
+
+    for (name, source) in cases {
+        let diagnostics = diagnostics_for_language_source(name, source);
+        assert_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Static divert targets must be knot or stitch paths",
+        );
+        assert_diagnostic(&diagnostics, DiagnosticSeverity::Error, "-> {next}");
+    }
+}
+
+#[test]
+fn dynamic_divert_target_type_is_checked() {
+    let diagnostics = diagnostics_for_language_source(
+        "dynamic-divert-wrong-type.ink",
+        concat!("VAR value: int = 1\n", "-> {value}\n"),
+    );
+
+    assert_diagnostic(
+        &diagnostics,
+        DiagnosticSeverity::Error,
+        "Dynamic divert target has type int but expected ->",
+    );
+
+    let diagnostics = diagnostics_for_language_source(
+        "dynamic-divert-wrong-field-type.ink",
+        concat!(
+            "STRUCT Player {\n",
+            "hp: int\n",
+            "}\n",
+            "VAR player: Player = { hp: 10 }\n",
+            "-> {player.hp}\n",
+            "== player ==\n",
+            "= hp\n",
+            "-> DONE",
+        ),
+    );
+
+    assert_diagnostic(
+        &diagnostics,
+        DiagnosticSeverity::Error,
+        "Dynamic divert target has type int but expected ->",
+    );
+}
+
+#[test]
+fn square_brackets_in_choice_text_are_literal() {
+    let compiled = compile_language_source(
+        "literal-choice-brackets.ink",
+        concat!(
+            "* Display [selected output]\n",
+            "    Branch.\n",
+            "    -> DONE"
+        ),
+    );
+    let mut story = Story::new(&compiled.json).expect("compiled JSON should load");
+
+    assert_eq!(story.continue_maximally().unwrap(), "");
+    assert_eq!(
+        story.get_current_choices()[0].text,
+        "Display [selected output]"
+    );
+    story.choose_choice_index(0).unwrap();
+    assert_eq!(story.continue_maximally().unwrap(), "Branch.\n");
+}
+
+#[test]
+fn star_and_plus_choices_are_repeatable() {
+    let compiled = compile_language_source(
+        "repeatable-choices.ink",
+        concat!(
+            "-> menu\n",
+            "== menu ==\n",
+            "* Star choice\n",
+            "    Star branch.\n",
+            "    -> menu\n",
+            "+ Plus choice\n",
+            "    Plus branch.\n",
+            "    -> menu",
+        ),
+    );
+    let mut story = Story::new(&compiled.json).expect("compiled JSON should load");
+
+    assert_eq!(story.continue_maximally().unwrap(), "");
+    assert_eq!(story.get_current_choices().len(), 2);
+    story.choose_choice_index(0).unwrap();
+    assert_eq!(story.continue_maximally().unwrap(), "Star branch.\n");
+    assert_eq!(story.get_current_choices().len(), 2);
+    story.choose_choice_index(1).unwrap();
+    assert_eq!(story.continue_maximally().unwrap(), "Plus branch.\n");
+    assert_eq!(story.get_current_choices().len(), 2);
+}
+
+#[test]
+fn selected_choice_text_is_not_echoed() {
+    let compiled = compile_language_source(
+        "choice-display-only.ink",
+        concat!("* Display text\n", "    Branch text.\n", "    -> DONE",),
+    );
+    let mut story = Story::new(&compiled.json).expect("compiled JSON should load");
+
+    assert_eq!(story.continue_maximally().unwrap(), "");
+    assert_eq!(story.get_current_choices()[0].text, "Display text");
+    story.choose_choice_index(0).unwrap();
+    assert_eq!(story.continue_maximally().unwrap(), "Branch text.\n");
+}
+
+#[test]
+fn choice_conditions_still_control_visibility() {
+    let compiled = compile_language_source(
+        "conditional-repeatable-choices.ink",
+        concat!(
+            "VAR open: bool = false\n",
+            "-> menu\n",
+            "== menu ==\n",
+            "* {open} Open path\n",
+            "    Done.\n",
+            "    -> DONE\n",
+            "* Toggle\n",
+            "    ~ open = true\n",
+            "    -> menu",
+        ),
+    );
+    let mut story = Story::new(&compiled.json).expect("compiled JSON should load");
+
+    assert_eq!(story.continue_maximally().unwrap(), "");
+    let choices = story.get_current_choices();
+    assert_eq!(choices.len(), 1);
+    assert_eq!(choices[0].text, "Toggle");
+    story.choose_choice_index(0).unwrap();
+    assert_eq!(story.continue_maximally().unwrap(), "");
+    let choices = story.get_current_choices();
+    assert_eq!(choices.len(), 2);
+    assert_eq!(choices[0].text, "Open path");
+    assert_eq!(choices[1].text, "Toggle");
+}
+
+#[test]
+fn save_load_preserves_generated_choices_without_regeneration() {
+    let compiled = compile_language_source(
+        "choice-save-load.ink",
+        concat!(
+            "VAR picked: int = 0\n",
+            "* First\n",
+            "    ~ picked = 1\n",
+            "    Picked {picked}.\n",
+            "    -> DONE\n",
+            "* Second\n",
+            "    ~ picked = 2\n",
+            "    Picked {picked}.\n",
+            "    -> DONE",
+        ),
+    );
+    let mut story = Story::new(&compiled.json).expect("compiled JSON should load");
+
+    assert_eq!(story.continue_maximally().unwrap(), "");
+    assert_eq!(story.get_current_choices().len(), 2);
+    let save_string = story.save_state().expect("choice state should save");
+    let save: serde_json::Value = serde_json::from_str(&save_string).expect("valid save JSON");
+    assert_eq!(save["inkSaveVersion"], json!(2));
+    assert!(save.get("currentChoices").is_some());
+    assert!(save.get("flows").is_none());
+    assert!(save.get("evalStack").is_none());
+    assert!(save.get("visitCounts").is_none());
+    assert!(save.get("turnIndices").is_none());
+    assert!(save.get("turnIdx").is_none());
+
+    let mut reloaded = Story::new(&compiled.json).expect("compiled JSON should load");
+    reloaded
+        .load_state(&save_string)
+        .expect("choice state should reload");
+    let choices = reloaded.get_current_choices();
+    assert_eq!(choices.len(), 2);
+    assert_eq!(choices[0].text, "First");
+    assert_eq!(choices[1].text, "Second");
+    reloaded.choose_choice_index(1).unwrap();
+    assert_eq!(reloaded.continue_maximally().unwrap(), "Picked 2.\n");
+}
+
+#[test]
+fn save_load_preserves_thread_generated_choices() {
+    let compiled = compile_language_source(
+        "thread-choice-save-load.ink",
+        concat!(
+            "<- side\n",
+            "* Main\n",
+            "    Main branch.\n",
+            "    -> DONE\n",
+            "== side ==\n",
+            "* Thread\n",
+            "    Thread branch.\n",
+            "    -> DONE",
+        ),
+    );
+    let mut story = Story::new(&compiled.json).expect("compiled JSON should load");
+
+    assert_eq!(story.continue_maximally().unwrap(), "");
+    let choices = story.get_current_choices();
+    assert_eq!(choices.len(), 2);
+    assert_eq!(choices[0].text, "Thread");
+    assert_eq!(choices[1].text, "Main");
+    let save_string = story.save_state().expect("thread choice state should save");
+    let save: serde_json::Value = serde_json::from_str(&save_string).expect("valid save JSON");
+    assert!(save.get("choiceThreads").is_some());
+
+    let mut reloaded = Story::new(&compiled.json).expect("compiled JSON should load");
+    reloaded
+        .load_state(&save_string)
+        .expect("thread choice state should reload");
+    assert_eq!(reloaded.get_current_choices().len(), 2);
+    reloaded.choose_choice_index(0).unwrap();
+    assert_eq!(reloaded.continue_maximally().unwrap(), "Thread branch.\n");
+}
+
+#[test]
+fn save_load_preserves_deterministic_random_state() {
+    let compiled = compile_language_source(
+        "random-save-load.ink",
+        concat!(
+            "~ SEED_RANDOM(12)\n",
+            "{RANDOM(1, 100)}\n",
+            "* Continue\n",
+            "    {RANDOM(1, 100)}\n",
+            "    -> DONE",
+        ),
+    );
+    let mut uninterrupted = Story::new(&compiled.json).expect("compiled JSON should load");
+    let uninterrupted_first_output = uninterrupted.continue_maximally().unwrap();
+    uninterrupted.choose_choice_index(0).unwrap();
+    let uninterrupted_output = uninterrupted.continue_maximally().unwrap();
+
+    let mut saved = Story::new(&compiled.json).expect("compiled JSON should load");
+    assert_eq!(
+        saved.continue_maximally().unwrap(),
+        uninterrupted_first_output
+    );
+    let save_string = saved.save_state().expect("random state should save");
+    let save: serde_json::Value = serde_json::from_str(&save_string).expect("valid save JSON");
+    assert!(save.get("storySeed").is_some());
+    assert!(save.get("previousRandom").is_some());
+    assert!(save.get("turnIdx").is_none());
+
+    let mut reloaded = Story::new(&compiled.json).expect("compiled JSON should load");
+    reloaded
+        .load_state(&save_string)
+        .expect("random state should reload");
+    reloaded.choose_choice_index(0).unwrap();
+    assert_eq!(reloaded.continue_maximally().unwrap(), uninterrupted_output);
 }
 
 #[test]
@@ -781,7 +1150,7 @@ fn untyped_constant_declaration_reports_missing_type() {
 }
 
 #[test]
-fn nested_global_var_declarations_report_removed_feature_diagnostic() {
+fn nested_global_var_declarations_report_current_syntax_error() {
     let cases = [
         (
             "nested-var-function.ink",
@@ -804,11 +1173,10 @@ fn nested_global_var_declarations_report_removed_feature_diagnostic() {
     for (name, source) in cases {
         let diagnostics = diagnostics_for_language_source(name, source);
 
-        assert_diagnostic_code(&diagnostics, DiagnosticCode::RemovedFeature);
         assert_diagnostic(
             &diagnostics,
             DiagnosticSeverity::Error,
-            "nested VAR declarations",
+            "Global VAR declarations must appear at the story top level",
         );
     }
 }
@@ -866,25 +1234,6 @@ fn missing_function_return_type_reports_missing_type() {
 }
 
 #[test]
-fn old_function_return_marker_reports_new_marker() {
-    let diagnostics = diagnostics_for_language_source(
-        "old-function-return-marker.ink",
-        concat!(
-            "{add(1, 2)}\n",
-            "-> DONE\n",
-            "== function add(a: int, b: int) -> int ==\n",
-            "~ return a + b"
-        ),
-    );
-
-    assert_diagnostic(
-        &diagnostics,
-        DiagnosticSeverity::Error,
-        "Function return types use `=>`, not `->`",
-    );
-}
-
-#[test]
 fn untyped_external_parameter_reports_missing_type() {
     let diagnostics = diagnostics_for_language_source(
         "untyped-external-param.ink",
@@ -913,34 +1262,5 @@ fn missing_external_return_type_reports_missing_type() {
         &diagnostics,
         DiagnosticSeverity::Error,
         "External declaration 'ext' is missing a return type",
-    );
-}
-
-#[test]
-fn old_external_return_marker_reports_new_marker() {
-    let diagnostics = diagnostics_for_language_source(
-        "old-external-return-marker.ink",
-        concat!("EXTERNAL ext(a: int) -> int\n", "{ext(1)}\n", "-> DONE"),
-    );
-
-    assert_diagnostic(
-        &diagnostics,
-        DiagnosticSeverity::Error,
-        "External return types use `=>`, not `->`",
-    );
-}
-
-#[test]
-fn removed_list_declaration_reports_removed_feature_diagnostic() {
-    let diagnostics = diagnostics_for_language_source(
-        "removed-list.ink",
-        language_fixture_text("removed-list.ink"),
-    );
-
-    assert_diagnostic_code(&diagnostics, DiagnosticCode::RemovedFeature);
-    assert_diagnostic(
-        &diagnostics,
-        DiagnosticSeverity::Error,
-        "removed feature: LIST declarations",
     );
 }

@@ -1,16 +1,11 @@
 #![allow(
-    dead_code,
-    unused_imports,
     unused_variables,
     non_snake_case,
     non_camel_case_types,
     non_upper_case_globals
 )]
 
-use crate::api::{
-    story::ExternalFunction, story::Story as RuntimeStory, story::VariableObserver,
-    value_type::ValueType,
-};
+use crate::api::{ExternalFunction, Story as RuntimeStory, ValueType, VariableObserver};
 use ink_compiler::{
     eliminate_comments, Compiler, CompilerOptions, Diagnostic, DiagnosticSeverity, FileHandler,
     ParsedStory, SourceInput,
@@ -193,50 +188,15 @@ impl ErrorHandler for RuntimeErrorHandler {
 }
 
 trait RuntimeStoryExt {
-    fn cont(&mut self) -> String;
-    fn cont_maximally(&mut self) -> String;
-    fn continue_maximally(&mut self) -> String;
-    fn choose_choice_index(&mut self, idx: usize);
     fn choose_path_string_simple(&mut self, path: &str);
-    fn choose_path_string_with_args(
-        &mut self,
-        path: &str,
-        reset_callstack: bool,
-        arguments: Option<Vec<ValueType>>,
-    );
-    fn get_current_choices(&mut self) -> Vec<Rc<Choice>>;
     fn current_choices(&mut self) -> Vec<Rc<Choice>>;
-    fn get_current_choices_len(&mut self) -> usize;
     fn current_choices_len(&mut self) -> usize;
-    fn get_current_tags(&mut self) -> Vec<String>;
     fn current_tags(&mut self) -> Vec<String>;
-    fn get_current_text(&mut self) -> String;
     fn current_text(&mut self) -> String;
     fn get_global_tags(&mut self) -> Vec<String>;
     fn global_tags(&mut self) -> Vec<String>;
-    fn can_continue(&mut self) -> bool;
     fn evaluation_stack_len(&mut self) -> usize;
-    fn set_allow_external_function_fallbacks(&mut self, value: bool);
-    fn evaluate_function(
-        &mut self,
-        function_name: &str,
-        arguments: Option<Vec<ValueType>>,
-        text_output: &mut String,
-    ) -> Option<ValueType>;
     fn save_state(&mut self) -> String;
-    fn load_state(&mut self, json: &str);
-    fn to_json(&mut self) -> String;
-    fn switch_flow(&mut self, flow_name: &str);
-    fn remove_flow(&mut self, flow_name: &str);
-    fn get_variable(&mut self, name: &str) -> Option<ValueType>;
-    fn set_variable(&mut self, name: &str, value: &ValueType) -> Result<(), String>;
-    fn bind_external_function(
-        &mut self,
-        func_name: &str,
-        func: Arc<Mutex<dyn ExternalFunction>>,
-        lookahead_safe: bool,
-    );
-    fn observe_variable(&mut self, variable_name: &str, observer: Arc<Mutex<dyn VariableObserver>>);
 }
 
 impl CSharpTestSuite {
@@ -254,25 +214,6 @@ impl CSharpTestSuite {
         buckets.errors.clear();
         buckets.warnings.clear();
         buckets.authors.clear();
-    }
-
-    fn push_runtime_message(&self, message: &str, error_type: ErrorType) {
-        let mut buckets = self.buckets.lock().unwrap();
-        match error_type {
-            ErrorType::Error => buckets.errors.push(message.to_string()),
-            ErrorType::Warning => buckets.warnings.push(message.to_string()),
-        }
-    }
-
-    fn push_parse_message(&self, message: String, line: i32, _character: i32, is_warning: bool) {
-        let prefix = if is_warning { "WARNING" } else { "ERROR" };
-        let full_message = format!("{}: line {}: {}", prefix, line + 1, message);
-        let mut buckets = self.buckets.lock().unwrap();
-        if is_warning {
-            buckets.warnings.push(full_message);
-        } else {
-            buckets.errors.push(full_message);
-        }
     }
 
     fn record_diagnostics(&self, diagnostics: &[Diagnostic]) {
@@ -410,15 +351,6 @@ impl CSharpTestSuite {
         parse_result.artifact
     }
 
-    fn clone_shared(&self) -> Self {
-        Self {
-            mode: self.mode,
-            testing_errors: self.testing_errors,
-            buckets: Arc::clone(&self.buckets),
-            file_handler: Arc::clone(&self.file_handler),
-        }
-    }
-
     pub fn error_messages(&self) -> Vec<String> {
         self.buckets.lock().unwrap().errors.clone()
     }
@@ -448,65 +380,24 @@ impl CSharpTestSuite {
 }
 
 impl RuntimeStoryExt for RuntimeStory {
-    fn cont(&mut self) -> String {
-        self.cont()
-    }
-
-    fn cont_maximally(&mut self) -> String {
-        self.cont_maximally()
-    }
-
-    fn continue_maximally(&mut self) -> String {
-        self.cont_maximally()
-    }
-
-    fn choose_choice_index(&mut self, idx: usize) {
-        self.choose_choice_index(idx);
-    }
-
     fn choose_path_string_simple(&mut self, path: &str) {
         self.choose_path_string(path, true, None);
-    }
-
-    fn choose_path_string_with_args(
-        &mut self,
-        path: &str,
-        reset_callstack: bool,
-        arguments: Option<Vec<ValueType>>,
-    ) {
-        self.choose_path_string(path, reset_callstack, arguments);
-    }
-
-    fn get_current_choices(&mut self) -> Vec<Rc<Choice>> {
-        RuntimeStory::get_current_choices(self)
     }
 
     fn current_choices(&mut self) -> Vec<Rc<Choice>> {
         RuntimeStory::get_current_choices(self)
     }
 
-    fn get_current_choices_len(&mut self) -> usize {
+    fn current_choices_len(&mut self) -> usize {
         RuntimeStory::get_current_choices(self).len()
     }
 
-    fn current_choices_len(&mut self) -> usize {
-        self.get_current_choices_len()
-    }
-
-    fn get_current_tags(&mut self) -> Vec<String> {
+    fn current_tags(&mut self) -> Vec<String> {
         RuntimeStory::get_current_tags(self)
     }
 
-    fn current_tags(&mut self) -> Vec<String> {
-        self.get_current_tags()
-    }
-
-    fn get_current_text(&mut self) -> String {
-        RuntimeStory::get_current_text(self)
-    }
-
     fn current_text(&mut self) -> String {
-        self.get_current_text()
+        RuntimeStory::get_current_text(self)
     }
 
     fn get_global_tags(&mut self) -> Vec<String> {
@@ -515,10 +406,6 @@ impl RuntimeStoryExt for RuntimeStory {
 
     fn global_tags(&mut self) -> Vec<String> {
         self.get_global_tags()
-    }
-
-    fn can_continue(&mut self) -> bool {
-        RuntimeStory::can_continue(self)
     }
 
     fn evaluation_stack_len(&mut self) -> usize {
@@ -530,63 +417,8 @@ impl RuntimeStoryExt for RuntimeStory {
             .map_or(0, |stack| stack.len())
     }
 
-    fn set_allow_external_function_fallbacks(&mut self, value: bool) {
-        RuntimeStory::set_allow_external_function_fallbacks(self, value);
-    }
-
-    fn evaluate_function(
-        &mut self,
-        function_name: &str,
-        arguments: Option<Vec<ValueType>>,
-        text_output: &mut String,
-    ) -> Option<ValueType> {
-        RuntimeStory::evaluate_function(self, function_name, arguments, text_output)
-    }
-
     fn save_state(&mut self) -> String {
         RuntimeStory::save_state(self)
-    }
-
-    fn load_state(&mut self, json: &str) {
-        RuntimeStory::load_state(self, json);
-    }
-
-    fn to_json(&mut self) -> String {
-        RuntimeStory::save_state(self)
-    }
-
-    fn switch_flow(&mut self, flow_name: &str) {
-        RuntimeStory::switch_flow(self, flow_name);
-    }
-
-    fn remove_flow(&mut self, flow_name: &str) {
-        RuntimeStory::remove_flow(self, flow_name);
-    }
-
-    fn get_variable(&mut self, name: &str) -> Option<ValueType> {
-        RuntimeStory::get_variable(self, name)
-    }
-
-    fn set_variable(&mut self, name: &str, value: &ValueType) -> Result<(), String> {
-        RuntimeStory::set_variable(self, name, value).map_err(|err| err.to_string())?;
-        Ok(())
-    }
-
-    fn bind_external_function(
-        &mut self,
-        func_name: &str,
-        func: Arc<Mutex<dyn ExternalFunction>>,
-        lookahead_safe: bool,
-    ) {
-        RuntimeStory::bind_external_function(self, func_name, func, lookahead_safe);
-    }
-
-    fn observe_variable(
-        &mut self,
-        variable_name: &str,
-        observer: Arc<Mutex<dyn VariableObserver>>,
-    ) {
-        RuntimeStory::observe_variable(self, variable_name, observer);
     }
 }
 
@@ -689,7 +521,61 @@ mod tests {
             "TestListRange",
             "TestListSaveLoad",
             "TestMoreListOperations",
+            "TestAllSequenceTypes",
+            "TestBlanksInInlineSequences",
+            "TestChoiceCount",
+            "TestChoiceDivertsToDone",
+            "TestChoiceWithBracketsOnly",
+            "TestConditionalChoiceInWeave",
+            "TestConditionalChoiceInWeave2",
+            "TestDefaultChoices",
+            "TestDivertInConditional",
+            "TestDivertTargetsWithParameters",
+            "TestDivertToWeavePoints",
+            "TestEmptySequenceContent",
+            "TestEvaluationStackLeaks",
+            "TestGatherReadCountWithInitialSequence",
+            "TestHasReadOnChoice",
+            "TestKnotStitchGatherCounts",
+            "TestKnotThreadInteraction",
+            "TestKnotThreadInteraction2",
+            "TestLeadingNewlineMultilineSequence",
+            "TestLogicInChoices",
+            "TestMultiFlowBasics",
+            "TestMultiFlowSaveLoadThreads",
+            "TestMultiThread",
+            "TestNewlineConsistency",
+            "TestNonTextInChoiceInnerContent",
+            "TestOnceOnlyChoicesCanLinkBackToSelf",
+            "TestOnceOnlyChoicesWithOwnContent",
+            "TestReadCountAcrossCallstack",
+            "TestReadCountAcrossThreads",
+            "TestReadCountDotSeparatedPath",
+            "TestReadCountVariableTarget",
+            "TestRequireVariableTargetsTyped",
+            "TestShouldntGatherDueToChoice",
+            "TestShuffleStackMuddying",
+            "TestStringsInChoices",
+            "TestTagsDynamicContent",
+            "TestTagsInChoice",
+            "TestTagsInSeq",
+            "TestTempUsageInOptions",
+            "TestThreadInLogic",
+            "TestTurns",
+            "TestTurnsSince",
+            "TestTurnsSinceNested",
+            "TestTurnsSinceWithVariableTarget",
+            "TestUnbalancedWeaveIndentation",
+            "TestVariableDivertTarget",
+            "TestVariableGetSetAPI",
+            "TestVariableTunnel",
             "TestVariableNamingCollisionWithFlow",
+            "TestVariousBlankChoiceWarning",
+            "TestVisitCountBugDueToNestedContainers",
+            "TestVisitCountsWhenChoosing",
+            "TestWeaveGathers",
+            "TestWeaveOptions",
+            "TestWeaveWithinSequence",
         ]);
         let mut names = BTreeSet::new();
         for line in source.lines() {
@@ -1692,39 +1578,6 @@ This content is inaccessible.
     //             story.SwitchFlow("Second");
     //             Assert.AreEqual("knot 2 line 2\n", story.Continue());
     //         }
-    #[test]
-    fn TestMultiFlowBasics() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
-=== knot1
-knot 1 line 1
-knot 1 line 2
--> END 
-
-=== knot2
-knot 2 line 1
-knot 2 line 2
--> END 
-"#,
-                    false,
-                    false,
-                )
-                .expect("compile should succeed");
-            story.switch_flow("First");
-            story.choose_path_string_simple("knot1");
-            assert_eq!("knot 1 line 1\n", story.cont());
-            story.switch_flow("Second");
-            story.choose_path_string_simple("knot2");
-            assert_eq!("knot 2 line 1\n", story.cont());
-            story.switch_flow("First");
-            assert_eq!("knot 1 line 2\n", story.cont());
-            story.switch_flow("Second");
-            assert_eq!("knot 2 line 2\n", story.cont());
-        });
-    }
-
     // C#:         [Test()]
     //         public void TestMultiFlowSaveLoadThreads()
     //         {
@@ -1816,97 +1669,6 @@ knot 2 line 2
     //             story.RemoveFlow("Blue Flow");
     //             Assert.AreEqual("Default line 2\n", story.Continue());
     //         }
-    #[test]
-    fn TestMultiFlowSaveLoadThreads() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
-Default line 1
-Default line 2
-
-== red ==
-Hello I'm red
-<- thread1("red")
-<- thread2("red")
--> DONE
-
-== blue ==
-Hello I'm blue
-<- thread1("blue")
-<- thread2("blue")
--> DONE
-
-== thread1(name) ==
-+ Thread 1 {name} choice
-    -> thread1Choice(name)
-
-== thread2(name) ==
-+ Thread 2 {name} choice
-    -> thread2Choice(name)
-
-== thread1Choice(name) ==
-After thread 1 choice ({name})
--> END
-
-== thread2Choice(name) ==
-After thread 2 choice ({name})
--> END
-"#,
-                    false,
-                    false,
-                )
-                .expect("compile should succeed");
-            assert_eq!("Default line 1\n", story.cont());
-            story.switch_flow("Blue Flow");
-            story.choose_path_string_simple("blue");
-            assert_eq!("Hello I'm blue\n", story.cont());
-            story.switch_flow("Red Flow");
-            story.choose_path_string_simple("red");
-            assert_eq!("Hello I'm red\n", story.cont());
-            story.switch_flow("Blue Flow");
-            assert_eq!("Hello I'm blue\n", story.current_text());
-            assert_eq!(
-                "Thread 1 blue choice",
-                story.current_choices()[0].text.clone()
-            );
-            story.switch_flow("Red Flow");
-            assert_eq!("Hello I'm red\n", story.current_text());
-            assert_eq!(
-                "Thread 1 red choice",
-                story.current_choices()[0].text.clone()
-            );
-            let saved = story.save_state();
-            story.choose_choice_index(0);
-            assert_eq!(
-                "Thread 1 red choice\nAfter thread 1 choice (red)\n",
-                story.continue_maximally()
-            );
-            story.load_state(&saved);
-            story.choose_choice_index(1);
-            assert_eq!(
-                "Thread 2 red choice\nAfter thread 2 choice (red)\n",
-                story.continue_maximally()
-            );
-            story.load_state(&saved);
-            story.switch_flow("Blue Flow");
-            story.choose_choice_index(0);
-            assert_eq!(
-                "Thread 1 blue choice\nAfter thread 1 choice (blue)\n",
-                story.continue_maximally()
-            );
-            story.load_state(&saved);
-            story.switch_flow("Blue Flow");
-            story.choose_choice_index(1);
-            assert_eq!(
-                "Thread 2 blue choice\nAfter thread 2 choice (blue)\n",
-                story.continue_maximally()
-            );
-            story.remove_flow("Blue Flow");
-            assert_eq!("Default line 2\n", story.cont());
-        });
-    }
-
     // C#:         [Test()]
     //         public void TestCharacterRangeIdentifiersForConstNamesWithAsciiPrefix()
     //         {
@@ -2206,101 +1968,6 @@ Hello
     }
 
     // C#:         [Test()]
-    //         public void TestChoiceCount()
-    //         {
-    //             Story story = CompileString(@"
-    // <- choices
-    // { CHOICE_COUNT() }
-    //
-    // = end
-    // -> END
-    //
-    // = choices
-    // * one -> end
-    // * two -> end
-    // ");
-    //
-    //             Assert.AreEqual("2\n", story.Continue());
-    //         }
-    #[test]
-    fn TestChoiceCount() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
-<- choices
-{ CHOICE_COUNT() }
-
-= end
--> END
-
-= choices
-* one -> end
-* two -> end
-"#,
-                    false,
-                    false,
-                )
-                .expect("compile should succeed");
-            assert_eq!("2\n", story.cont());
-        });
-    }
-
-    // C#:         [Test()]
-    //         public void TestChoiceDivertsToDone()
-    //         {
-    //             var story = CompileString(@"* choice -> DONE");
-    //
-    //             story.Continue();
-    //
-    //             Assert.AreEqual(1, story.currentChoices.Count);
-    //             story.ChooseChoiceIndex(0);
-    //
-    //             Assert.AreEqual("choice", story.Continue());
-    //         }
-    #[test]
-    fn TestChoiceDivertsToDone() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string("* choice -> DONE", false, false)
-                .expect("compile should succeed");
-            story.cont();
-            assert_eq!(1, story.get_current_choices_len());
-            story.choose_choice_index(0);
-            assert_eq!("choice", story.cont());
-        });
-    }
-
-    // C#:         [Test()]
-    //         public void TestChoiceWithBracketsOnly()
-    //         {
-    //             var storyStr = "*   [Option]\n    Text";
-    //
-    //             Story story = CompileString(storyStr);
-    //             story.Continue();
-    //
-    //             Assert.AreEqual(1, story.currentChoices.Count);
-    //             Assert.AreEqual("Option", story.currentChoices[0].text);
-    //
-    //             story.ChooseChoiceIndex(0);
-    //
-    //             Assert.AreEqual("Text\n", story.Continue());
-    //         }
-    #[test]
-    fn TestChoiceWithBracketsOnly() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string("*   [Option]\n    Text", false, false)
-                .expect("compile should succeed");
-            story.cont();
-            assert_eq!(1, story.get_current_choices_len());
-            assert_eq!("Option", story.current_choices()[0].text.clone());
-            story.choose_choice_index(0);
-            assert_eq!("Text\n", story.cont());
-        });
-    }
-
-    // C#:         [Test()]
     //         public void TestCompareDivertTargets()
     //         {
     //             var storyStr = @"
@@ -2362,256 +2029,6 @@ VAR to_two: -> = -> two
     }
 
     // C#:         [Test()]
-    //         public void TestBlanksInInlineSequences()
-    //         {
-    //             var story = CompileString(@"
-    // 1. -> seq1 ->
-    // 2. -> seq1 ->
-    // 3. -> seq1 ->
-    // 4. -> seq1 ->
-    // \---
-    // 1. -> seq2 ->
-    // 2. -> seq2 ->
-    // 3. -> seq2 ->
-    // \---
-    // 1. -> seq3 ->
-    // 2. -> seq3 ->
-    // 3. -> seq3 ->
-    // \---
-    // 1. -> seq4 ->
-    // 2. -> seq4 ->
-    // 3. -> seq4 ->
-    //
-    // == seq1 ==
-    // {a||b}
-    // ->->
-    //
-    // == seq2 ==
-    // {|a}
-    // ->->
-    //
-    // == seq3 ==
-    // {a|}
-    // ->->
-    //
-    // == seq4 ==
-    // {|}
-    // ->->".Replace("\r", ""));
-    //
-    //             Assert.AreEqual(
-    // @"1. a
-    // 2.
-    // 3. b
-    // 4. b
-    // ---
-    // 1.
-    // 2. a
-    // 3. a
-    // ---
-    // 1. a
-    // 2.
-    // 3.
-    // ---
-    // 1.
-    // 2.
-    // 3.
-    // ".Replace("\r", ""), story.ContinueMaximally().Replace("\r", ""));
-    //         }
-    #[test]
-    fn TestBlanksInInlineSequences() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
-1. -> seq1 ->
-2. -> seq1 ->
-3. -> seq1 ->
-4. -> seq1 ->
-\---
-1. -> seq2 ->
-2. -> seq2 ->
-3. -> seq2 ->
-\---
-1. -> seq3 ->
-2. -> seq3 ->
-3. -> seq3 ->
-\---
-1. -> seq4 ->
-2. -> seq4 ->
-3. -> seq4 ->
-
-== seq1 ==
-{a||b}
-->->
-
-== seq2 ==
-{|a}
-->->
-
-== seq3 ==
-{a|}
-->->
-
-== seq4 ==
-{|}
-->->"#,
-                    false,
-                    false,
-                )
-                .expect("compile should succeed");
-
-            let expected = r#"1. a
-2.
-3. b
-4. b
----
-1.
-2. a
-3. a
----
-1. a
-2.
-3.
----
-1.
-2.
-3.
-"#;
-            assert_eq!(
-                expected.replace("\r", ""),
-                story.cont_maximally().replace("\r", "")
-            );
-        });
-    }
-
-    // C#:         [Test()]
-    //         public void TestAllSequenceTypes()
-    //         {
-    //             var storyStr =
-    //                 @"
-    // ~ SEED_RANDOM(1)
-    //
-    // Once: {f_once()} {f_once()} {f_once()} {f_once()}
-    // Stopping: {f_stopping()} {f_stopping()} {f_stopping()} {f_stopping()}
-    // Default: {f_default()} {f_default()} {f_default()} {f_default()}
-    // Cycle: {f_cycle()} {f_cycle()} {f_cycle()} {f_cycle()}
-    // Shuffle: {f_shuffle()} {f_shuffle()} {f_shuffle()} {f_shuffle()}
-    // Shuffle stopping: {f_shuffle_stopping()} {f_shuffle_stopping()} {f_shuffle_stopping()} {f_shuffle_stopping()}
-    // Shuffle once: {f_shuffle_once()} {f_shuffle_once()} {f_shuffle_once()} {f_shuffle_once()}
-    //
-    // == function f_once ==
-    // {once:
-    //     - one
-    //     - two
-    // }
-    //
-    // == function f_stopping ==
-    // {stopping:
-    //     - one
-    //     - two
-    // }
-    //
-    // == function f_default ==
-    // {one|two}
-    //
-    // == function f_cycle ==
-    // {cycle:
-    //     - one
-    //     - two
-    // }
-    //
-    // == function f_shuffle ==
-    // {shuffle:
-    //     - one
-    //     - two
-    // }
-    //
-    // == function f_shuffle_stopping ==
-    // {stopping shuffle:
-    //     - one
-    //     - two
-    //     - final
-    // }
-    //
-    // == function f_shuffle_once ==
-    // {shuffle once:
-    //     - one
-    //     - two
-    // }
-    //                 ";
-    //
-    //             Story story = CompileString(storyStr);
-    //             Assert.AreEqual("Once: one two\nStopping: one two two two\nDefault: one two two two\nCycle: one two one two\nShuffle: two one two one\nShuffle stopping: one two final final\nShuffle once: two one\n", story.ContinueMaximally());
-    //         }
-    #[test]
-    fn TestAllSequenceTypes() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
-~ SEED_RANDOM(1)
-
-Once: {f_once()} {f_once()} {f_once()} {f_once()}
-Stopping: {f_stopping()} {f_stopping()} {f_stopping()} {f_stopping()}
-Default: {f_default()} {f_default()} {f_default()} {f_default()}
-Cycle: {f_cycle()} {f_cycle()} {f_cycle()} {f_cycle()}
-Shuffle: {f_shuffle()} {f_shuffle()} {f_shuffle()} {f_shuffle()}
-Shuffle stopping: {f_shuffle_stopping()} {f_shuffle_stopping()} {f_shuffle_stopping()} {f_shuffle_stopping()}
-Shuffle once: {f_shuffle_once()} {f_shuffle_once()} {f_shuffle_once()} {f_shuffle_once()}
-
-== function f_once => string ==
-{once:
-    - one
-    - two
-}
-
-== function f_stopping => string ==
-{stopping:
-    - one
-    - two
-}
-
-== function f_default => string ==
-{one|two}
-
-== function f_cycle => string ==
-{cycle:
-    - one
-    - two
-}
-
-== function f_shuffle => string ==
-{shuffle:
-    - one
-    - two
-}
-
-== function f_shuffle_stopping => string ==
-{stopping shuffle:
-    - one
-    - two
-    - final
-}
-
-== function f_shuffle_once => string ==
-{shuffle once:
-    - one
-    - two
-}
-"#,
-                    false,
-                    false,
-                )
-                .expect("compile should succeed");
-
-            assert_eq!(
-                "Once: one two\nStopping: one two two two\nDefault: one two two two\nCycle: one two one two\nShuffle: two one two one\nShuffle stopping: one two final final\nShuffle once: two one\n",
-                story.cont_maximally()
-            );
-        });
-    }
-
-    // C#:         [Test()]
     //         public void TestCallStackEvaluation()
     //         {
     //             var storyStr =
@@ -2655,113 +2072,6 @@ Shuffle once: {f_shuffle_once()} {f_shuffle_once()} {f_shuffle_once()} {f_shuffl
                 )
                 .expect("compile should succeed");
             assert_eq!("8\n", story.cont());
-        });
-    }
-
-    // C#:         [Test()]
-    //         public void TestConditionalChoiceInWeave()
-    //         {
-    //             var storyStr =
-    //                 @"
-    // - start
-    //  {
-    //     - true: * [go to a stitch] -> a_stitch
-    //  }
-    // - gather should be seen
-    // -> DONE
-    //
-    // = a_stitch
-    //     result
-    //     -> END
-    //                 ";
-    //
-    //             Story story = CompileString(storyStr);
-    //
-    //             Assert.AreEqual("start\ngather should be seen\n", story.ContinueMaximally());
-    //             Assert.AreEqual(1, story.currentChoices.Count);
-    //
-    //             story.ChooseChoiceIndex(0);
-    //
-    //             Assert.AreEqual("result\n", story.Continue());
-    //         }
-    #[test]
-    fn TestConditionalChoiceInWeave() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
-- start
- {
-    - true: * [go to a stitch] -> a_stitch
- }
-- gather should be seen
--> DONE
-
-= a_stitch
-    result
-    -> END
-"#,
-                    false,
-                    false,
-                )
-                .expect("compile should succeed");
-
-            assert_eq!("start\ngather should be seen\n", story.cont_maximally());
-            assert_eq!(1, story.get_current_choices_len());
-            story.choose_choice_index(0);
-            assert_eq!("result\n", story.cont());
-        });
-    }
-
-    // C#:         [Test()]
-    //         public void TestConditionalChoiceInWeave2()
-    //         {
-    //             var storyStr =
-    //                 @"
-    // - first gather
-    //     * [option 1]
-    //     * [option 2]
-    // - the main gather
-    // {false:
-    //     * unreachable option -> END
-    // }
-    // - bottom gather";
-    //
-    //             Story story = CompileString(storyStr);
-    //
-    //             Assert.AreEqual("first gather\n", story.Continue());
-    //
-    //             Assert.AreEqual(2, story.currentChoices.Count);
-    //
-    //             story.ChooseChoiceIndex(0);
-    //
-    //             Assert.AreEqual("the main gather\nbottom gather\n", story.ContinueMaximally());
-    //             Assert.AreEqual(0, story.currentChoices.Count);
-    //         }
-    #[test]
-    fn TestConditionalChoiceInWeave2() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
-- first gather
-    * [option 1]
-    * [option 2]
-- the main gather
-{false:
-    * unreachable option -> END
-}
-- bottom gather"#,
-                    false,
-                    false,
-                )
-                .expect("compile should succeed");
-
-            assert_eq!("first gather\n", story.cont());
-            assert_eq!(2, story.get_current_choices_len());
-            story.choose_choice_index(0);
-            assert_eq!("the main gather\nbottom gather\n", story.cont_maximally());
-            assert_eq!(0, story.get_current_choices_len());
         });
     }
 
@@ -2814,7 +2124,7 @@ Shuffle once: {f_shuffle_once()} {f_shuffle_once()} {f_shuffle_once()} {f_shuffl
                 .expect("compile should succeed");
             story.cont_maximally();
 
-            assert_eq!(4, story.get_current_choices_len());
+            assert_eq!(4, story.current_choices_len());
             assert_eq!("one", story.current_choices()[0].text.clone());
             assert_eq!("two", story.current_choices()[1].text.clone());
             assert_eq!("three", story.current_choices()[2].text.clone());
@@ -2937,67 +2247,6 @@ CONST c: int = 5
     }
 
     // C#:         [Test()]
-    //         public void TestDefaultChoices()
-    //         {
-    //             Story story = CompileString(@"
-    //  - (start)
-    //  * [Choice 1]
-    //  * [Choice 2]
-    //  * {false} Impossible choice
-    //  * -> default
-    //  - After choice
-    //  -> start
-    //
-    // == default ==
-    // This is default.
-    // -> DONE
-    // ");
-    //
-    //             Assert.AreEqual("", story.Continue());
-    //             Assert.AreEqual(2, story.currentChoices.Count);
-    //
-    //             story.ChooseChoiceIndex(0);
-    //             Assert.AreEqual("After choice\n", story.Continue());
-    //
-    //             Assert.AreEqual(1, story.currentChoices.Count);
-    //
-    //             story.ChooseChoiceIndex(0);
-    //             Assert.AreEqual("After choice\nThis is default.\n", story.ContinueMaximally());
-    //         }
-    #[test]
-    fn TestDefaultChoices() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
- - (start)
- * [Choice 1]
- * [Choice 2]
- * {false} Impossible choice
- * -> default
- - After choice
- -> start
-
-== default ==
-This is default.
--> DONE
-"#,
-                    false,
-                    false,
-                )
-                .expect("compile should succeed");
-
-            assert_eq!("", story.cont());
-            assert_eq!(2, story.get_current_choices_len());
-            story.choose_choice_index(0);
-            assert_eq!("After choice\n", story.cont());
-            assert_eq!(1, story.get_current_choices_len());
-            story.choose_choice_index(0);
-            assert_eq!("After choice\nThis is default.\n", story.cont_maximally());
-        });
-    }
-
-    // C#:         [Test()]
     //         public void TestDefaultSimpleGather()
     //         {
     //             var story = CompileString(@"
@@ -3021,46 +2270,6 @@ This is default.
                 )
                 .expect("compile should succeed");
             assert_eq!("x\n", story.cont());
-        });
-    }
-
-    // C#:         [Test()]
-    //         public void TestDivertInConditional()
-    //         {
-    //             var storyStr =
-    //                 @"
-    // === intro
-    // = top
-    //     { main: -> done }
-    //     -> END
-    // = main
-    //     -> top
-    // = done
-    //     -> END
-    //                 ";
-    //
-    //             Story story = CompileString(storyStr);
-    //             Assert.AreEqual("", story.ContinueMaximally());
-    //         }
-    #[test]
-    fn TestDivertInConditional() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
-=== intro
-= top
-    { main: -> done }
-    -> END
-= main
-    -> top
-= done
-    -> END"#,
-                    false,
-                    false,
-                )
-                .expect("compile should succeed");
-            assert_eq!("", story.cont_maximally());
         });
     }
 
@@ -3091,66 +2300,6 @@ Knot.
             );
 
             assert!(suite.had_error(Some("not found")));
-        });
-    }
-
-    // C#:         [Test()]
-    //         public void TestDivertToWeavePoints()
-    //         {
-    //             var storyStr =
-    //                 @"
-    // -> knot.stitch.gather
-    //
-    // == knot ==
-    // = stitch
-    // - hello
-    //     * (choice) test
-    //         choice content
-    // - (gather)
-    //   gather
-    //
-    //   {stopping:
-    //     - -> knot.stitch.choice
-    //     - second time round
-    //   }
-    //
-    // -> END
-    //                 ";
-    //
-    //             Story story = CompileString(storyStr);
-    //
-    //             Assert.AreEqual("gather\ntest\nchoice content\ngather\nsecond time round\n", story.ContinueMaximally());
-    //         }
-    #[test]
-    fn TestDivertToWeavePoints() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
--> knot.stitch.gather
-
-== knot ==
-= stitch
-- hello
-    * (choice) test
-        choice content
-- (gather)
-  gather
-
-  {stopping:
-    - -> knot.stitch.choice
-    - second time round
-  }
-
--> END"#,
-                    false,
-                    false,
-                )
-                .expect("compile should succeed");
-            assert_eq!(
-                "gather\ntest\nchoice content\ngather\nsecond time round\n",
-                story.cont_maximally()
-            );
         });
     }
 
@@ -3418,61 +2567,6 @@ Knot.
                 .expect("compile should succeed");
 
             assert_eq!("", story.cont());
-        });
-    }
-
-    // C#:         [Test()]
-    //         public void TestEmptySequenceContent()
-    //         {
-    //             var story = CompileString(@"
-    // -> thing ->
-    // -> thing ->
-    // -> thing ->
-    // -> thing ->
-    // -> thing ->
-    // Done.
-    //
-    // == thing ==
-    // {once:
-    //   - Wait for it....
-    //   -
-    //   -
-    //   -  Surprise!
-    // }
-    // ->->
-    // ");
-    //             Assert.AreEqual("Wait for it....\nSurprise!\nDone.\n", story.ContinueMaximally());
-    //         }
-    #[test]
-    fn TestEmptySequenceContent() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
--> thing ->
--> thing ->
--> thing ->
--> thing ->
--> thing ->
-Done.
-
-== thing ==
-{once:
-  - Wait for it....
-  -
-  -
-  -  Surprise!
-}
-->->
-"#,
-                    false,
-                    false,
-                )
-                .expect("compile should succeed");
-            assert_eq!(
-                "Wait for it....\nSurprise!\nDone.\n",
-                story.cont_maximally()
-            );
         });
     }
 
@@ -3755,140 +2849,6 @@ world
     }
 
     // C#:         [Test()]
-    //         public void TestReadCountAcrossCallstack()
-    //         {
-    //             var story = CompileString(@"
-    // -> first
-    //
-    // == first ==
-    // 1) Seen first {first} times.
-    // -> second ->
-    // 2) Seen first {first} times.
-    // -> DONE
-    //
-    // == second ==
-    // In second.
-    // ->->
-    // ");
-    //             Assert.AreEqual("1) Seen first 1 times.\nIn second.\n2) Seen first 1 times.\n", story.ContinueMaximally());
-    //         }
-    #[test]
-    fn TestReadCountAcrossCallstack() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
--> first
-
-== first ==
-1) Seen first {first} times.
--> second ->
-2) Seen first {first} times.
--> DONE
-
-== second ==
-In second.
-->->
-"#,
-                    false,
-                    false,
-                )
-                .expect("compile should succeed");
-            assert_eq!(
-                "1) Seen first 1 times.\nIn second.\n2) Seen first 1 times.\n",
-                story.cont_maximally()
-            );
-        });
-    }
-
-    // C#:         [Test()]
-    //         public void TestReadCountAcrossThreads()
-    //         {
-    //             var story = CompileString(@"
-    //     -> top
-    //
-    // = top
-    //     {top}
-    //     <- aside
-    //     {top}
-    //     -> DONE
-    //
-    // = aside
-    //     * {false} DONE
-    // 	- -> DONE
-    // ");
-    //             Assert.AreEqual("1\n1\n", story.ContinueMaximally());
-    //         }
-    #[test]
-    fn TestReadCountAcrossThreads() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
-    -> top
-
-= top
-    {top}
-    <- aside
-    {top}
-    -> DONE
-
-= aside
-    * {false} DONE
-	- -> DONE
-"#,
-                    false,
-                    false,
-                )
-                .expect("compile should succeed");
-            assert_eq!("1\n1\n", story.cont_maximally());
-        });
-    }
-
-    // C#:         [Test()]
-    //         public void TestReadCountDotSeparatedPath()
-    //         {
-    //             Story story = CompileString(@"
-    // -> hi ->
-    // -> hi ->
-    // -> hi ->
-    //
-    // { hi.stitch_to_count }
-    //
-    // == hi ==
-    // = stitch_to_count
-    // hi
-    // ->->
-    // ");
-    //
-    //             Assert.AreEqual("hi\nhi\nhi\n3\n", story.ContinueMaximally());
-    //         }
-    #[test]
-    fn TestReadCountDotSeparatedPath() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
--> hi ->
--> hi ->
--> hi ->
-
-{ hi.stitch_to_count }
-
-== hi ==
-= stitch_to_count
-hi
-->->
-"#,
-                    false,
-                    false,
-                )
-                .expect("compile should succeed");
-            assert_eq!("hi\nhi\nhi\n3\n", story.cont_maximally());
-        });
-    }
-
-    // C#:         [Test()]
     //         public void TestReturnTextWarning()
     //         {
     //             InkParser parser = new InkParser("== test ==\n return something",
@@ -3947,43 +2907,6 @@ as fast as we could.
                 "We hurried home to Savile Row as fast as we could.\n",
                 story.cont()
             );
-        });
-    }
-
-    // C#:         [Test()]
-    //         public void TestShouldntGatherDueToChoice()
-    //         {
-    //             Story story = CompileString(@"
-    // * opt
-    //     - - text
-    //     * * {false} impossible
-    //     * * -> END
-    // - gather");
-    //
-    //             story.ContinueMaximally();
-    //             story.ChooseChoiceIndex(0);
-    //
-    //             // Shouldn't go to "gather"
-    //             Assert.AreEqual("opt\ntext\n", story.ContinueMaximally());
-    //         }
-    #[test]
-    fn TestShouldntGatherDueToChoice() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
-* opt
-    - - text
-    * * {false} impossible
-    * * -> END
-- gather"#,
-                    false,
-                    false,
-                )
-                .expect("compile should succeed");
-            story.cont_maximally();
-            story.choose_choice_index(0);
-            assert_eq!("opt\ntext\n", story.cont_maximally());
         });
     }
 
@@ -4078,42 +3001,6 @@ CONST kX: string = "hi"
                 )
                 .expect("compile should succeed");
             assert_eq!("hi\n", story.cont());
-        });
-    }
-
-    // C#:         [Test()]
-    //         public void TestStringsInChoices()
-    //         {
-    //             var story = CompileString(@"
-    // * \ {""test1""} [""test2 {""test3""}""] {""test4""}
-    // -> DONE
-    // ");
-    //             story.ContinueMaximally();
-    //
-    //             Assert.AreEqual(1, story.currentChoices.Count);
-    //             Assert.AreEqual(@"test1 ""test2 test3""", story.currentChoices[0].text);
-    //
-    //             story.ChooseChoiceIndex(0);
-    //             Assert.AreEqual("test1 test4\n", story.Continue());
-    //         }
-    #[test]
-    fn TestStringsInChoices() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
-* \ {"test1"} ["test2 {"test3"}"] {"test4"}
--> DONE
-"#,
-                    false,
-                    false,
-                )
-                .expect("compile should succeed");
-            story.cont_maximally();
-            assert_eq!(1, story.current_choices_len());
-            assert_eq!(r#"test1 "test2 test3""#, story.current_choices()[0].text);
-            story.choose_choice_index(0);
-            assert_eq!("test1 test4\n", story.cont());
         });
     }
 
@@ -4343,216 +3230,6 @@ Done.
     }
 
     // C#:         [Test()]
-    //         public void TestTurnsSince()
-    //         {
-    //             Story story = CompileString(@"
-    // { TURNS_SINCE(-> test) }
-    // ~ test()
-    // { TURNS_SINCE(-> test) }
-    // * [choice 1]
-    // - { TURNS_SINCE(-> test) }
-    // * [choice 2]
-    // - { TURNS_SINCE(-> test) }
-    //
-    // == function test ==
-    // ~ return
-    // ");
-    //             Assert.AreEqual("-1\n0\n", story.ContinueMaximally());
-    //
-    //             story.ChooseChoiceIndex(0);
-    //             Assert.AreEqual("1\n", story.ContinueMaximally());
-    //
-    //             story.ChooseChoiceIndex(0);
-    //             Assert.AreEqual("2\n", story.ContinueMaximally());
-    //         }
-    #[test]
-    fn TestTurnsSince() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
-{ TURNS_SINCE(-> test) }
-~ test()
-{ TURNS_SINCE(-> test) }
-* [choice 1]
-- { TURNS_SINCE(-> test) }
-* [choice 2]
-- { TURNS_SINCE(-> test) }
-
-== function test => void ==
-~ return
-"#,
-                    false,
-                    false,
-                )
-                .expect("compile should succeed");
-            assert_eq!("-1\n0\n", story.cont_maximally());
-            story.choose_choice_index(0);
-            assert_eq!("1\n", story.cont_maximally());
-            story.choose_choice_index(0);
-            assert_eq!("2\n", story.cont_maximally());
-        });
-    }
-
-    // C#:         [Test()]
-    //         public void TestTurnsSinceNested()
-    //         {
-    //             var story = CompileString(@"
-    // -> empty_world
-    // === empty_world ===
-    //     {TURNS_SINCE(-> then)} = -1
-    //     * (then) stuff
-    //         {TURNS_SINCE(-> then)} = 0
-    //         * * (next) more stuff
-    //             {TURNS_SINCE(-> then)} = 1
-    //         -> DONE
-    // ");
-    //             Assert.AreEqual("-1 = -1\n", story.ContinueMaximally());
-    //
-    //             Assert.AreEqual(1, story.currentChoices.Count);
-    //             story.ChooseChoiceIndex(0);
-    //
-    //             Assert.AreEqual("stuff\n0 = 0\n", story.ContinueMaximally());
-    //
-    //             Assert.AreEqual(1, story.currentChoices.Count);
-    //             story.ChooseChoiceIndex(0);
-    //
-    //             Assert.AreEqual("more stuff\n1 = 1\n", story.ContinueMaximally());
-    //         }
-    #[test]
-    fn TestTurnsSinceNested() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
--> empty_world
-=== empty_world ===
-    {TURNS_SINCE(-> then)} = -1
-    * (then) stuff
-        {TURNS_SINCE(-> then)} = 0
-        * * (next) more stuff
-            {TURNS_SINCE(-> then)} = 1
-        -> DONE
-"#,
-                    false,
-                    false,
-                )
-                .expect("compile should succeed");
-            assert_eq!("-1 = -1\n", story.cont_maximally());
-            assert_eq!(1, story.current_choices_len());
-            story.choose_choice_index(0);
-            assert_eq!("stuff\n0 = 0\n", story.cont_maximally());
-            assert_eq!(1, story.current_choices_len());
-            story.choose_choice_index(0);
-            assert_eq!("more stuff\n1 = 1\n", story.cont_maximally());
-        });
-    }
-
-    // C#:         [Test()]
-    //         public void TestTurnsSinceWithVariableTarget()
-    //         {
-    //             // Count all visits must be switched on for variable count targets
-    //             var story = CompileString(@"
-    // -> start
-    //
-    // === start ===
-    //     {beats(-> start)}
-    //     {beats(-> start)}
-    //     *   [Choice]  -> next
-    // = next
-    //     {beats(-> start)}
-    //     -> END
-    //
-    // === function beats(x) ===
-    //     ~ return TURNS_SINCE(x)
-    // ", countAllVisits: true);
-    //
-    //             Assert.AreEqual("0\n0\n", story.ContinueMaximally());
-    //
-    //             story.ChooseChoiceIndex(0);
-    //             Assert.AreEqual("1\n", story.ContinueMaximally());
-    //         }
-    #[test]
-    fn TestTurnsSinceWithVariableTarget() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
--> start
-
-=== start ===
-    {beats(-> start)}
-    {beats(-> start)}
-    *   [Choice]  -> next
-= next
-    {beats(-> start)}
-    -> END
-
-=== function beats(x: ->) => int ===
-    ~ return TURNS_SINCE(x)
-"#,
-                    true,
-                    false,
-                )
-                .expect("compile should succeed");
-            assert_eq!("0\n0\n", story.cont_maximally());
-            story.choose_choice_index(0);
-            assert_eq!("1\n", story.cont_maximally());
-        });
-    }
-
-    // C#:         [Test()]
-    //         public void TestUnbalancedWeaveIndentation()
-    //         {
-    //             var story = CompileString(@"
-    // * * * First
-    // * * * * Very indented
-    // - - End
-    // -> END
-    // ");
-    //             story.ContinueMaximally();
-    //
-    //             Assert.AreEqual(1, story.currentChoices.Count);
-    //             Assert.AreEqual("First", story.currentChoices[0].text);
-    //
-    //             story.ChooseChoiceIndex(0);
-    //             Assert.AreEqual("First\n", story.ContinueMaximally());
-    //             Assert.AreEqual(1, story.currentChoices.Count);
-    //             Assert.AreEqual("Very indented", story.currentChoices[0].text);
-    //
-    //             story.ChooseChoiceIndex(0);
-    //             Assert.AreEqual("Very indented\nEnd\n", story.ContinueMaximally());
-    //             Assert.AreEqual(0, story.currentChoices.Count);
-    //         }
-    #[test]
-    fn TestUnbalancedWeaveIndentation() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
-* * * First
-* * * * Very indented
-- - End
--> END
-"#,
-                    false,
-                    false,
-                )
-                .expect("compile should succeed");
-            story.cont_maximally();
-            assert_eq!(1, story.current_choices_len());
-            assert_eq!("First", story.current_choices()[0].text);
-            story.choose_choice_index(0);
-            assert_eq!("First\n", story.cont_maximally());
-            assert_eq!(1, story.current_choices_len());
-            assert_eq!("Very indented", story.current_choices()[0].text);
-            story.choose_choice_index(0);
-            assert_eq!("Very indented\nEnd\n", story.cont_maximally());
-            assert_eq!(0, story.current_choices_len());
-        });
-    }
-
-    // C#:         [Test()]
     //         public void TestVariableDeclarationInConditional()
     //         {
     //             var storyStr =
@@ -4587,116 +3264,6 @@ VAR x: int = 0
                 )
                 .expect("compile should succeed");
             assert_eq!("5\n", story.cont());
-        });
-    }
-
-    // C#:         [Test()]
-    //         public void TestVariableGetSetAPI()
-    //         {
-    //             var story = CompileString(@"
-    // VAR x = 5
-    //
-    // {x}
-    //
-    // * [choice]
-    // -
-    // {x}
-    //
-    // * [choice]
-    // -
-    //
-    // {x}
-    //
-    // * [choice]
-    // -
-    //
-    // {x}
-    //
-    // -> DONE
-    // ");
-    //
-    //             // Initial state
-    //             Assert.AreEqual("5\n", story.ContinueMaximally());
-    //             Assert.AreEqual(5, story.variablesState["x"]);
-    //
-    //             story.variablesState["x"] = 10;
-    //             story.ChooseChoiceIndex(0);
-    //             Assert.AreEqual("10\n", story.ContinueMaximally());
-    //             Assert.AreEqual(10, story.variablesState["x"]);
-    //
-    //             story.variablesState["x"] = 8.5f;
-    //             story.ChooseChoiceIndex(0);
-    //             Assert.AreEqual("8"+ System.Globalization.NumberFormatInfo.CurrentInfo.NumberDecimalSeparator+"5\n", story.ContinueMaximally());
-    //             Assert.AreEqual(8.5f, story.variablesState["x"]);
-    //
-    //             story.variablesState["x"] = "a string";
-    //             story.ChooseChoiceIndex(0);
-    //             Assert.AreEqual("a string\n", story.ContinueMaximally());
-    //             Assert.AreEqual("a string", story.variablesState["x"]);
-    //
-    //             Assert.AreEqual(null, story.variablesState["z"]);
-    //
-    //             // Not allowed arbitrary types
-    //             Assert.Throws<Exception>(() =>
-    //             {
-    //                 story.variablesState["x"] = new System.Text.StringBuilder();
-    //             });
-    //         }
-    #[test]
-    fn TestVariableGetSetAPI() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
-VAR x: int = 5
-
-{x}
-
-* [choice]
--
-{x}
-
-* [choice]
--
-
-{x}
-
-* [choice]
--
-
-{x}
-
--> DONE
-"#,
-                    false,
-                    false,
-                )
-                .expect("compile should succeed");
-
-            assert_eq!("5\n", story.cont_maximally());
-            assert_eq!(Some(ValueType::Int(5)), story.get_variable("x"));
-
-            story.set_variable("x", &ValueType::Int(10)).unwrap();
-            story.choose_choice_index(0);
-            assert_eq!("10\n", story.cont_maximally());
-            assert_eq!(Some(ValueType::Int(10)), story.get_variable("x"));
-
-            story.set_variable("x", &ValueType::Float(8.5)).unwrap();
-            story.choose_choice_index(0);
-            assert_eq!("8.5\n", story.cont_maximally());
-            assert_eq!(Some(ValueType::Float(8.5)), story.get_variable("x"));
-
-            story
-                .set_variable("x", &ValueType::String("a string".to_string()))
-                .unwrap();
-            story.choose_choice_index(0);
-            assert_eq!("a string\n", story.cont_maximally());
-            assert_eq!(
-                Some(ValueType::String("a string".to_string())),
-                story.get_variable("x")
-            );
-
-            assert_eq!(None, story.get_variable("z"));
         });
     }
 
@@ -4889,52 +3456,6 @@ VAR val: int = 5
                 .expect("compile should succeed");
 
             assert_eq!("1 2\n", story.cont_maximally());
-        });
-    }
-
-    // C#:         [Test()]
-    //         public void TestVariableTunnel()
-    //         {
-    //             var story = CompileString(@"
-    // -> one_then_tother(-> tunnel)
-    //
-    // === one_then_tother(-> x) ===
-    //     -> x -> end
-    //
-    // === tunnel ===
-    //     STUFF
-    //     ->->
-    //
-    // === end ===
-    //     -> END
-    // ");
-    //
-    //             Assert.AreEqual("STUFF\n", story.ContinueMaximally());
-    //         }
-    #[test]
-    fn TestVariableTunnel() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
--> one_then_tother(-> tunnel)
-
-=== one_then_tother(-> x) ===
-    -> x -> end
-
-=== tunnel ===
-    STUFF
-    ->->
-
-=== end ===
-    -> END
-"#,
-                    false,
-                    false,
-                )
-                .expect("compile should succeed");
-
-            assert_eq!("STUFF\n", story.cont_maximally());
         });
     }
 
@@ -5150,33 +3671,6 @@ Unreachable
     }
 
     // C#:         [Test ()]
-    //         public void TestVariousBlankChoiceWarning ()
-    //         {
-    //         	var storyStr =
-    //         @"
-    // * [] blank
-    //         ";
-    //
-    //         	CompileString (storyStr, testingErrors:true);
-    //             Assert.IsTrue (HadWarning ("Blank choice"));
-    //         }
-    #[test]
-    fn TestVariousBlankChoiceWarning() {
-        run_in_both_modes(|suite| {
-            suite
-                .compile_string(
-                    r#"
-* [] blank
-        "#,
-                    false,
-                    true,
-                )
-                .expect("compile should succeed");
-            assert!(suite.had_warning(Some("Blank choice")));
-        });
-    }
-
-    // C#:         [Test ()]
     //         public void TestTunnelOnwardsWithParamDefaultChoice ()
     //         {
     //             var storyStr =
@@ -5263,104 +3757,6 @@ This is the_esc
                 )
                 .expect("compile should succeed");
             assert_eq!("This is outer\nThis is the_esc\n", story.cont_maximally());
-        });
-    }
-
-    // C#:         [Test ()]
-    //         public void TestReadCountVariableTarget ()
-    //         {
-    //             var storyStr =
-    // @"
-    // VAR x = ->knot
-    //
-    // Count start: {READ_COUNT (x)} {READ_COUNT (-> knot)} {knot}
-    //
-    // -> x (1) ->
-    // -> x (2) ->
-    // -> x (3) ->
-    //
-    // Count end: {READ_COUNT (x)} {READ_COUNT (-> knot)} {knot}
-    // -> END
-    //
-    //
-    // == knot (a) ==
-    // {a}
-    // ->->
-    // ";
-    //
-    //             var story = CompileString (storyStr, countAllVisits:true);
-    //             Assert.AreEqual ("Count start: 0 0 0\n1\n2\n3\nCount end: 3 3 3\n", story.ContinueMaximally ());
-    //         }
-    #[test]
-    fn TestReadCountVariableTarget() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
-VAR x: -> = ->knot
-
-Count start: {READ_COUNT (x)} {READ_COUNT (-> knot)} {knot}
-
--> x (1) ->
--> x (2) ->
--> x (3) ->
-
-Count end: {READ_COUNT (x)} {READ_COUNT (-> knot)} {knot}
--> END
-
-
-== knot (a) ==
-{a}
-->->
-"#,
-                    true,
-                    false,
-                )
-                .expect("compile should succeed");
-            assert_eq!(
-                "Count start: 0 0 0\n1\n2\n3\nCount end: 3 3 3\n",
-                story.cont_maximally()
-            );
-        });
-    }
-
-    // C#:         [Test ()]
-    //         public void TestDivertTargetsWithParameters ()
-    //         {
-    //             var storyStr =
-    // @"
-    // VAR x = ->place
-    //
-    // ->x (5)
-    //
-    // == place (a) ==
-    // {a}
-    // -> DONE
-    // ";
-    //
-    //             var story = CompileString (storyStr);
-    //
-    //             Assert.AreEqual ("5\n", story.ContinueMaximally ());
-    //         }
-    #[test]
-    fn TestDivertTargetsWithParameters() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
-VAR x: -> = ->place
-
--> x (5)
-
-== place (a) ==
-{a}
--> DONE
-"#,
-                    false,
-                    false,
-                )
-                .expect("compile should succeed");
-            assert_eq!("5\n", story.cont_maximally());
         });
     }
 
@@ -5784,74 +4180,6 @@ x = {x}, y = {y}
         });
     }
 
-    // C#:         [Test ()]
-    //         public void TestEvaluationStackLeaks ()
-    //         {
-    //         	var storyStr =
-    // @"
-    // {false:
-    //
-    // - else:
-    //     else
-    // }
-    //
-    // {6:
-    // - 5: five
-    // - else: else
-    // }
-    //
-    // -> onceTest ->
-    // -> onceTest ->
-    //
-    // == onceTest ==
-    // {once:
-    // - hi
-    // }
-    // ->->
-    // ";
-    //
-    //         	var story = CompileString (storyStr);
-    //
-    //         	var result = story.ContinueMaximally ();
-    //
-    //         	Assert.AreEqual ("else\nelse\nhi\n", result);
-    //             Assert.IsTrue (story.state.evaluationStack.Count == 0);
-    //         }
-    #[test]
-    fn TestEvaluationStackLeaks() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
-{false:
-
-- else:
-    else
-}
-
-{6:
-- 5: five
-- else: else
-}
-
--> onceTest ->
--> onceTest ->
-
-== onceTest ==
-{once:
-- hi
-}
-->->
-"#,
-                    false,
-                    false,
-                )
-                .expect("compile should succeed");
-            assert_eq!("else\nelse\nhi\n", story.cont_maximally());
-            assert!(!story.can_continue());
-        });
-    }
-
     // C#:         [Test()]
     //         public void TestFallbackChoiceOnThread()
     //         {
@@ -6036,77 +4364,6 @@ In top external
             story.choose_choice_index(0);
             story.cont();
             assert_eq!("world", story.current_choices()[0].text.clone());
-        });
-    }
-
-    // C#:         [Test()]
-    //         public void TestGatherReadCountWithInitialSequence()
-    //         {
-    //             var story = CompileString(@"
-    // - (opts)
-    // {test:seen test}
-    // - (test)
-    // { -> opts |}
-    // ");
-    //
-    //             Assert.AreEqual("seen test\n", story.Continue());
-    //         }
-    #[test]
-    fn TestGatherReadCountWithInitialSequence() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
-- (opts)
-{test:seen test}
-- (test)
-{ -> opts |}
-"#,
-                    false,
-                    false,
-                )
-                .expect("compile should succeed");
-            assert_eq!("seen test\n", story.cont());
-        });
-    }
-
-    // C#:         [Test()]
-    //         public void TestHasReadOnChoice()
-    //         {
-    //             var storyStr =
-    //                 @"
-    // * { not test } visible choice
-    // * { test } visible choice
-    //
-    // == test ==
-    // -> END
-    //                 ";
-    //
-    //             Story story = CompileString(storyStr);
-    //             story.ContinueMaximally();
-    //
-    //             Assert.AreEqual(1, story.currentChoices.Count);
-    //             Assert.AreEqual("visible choice", story.currentChoices[0].text);
-    //         }
-    #[test]
-    fn TestHasReadOnChoice() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
-* { not test } visible choice
-* { test } visible choice
-
-== test ==
--> END
-"#,
-                    false,
-                    false,
-                )
-                .expect("compile should succeed");
-            story.cont_maximally();
-            assert_eq!(1, story.current_choices().len());
-            assert_eq!("visible choice", story.current_choices()[0].text.clone());
         });
     }
 
@@ -6363,133 +4620,6 @@ VAR x: int = 5
     }
 
     // C#:         [Test()]
-    //         public void TestKnotStitchGatherCounts()
-    //         {
-    //             var storyStr =
-    //         @"
-    // VAR knotCount = 0
-    // VAR stitchCount = 0
-    //
-    // -> gather_count_test ->
-    //
-    // ~ knotCount = 0
-    // -> knot_count_test ->
-    //
-    // ~ knotCount = 0
-    // -> knot_count_test ->
-    //
-    // -> stitch_count_test ->
-    //
-    // == gather_count_test ==
-    // VAR gatherCount = 0
-    // - (loop)
-    // ~ gatherCount++
-    // {gatherCount} {loop}
-    // {gatherCount<3:->loop}
-    // ->->
-    //
-    // == knot_count_test ==
-    // ~ knotCount++
-    // {knotCount} {knot_count_test}
-    // {knotCount<3:->knot_count_test}
-    // ->->
-    //
-    //
-    // == stitch_count_test ==
-    // ~ stitchCount = 0
-    // -> stitch ->
-    // ~ stitchCount = 0
-    // -> stitch ->
-    // ->->
-    //
-    // = stitch
-    // ~ stitchCount++
-    // {stitchCount} {stitch}
-    // {stitchCount<3:->stitch}
-    // ->->
-    // ";
-    //
-    //             // Ensure it just compiles
-    //             var story = CompileString(storyStr);
-    //
-    //             Assert.AreEqual(
-    // @"1 1
-    // 2 2
-    // 3 3
-    // 1 1
-    // 2 1
-    // 3 1
-    // 1 2
-    // 2 2
-    // 3 2
-    // 1 1
-    // 2 1
-    // 3 1
-    // 1 2
-    // 2 2
-    // 3 2
-    // ".Replace(Environment.NewLine, "\n"), story.ContinueMaximally());
-    //         }
-    #[test]
-    fn TestKnotStitchGatherCounts() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
-VAR knotCount: int = 0
-VAR stitchCount: int = 0
-VAR gatherCount: int = 0
-
--> gather_count_test ->
-
-~ knotCount = 0
--> knot_count_test ->
-
-~ knotCount = 0
--> knot_count_test ->
-
--> stitch_count_test ->
-
-== gather_count_test ==
-~ gatherCount = 0
-- (loop)
-~ gatherCount++
-{gatherCount} {loop}
-{gatherCount<3:->loop}
-->->
-
-== knot_count_test ==
-~ knotCount++
-{knotCount} {knot_count_test}
-{knotCount<3:->knot_count_test}
-->->
-
-
-== stitch_count_test ==
-~ stitchCount = 0
--> stitch ->
-~ stitchCount = 0
--> stitch ->
-->->
-
-= stitch
-~ stitchCount++
-{stitchCount} {stitch}
-{stitchCount<3:->stitch}
-->->
-"#,
-                    false,
-                    false,
-                )
-                .expect("compile should succeed");
-            assert_eq!(
-                "1 1\n2 2\n3 3\n1 1\n2 1\n3 1\n1 2\n2 2\n3 2\n1 1\n2 1\n3 1\n1 2\n2 2\n3 2\n",
-                story.cont_maximally()
-            );
-        });
-    }
-
-    // C#:         [Test()]
     //         public void TestKnotTerminationSkipsGlobalObjects()
     //         {
     //             CompileStringWithoutRuntime(@"
@@ -6516,175 +4646,6 @@ CONST Y: int = 2
             true,
         );
         assert!(suite.warning_messages().is_empty());
-    }
-
-    // C#:         [Test()]
-    //         public void TestKnotThreadInteraction()
-    //         {
-    //             Story story = CompileString(@"
-    // -> knot
-    // === knot
-    //     <- threadB
-    //     -> tunnel ->
-    //     THE END
-    //     -> END
-    //
-    // === tunnel
-    //     - blah blah
-    //     * wigwag
-    //     - ->->
-    //
-    // === threadB
-    //     *   option
-    //     -   something
-    //         -> DONE
-    // ");
-    //
-    //             Assert.AreEqual("blah blah\n", story.ContinueMaximally());
-    //
-    //             Assert.AreEqual(2, story.currentChoices.Count);
-    //             Assert.IsTrue(story.currentChoices[0].text.Contains("option"));
-    //             Assert.IsTrue(story.currentChoices[1].text.Contains("wigwag"));
-    //
-    //             story.ChooseChoiceIndex(1);
-    //             Assert.AreEqual("wigwag\n", story.Continue());
-    //             Assert.AreEqual("THE END\n", story.Continue());
-    //         }
-    #[test]
-    fn TestKnotThreadInteraction() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
--> knot
-=== knot
-    <- threadB
-    -> tunnel ->
-    THE END
-    -> END
-
-=== tunnel
-    - blah blah
-    * wigwag
-    - ->->
-
-=== threadB
-    *   option
-    -   something
-        -> DONE
-"#,
-                    false,
-                    false,
-                )
-                .expect("compile should succeed");
-            assert_eq!("blah blah\n", story.cont_maximally());
-            assert_eq!(2, story.current_choices().len());
-            assert!(story.current_choices()[0].text.contains("option"));
-            assert!(story.current_choices()[1].text.contains("wigwag"));
-            story.choose_choice_index(1);
-            assert_eq!("wigwag\n", story.cont());
-            assert_eq!("THE END\n", story.cont());
-        });
-    }
-
-    // C#:         [Test()]
-    //         public void TestKnotThreadInteraction2()
-    //         {
-    //             Story story = CompileString(@"
-    // -> knot
-    // === knot
-    //     <- threadA
-    //     When should this get printed?
-    //     -> DONE
-    //
-    // === threadA
-    //     -> tunnel ->
-    //     Finishing thread.
-    //     -> DONE
-    //
-    // === tunnel
-    //     -   I’m in a tunnel
-    //     *   I’m an option
-    //     -   ->->
-    //
-    // ");
-    //
-    //             Assert.AreEqual("I’m in a tunnel\nWhen should this get printed?\n", story.ContinueMaximally());
-    //             Assert.AreEqual(1, story.currentChoices.Count);
-    //             Assert.AreEqual(story.currentChoices[0].text, "I’m an option");
-    //
-    //             story.ChooseChoiceIndex(0);
-    //             Assert.AreEqual("I’m an option\nFinishing thread.\n", story.ContinueMaximally());
-    //         }
-    #[test]
-    fn TestKnotThreadInteraction2() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
--> knot
-=== knot
-    <- threadA
-    When should this get printed?
-    -> DONE
-
-=== threadA
-    -> tunnel ->
-    Finishing thread.
-    -> DONE
-
-=== tunnel
-    -   I'm in a tunnel
-    *   I'm an option
-    -   ->->
-
-"#,
-                    false,
-                    false,
-                )
-                .expect("compile should succeed");
-            assert_eq!(
-                "I'm in a tunnel\nWhen should this get printed?\n",
-                story.cont_maximally()
-            );
-            assert_eq!(1, story.current_choices().len());
-            assert_eq!(story.current_choices()[0].text.clone(), "I'm an option");
-            story.choose_choice_index(0);
-            assert_eq!("I'm an option\nFinishing thread.\n", story.cont_maximally());
-        });
-    }
-
-    // C#:         [Test()]
-    //         public void TestLeadingNewlineMultilineSequence()
-    //         {
-    //             var story = CompileString(@"
-    // {stopping:
-    //
-    // - a line after an empty line
-    // - blah
-    // }
-    // ");
-    //
-    //             Assert.AreEqual("a line after an empty line\n", story.Continue());
-    //         }
-    #[test]
-    fn TestLeadingNewlineMultilineSequence() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
-{stopping:
-
-- a line after an empty line
-- blah
-}
-"#,
-                    false,
-                    false,
-                )
-                .expect("compile should succeed");
-            assert_eq!("a line after an empty line\n", story.cont());
-        });
     }
 
     // C#:         [Test ()]
@@ -6762,53 +4723,6 @@ VAR negativeLiteral3: bool = !(false)
                 )
                 .expect("compile should succeed");
             assert_eq!("-1\nfalse\ntrue\n", story.cont_maximally());
-        });
-    }
-
-    // C#:         [Test()]
-    //         public void TestLogicInChoices()
-    //         {
-    //             var story = CompileString(@"
-    // * 'Hello {name()}[, your name is {name()}.'],' I said, knowing full well that his name was {name()}.
-    // -> DONE
-    //
-    // == function name ==
-    // Joe
-    // ");
-    //
-    //             story.ContinueMaximally();
-    //
-    //             Assert.AreEqual("'Hello Joe, your name is Joe.'", story.currentChoices[0].text);
-    //             story.ChooseChoiceIndex(0);
-    //
-    //             Assert.AreEqual("'Hello Joe,' I said, knowing full well that his name was Joe.\n", story.ContinueMaximally());
-    //         }
-    #[test]
-    fn TestLogicInChoices() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
-* 'Hello {name()}[, your name is {name()}.'],' I said, knowing full well that his name was {name()}.
--> DONE
-
-== function name => string ==
-Joe
-"#,
-                    false,
-                    false,
-                )
-                .expect("compile should succeed");
-            story.cont_maximally();
-            assert_eq!(
-                "'Hello Joe, your name is Joe.'",
-                story.current_choices()[0].text.clone()
-            );
-            story.choose_choice_index(0);
-            assert_eq!(
-                "'Hello Joe,' I said, knowing full well that his name was Joe.\n",
-                story.cont_maximally()
-            );
         });
     }
 
@@ -6927,76 +4841,6 @@ Loose end when there's no weave
         assert_eq!(3, suite.warning_messages().len());
         assert!(suite.had_warning(Some("Apparent loose end")));
         assert_eq!(1, suite.author_messages().len());
-    }
-
-    // C#:         [Test()]
-    //         public void TestMultiThread()
-    //         {
-    //             Story story = CompileString(@"
-    // -> start
-    // == start ==
-    // -> tunnel ->
-    // The end
-    // -> END
-    //
-    // == tunnel ==
-    // <- place1
-    // <- place2
-    // -> DONE
-    //
-    // == place1 ==
-    // This is place 1.
-    // * choice in place 1
-    // - ->->
-    //
-    // == place2 ==
-    // This is place 2.
-    // * choice in place 2
-    // - ->->
-    // ");
-    //             Assert.AreEqual("This is place 1.\nThis is place 2.\n", story.ContinueMaximally());
-    //
-    //             story.ChooseChoiceIndex(0);
-    //             Assert.AreEqual("choice in place 1\nThe end\n", story.ContinueMaximally());
-    //         }
-    #[test]
-    fn TestMultiThread() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
--> start
-== start ==
--> tunnel ->
-The end
--> END
-
-== tunnel ==
-<- place1
-<- place2
--> DONE
-
-== place1 ==
-This is place 1.
-* choice in place 1
-- ->->
-
-== place2 ==
-This is place 2.
-* choice in place 2
-- ->->
-"#,
-                    false,
-                    false,
-                )
-                .expect("compile should succeed");
-            assert_eq!(
-                "This is place 1.\nThis is place 2.\n",
-                story.cont_maximally()
-            );
-            story.choose_choice_index(0);
-            assert_eq!("choice in place 1\nThe end\n", story.cont_maximally());
-        });
     }
 
     // C#:         [Test ()]
@@ -7206,96 +5050,6 @@ VAR globalVal: int = 5
         });
     }
 
-    // C#: public void TestNewlineConsistency()
-    // C#: {
-    // C#:     var storyStr =
-    // C#:         @"
-    // C#: hello -> world
-    // C#: == world
-    // C#: world
-    // C#: -> END";
-    // C#:
-    // C#:     var story = CompileString(storyStr);
-    // C#:     Assert.AreEqual("hello world\n", story.ContinueMaximally());
-    // C#:
-    // C#:     storyStr =
-    // C#: @"
-    // C#: * hello -> world
-    // C#: == world
-    // C#: world
-    // C#: -> END";
-    // C#:     story = CompileString(storyStr);
-    // C#:
-    // C#:     story.Continue();
-    // C#:     story.ChooseChoiceIndex(0);
-    // C#:     Assert.AreEqual("hello world\n", story.ContinueMaximally());
-    // C#:
-    // C#:
-    // C#:     storyStr =
-    // C#:     @"
-    // C#: * hello
-    // C#:     -> world
-    // C#: == world
-    // C#: world
-    // C#: -> END";
-    // C#:     story = CompileString(storyStr);
-    // C#:
-    // C#:     story.Continue();
-    // C#:     story.ChooseChoiceIndex(0);
-    // C#:     Assert.AreEqual("hello\nworld\n", story.ContinueMaximally());
-    // C#: }
-    #[test]
-    fn TestNewlineConsistency() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
-hello -> world
-== world
-world
--> END
-"#,
-                    false,
-                    false,
-                )
-                .expect("compile should succeed");
-            assert_eq!("hello world\n", story.cont_maximally());
-
-            let mut story = suite
-                .compile_string(
-                    r#"
-* hello -> world
-== world
-world
--> END
-"#,
-                    false,
-                    false,
-                )
-                .expect("compile should succeed");
-            story.cont();
-            story.choose_choice_index(0);
-            assert_eq!("hello world\n", story.cont_maximally());
-
-            let mut story = suite
-                .compile_string(
-                    r#"
-* hello
-    -> world
-== world
-world
--> END
-"#,
-                    false,
-                    false,
-                )
-                .expect("compile should succeed");
-            story.cont();
-            story.choose_choice_index(0);
-            assert_eq!("hello\nworld\n", story.cont_maximally());
-        });
-    }
-
     // C#: public void TestNewlinesTrimmingWithFuncExternalFallback()
     // C#: {
     // C#:     var storyStr =
@@ -7392,226 +5146,6 @@ B
         });
     }
 
-    // C#: public void TestNonTextInChoiceInnerContent()
-    // C#: {
-    // C#:     var storyStr =
-    // C#:         @"
-    // C#: -> knot
-    // C#: == knot
-    // C#:    *   option text[]. {true: Conditional bit.} -> next
-    // C#:    -> DONE
-    // C#:
-    // C#: == next
-    // C#:     Next.
-    // C#:     -> DONE
-    // C#:                 ";
-    // C#:
-    // C#:     Story story = CompileString(storyStr);
-    // C#:     story.Continue();
-    // C#:
-    // C#:     story.ChooseChoiceIndex(0);
-    // C#:     Assert.AreEqual("option text. Conditional bit. Next.\n", story.Continue());
-    // C#: }
-    #[test]
-    fn TestNonTextInChoiceInnerContent() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
--> knot
-== knot
-   *   option text[]. {true: Conditional bit.} -> next
-   -> DONE
-
-== next
-    Next.
-    -> DONE
-"#,
-                    false,
-                    false,
-                )
-                .expect("compile should succeed");
-            story.cont();
-            story.choose_choice_index(0);
-            assert_eq!("option text. Conditional bit. Next.\n", story.cont());
-        });
-    }
-
-    // C#: public void TestOnceOnlyChoicesCanLinkBackToSelf()
-    // C#: {
-    // C#:     var story = CompileString(@"
-    // C#: -> opts
-    // C#: = opts
-    // C#: *   (firstOpt) [First choice]   ->  opts
-    // C#: *   {firstOpt} [Second choice]  ->  opts
-    // C#: * -> end
-    // C#:
-    // C#: - (end)
-    // C#:     -> END
-    // C#: ");
-    // C#:
-    // C#:     story.ContinueMaximally();
-    // C#:
-    // C#:     Assert.AreEqual(1, story.currentChoices.Count);
-    // C#:     Assert.AreEqual("First choice", story.currentChoices[0].text);
-    // C#:
-    // C#:     story.ChooseChoiceIndex(0);
-    // C#:     story.ContinueMaximally();
-    // C#:
-    // C#:     Assert.AreEqual(1, story.currentChoices.Count);
-    // C#:     Assert.AreEqual("Second choice", story.currentChoices[0].text);
-    // C#:
-    // C#:     story.ChooseChoiceIndex(0);
-    // C#:     story.ContinueMaximally();
-    // C#:
-    // C#:     Assert.AreEqual(null, story.currentErrors);
-    // C#: }
-    #[test]
-    fn TestOnceOnlyChoicesCanLinkBackToSelf() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
--> opts
-= opts
-*   (firstOpt) [First choice]   ->  opts
-*   {firstOpt} [Second choice]  ->  opts
-* -> end
-
-- (end)
-    -> END
-"#,
-                    false,
-                    false,
-                )
-                .expect("compile should succeed");
-            story.cont_maximally();
-            assert_eq!(1, story.current_choices().len());
-            assert_eq!("First choice", story.current_choices()[0].text.clone());
-            story.choose_choice_index(0);
-            story.cont_maximally();
-            assert_eq!(1, story.current_choices().len());
-            assert_eq!("Second choice", story.current_choices()[0].text.clone());
-            story.choose_choice_index(0);
-            story.cont_maximally();
-            assert!(suite.error_messages().is_empty());
-        });
-    }
-
-    // C#: public void TestOnceOnlyChoicesWithOwnContent()
-    // C#: {
-    // C#:     Story story = CompileString(@"
-    // C#: VAR times = 3
-    // C#: -> home
-    // C#:
-    // C#: == home ==
-    // C#: ~ times = times - 1
-    // C#: {times >= 0:-> eat}
-    // C#: I've finished eating now.
-    // C#: -> END
-    // C#:
-    // C#: == eat ==
-    // C#: This is the {first|second|third} time.
-    // C#:  * Eat ice-cream[]
-    // C#:  * Drink coke[]
-    // C#:  * Munch cookies[]
-    // C#: -
-    // C#: -> home
-    // C#: ");
-    // C#:
-    // C#:     story.ContinueMaximally();
-    // C#:
-    // C#:     Assert.AreEqual(3, story.currentChoices.Count);
-    // C#:
-    // C#:     story.ChooseChoiceIndex(0);
-    // C#:     story.ContinueMaximally();
-    // C#:
-    // C#:     Assert.AreEqual(2, story.currentChoices.Count);
-    // C#:
-    // C#:     story.ChooseChoiceIndex(0);
-    // C#:     story.ContinueMaximally();
-    // C#:
-    // C#:     Assert.AreEqual(1, story.currentChoices.Count);
-    // C#:
-    // C#:     story.ChooseChoiceIndex(0);
-    // C#:     story.ContinueMaximally();
-    // C#:
-    // C#:     Assert.AreEqual(0, story.currentChoices.Count);
-    // C#: }
-    #[test]
-    fn TestOnceOnlyChoicesWithOwnContent() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
-VAR times: int = 3
--> home
-
-== home ==
-~ times = times - 1
-{times >= 0:-> eat}
-I've finished eating now.
--> END
-
-== eat ==
-This is the {first|second|third} time.
- * Eat ice-cream[]
- * Drink coke[]
- * Munch cookies[]
--
--> home
-"#,
-                    false,
-                    false,
-                )
-                .expect("compile should succeed");
-            story.cont_maximally();
-            assert_eq!(3, story.current_choices().len());
-            story.choose_choice_index(0);
-            story.cont_maximally();
-            assert_eq!(2, story.current_choices().len());
-            story.choose_choice_index(0);
-            story.cont_maximally();
-            assert_eq!(1, story.current_choices().len());
-            story.choose_choice_index(0);
-            story.cont_maximally();
-            assert_eq!(0, story.current_choices().len());
-        });
-    }
-
-    // C#: public void TestRequireVariableTargetsTyped()
-    // C#: {
-    // C#:     CompileStringWithoutRuntime(@"
-    // C#: -> test(-> elsewhere)
-    // C#:
-    // C#: == test(varTarget) ==
-    // C#: -> varTarget ->
-    // C#: -> DONE
-    // C#:
-    // C#: == elsewhere ==
-    // C#: ->->
-    // C#: ", testingErrors: true);
-    // C#:     Assert.IsTrue(HadError("it should be marked as: ->"));
-    // C#: }
-    #[test]
-    fn TestRequireVariableTargetsTyped() {
-        let mut suite = CSharpTestSuite::new(TestMode::Normal);
-        suite.compile_string_without_runtime(
-            r#"
--> test(-> elsewhere)
-
-== test(varTarget) ==
--> varTarget ->
--> DONE
-
-== elsewhere ==
-->->
-"#,
-            true,
-        );
-        assert!(suite.had_error(Some("it should be marked as: ->")));
-    }
-
     // C#: public void TestSetNonExistantVariable()
     // C#: {
     // C#:     var storyStr =
@@ -7644,57 +5178,6 @@ Hello {x}.
             assert!(story
                 .set_variable("y", &ValueType::String("earth".to_string()))
                 .is_err());
-        });
-    }
-
-    // C#: public void TestShuffleStackMuddying()
-    // C#: {
-    // C#:     var story = CompileString(@"
-    // C#: * {condFunc()} [choice 1]
-    // C#: * {condFunc()} [choice 2]
-    // C#: * {condFunc()} [choice 3]
-    // C#: * {condFunc()} [choice 4]
-    // C#:
-    // C#:
-    // C#: === function condFunc() ===
-    // C#: {shuffle:
-    // C#:     - ~ return false
-    // C#:     - ~ return true
-    // C#:     - ~ return true
-    // C#:     - ~ return false
-    // C#: }
-    // C#: ");
-    // C#:
-    // C#:     story.Continue();
-    // C#:
-    // C#:     Assert.AreEqual(2, story.currentChoices.Count);
-    // C#: }
-    #[test]
-    fn TestShuffleStackMuddying() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
-* {condFunc()} [choice 1]
-* {condFunc()} [choice 2]
-* {condFunc()} [choice 3]
-* {condFunc()} [choice 4]
-
-
-=== function condFunc() => bool ===
-{shuffle:
-    - ~ return false
-    - ~ return true
-    - ~ return true
-    - ~ return false
-}
-"#,
-                    false,
-                    false,
-                )
-                .expect("compile should succeed");
-            story.cont();
-            assert_eq!(2, story.current_choices().len());
         });
     }
 
@@ -7873,101 +5356,6 @@ Stitch content
         });
     }
 
-    // C#: public void TestTagsDynamicContent()
-    // C#: {
-    // C#:     var storyStr = @"tag # pic{5+3}{red|blue}.jpg";
-    // C#:     var story = CompileString(storyStr);
-    // C#:
-    // C#:     Assert.AreEqual("tag\n", story.Continue());
-    // C#:     Assert.AreEqual(new List<string> {"pic8red.jpg"}, story.currentTags);
-    // C#: }
-    #[test]
-    fn TestTagsDynamicContent() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(r#"tag # pic{5+3}{red|blue}.jpg"#, false, false)
-                .expect("compile should succeed");
-            assert_eq!("tag\n", story.cont());
-            assert_eq!(vec!["pic8red.jpg"], story.current_tags());
-        });
-    }
-
-    // C#: public void TestTagsInChoice()
-    // C#: {
-    // C#:     var storyStr = @"+ one #one [two #two] three #three -> END";
-    // C#:     var story = CompileString(storyStr);
-    // C#:
-    // C#:     story.Continue();
-    // C#:     Assert.AreEqual(0, story.currentTags.Count);
-    // C#:     Assert.AreEqual(1, story.currentChoices.Count);
-    // C#:     Assert.AreEqual(new List<string> {"one", "two"}, story.currentChoices[0].tags);
-    // C#:
-    // C#:     story.ChooseChoiceIndex(0);
-    // C#:
-    // C#:     Assert.AreEqual("one three", story.Continue());
-    // C#:     Assert.AreEqual(new List<string> {"one", "three"}, story.currentTags);
-    // C#: }
-    #[test]
-    fn TestTagsInChoice() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(r#"+ one #one [two #two] three #three -> END"#, false, false)
-                .expect("compile should succeed");
-            story.cont();
-            assert_eq!(0, story.current_tags().len());
-            assert_eq!(1, story.current_choices().len());
-            assert_eq!(
-                vec!["one".to_string(), "two".to_string()],
-                story.current_choices()[0].tags
-            );
-            story.choose_choice_index(0);
-            assert_eq!("one three", story.cont());
-            assert_eq!(
-                vec!["one".to_string(), "three".to_string()],
-                story.current_tags()
-            );
-        });
-    }
-
-    // C#: public void TestTagsInSeq()
-    // C#: {
-    // C#:     var storyStr =
-    // C#: @"
-    // C#: -> knot -> knot ->
-    // C#: == knot
-    // C#: A {red #red|white #white|blue #blue|green #green} sequence.
-    // C#: ->->
-    // C#: ";
-    // C#:     var story = CompileString(storyStr);
-    // C#:
-    // C#:     Assert.AreEqual("A red sequence.\n", story.Continue());
-    // C#:     Assert.AreEqual(new List<string> {"red"}, story.currentTags);
-    // C#:
-    // C#:     Assert.AreEqual("A white sequence.\n", story.Continue());
-    // C#:     Assert.AreEqual(new List<string> {"white"}, story.currentTags);
-    // C#: }
-    #[test]
-    fn TestTagsInSeq() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
--> knot -> knot ->
-== knot
-A {red #red|white #white|blue #blue|green #green} sequence.
-->->
-"#,
-                    false,
-                    false,
-                )
-                .expect("compile should succeed");
-            assert_eq!("A red sequence.\n", story.cont());
-            assert_eq!(vec!["red".to_string()], story.current_tags());
-            assert_eq!("A white sequence.\n", story.cont());
-            assert_eq!(vec!["white".to_string()], story.current_tags());
-        });
-    }
-
     // C#: public void TestTempGlobalConflict()
     // C#: {
     // C#:     var storyStr =
@@ -8102,100 +5490,6 @@ hello
             story.cont_maximally()
         });
         assert!(suite.had_warning(None));
-    }
-
-    // C#: public void TestTempUsageInOptions()
-    // C#: {
-    // C#:     var storyStr =
-    // C#:         @"
-    // C#: ~ temp one = 1
-    // C#: * \ {one}
-    // C#: - End of choice
-    // C#:     -> another
-    // C#: * (another) this [is] another
-    // C#:  -> DONE
-    // C#: ";
-    // C#:
-    // C#:     Story story = CompileString(storyStr);
-    // C#:     story.Continue();
-    // C#:
-    // C#:     Assert.AreEqual(1, story.currentChoices.Count);
-    // C#:     Assert.AreEqual("1", story.currentChoices[0].text);
-    // C#:     story.ChooseChoiceIndex(0);
-    // C#:
-    // C#:     Assert.AreEqual("1\nEnd of choice\nthis another\n", story.ContinueMaximally());
-    // C#:
-    // C#:     Assert.AreEqual(0, story.currentChoices.Count);
-    // C#: }
-    #[test]
-    fn TestTempUsageInOptions() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
-~ temp one: int = 1
-* \ {one}
-- End of choice
-    -> another
-* (another) this [is] another
- -> DONE
-"#,
-                    false,
-                    false,
-                )
-                .expect("compile should succeed");
-            story.cont();
-            assert_eq!(1, story.current_choices().len());
-            assert_eq!("1", story.current_choices()[0].text.clone());
-            story.choose_choice_index(0);
-            assert_eq!("1\nEnd of choice\nthis another\n", story.cont_maximally());
-            assert_eq!(0, story.current_choices().len());
-        });
-    }
-
-    // C#: public void TestThreadInLogic()
-    // C#: {
-    // C#:     var storyStr =
-    // C#:         @"
-    // C#: -> once ->
-    // C#: -> once ->
-    // C#:
-    // C#: == once ==
-    // C#: {<- content|}
-    // C#: ->->
-    // C#:
-    // C#: == content ==
-    // C#: Content
-    // C#: -> DONE
-    // C#: ";
-    // C#:
-    // C#:     Story story = CompileString(storyStr);
-    // C#:
-    // C#:     Assert.AreEqual("Content\n", story.Continue());
-    // C#: }
-    #[test]
-    fn TestThreadInLogic() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
--> once ->
--> once ->
-
-== once ==
-{<- content|}
-->->
-
-== content ==
-Content
--> DONE
-"#,
-                    false,
-                    false,
-                )
-                .expect("compile should succeed");
-            assert_eq!("Content\n", story.cont());
-        });
     }
 
     // C#: public void TestTopFlowTerminatorShouldntKillThreadChoices()
@@ -8343,48 +5637,6 @@ Now in B.
         });
     }
 
-    // C#:         [Test ()]
-    //         public void TestTurns ()
-    //         {
-    //             var storyStr =
-    //                 @"
-    // -> c
-    // - (top)
-    // + (c) [choice]
-    //     {TURNS ()}
-    //     -> top
-    //                     ";
-    //
-    //             var story = CompileString (storyStr);
-    //
-    //             for (int i = 0; i < 10; i++) {
-    //                 Assert.AreEqual(i + "\n", story.Continue ());
-    //                 story.ChooseChoiceIndex (0);
-    //             }
-    //         }
-    #[test]
-    fn TestTurns() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
--> c
-- (top)
-+ (c) [choice]
-    {TURNS ()}
-    -> top
-"#,
-                    false,
-                    false,
-                )
-                .expect("compile should succeed");
-            for i in 0..10 {
-                assert_eq!(format!("{}\n", i), story.cont());
-                story.choose_choice_index(0);
-            }
-        });
-    }
-
     // C#:         [Test()]
     //         public void TestUsingFunctionAndIncrementTogether()
     //         {
@@ -8413,358 +5665,6 @@ VAR x: int = 5
 "#,
             false,
         );
-    }
-
-    // C#:         [Test()]
-    //         public void TestVariableDivertTarget()
-    //         {
-    //             var story = CompileString(@"
-    // VAR x = -> here
-    //
-    // -> there
-    //
-    // == there ==
-    // -> x
-    //
-    // == here ==
-    // Here.
-    // -> DONE
-    // ");
-    //             Assert.AreEqual("Here.\n", story.Continue());
-    //         }
-    #[test]
-    fn TestVariableDivertTarget() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
-VAR x: -> = -> here
-
--> there
-
-== there ==
--> x
-
-== here ==
-Here.
--> DONE
-"#,
-                    false,
-                    false,
-                )
-                .expect("compile should succeed");
-            assert_eq!("Here.\n", story.cont());
-        });
-    }
-
-    // C#:         [Test()]
-    //         public void TestVisitCountBugDueToNestedContainers()
-    //         {
-    //             var storyStr = @"
-    //                 - (gather) {gather}
-    //                 * choice
-    //                 - {gather}
-    //             ";
-    //
-    //             Story story = CompileString(storyStr);
-    //
-    //             Assert.AreEqual("1\n", story.Continue());
-    //
-    //             story.ChooseChoiceIndex(0);
-    //             Assert.AreEqual("choice\n1\n", story.ContinueMaximally());
-    //         }
-    #[test]
-    fn TestVisitCountBugDueToNestedContainers() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
-                - (gather) {gather}
-                * choice
-                - {gather}
-"#,
-                    false,
-                    false,
-                )
-                .expect("compile should succeed");
-            assert_eq!("1\n", story.cont());
-            story.choose_choice_index(0);
-            assert_eq!("choice\n1\n", story.cont_maximally());
-        });
-    }
-
-    // C#:         [Test()]
-    //         public void TestVisitCountsWhenChoosing()
-    //         {
-    //             var storyStr =
-    //                 @"
-    // == TestKnot ==
-    // this is a test
-    // + [Next] -> TestKnot2
-    //
-    // == TestKnot2 ==
-    // this is the end
-    // -> END
-    // ";
-    //
-    //             Story story = CompileString(storyStr, countAllVisits:true);
-    //
-    //             Assert.AreEqual (0, story.state.VisitCountAtPathString ("TestKnot"));
-    //             Assert.AreEqual (0, story.state.VisitCountAtPathString ("TestKnot2"));
-    //
-    //             story.ChoosePathString ("TestKnot");
-    //
-    //             Assert.AreEqual (1, story.state.VisitCountAtPathString ("TestKnot"));
-    //             Assert.AreEqual (0, story.state.VisitCountAtPathString ("TestKnot2"));
-    //
-    //             story.Continue ();
-    //
-    //             Assert.AreEqual (1, story.state.VisitCountAtPathString ("TestKnot"));
-    //             Assert.AreEqual (0, story.state.VisitCountAtPathString ("TestKnot2"));
-    //
-    //             story.ChooseChoiceIndex (0);
-    //
-    //             Assert.AreEqual (1, story.state.VisitCountAtPathString ("TestKnot"));
-    //
-    //             // At this point, we have made the choice, but the divert *within* the choice
-    //             // won't yet have been evaluated.
-    //             Assert.AreEqual (0, story.state.VisitCountAtPathString ("TestKnot2"));
-    //
-    //             story.Continue ();
-    //
-    //             Assert.AreEqual (1, story.state.VisitCountAtPathString ("TestKnot"));
-    //             Assert.AreEqual (1, story.state.VisitCountAtPathString ("TestKnot2"));
-    //         }
-    #[test]
-    fn TestVisitCountsWhenChoosing() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
-== TestKnot ==
-this is a test
-+ [Next] -> TestKnot2
-
-== TestKnot2 ==
-this is the end
--> END
-"#,
-                    true,
-                    false,
-                )
-                .expect("compile should succeed");
-            assert_eq!(
-                0,
-                story
-                    .get_visit_count_at_path_string("TestKnot")
-                    .expect("expected visit count")
-            );
-            assert_eq!(
-                0,
-                story
-                    .get_visit_count_at_path_string("TestKnot2")
-                    .expect("expected visit count")
-            );
-            story.choose_path_string_simple("TestKnot");
-            assert_eq!(
-                1,
-                story
-                    .get_visit_count_at_path_string("TestKnot")
-                    .expect("expected visit count")
-            );
-            assert_eq!(
-                0,
-                story
-                    .get_visit_count_at_path_string("TestKnot2")
-                    .expect("expected visit count")
-            );
-            story.cont();
-            assert_eq!(
-                1,
-                story
-                    .get_visit_count_at_path_string("TestKnot")
-                    .expect("expected visit count")
-            );
-            assert_eq!(
-                0,
-                story
-                    .get_visit_count_at_path_string("TestKnot2")
-                    .expect("expected visit count")
-            );
-            story.choose_choice_index(0);
-            assert_eq!(
-                1,
-                story
-                    .get_visit_count_at_path_string("TestKnot")
-                    .expect("expected visit count")
-            );
-            assert_eq!(
-                0,
-                story
-                    .get_visit_count_at_path_string("TestKnot2")
-                    .expect("expected visit count")
-            );
-            story.cont();
-            assert_eq!(
-                1,
-                story
-                    .get_visit_count_at_path_string("TestKnot")
-                    .expect("expected visit count")
-            );
-            assert_eq!(
-                1,
-                story
-                    .get_visit_count_at_path_string("TestKnot2")
-                    .expect("expected visit count")
-            );
-        });
-    }
-
-    // C#:         [Test()]
-    //         public void TestWeaveGathers()
-    //         {
-    //             var storyStr =
-    //                 @"
-    // -
-    //  * one
-    //     * * two
-    //    - - three
-    //  *  four
-    //    - - five
-    // - six
-    //                 ";
-    //
-    //             Story story = CompileString(storyStr);
-    //
-    //             story.ContinueMaximally();
-    //
-    //             Assert.AreEqual(2, story.currentChoices.Count);
-    //             Assert.AreEqual("one", story.currentChoices[0].text);
-    //             Assert.AreEqual("four", story.currentChoices[1].text);
-    //
-    //             story.ChooseChoiceIndex(0);
-    //             story.ContinueMaximally();
-    //
-    //             Assert.AreEqual(1, story.currentChoices.Count);
-    //             Assert.AreEqual("two", story.currentChoices[0].text);
-    //
-    //             story.ChooseChoiceIndex(0);
-    //             Assert.AreEqual("two\nthree\nsix\n", story.ContinueMaximally());
-    //         }
-    #[test]
-    fn TestWeaveGathers() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
--
- * one
-    * * two
-   - - three
- *  four
-   - - five
-- six
-"#,
-                    false,
-                    false,
-                )
-                .expect("compile should succeed");
-            story.cont_maximally();
-            assert_eq!(2, story.current_choices().len());
-            assert_eq!("one", story.current_choices()[0].text.clone());
-            assert_eq!("four", story.current_choices()[1].text.clone());
-            story.choose_choice_index(0);
-            story.cont_maximally();
-            assert_eq!(1, story.current_choices().len());
-            assert_eq!("two", story.current_choices()[0].text.clone());
-            story.choose_choice_index(0);
-            assert_eq!("two\nthree\nsix\n", story.cont_maximally());
-        });
-    }
-
-    // C#:         [Test()]
-    //         public void TestWeaveOptions()
-    //         {
-    //             var storyStr =
-    //                 @"
-    //                     -> test
-    //                     === test
-    //                         * Hello[.], world.
-    //                         -> END
-    //                 ";
-    //
-    //             Story story = CompileString(storyStr);
-    //             story.Continue();
-    //
-    //             Assert.AreEqual("Hello.", story.currentChoices[0].text);
-    //
-    //             story.ChooseChoiceIndex(0);
-    //             Assert.AreEqual("Hello, world.\n", story.Continue());
-    //         }
-    #[test]
-    fn TestWeaveOptions() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
-                    -> test
-                    === test
-                        * Hello[.], world.
-                        -> END
-"#,
-                    false,
-                    false,
-                )
-                .expect("compile should succeed");
-            story.cont();
-            assert_eq!("Hello.", story.current_choices()[0].text.clone());
-            story.choose_choice_index(0);
-            assert_eq!("Hello, world.\n", story.cont());
-        });
-    }
-
-    // C#:         [Test ()]
-    //         public void TestWeaveWithinSequence ()
-    //         {
-    //             var storyStr =
-    //                 @"
-    // { shuffle:
-    // -   * choice
-    //     nextline
-    //     -> END
-    // }
-    // ";
-    //             var story = CompileString (storyStr);
-    //
-    //             story.Continue ();
-    //
-    //             Assert.IsTrue (story.currentChoices.Count == 1);
-    //
-    //             story.ChooseChoiceIndex (0);
-    //
-    //             Assert.AreEqual ("choice\nnextline\n", story.ContinueMaximally ());
-    //         }
-    #[test]
-    fn TestWeaveWithinSequence() {
-        run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
-{ shuffle:
--   * choice
-    nextline
-    -> END
-}
-"#,
-                    false,
-                    false,
-                )
-                .expect("compile should succeed");
-            story.cont();
-            assert_eq!(1, story.current_choices().len());
-            story.choose_choice_index(0);
-            assert_eq!("choice\nnextline\n", story.cont_maximally());
-        });
     }
 
     // C#:         [Test()]

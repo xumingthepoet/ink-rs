@@ -291,9 +291,8 @@ impl Story {
                         .push_evaluation_stack(Rc::new(Value::new::<i32>(choice_count as i32)));
                 }
                 CommandType::Turns => {
-                    let current_turn = self.get_state().current_turn_index;
                     self.get_state_mut()
-                        .push_evaluation_stack(Rc::new(Value::new::<i32>(current_turn + 1)));
+                        .push_evaluation_stack(Rc::new(Value::new::<i32>(0)));
                 }
                 CommandType::TurnsSince | CommandType::ReadCount => {
                     let target = self.get_state_mut().pop_evaluation_stack();
@@ -317,14 +316,11 @@ impl Story {
                     let either_count: i32;
                     match container {
                         Some(container) => {
-                            if eval_command.command_type == CommandType::TurnsSince {
-                                either_count = self
-                                    .get_state()
-                                    .turns_since_for_container(container.as_ref())?;
+                            either_count = if eval_command.command_type == CommandType::TurnsSince {
+                                -1
                             } else {
-                                either_count =
-                                    self.get_state_mut().visit_count_for_container(&container);
-                            }
+                                self.get_state_mut().visit_count_for_container(&container)
+                            };
                         }
                         None => {
                             if eval_command.command_type == CommandType::TurnsSince {

@@ -67,6 +67,10 @@ The upstream reference lives in `ink-csharp/`.
   clear reason to change it.
 - When behavior intentionally diverges from upstream Ink, update tests and
   documentation in the same change.
+- When a feature change makes old behavior obsolete or explicitly removed,
+  delete code, tests, fixture hooks, empty macros, and compatibility shims that
+  only served that old behavior. Do not leave unused `obsolete`, `removed
+  behavior`, `dead_code`, ignored-test, or no-op compatibility paths behind.
 - Avoid broad unrelated edits when working on compiler or language behavior.
 - Write repository-authored documentation in English. Avoid non-English prose in
   docs; describe localized user prompts generically unless exact text is

@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std::fs;
 
 use ink_compiler::{Compiler, CompilerOptions, SourceInput};

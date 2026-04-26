@@ -262,9 +262,6 @@ fn collect_local_variables_in_object(object: &Object, local_variables: &mut Hash
             if let Some(content) = choice.start_content() {
                 collect_local_variables_in_content_list(content, local_variables);
             }
-            if let Some(content) = choice.choice_only_content() {
-                collect_local_variables_in_content_list(content, local_variables);
-            }
             collect_local_variables_in_content_list(choice.inner_content(), local_variables);
         }
         Object::Sequence(sequence) => {

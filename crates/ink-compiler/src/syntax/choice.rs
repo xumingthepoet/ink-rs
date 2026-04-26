@@ -1,8 +1,4 @@
-use crate::{
-    diagnostic::{Diagnostic, DiagnosticCode},
-    parsed::{Choice, ContentList, Expression},
-    source::SourceSpan,
-};
+use crate::parsed::{Choice, ContentList, Expression};
 
 use super::{is_identifier, rule::RuleParser, scan, text};
 
@@ -10,11 +6,12 @@ pub(super) fn parse_choice(parser: &mut RuleParser<'_>) -> Option<Choice> {
     parser.skip_horizontal_whitespace();
     let span = parser.current_span();
 
-    // Match one or more '*' (once-only) or '+' (sticky) bullets.
-    let (bullet, once_only) = if parser.match_string("*").is_some() {
-        ('*', true)
+    // `*` and `+` are both repeatable in ink-rs. The bullet still controls
+    // nesting style by repetition, but no longer changes runtime visibility.
+    let bullet = if parser.match_string("*").is_some() {
+        '*'
     } else if parser.match_string("+").is_some() {
-        ('+', false)
+        '+'
     } else {
         return None;
     };
@@ -35,7 +32,6 @@ pub(super) fn parse_choice(parser: &mut RuleParser<'_>) -> Option<Choice> {
 
     parser.skip_horizontal_whitespace();
 
-    let body_span = parser.current_span();
     let choice_body = parser.line_remainder().to_string();
     parser.skip_to_end();
 
@@ -54,13 +50,9 @@ pub(super) fn parse_choice(parser: &mut RuleParser<'_>) -> Option<Choice> {
 
         // Invisible default choice - inner content is just a newline
         let inner = append_newline(ContentList::new(vec![]), span.clone());
-        let mut choice = Choice::new_with_inline_brackets(
-            None, // no start content
-            None, // no choice-only content
-            inner, span, false, // no inline brackets
-        );
+        let mut choice = Choice::new(None, inner, span);
         choice.set_identifier(identifier);
-        choice.set_once_only(once_only);
+        choice.set_once_only(false);
         choice.set_is_invisible_default(true);
         choice.set_condition(condition);
         choice.set_indentation_depth(indentation_depth);
@@ -70,50 +62,26 @@ pub(super) fn parse_choice(parser: &mut RuleParser<'_>) -> Option<Choice> {
     let is_divert_only_choice = find_top_level_divert(&choice_body)
         .is_some_and(|divert_index| choice_body[..divert_index].trim().is_empty());
 
-    let segments = parse_choice_segments(&choice_body)
-        .map_err(|error| {
-            let span = SourceSpan::new(
-                body_span.source_name.clone(),
-                body_span.line,
-                body_span.column + error.char_offset,
-            );
-            parser.diagnostic(
-                Diagnostic::error(span, error.message)
-                    .with_code(DiagnosticCode::InvalidChoiceSyntax),
-            );
-        })
-        .ok()?;
+    let segments = parse_choice_segments(&choice_body);
 
     let start_content = content_list_from_segment(segments.start, span.clone(), false, false);
-    let choice_only_content = segments.choice_only.map(|segment| {
-        content_list_from_segment(segment, span.clone(), true, true).unwrap_or_default()
-    });
-    if start_content.is_none() && segments.has_inline_brackets && choice_only_content.is_none() {
-        parser.warning(
-            "Blank choice - if you intended a default fallback choice, use the `* ->` syntax",
-        );
-    }
 
-    let mut choice = Choice::new_with_inline_brackets(
+    let mut choice = Choice::new(
         start_content,
-        choice_only_content,
         append_newline(
             content_list_from_segment(segments.inner, span.clone(), true, true).unwrap_or_default(),
             span.clone(),
         ),
         span,
-        segments.has_inline_brackets,
     );
     choice.set_identifier(identifier);
-    choice.set_once_only(once_only);
+    choice.set_once_only(false);
     choice.set_condition(condition);
     choice.set_indentation_depth(indentation_depth);
 
     // Check if this is an invisible default (empty content)
     let is_invisible_default = is_divert_only_choice
-        || (!choice.has_start_content()
-            && !choice.has_choice_only_content()
-            && choice.inner_content().objects().len() <= 1); // Only newline
+        || (!choice.has_start_content() && choice.inner_content().objects().len() <= 1); // Only newline
     choice.set_is_invisible_default(is_invisible_default);
 
     Some(choice)
@@ -160,78 +128,21 @@ fn parse_condition_expression(source: &str) -> Option<Expression> {
 
 struct ChoiceSegments {
     start: String,
-    choice_only: Option<String>,
     inner: String,
-    has_inline_brackets: bool,
 }
 
-struct ChoiceSyntaxError {
-    message: &'static str,
-    char_offset: usize,
-}
-
-fn parse_choice_segments(choice_body: &str) -> Result<ChoiceSegments, ChoiceSyntaxError> {
-    let Some(open_index) = choice_body.find('[') else {
-        if let Some(close_index) = choice_body.find(']') {
-            return Err(ChoiceSyntaxError {
-                message: "expected opening `[` for choice-only text before `]`",
-                char_offset: char_offset(choice_body, close_index),
-            });
-        }
-
-        if let Some(divert_index) = find_top_level_divert(choice_body) {
-            return Ok(ChoiceSegments {
-                start: choice_body[..divert_index].to_string(),
-                choice_only: None,
-                inner: choice_body[divert_index..].to_string(),
-                has_inline_brackets: false,
-            });
-        }
-
-        return Ok(ChoiceSegments {
-            start: choice_body.to_string(),
-            choice_only: None,
-            inner: String::new(),
-            has_inline_brackets: false,
-        });
-    };
-
-    let close_index = choice_body[open_index + 1..]
-        .find(']')
-        .map(|relative| open_index + 1 + relative)
-        .ok_or_else(|| ChoiceSyntaxError {
-            message: "expected closing `]` for choice-only text before end of line",
-            char_offset: char_offset(choice_body, open_index),
-        })?;
-
-    if let Some(relative_index) =
-        choice_body[open_index + 1..close_index].find(|ch| matches!(ch, '[' | ']'))
-    {
-        return Err(ChoiceSyntaxError {
-            message: "nested choice-only brackets are not supported",
-            char_offset: char_offset(choice_body, open_index + 1 + relative_index),
-        });
+fn parse_choice_segments(choice_body: &str) -> ChoiceSegments {
+    if let Some(divert_index) = find_top_level_divert(choice_body) {
+        return ChoiceSegments {
+            start: choice_body[..divert_index].to_string(),
+            inner: choice_body[divert_index..].to_string(),
+        };
     }
 
-    if let Some(relative_index) = choice_body[close_index + 1..].find(|ch| matches!(ch, '[' | ']'))
-    {
-        return Err(ChoiceSyntaxError {
-            message: "multiple choice-only bracket sections are not supported",
-            char_offset: char_offset(choice_body, close_index + 1 + relative_index),
-        });
+    ChoiceSegments {
+        start: choice_body.to_string(),
+        inner: String::new(),
     }
-
-    Ok(ChoiceSegments {
-        start: choice_body[..open_index].to_string(),
-        choice_only: (!choice_body[open_index + 1..close_index].is_empty())
-            .then(|| choice_body[open_index + 1..close_index].to_string()),
-        inner: choice_body[close_index + 1..].to_string(),
-        has_inline_brackets: true,
-    })
-}
-
-fn char_offset(source: &str, byte_index: usize) -> usize {
-    source[..byte_index].chars().count()
 }
 
 fn find_top_level_divert(source: &str) -> Option<usize> {

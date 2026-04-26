@@ -75,9 +75,6 @@ fn check_global_var_declaration_scope_in_object(
             if let Some(content) = choice.start_content() {
                 check_global_var_declaration_scope_in_content_list(content, diagnostics);
             }
-            if let Some(content) = choice.choice_only_content() {
-                check_global_var_declaration_scope_in_content_list(content, diagnostics);
-            }
             check_global_var_declaration_scope_in_content_list(choice.inner_content(), diagnostics);
         }
         Object::ContentList(content) => {
@@ -128,10 +125,9 @@ fn check_global_var_declaration_scope_in_content_list(
 }
 
 fn nested_global_var_declaration_diagnostic(span: SourceSpan) -> Diagnostic {
-    Diagnostic::removed_feature(
+    Diagnostic::error(
         span,
-        "nested VAR declarations",
-        "Move global VAR declarations to the story top level, outside knots, stitches, functions, choices, conditionals, and sequences.",
+        "Global VAR declarations must appear at the story top level, outside knots, stitches, functions, choices, conditionals, and sequences.",
     )
 }
 
@@ -338,13 +334,6 @@ fn check_nested_choice_termination_in_weave(
                     ));
                 }
                 if let Some(content) = choice.start_content() {
-                    check_nested_choice_termination_in_content_list(
-                        content,
-                        inside_sealed_content,
-                        diagnostics,
-                    );
-                }
-                if let Some(content) = choice.choice_only_content() {
                     check_nested_choice_termination_in_content_list(
                         content,
                         inside_sealed_content,
@@ -616,11 +605,6 @@ fn find_return_in_object(object: &Object) -> Option<&Return> {
         Object::Choice(choice) => choice
             .start_content()
             .and_then(find_return_in_content_list)
-            .or_else(|| {
-                choice
-                    .choice_only_content()
-                    .and_then(find_return_in_content_list)
-            })
             .or_else(|| find_return_in_content_list(choice.inner_content())),
         Object::AuthorWarning(_)
         | Object::ConstantDeclaration(_)
@@ -755,7 +739,7 @@ mod tests {
             assert_single_diagnostic(
                 &diagnostics,
                 DiagnosticSeverity::Error,
-                "removed feature: nested VAR declarations. Move global VAR declarations to the story top level, outside knots, stitches, functions, choices, conditionals, and sequences.",
+                "Global VAR declarations must appear at the story top level, outside knots, stitches, functions, choices, conditionals, and sequences.",
             );
         }
     }

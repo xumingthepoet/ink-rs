@@ -115,14 +115,7 @@ fn parse_external_argument(parser: &mut RuleParser<'_>) -> Option<(String, Optio
 fn parse_external_return_type(parser: &mut RuleParser<'_>) -> Option<TypeName> {
     parser.parse_rule(|parser| {
         parser.skip_horizontal_whitespace();
-        if parser.match_string("->").is_some() {
-            parser.diagnostic(Diagnostic::error(
-                parser.current_span(),
-                "External return types use `=>`, not `->`",
-            ));
-        } else {
-            parser.match_string("=>")?;
-        }
+        parser.match_string("=>")?;
         parser.skip_horizontal_whitespace();
         parser.expect("return type", type_name::parse_type_name, |parser| {
             parser.skip_to_end();
@@ -242,21 +235,6 @@ mod tests {
             panic!("expected external declaration");
         };
         assert_eq!(declaration.return_type(), &TypeName::divert_target());
-    }
-
-    #[test]
-    fn rejects_old_external_return_marker() {
-        let line = line("EXTERNAL choose(name: string) -> ->");
-        let mut parser = RuleParser::new(&line);
-
-        assert!(external_statement(&mut parser).is_none());
-        let diagnostics = parser.finish();
-        assert_eq!(diagnostics.len(), 1, "{diagnostics:#?}");
-        assert_eq!(diagnostics[0].severity, DiagnosticSeverity::Error);
-        assert_eq!(
-            diagnostics[0].message,
-            "External return types use `=>`, not `->`"
-        );
     }
 
     #[test]

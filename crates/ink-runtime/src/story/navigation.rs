@@ -232,7 +232,8 @@ impl Story {
                     all_children_entered_at_start = false;
                 }
 
-                // Mark a visit to this container
+                // Legacy navigation hook. Visit and turn counts are no longer
+                // persisted by the current runtime.
                 self.visit_container(&current_container, entering_at_start);
 
                 current_child_of_container = current_container.clone();
@@ -299,17 +300,5 @@ impl Story {
 
     pub(crate) fn content_at_path(&self, path: &Path) -> SearchResult {
         self.main_content_container.content_at_path(path, 0, -1)
-    }
-
-    /// Gets the visit/read count of a particular `Container` at the given
-    /// path. For a knot or stitch, that path string will be in the
-    /// form:
-    ///
-    /// ```ink
-    ///     knot
-    ///     knot.stitch
-    /// ```
-    pub fn get_visit_count_at_path_string(&self, path_string: &str) -> Result<i32, StoryError> {
-        self.get_state().visit_count_at_path_string(path_string)
     }
 }

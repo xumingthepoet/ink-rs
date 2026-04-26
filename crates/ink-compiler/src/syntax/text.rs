@@ -22,7 +22,7 @@ pub(super) fn parse_text_line(parser: &mut RuleParser<'_>) -> Option<Vec<Object>
         return None;
     }
 
-    if has_unsupported_text_syntax(&text) {
+    if is_structured_syntax_prefix(&text) {
         return None;
     }
 
@@ -59,10 +59,9 @@ pub(super) fn parse_text_line(parser: &mut RuleParser<'_>) -> Option<Vec<Object>
     Some(objects)
 }
 
-fn has_unsupported_text_syntax(text: &str) -> bool {
+fn is_structured_syntax_prefix(text: &str) -> bool {
     text.starts_with("INCLUDE ")
         || text.starts_with("VAR ")
-        || text.starts_with("LIST ")
         || text.starts_with("CONST ")
         || text.starts_with("EXTERNAL ")
         || text.starts_with("===")

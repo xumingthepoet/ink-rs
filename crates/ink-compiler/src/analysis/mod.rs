@@ -15,7 +15,6 @@ mod target_symbols;
 mod targets;
 #[cfg(test)]
 mod test_support;
-mod variable_targets;
 mod variables;
 mod warnings;
 
@@ -68,7 +67,7 @@ fn run_analysis_passes(story: &Story) -> Vec<Diagnostic> {
     // control-flow shape rather than target availability.
     diagnostics.extend(flow_diagnostics(story));
 
-    // Target checks build symbol, variable-target, and variable-scope indexes.
+    // Target checks build symbol and variable-scope indexes.
     // Keep this after naming/flow diagnostics so resolution errors do not hide
     // more local structural problems.
     diagnostics.extend(call_target_diagnostics(story));
@@ -103,7 +102,6 @@ mod tests {
         ("target_symbols.rs", include_str!("target_symbols.rs")),
         ("targets.rs", include_str!("targets.rs")),
         ("test_support.rs", include_str!("test_support.rs")),
-        ("variable_targets.rs", include_str!("variable_targets.rs")),
         ("variables.rs", include_str!("variables.rs")),
         ("warnings.rs", include_str!("warnings.rs")),
     ];

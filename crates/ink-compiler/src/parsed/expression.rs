@@ -107,6 +107,10 @@ pub enum UnaryOperator {
 }
 
 impl Expression {
+    pub fn to_source_string(&self) -> String {
+        expression_display(self)
+    }
+
     pub fn write_parse_snapshot(&self, out: &mut String, indent: usize) {
         push_indent(out, indent);
         match self {

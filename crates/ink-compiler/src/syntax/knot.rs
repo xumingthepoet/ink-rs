@@ -56,7 +56,7 @@ pub(super) fn parse_knot_declaration(parser: &mut RuleParser<'_>) -> Option<Flow
 
     let arguments = parse_arguments(parser).unwrap_or_default();
     let return_type = if is_function {
-        parse_return_type(parser, "Function")
+        parse_return_type(parser)
     } else {
         None
     };
@@ -122,7 +122,7 @@ pub(super) fn parse_stitch_declaration(parser: &mut RuleParser<'_>) -> Option<Fl
 
     let arguments = parse_arguments(parser).unwrap_or_default();
     let return_type = if is_function {
-        parse_return_type(parser, "Function")
+        parse_return_type(parser)
     } else {
         None
     };
@@ -148,17 +148,10 @@ pub(super) fn parse_stitch_declaration(parser: &mut RuleParser<'_>) -> Option<Fl
     })
 }
 
-fn parse_return_type(parser: &mut RuleParser<'_>, signature_kind: &str) -> Option<TypeName> {
+fn parse_return_type(parser: &mut RuleParser<'_>) -> Option<TypeName> {
     parser.parse_rule(|parser| {
         parser.skip_horizontal_whitespace();
-        if parser.match_string("->").is_some() {
-            parser.diagnostic(Diagnostic::error(
-                parser.current_span(),
-                format!("{signature_kind} return types use `=>`, not `->`"),
-            ));
-        } else {
-            parser.match_string("=>")?;
-        }
+        parser.match_string("=>")?;
         parser.skip_horizontal_whitespace();
         parser.expect("return type", type_name::parse_type_name, |parser| {
             parser.skip_to_end();
@@ -423,19 +416,6 @@ mod tests {
         assert_eq!(
             diagnostics[0].message,
             "Function parameter 'a' is missing a type"
-        );
-    }
-
-    #[test]
-    fn rejects_old_function_return_marker() {
-        let (declaration, diagnostics) = parse_knot("== function add(a: int) -> int ==");
-
-        assert!(declaration.is_some());
-        assert_eq!(diagnostics.len(), 1, "{diagnostics:#?}");
-        assert_eq!(diagnostics[0].severity, DiagnosticSeverity::Error);
-        assert_eq!(
-            diagnostics[0].message,
-            "Function return types use `=>`, not `->`"
         );
     }
 

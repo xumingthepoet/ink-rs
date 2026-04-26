@@ -251,14 +251,6 @@ fn check_temporary_names_against_arguments_in_object(
                     diagnostics,
                 );
             }
-            if let Some(content) = choice.choice_only_content() {
-                check_temporary_names_against_arguments_in_content_list(
-                    content,
-                    flow_name,
-                    argument_names,
-                    diagnostics,
-                );
-            }
             check_temporary_names_against_arguments_in_content_list(
                 choice.inner_content(),
                 flow_name,
@@ -336,9 +328,6 @@ fn check_weave_point_names(
                     );
                 }
                 if let Some(content) = choice.start_content() {
-                    check_weave_point_names_in_content_list(content, global_variables, diagnostics);
-                }
-                if let Some(content) = choice.choice_only_content() {
                     check_weave_point_names_in_content_list(content, global_variables, diagnostics);
                 }
                 check_weave_point_names_in_content_list(

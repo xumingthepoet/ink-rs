@@ -24,7 +24,7 @@ impl ChoicePoint {
             has_choice_only_content: (flags & 4) > 0,
             has_start_content: (flags & 2) > 0,
             is_invisible_default: (flags & 8) > 0,
-            once_only: (flags & 16) > 0,
+            once_only: false,
             has_condition: (flags & 1) > 0,
             path_on_choice: RefCell::new(Path::new_with_components_string(Some(
                 path_string_on_choice,

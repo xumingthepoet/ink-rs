@@ -103,14 +103,6 @@ pub(super) enum CallSignature {
     },
 }
 
-impl CallSignature {
-    pub(super) fn return_type(&self) -> &TypeName {
-        match self {
-            Self::External { return_type, .. } | Self::Ink { return_type, .. } => return_type,
-        }
-    }
-}
-
 fn collect_variable_declarations_in_objects<'a>(
     objects: &'a [Object],
     declarations: &mut Vec<&'a VariableAssignment>,
@@ -147,9 +139,6 @@ fn collect_variable_declarations_in_object<'a>(
         }
         Object::Choice(choice) => {
             if let Some(content) = choice.start_content() {
-                collect_variable_declarations_in_content_list(content, declarations);
-            }
-            if let Some(content) = choice.choice_only_content() {
                 collect_variable_declarations_in_content_list(content, declarations);
             }
             collect_variable_declarations_in_content_list(choice.inner_content(), declarations);
@@ -228,9 +217,6 @@ fn collect_struct_definitions_in_object(object: &Object, definitions: &mut Struc
         }
         Object::Choice(choice) => {
             if let Some(content) = choice.start_content() {
-                collect_struct_definitions_in_content_list(content, definitions);
-            }
-            if let Some(content) = choice.choice_only_content() {
                 collect_struct_definitions_in_content_list(content, definitions);
             }
             collect_struct_definitions_in_content_list(choice.inner_content(), definitions);
@@ -314,9 +300,6 @@ fn collect_constant_values_in_object(object: &Object, constants: &mut ConstantVa
         }
         Object::Choice(choice) => {
             if let Some(content) = choice.start_content() {
-                collect_constant_values_in_content_list(content, constants);
-            }
-            if let Some(content) = choice.choice_only_content() {
                 collect_constant_values_in_content_list(content, constants);
             }
             collect_constant_values_in_content_list(choice.inner_content(), constants);
@@ -409,9 +392,6 @@ fn collect_external_signatures_in_object(object: &Object, signatures: &mut Exter
         }
         Object::Choice(choice) => {
             if let Some(content) = choice.start_content() {
-                collect_external_signatures_in_content_list(content, signatures);
-            }
-            if let Some(content) = choice.choice_only_content() {
                 collect_external_signatures_in_content_list(content, signatures);
             }
             collect_external_signatures_in_content_list(choice.inner_content(), signatures);
@@ -637,16 +617,6 @@ fn collect_counted_paths_in_object(
                     paths,
                 );
             }
-            if let Some(content) = choice.choice_only_content() {
-                collect_counted_paths_in_content_list(
-                    content,
-                    global_labels,
-                    constants,
-                    global_variables,
-                    path_mode,
-                    paths,
-                );
-            }
             collect_counted_paths_in_content_list(
                 choice.inner_content(),
                 global_labels,
@@ -682,26 +652,14 @@ fn collect_counted_paths_in_object(
         }
         Object::VariableAssignment(assignment) => {
             if let Some(expression) = assignment.expression() {
-                match expression {
-                    Expression::DivertTarget(target) if assignment.is_global() => {
-                        insert_counted_divert_target(
-                            target,
-                            global_labels,
-                            path_mode,
-                            paths,
-                            true,
-                            true,
-                        );
-                    }
-                    expression => collect_counted_paths_in_expression(
-                        expression,
-                        global_labels,
-                        constants,
-                        global_variables,
-                        path_mode,
-                        paths,
-                    ),
-                }
+                collect_counted_paths_in_expression(
+                    expression,
+                    global_labels,
+                    constants,
+                    global_variables,
+                    path_mode,
+                    paths,
+                );
             }
         }
         Object::Return(ret) => {
@@ -756,14 +714,6 @@ fn collect_counted_paths_in_expression(
                     path_mode,
                     paths,
                 );
-            } else if !name_is_visible_variable(name, global_variables, path_mode) {
-                if let Some(target) = path_mode.scoped_label_target(name, global_labels) {
-                    paths.visits.insert(target.to_string());
-                } else if path_mode.is_flow_sibling_stitch(name) {
-                    paths
-                        .visits
-                        .insert(path_mode.resolve_single_stitch_target(name));
-                }
             }
         }
         Expression::StringContent(content) => {
@@ -776,40 +726,16 @@ fn collect_counted_paths_in_expression(
                 paths,
             );
         }
-        Expression::FunctionCall { name, args } => {
-            let count_turns = name == "TURNS_SINCE";
-            let count_visits = name == "READ_COUNT";
+        Expression::FunctionCall { name: _, args } => {
             for arg in args {
-                match arg {
-                    Expression::DivertTarget(target) if count_turns => {
-                        insert_counted_divert_target(
-                            target,
-                            global_labels,
-                            path_mode,
-                            paths,
-                            false,
-                            true,
-                        );
-                    }
-                    Expression::DivertTarget(target) if count_visits => {
-                        insert_counted_divert_target(
-                            target,
-                            global_labels,
-                            path_mode,
-                            paths,
-                            true,
-                            false,
-                        );
-                    }
-                    _ => collect_counted_paths_in_expression(
-                        arg,
-                        global_labels,
-                        constants,
-                        global_variables,
-                        path_mode,
-                        paths,
-                    ),
-                }
+                collect_counted_paths_in_expression(
+                    arg,
+                    global_labels,
+                    constants,
+                    global_variables,
+                    path_mode,
+                    paths,
+                );
             }
         }
         Expression::ArrayLiteral(elements) => {
@@ -836,22 +762,15 @@ fn collect_counted_paths_in_expression(
                 );
             }
         }
-        Expression::FieldAccess { .. } => {
-            if let Some(path) = expression.dotted_path() {
-                if !dotted_path_starts_with_visible_variable(
-                    expression,
-                    global_variables,
-                    path_mode,
-                ) {
-                    if let Some(target) = path_mode.scoped_label_target(&path, global_labels) {
-                        paths.visits.insert(target.to_string());
-                    } else if path_mode.is_flow_sibling_stitch(&path) {
-                        paths
-                            .visits
-                            .insert(path_mode.resolve_single_stitch_target(&path));
-                    }
-                }
-            }
+        Expression::FieldAccess { base, .. } => {
+            collect_counted_paths_in_expression(
+                base,
+                global_labels,
+                constants,
+                global_variables,
+                path_mode,
+                paths,
+            );
         }
         Expression::IndexAccess { base, index } => {
             collect_counted_paths_in_expression(
@@ -911,62 +830,10 @@ fn collect_counted_paths_in_expression(
                 paths,
             );
         }
-        Expression::DivertTarget(target) => {
-            insert_counted_divert_target(target, global_labels, path_mode, paths, true, true);
-        }
+        Expression::DivertTarget(_) => {}
         Expression::String(_)
         | Expression::NumberInt(_)
         | Expression::NumberFloat(_)
         | Expression::NumberBool(_) => {}
-    }
-}
-
-fn dotted_path_starts_with_visible_variable(
-    expression: &Expression,
-    global_variables: &HashSet<String>,
-    path_mode: &ChoicePathMode,
-) -> bool {
-    expression_root_variable_name(expression)
-        .is_some_and(|name| name_is_visible_variable(name, global_variables, path_mode))
-}
-
-fn name_is_visible_variable(
-    name: &str,
-    global_variables: &HashSet<String>,
-    path_mode: &ChoicePathMode,
-) -> bool {
-    path_mode.is_local_variable(name) || global_variables.contains(name)
-}
-
-fn expression_root_variable_name(expression: &Expression) -> Option<&str> {
-    match expression {
-        Expression::VariableReference(name) => Some(name),
-        Expression::FieldAccess { base, .. } => expression_root_variable_name(base),
-        _ => None,
-    }
-}
-
-fn insert_counted_divert_target(
-    target: &str,
-    global_labels: &LabelIndex,
-    path_mode: &ChoicePathMode,
-    paths: &mut CountedFlowPaths,
-    count_visits: bool,
-    count_turns: bool,
-) {
-    let counted_target = path_mode
-        .scoped_label_target(target, global_labels)
-        .map(str::to_string)
-        .or_else(|| {
-            path_mode
-                .is_flow_sibling_stitch(target)
-                .then(|| path_mode.resolve_single_stitch_target(target))
-        })
-        .unwrap_or_else(|| target.to_string());
-    if count_visits {
-        paths.visits.insert(counted_target.clone());
-    }
-    if count_turns {
-        paths.turns.insert(counted_target);
     }
 }

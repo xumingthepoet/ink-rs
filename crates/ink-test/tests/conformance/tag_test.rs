@@ -1,4 +1,4 @@
-use crate::conformance::api::{story::Story, story_error::StoryError};
+use crate::conformance::api::{Story, StoryError};
 
 use crate::conformance::common;
 
@@ -36,24 +36,6 @@ fn tags_test() -> Result<(), StoryError> {
     assert_eq!("", story.cont());
     let current_tags = story.get_current_tags();
     assert_eq!("end of knot tag", current_tags[0]);
-
-    Ok(())
-}
-
-#[test]
-fn tags_in_seq_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("inkfiles/tags/tagsInSeq.ink.json");
-    let mut story = Story::new(&json_string);
-
-    assert_eq!("A red sequence.\n", story.cont());
-    let current_tags = story.get_current_tags();
-    assert_eq!(1, current_tags.len());
-    assert_eq!("red", current_tags[0]);
-
-    assert_eq!("A white sequence.\n", story.cont());
-    let current_tags = story.get_current_tags();
-    assert_eq!(1, current_tags.len());
-    assert_eq!("white", current_tags[0]);
 
     Ok(())
 }
@@ -102,19 +84,6 @@ fn tags_in_choice_dynamic_content_test() -> Result<(), StoryError> {
 
     assert_eq!(1, choices[2].tags.len());
     assert_eq!("Name tag 1 2 3 4", choices[2].tags[0]);
-
-    Ok(())
-}
-
-#[test]
-fn tags_dynamic_content_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("inkfiles/tags/tagsDynamicContent.ink.json");
-    let mut story = Story::new(&json_string);
-
-    assert_eq!("tag\n", story.cont());
-    let current_tags = story.get_current_tags();
-    assert_eq!(1, current_tags.len());
-    assert_eq!("pic8red.jpg", current_tags[0]);
 
     Ok(())
 }

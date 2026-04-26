@@ -600,10 +600,6 @@ fn lower_choice_in_section(
             weave_path_mode.absolute_child_path(&gather_container_name),
         );
     }
-    if choice.has_start_content() {
-        choice_content =
-            choice_container_prefix(path_mode, &choice_container_name, content.len() - 1, 2);
-    }
     lower_content_list_into_context(
         &mut choice_content,
         choice.inner_content(),
@@ -656,9 +652,7 @@ fn lower_choice_in_section(
         choice_container_name,
         choice_content,
         named_container_flags(
-            count_all_visits
-                || choice.once_only()
-                || counted_paths.visits.contains(&choice_container_path),
+            count_all_visits || counted_paths.visits.contains(&choice_container_path),
             counted_paths.turns.contains(&choice_container_path),
             false,
         ),
@@ -741,9 +735,7 @@ fn choice_outer(
     struct_definitions: &StructDefinitions,
 ) -> ChoiceOuter {
     let mut outer_content = Vec::new();
-    let has_eval_content = choice.has_start_content()
-        || choice.has_choice_only_content()
-        || choice.condition().is_some();
+    let has_eval_content = choice.has_start_content() || choice.condition().is_some();
 
     if has_eval_content {
         outer_content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
@@ -761,22 +753,6 @@ fn choice_outer(
             variable: false,
         });
         outer_content.push(RuntimeObject::named_container("$r1", Vec::new()));
-        outer_content.push(RuntimeObject::ControlCommand(ControlCommand::EndString));
-    }
-
-    if let Some(choice_only_content) = choice.choice_only_content() {
-        outer_content.push(RuntimeObject::ControlCommand(ControlCommand::BeginString));
-        lower_content_list_into_context(
-            &mut outer_content,
-            choice_only_content,
-            path_mode,
-            choice_labels,
-            global_labels,
-            global_variables,
-            external_signatures,
-            constants,
-            struct_definitions,
-        );
         outer_content.push(RuntimeObject::ControlCommand(ControlCommand::EndString));
     }
 
@@ -834,28 +810,6 @@ fn choice_outer(
         .push(named_content("s", start_content));
 
     ChoiceOuter::Nested(outer_container)
-}
-
-pub(super) fn choice_container_prefix(
-    path_mode: &ChoicePathMode,
-    choice_container_name: &str,
-    choice_point_index: usize,
-    return_index: usize,
-) -> Vec<RuntimeObject> {
-    vec![
-        RuntimeObject::ControlCommand(ControlCommand::EvalStart),
-        RuntimeObject::DivertTarget(format!(
-            "{}.$r{return_index}",
-            path_mode.choice_content_return_target(choice_container_name)
-        )),
-        RuntimeObject::ControlCommand(ControlCommand::EvalEnd),
-        RuntimeObject::VariableAssignment("$r".to_string()),
-        RuntimeObject::Divert {
-            target: path_mode.start_content_target(choice_point_index),
-            variable: false,
-        },
-        RuntimeObject::named_container(format!("$r{return_index}"), Vec::new()),
-    ]
 }
 
 fn lower_content_list_with_context(

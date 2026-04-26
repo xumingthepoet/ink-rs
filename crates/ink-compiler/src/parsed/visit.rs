@@ -152,9 +152,6 @@ where
     if let Some(content) = choice.start_content() {
         walk_content_list(content, visitor, &choice_content_context);
     }
-    if let Some(content) = choice.choice_only_content() {
-        walk_content_list(content, visitor, &choice_content_context);
-    }
     walk_content_list(choice.inner_content(), visitor, &choice_content_context);
 }
 
@@ -410,7 +407,7 @@ mod tests {
             "root, conditional branch, nested object weave, knot, and stitch weaves should be visited"
         );
         assert!(
-            visitor.content_list_count >= 5,
+            visitor.content_list_count >= 4,
             "choice content, sequence elements, and string expression content should be visited"
         );
 
@@ -444,7 +441,6 @@ mod tests {
     fn choice_with_all_content() -> Choice {
         let mut choice = Choice::new(
             Some(ContentList::from_text("start", span())),
-            Some(ContentList::from_text("choice only", span())),
             ContentList::new(vec![Object::Expression(Expression::MultipleCondition(
                 vec![
                     Expression::VariableReference("a".to_string()),

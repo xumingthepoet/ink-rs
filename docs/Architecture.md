@@ -133,7 +133,8 @@ format model: `ink_story_json_format::Program`, `Container`, and `Object`
 values. It is split by responsibility:
 
 - `context.rs`: lowering state, container stack, and scoped state
-- `indexes.rs`: story-wide target, count, variable, and constant indexes
+- `indexes.rs`: story-wide target, variable, constant, and legacy compiled
+  count-metadata indexes
 - `labels.rs`: label index construction
 - `path.rs`: runtime path types and path compaction
 - `flow.rs`: story, knot, stitch, and function containers
@@ -190,6 +191,26 @@ Important modules include:
 
 Compiler work should preserve runtime JSON compatibility unless the language
 change explicitly requires a coordinated runtime change.
+
+### Runtime Save State
+
+Runtime save JSON is a separate format from compiled story JSON. The current
+save format is version 2 and is intentionally minimal:
+
+- `callstack`: active execution stack, including frame paths, indices, push/pop
+  type, expression flags, and frame temporary variables
+- `currentChoices`: generated choices available at the current pause point
+- `choiceThreads`: optional thread snapshots needed by generated choices
+- `variablesState`: global variables
+- `storySeed` and `previousRandom`: deterministic random state
+- `inkSaveVersion` and `inkFormatVersion`: save and compiled-story format
+  version markers
+
+The save format no longer stores named flow maps, `currentFlowName`,
+`evalStack`, `currentDivertTarget`, `visitCounts`, `turnIndices`, or `turnIdx`.
+Version 1 saves are rejected rather than migrated. Saving is supported only at
+stable public pause points; mid-expression, string-generation, or pending-divert
+state should produce a clear error instead of serializing runtime internals.
 
 ## Reference Implementation
 

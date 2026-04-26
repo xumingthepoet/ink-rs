@@ -6,9 +6,10 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+#[cfg(feature = "csharp-tests")]
+use ink_runtime::story::errors::ErrorHandler as RuntimeErrorHandler;
 use ink_runtime::{
-    choice::Choice, story::errors::ErrorHandler as RuntimeErrorHandler,
-    story::external_functions::ExternalFunction as RuntimeExternalFunction,
+    choice::Choice, story::external_functions::ExternalFunction as RuntimeExternalFunction,
     story::variable_observer::VariableObserver as RuntimeVariableObserver,
     story::Story as RuntimeStory, story_error::StoryError as RuntimeStoryError,
     value_type::ValueType as RuntimeValueType,
@@ -67,6 +68,7 @@ impl FromValueType for String {
 }
 
 impl ValueType {
+    #[cfg(not(feature = "csharp-tests"))]
     pub fn new<T: Into<ValueType>>(value: T) -> Self {
         value.into()
     }
@@ -198,7 +200,6 @@ impl Clone for Story {
     }
 }
 
-#[allow(dead_code)]
 impl Story {
     pub fn new(json: &str) -> Self {
         Self {
@@ -207,6 +208,7 @@ impl Story {
         }
     }
 
+    #[cfg(not(feature = "csharp-tests"))]
     pub fn can_continue(&self) -> bool {
         self.inner.can_continue()
     }
@@ -229,12 +231,6 @@ impl Story {
         self.inner
             .choose_choice_index(idx)
             .expect("expected choice index to be valid");
-    }
-
-    pub fn try_choose_choice_index(&mut self, idx: usize) -> Result<(), StoryError> {
-        self.inner
-            .choose_choice_index(idx)
-            .map_err(StoryError::from)
     }
 
     pub fn choose_path_string(
@@ -265,38 +261,21 @@ impl Story {
             .expect("expected current tags to load")
     }
 
+    #[cfg(not(feature = "csharp-tests"))]
     pub fn get_current_errors(&self) -> Vec<String> {
         self.inner.get_current_errors().clone()
     }
 
-    pub fn get_current_errors_ref(&self) -> Vec<String> {
-        self.get_current_errors()
-    }
-
+    #[cfg(feature = "csharp-tests")]
     pub fn get_current_warnings(&self) -> Vec<String> {
         self.inner.get_current_warnings().clone()
     }
 
+    #[cfg(feature = "csharp-tests")]
     pub fn get_current_text(&mut self) -> String {
         self.inner
             .get_current_text()
             .expect("expected current text")
-    }
-
-    pub fn get_current_text_ref(&mut self) -> String {
-        self.get_current_text()
-    }
-
-    pub fn switch_flow(&mut self, flow_name: &str) {
-        self.inner
-            .switch_flow(flow_name)
-            .expect("expected flow switch to succeed");
-    }
-
-    pub fn remove_flow(&mut self, flow_name: &str) {
-        self.inner
-            .remove_flow(flow_name)
-            .expect("expected flow removal to succeed");
     }
 
     pub fn get_global_tags(&self) -> Vec<String> {
@@ -311,6 +290,7 @@ impl Story {
             .expect("expected tags to load for path")
     }
 
+    #[cfg(not(feature = "csharp-tests"))]
     pub fn get_variable(&self, name: &str) -> Option<ValueType> {
         self.inner
             .get_variable(name)
@@ -327,6 +307,7 @@ impl Story {
         self.inner.set_allow_external_function_fallbacks(value);
     }
 
+    #[cfg(feature = "csharp-tests")]
     pub fn set_error_handler(&mut self, err_handler: Rc<RefCell<dyn RuntimeErrorHandler>>) {
         self.inner.set_error_handler(err_handler);
     }
@@ -384,26 +365,18 @@ impl Story {
         self.inner.load_state(json).expect("expected state to load")
     }
 
-    pub fn get_visit_count_at_path_string(&self, path: &str) -> Result<i32, StoryError> {
-        self.inner
-            .get_visit_count_at_path_string(path)
-            .map_err(StoryError::from)
-    }
-
+    #[cfg(not(feature = "csharp-tests"))]
     pub fn build_string_of_hierarchy(&self) -> String {
         self.inner.build_string_of_hierarchy()
     }
 
-    #[allow(non_snake_case)]
-    pub fn BuildStringOfHierarchy(&self) -> String {
-        self.build_string_of_hierarchy()
-    }
-
+    #[cfg(feature = "csharp-tests")]
     #[allow(non_snake_case)]
     pub fn ResetState(&mut self) {
         self.inner.reset_state().expect("expected state to reset")
     }
 
+    #[cfg(feature = "csharp-tests")]
     #[allow(non_snake_case)]
     pub fn UnbindExternalFunction(&mut self, func_name: String) {
         self.inner
@@ -411,11 +384,13 @@ impl Story {
             .expect("expected external function to unbind")
     }
 
+    #[cfg(feature = "csharp-tests")]
     #[allow(non_snake_case)]
     pub fn TagsForContentAtPath(&self, path: String) -> Vec<String> {
         self.tags_for_content_at_path(&path)
     }
 
+    #[cfg(feature = "csharp-tests")]
     #[allow(non_snake_case)]
     pub fn EvaluateFunction(
         &mut self,
@@ -426,48 +401,9 @@ impl Story {
         self.evaluate_function(&function_name, Some(arguments), &mut text_output)
     }
 
+    #[cfg(feature = "csharp-tests")]
     #[allow(non_snake_case)]
     pub fn get_hasWarning(&self) -> bool {
         !self.get_current_warnings().is_empty()
-    }
-
-    pub fn get_can_continue(&self) -> bool {
-        self.can_continue()
-    }
-
-    pub fn get_current_choices_len(&self) -> usize {
-        self.get_current_choices().len()
-    }
-
-    pub fn get_current_choices_ref(&self) -> Vec<Rc<Choice>> {
-        self.get_current_choices()
-    }
-
-    pub fn is_ended(&self) -> bool {
-        !self.can_continue() && self.get_current_choices().is_empty()
-    }
-}
-
-pub mod story_error {
-    pub use super::StoryError;
-}
-
-pub mod value_type {
-    #[allow(unused_imports)]
-    pub use super::{FromValueType, ValueType};
-}
-
-pub mod story {
-    #[allow(unused_imports)]
-    pub use super::{ExternalFunction, Story, VariableObserver};
-
-    pub mod external_functions {
-        #[allow(unused_imports)]
-        pub use super::super::ExternalFunction;
-    }
-
-    pub mod variable_observer {
-        #[allow(unused_imports)]
-        pub use super::super::VariableObserver;
     }
 }

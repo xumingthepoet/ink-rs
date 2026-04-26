@@ -191,12 +191,7 @@ impl Parser {
             }
         }
 
-        let diagnostics = line_parser.finish();
-        self.diagnostics.extend(diagnostics);
-
-        if let Some(diagnostic) = self.try_unsupported_statement(line) {
-            self.diagnostics.push(diagnostic);
-        }
+        self.diagnostics.extend(line_parser.finish());
         Vec::new()
     }
 
@@ -223,46 +218,6 @@ impl Parser {
         }
 
         Some(objects)
-    }
-
-    fn try_unsupported_statement(&self, line: &SourceLine) -> Option<Diagnostic> {
-        let trimmed = line.text.trim_start();
-
-        if trimmed.starts_with("LIST ") {
-            return Some(Diagnostic::removed_feature(
-                line.span.clone(),
-                "LIST declarations",
-                "Use variables, functions, or host data instead.",
-            ));
-        }
-
-        let feature = if trimmed.starts_with("INCLUDE ") {
-            Some("include")
-        } else if trimmed.starts_with("VAR ") {
-            Some("global variable declaration")
-        } else if trimmed.starts_with("CONST ") {
-            Some("constant declaration")
-        } else if trimmed.starts_with("EXTERNAL ") {
-            Some("external declaration")
-        } else if trimmed.starts_with("STRUCT ") {
-            Some("struct declaration")
-        } else if knot::is_knot_declaration_line(trimmed) {
-            Some("knot declaration")
-        } else if trimmed.starts_with('*') || trimmed.starts_with('+') {
-            Some("choice")
-        } else if trimmed.starts_with('~') {
-            Some("logic line")
-        } else if trimmed.contains('{') || trimmed.contains('}') {
-            Some("inline logic")
-        } else if trimmed.contains("<>") {
-            Some("glue")
-        } else if trimmed.contains('#') {
-            Some("tag")
-        } else {
-            None
-        };
-
-        feature.map(|feature| Diagnostic::unsupported(line.span.clone(), feature))
     }
 
     fn parse_flow(&mut self, lines: &[SourceLine], index: &mut usize) -> Option<Flow> {
@@ -561,10 +516,9 @@ pub(super) fn is_global_var_declaration_line(trimmed: &str) -> bool {
 }
 
 pub(super) fn nested_global_var_declaration_diagnostic(line: &SourceLine) -> Diagnostic {
-    Diagnostic::removed_feature(
+    Diagnostic::error(
         line.span.clone(),
-        "nested VAR declarations",
-        "Move global VAR declarations to the story top level, outside knots, stitches, functions, choices, conditionals, and sequences.",
+        "Global VAR declarations must appear at the story top level, outside knots, stitches, functions, choices, conditionals, and sequences.",
     )
 }
 
@@ -674,44 +628,19 @@ mod tests {
     }
 
     #[test]
-    fn unsupported_syntax_diagnostics_stay_parser_owned() {
-        let output = parse(SourceInput::new("INCLUDE file.ink"));
+    fn uppercase_prose_with_punctuation_parses_as_text() {
+        let output = parse(SourceInput::new("INVENTORY items = ()"));
 
-        assert_eq!(output.diagnostics.len(), 1);
-        assert_eq!(
-            output.diagnostics[0].severity,
-            crate::diagnostic::DiagnosticSeverity::Error
-        );
-        assert_eq!(
-            output.diagnostics[0].code,
-            Some(crate::diagnostic::DiagnosticCode::UnsupportedSyntax)
-        );
-        assert_eq!(output.diagnostics[0].message, "unsupported syntax: include");
+        assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
+        let story = output.artifact.expect("expected story");
+        assert!(matches!(
+            &story.root_weave().content()[0],
+            Object::Text(text) if text.text() == "INVENTORY items = ()"
+        ));
     }
 
     #[test]
-    fn removed_feature_diagnostics_stay_parser_owned() {
-        let output = parse(SourceInput::new("LIST items = ()"));
-
-        assert_eq!(output.diagnostics.len(), 1);
-        assert_eq!(
-            output.diagnostics[0].severity,
-            crate::diagnostic::DiagnosticSeverity::Error
-        );
-        assert_eq!(
-            output.diagnostics[0].code,
-            Some(crate::diagnostic::DiagnosticCode::RemovedFeature)
-        );
-        assert_eq!(output.diagnostics[0].line, 1);
-        assert_eq!(output.diagnostics[0].column, 1);
-        assert_eq!(
-            output.diagnostics[0].message,
-            "removed feature: LIST declarations. Use variables, functions, or host data instead."
-        );
-    }
-
-    #[test]
-    fn global_var_declarations_inside_flows_report_removed_feature() {
+    fn global_var_declarations_inside_flows_report_current_syntax_error() {
         let cases = [
             "== knot ==\nVAR score: int = 0\n-> DONE",
             "== knot ==\n= stitch\nVAR score: int = 0\n-> DONE",
@@ -727,12 +656,8 @@ mod tests {
                 crate::diagnostic::DiagnosticSeverity::Error
             );
             assert_eq!(
-                output.diagnostics[0].code,
-                Some(crate::diagnostic::DiagnosticCode::RemovedFeature)
-            );
-            assert_eq!(
                 output.diagnostics[0].message,
-                "removed feature: nested VAR declarations. Move global VAR declarations to the story top level, outside knots, stitches, functions, choices, conditionals, and sequences."
+                "Global VAR declarations must appear at the story top level, outside knots, stitches, functions, choices, conditionals, and sequences."
             );
         }
     }
@@ -741,7 +666,7 @@ mod tests {
     fn invalid_logic_expression_reports_specific_error_and_recovers_next_line() {
         let output = parse(SourceInput::new("~ x +\nLIST items = ()"));
 
-        assert_eq!(output.diagnostics.len(), 2, "{:#?}", output.diagnostics);
+        assert_eq!(output.diagnostics.len(), 1, "{:#?}", output.diagnostics);
         assert_eq!(
             output.diagnostics[0].code,
             Some(crate::diagnostic::DiagnosticCode::InvalidExpression)
@@ -752,32 +677,22 @@ mod tests {
             output.diagnostics[0].message,
             "expected expression after operator `+` before end of input"
         );
-        assert_eq!(
-            output.diagnostics[1].code,
-            Some(crate::diagnostic::DiagnosticCode::RemovedFeature)
-        );
-        assert_eq!(output.diagnostics[1].line, 2);
-        assert_eq!(
-            output.diagnostics[1].message,
-            "removed feature: LIST declarations. Use variables, functions, or host data instead."
-        );
     }
 
     #[test]
-    fn invalid_choice_bracket_reports_specific_error_span() {
+    fn square_brackets_in_choices_parse_as_literal_text() {
         let output = parse(SourceInput::new("* Hello [choice text"));
 
-        assert_eq!(output.diagnostics.len(), 1, "{:#?}", output.diagnostics);
-        assert_eq!(
-            output.diagnostics[0].code,
-            Some(crate::diagnostic::DiagnosticCode::InvalidChoiceSyntax)
-        );
-        assert_eq!(output.diagnostics[0].line, 1);
-        assert_eq!(output.diagnostics[0].column, 9);
-        assert_eq!(
-            output.diagnostics[0].message,
-            "expected closing `]` for choice-only text before end of line"
-        );
+        assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
+        let story = output.artifact.expect("expected story");
+        let Object::Choice(choice) = &story.root_weave().content()[0] else {
+            panic!("expected choice");
+        };
+        let start_content = choice.start_content().expect("expected choice text");
+        assert!(matches!(
+            &start_content.objects()[0],
+            Object::Text(text) if text.text() == "Hello [choice text"
+        ));
     }
 
     #[test]

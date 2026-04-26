@@ -330,6 +330,9 @@
           "include": "#inline-logic"
         },
         {
+          "include": "#dynamic-divert"
+        },
+        {
           "include": "#divert"
         },
         {
@@ -494,6 +497,32 @@
         }
       },
       "name": "meta.divert.ink"
+    },
+    "dynamic-divert": {
+      "begin": "(->->|->t->|->|<-)\\s*(\\{)",
+      "beginCaptures": {
+        "1": {
+          "name": "keyword.operator.divert.ink"
+        },
+        "2": {
+          "name": "punctuation.section.dynamic-divert.begin.ink"
+        }
+      },
+      "end": "(\\})(?:\\s*(\\([^)]*\\)))?",
+      "endCaptures": {
+        "1": {
+          "name": "punctuation.section.dynamic-divert.end.ink"
+        },
+        "2": {
+          "name": "meta.arguments.dynamic-divert.ink"
+        }
+      },
+      "name": "meta.divert.dynamic.ink",
+      "patterns": [
+        {
+          "include": "#expression"
+        }
+      ]
     },
     "inline-sequence": {
       "begin": "(\\{)\\s*([~&!$])?(?=[^}]*\\|)",
@@ -662,6 +691,9 @@
           "include": "#operators"
         },
         {
+          "include": "#dynamic-divert"
+        },
+        {
           "include": "#divert"
         }
       ]
@@ -699,7 +731,7 @@
       "name": "constant.language.boolean.ink"
     },
     "builtins": {
-      "match": "\\b(?:LEN|ARRAY_REMOVE|TURNS_SINCE|READ_COUNT|RANDOM|SEED_RANDOM|POW|FLOOR|CEILING|INT|FLOAT)\\b",
+      "match": "\\b(?:LEN|ARRAY_REMOVE|RANDOM|SEED_RANDOM|POW|FLOOR|CEILING|INT|FLOAT)\\b",
       "name": "support.function.builtin.ink"
     },
     "field-key": {

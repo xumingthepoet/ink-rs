@@ -1,6 +1,7 @@
-//! This is a Rust port of inkle's [Ink](https://github.com/inkle/ink), a scripting language for writing interactive narratives.
-//! `ink_runtime` is fully compatible with the reference version and supports all
-//! its language features.
+//! This is a Rust implementation of ink-rs, a language fork of inkle's
+//! [Ink](https://github.com/inkle/ink) for writing interactive narratives.
+//! It intentionally diverges from upstream Ink in a few language and save-state
+//! areas; see the repository documentation for the maintained language surface.
 //!
 //! To learn more about the Ink language, you can check [the official documentation](https://github.com/inkle/ink/blob/master/Documentation/WritingWithInk.md).
 //!
@@ -38,12 +39,11 @@
 //! # }
 //! ```
 //!
-//! The `ink_runtime` library supports all the **Ink** language features, including
-//! threads, multi-flows, variable set/get from code, variable observing,
-//! external functions, tags on choices, etc. Examples of uses of all these
-//! features will be added to this documentation in the future, but meanwhile,
-//! all the examples can be found in the `lib/tests` folder in the source code
-//! of this crate.
+//! The `ink_runtime` library supports the maintained ink-rs runtime features,
+//! including threads, variable set/get from code, variable observing, external
+//! functions, tags on choices, and v2 minimal save/load state. Upstream
+//! multi-flow APIs and visit/turn-count state are intentionally not part of the
+//! current runtime API.
 
 mod callstack;
 pub mod choice;

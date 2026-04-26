@@ -15,6 +15,7 @@ pub struct Divert {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DivertTarget {
     Path(String),
+    Dynamic(Expression),
     Done,
     End,
     Empty,
@@ -114,13 +115,14 @@ impl DivertTarget {
     pub fn as_runtime_target(&self) -> Option<&str> {
         match self {
             Self::Path(target) => Some(target),
-            Self::Done | Self::End | Self::Empty => None,
+            Self::Dynamic(_) | Self::Done | Self::End | Self::Empty => None,
         }
     }
 
     pub fn to_snapshot_string(&self) -> String {
         match self {
             Self::Path(target) => target.clone(),
+            Self::Dynamic(expression) => format!("{{{}}}", expression.to_source_string()),
             Self::Done => "DONE".to_string(),
             Self::End => "END".to_string(),
             Self::Empty => String::new(),

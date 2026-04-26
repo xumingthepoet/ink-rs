@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use crate::conformance::api::{story::Story, story_error::StoryError, value_type::ValueType};
+use crate::conformance::api::{Story, StoryError, ValueType};
 
 use crate::conformance::common;
 
@@ -17,34 +17,6 @@ fn operations_test() -> Result<(), StoryError> {
     Ok(())
 }
 
-#[test]
-fn read_counts_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("inkfiles/misc/read-counts.ink.json");
-    let mut story = Story::new(&json_string);
-
-    assert_eq!(
-        "Count start: 0 0 0\n1\n2\n3\nCount end: 3 3 3\n",
-        &story.continue_maximally()
-    );
-
-    Ok(())
-}
-
-#[test]
-fn turns_since_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("inkfiles/misc/turns-since.ink.json");
-    let mut story = Story::new(&json_string);
-
-    assert_eq!("0\n0\n", &story.continue_maximally());
-    story.choose_choice_index(0);
-    assert_eq!("1\n", &story.continue_maximally());
-
-    Ok(())
-}
-
-/**
- * Issue: original upstream issue 15
- */
 #[test]
 fn issue15_test() -> Result<(), StoryError> {
     let json_string = common::get_json_string("inkfiles/misc/issue15.ink.json");

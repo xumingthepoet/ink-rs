@@ -1,4 +1,4 @@
-use crate::conformance::api::{story::Story, story_error::StoryError};
+use crate::conformance::api::{Story, StoryError};
 
 use crate::conformance::common;
 
@@ -141,28 +141,6 @@ fn mixed_choice_test() -> Result<(), StoryError> {
 }
 
 #[test]
-fn varying_choice_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("inkfiles/choices/varying-choice.ink.json");
-    let mut story = Story::new(&json_string);
-    let mut text: Vec<String> = Vec::new();
-
-    common::next_all(&mut story, &mut text);
-    assert_eq!(2, story.get_current_choices().len());
-    story.choose_choice_index(0);
-
-    text.clear();
-    common::next_all(&mut story, &mut text);
-
-    assert_eq!(1, story.get_current_choices().len());
-    assert_eq!(
-        "The man with the briefcase?",
-        story.get_current_choices()[0].text
-    );
-
-    Ok(())
-}
-
-#[test]
 fn sticky_choice_test() -> Result<(), StoryError> {
     let json_string = common::get_json_string("inkfiles/choices/sticky-choice.ink.json");
     let mut story = Story::new(&json_string);
@@ -193,28 +171,6 @@ fn fallback_choice_test() -> Result<(), StoryError> {
 }
 
 #[test]
-fn fallback_choice2_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("inkfiles/choices/fallback-choice.ink.json");
-    let mut story = Story::new(&json_string);
-    let mut text: Vec<String> = Vec::new();
-
-    common::next_all(&mut story, &mut text);
-    assert_eq!(2, story.get_current_choices().len());
-    story.choose_choice_index(0);
-
-    text.clear();
-    common::next_all(&mut story, &mut text);
-    story.choose_choice_index(0);
-
-    text.clear();
-    common::next_all(&mut story, &mut text);
-
-    assert!(common::is_ended(&story));
-
-    Ok(())
-}
-
-#[test]
 fn conditional_choice_test() -> Result<(), StoryError> {
     let json_string = common::get_json_string("inkfiles/choices/conditional-choice.ink.json");
     let mut story = Story::new(&json_string);
@@ -222,86 +178,6 @@ fn conditional_choice_test() -> Result<(), StoryError> {
 
     common::next_all(&mut story, &mut text);
     assert_eq!(4, story.get_current_choices().len());
-
-    Ok(())
-}
-
-#[test]
-fn label_flow_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("inkfiles/choices/label-flow.ink.json");
-    let mut story = Story::new(&json_string);
-    let mut text: Vec<String> = Vec::new();
-
-    common::next_all(&mut story, &mut text);
-    assert_eq!(2, story.get_current_choices().len());
-    story.choose_choice_index(0);
-
-    text.clear();
-    common::next_all(&mut story, &mut text);
-
-    assert_eq!(2, story.get_current_choices().len());
-    assert_eq!(
-        "\'Having a nice day?\'",
-        story.get_current_choices()[0].text
-    );
-
-    Ok(())
-}
-
-#[test]
-fn label_flow2_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("inkfiles/choices/label-flow.ink.json");
-    let mut story = Story::new(&json_string);
-    let mut text: Vec<String> = Vec::new();
-
-    common::next_all(&mut story, &mut text);
-    assert_eq!(2, story.get_current_choices().len());
-    story.choose_choice_index(1);
-
-    text.clear();
-    common::next_all(&mut story, &mut text);
-
-    assert_eq!(2, story.get_current_choices().len());
-    assert_eq!("Shove him aside", story.get_current_choices()[1].text);
-
-    Ok(())
-}
-
-#[test]
-fn label_scope_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("inkfiles/choices/label-scope.ink.json");
-    let mut story = Story::new(&json_string);
-    let mut text: Vec<String> = Vec::new();
-
-    common::next_all(&mut story, &mut text);
-    story.choose_choice_index(0);
-
-    text.clear();
-    common::next_all(&mut story, &mut text);
-
-    assert_eq!(1, story.get_current_choices().len());
-    assert_eq!("Found gatherpoint", story.get_current_choices()[0].text);
-
-    Ok(())
-}
-
-#[test]
-fn divert_choice_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("inkfiles/choices/divert-choice.ink.json");
-    let mut story = Story::new(&json_string);
-    let mut text: Vec<String> = Vec::new();
-
-    common::next_all(&mut story, &mut text);
-    assert_eq!(2, story.get_current_choices().len());
-    story.choose_choice_index(0);
-
-    text.clear();
-    common::next_all(&mut story, &mut text);
-    assert_eq!(2, text.len());
-    assert_eq!("You pull a face, and the soldier comes at you! You shove the guard to one side, but he comes back swinging.", text[0]);
-
-    assert_eq!(1, story.get_current_choices().len());
-    assert_eq!("Grapple and fight", story.get_current_choices()[0].text);
 
     Ok(())
 }

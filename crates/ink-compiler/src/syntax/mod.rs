@@ -170,47 +170,19 @@ mod tests {
     }
 
     #[test]
-    fn parses_inline_choice_segments() {
-        let output = parse(SourceInput::new("* Hello [back!] right back to you!"));
-        assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
-        let story = output.artifact.unwrap();
-
-        let Object::Choice(choice) = &story.root_weave().content()[0] else {
-            panic!("expected choice");
-        };
-        assert_eq!(choice.start_content().unwrap().objects().len(), 1);
-        assert_eq!(choice.choice_only_content().unwrap().objects().len(), 1);
-        assert_eq!(choice.inner_content().objects().len(), 2);
-        assert!(choice.has_weave_style_inline_brackets());
-    }
-
-    #[test]
-    fn parses_choice_only_inline_choice() {
-        let output = parse(SourceInput::new("* [Hello back!]"));
-        assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
-        let story = output.artifact.unwrap();
-
-        let Object::Choice(choice) = &story.root_weave().content()[0] else {
-            panic!("expected choice");
-        };
-        assert!(!choice.has_start_content());
-        assert!(choice.has_choice_only_content());
-        assert_eq!(choice.inner_content().objects().len(), 1);
-    }
-
-    #[test]
     fn parses_choice_with_inner_divert() {
-        let output = parse(SourceInput::new("* [Open the gate] -> paragraph_2"));
+        let output = parse(SourceInput::new("* Open the gate -> paragraph_2"));
         assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
         let story = output.artifact.unwrap();
 
         let Object::Choice(choice) = &story.root_weave().content()[0] else {
             panic!("expected choice");
         };
-        assert!(matches!(
-            choice.inner_content().objects()[1],
-            Object::Divert(_)
-        ));
+        assert!(choice
+            .inner_content()
+            .objects()
+            .iter()
+            .any(|object| matches!(object, Object::Divert(_))));
     }
 
     #[test]
@@ -232,43 +204,19 @@ mod tests {
     }
 
     #[test]
-    fn parses_empty_inline_choice_brackets_without_choice_only_content() {
-        let output = parse(SourceInput::new("* Text[] inner"));
-        assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
-        let story = output.artifact.unwrap();
-
-        let Object::Choice(choice) = &story.root_weave().content()[0] else {
-            panic!("expected choice");
-        };
-        assert!(choice.has_weave_style_inline_brackets());
-        assert!(!choice.has_choice_only_content());
-    }
-
-    #[test]
-    fn parses_inline_choice_brackets_after_array_literal_support() {
+    fn parses_square_brackets_as_choice_text() {
         let output = parse(SourceInput::new("* Start [choice text] inner"));
         assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
-        let story = output.artifact.unwrap();
 
+        let story = output.artifact.unwrap();
         let Object::Choice(choice) = &story.root_weave().content()[0] else {
             panic!("expected choice");
         };
-        assert!(choice.has_weave_style_inline_brackets());
-        assert!(choice.has_choice_only_content());
-        assert_eq!(choice.choice_only_content().unwrap().objects().len(), 1);
-    }
-
-    #[test]
-    fn parses_inline_choice_brackets_after_index_access_support() {
-        let output = parse(SourceInput::new("* Open [the indexed door] now"));
-        assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
-        let story = output.artifact.unwrap();
-
-        let Object::Choice(choice) = &story.root_weave().content()[0] else {
-            panic!("expected choice");
-        };
-        assert!(choice.has_weave_style_inline_brackets());
-        assert!(choice.has_choice_only_content());
+        let start_content = choice.start_content().expect("expected choice text");
+        assert!(matches!(
+            &start_content.objects()[0],
+            Object::Text(text) if text.text() == "Start [choice text] inner"
+        ));
     }
 
     #[test]
@@ -279,6 +227,60 @@ mod tests {
 
         assert_eq!(story.root_weave().content().len(), 3);
         assert!(matches!(story.root_weave().content()[1], Object::Divert(_)));
+    }
+
+    #[test]
+    fn parses_braced_dynamic_diverts() {
+        let cases = [
+            "-> {next}",
+            "-> {route.next}",
+            "-> {targets[0]}",
+            "-> {pick(flag)}",
+            "-> {next}(value)",
+        ];
+
+        for source in cases {
+            let output = parse(SourceInput::new(source));
+            assert!(
+                output.diagnostics.is_empty(),
+                "{source}: {:#?}",
+                output.diagnostics
+            );
+            let story = output.artifact.unwrap();
+            let Object::Divert(divert) = &story.root_weave().content()[0] else {
+                panic!("expected dynamic divert for {source}");
+            };
+            assert!(matches!(
+                divert.target(),
+                crate::parsed::DivertTarget::Dynamic(_)
+            ));
+        }
+    }
+
+    #[test]
+    fn parses_braced_dynamic_tunnel_targets() {
+        let output = parse(SourceInput::new("-> {next} ->"));
+        assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
+        let story = output.artifact.unwrap();
+        let Object::Divert(divert) = &story.root_weave().content()[0] else {
+            panic!("expected dynamic tunnel divert");
+        };
+        assert!(divert.is_tunnel());
+        assert!(matches!(
+            divert.target(),
+            crate::parsed::DivertTarget::Dynamic(_)
+        ));
+
+        let output = parse(SourceInput::new("->-> {next}"));
+        assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
+        let story = output.artifact.unwrap();
+        let Object::TunnelOnwards(tunnel_onwards) = &story.root_weave().content()[0] else {
+            panic!("expected tunnel onwards");
+        };
+        assert!(matches!(
+            tunnel_onwards.override_target(),
+            Some(crate::parsed::DivertTarget::Dynamic(_))
+        ));
     }
 
     #[test]

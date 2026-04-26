@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, rc::Rc};
 
 use crate::{
     callstack::CallStack,
@@ -7,8 +7,7 @@ use crate::{
     control_command::{CommandType, ControlCommand},
     flow::Flow,
     glue::Glue,
-    json::{json_read, json_write},
-    object::{Object, RTObject},
+    object::RTObject,
     path::Path,
     pointer::{self, Pointer},
     push_pop::PushPopType,
@@ -25,7 +24,7 @@ use crate::{
 use rand::Rng;
 use serde_json::{json, Map};
 
-pub const INK_SAVE_STATE_VERSION: u32 = 1;
+pub const INK_SAVE_STATE_VERSION: u32 = 2;
 
 static DEFAULT_FLOW_NAME: &str = "DEFAULT_FLOW";
 
@@ -35,18 +34,13 @@ pub(crate) struct StoryState {
     output_stream_text_dirty: bool,
     output_stream_tags_dirty: bool,
     pub variables_state: VariablesState,
-    alive_flow_names_dirty: bool,
     pub evaluation_stack: Vec<Rc<dyn RTObject>>,
     main_content_container: Rc<Container>,
     current_errors: Vec<String>,
     current_warnings: Vec<String>,
     current_text: Option<String>,
     patch: Option<StatePatch>,
-    named_flows: Option<HashMap<String, Flow>>,
     pub diverted_pointer: Pointer,
-    pub visit_counts: HashMap<String, i32>,
-    pub turn_indices: HashMap<String, i32>,
-    pub current_turn_index: i32,
     pub story_seed: i32,
     pub previous_random: i32,
     current_tags: Vec<String>,
@@ -66,18 +60,13 @@ impl StoryState {
             output_stream_text_dirty: true,
             output_stream_tags_dirty: true,
             variables_state: VariablesState::new(callstack),
-            alive_flow_names_dirty: true,
             evaluation_stack: Vec::new(),
             main_content_container,
             current_errors: Vec::with_capacity(0),
             current_warnings: Vec::with_capacity(0),
             current_text: None,
             patch: None,
-            named_flows: None,
             diverted_pointer: pointer::NULL.clone(),
-            visit_counts: HashMap::new(),
-            turn_indices: HashMap::new(),
-            current_turn_index: -1,
             story_seed,
             previous_random: 0,
             current_tags: Vec::with_capacity(0),
@@ -99,17 +88,6 @@ impl StoryState {
     /// String representation of the location where the story currently is.
     pub fn current_path_string(&self) -> Option<String> {
         let pointer = self.get_current_pointer();
-        pointer.get_path().map(|path| path.to_string())
-    }
-
-    /// Get the previous state of currentPathString, which can be helpful
-    /// for finding out where the story was before it ended (when the path
-    /// string becomes null)
-    ///
-    /// Marked as dead code by now.
-    #[allow(dead_code)]
-    pub fn previous_path_string(&self) -> Option<String> {
-        let pointer = self.get_previous_pointer();
         pointer.get_path().map(|path| path.to_string())
     }
 
@@ -376,65 +354,8 @@ impl StoryState {
         self.push_to_output_stream_individual(obj);
     }
 
-    pub fn increment_visit_count_for_container(&mut self, container: &Rc<Container>) {
-        let has_patch = self.patch.is_some();
-
-        if has_patch {
-            let curr_count = self.visit_count_for_container(container);
-            let new_count = curr_count + 1;
-            self.patch
-                .as_mut()
-                .unwrap()
-                .set_visit_count(container, new_count);
-        } else {
-            let mut count = 0;
-            let container_path_str = container.get_path().to_string();
-
-            if let Some(&existing_count) = self.visit_counts.get(&container_path_str) {
-                count = existing_count;
-            }
-
-            count += 1;
-            self.visit_counts.insert(container_path_str, count);
-        }
-    }
-
-    pub fn visit_count_for_container(&mut self, container: &Rc<Container>) -> i32 {
-        if !container.visits_should_be_counted {
-            // TODO
-
-            // story.error(format!(
-            //     "Read count for target ({:?} - on {:?}) unknown.",
-            //     container.get_name(),
-            //     container.get_debug_metadata()
-            // ));
-            return 0;
-        }
-
-        if let Some(patch) = &self.patch {
-            if let Some(visit_count) = patch.get_visit_count(container) {
-                return visit_count;
-            }
-        }
-
-        let container_path_str = container.get_path().to_string();
-
-        if let Some(&count) = self.visit_counts.get(&container_path_str) {
-            return count;
-        }
-
+    pub fn visit_count_for_container(&mut self, _container: &Rc<Container>) -> i32 {
         0
-    }
-
-    pub fn record_turn_index_visit_to_container(&mut self, container: &Container) {
-        if let Some(patch) = &mut self.patch {
-            patch.set_turn_index(container, self.current_turn_index);
-            return;
-        }
-
-        let container_path_str = Object::get_path(container).to_string();
-        self.turn_indices
-            .insert(container_path_str, self.current_turn_index);
     }
 
     fn try_splitting_head_tail_whitespace(text: &str) -> Option<Vec<Value>> {
@@ -769,21 +690,6 @@ impl StoryState {
             copy.current_flow.current_choices = self.current_flow.current_choices.clone();
         }
 
-        // The copy of the state has its own copy of the named flows dictionary,
-        // except with the current flow replaced with the copy above
-        // (Assuming we're in multi-flow mode at all. If we're not then
-        // the above copy is simply the default flow copy and we're done)
-        if self.named_flows.is_some() {
-            let mut nf = self.named_flows.clone();
-            nf.as_mut().unwrap().insert(
-                copy.current_flow.name.to_string(),
-                copy.current_flow.clone(),
-            );
-            copy.alive_flow_names_dirty = true;
-
-            copy.named_flows = nf;
-        }
-
         if self.has_error() {
             copy.current_errors = self.current_errors.clone();
         }
@@ -808,12 +714,6 @@ impl StoryState {
 
         copy.set_previous_pointer(self.get_previous_pointer().clone());
 
-        // visit counts and turn indicies will be read only, not modified
-        // while in patch mode
-        copy.visit_counts = self.visit_counts.clone();
-        copy.turn_indices = self.turn_indices.clone();
-
-        copy.current_turn_index = self.current_turn_index;
         copy.story_seed = self.story_seed;
         copy.previous_random = self.previous_random;
 
@@ -838,27 +738,7 @@ impl StoryState {
 
         self.variables_state.apply_patch();
 
-        if self.patch.is_some() {
-            for (path, count) in self.patch.as_ref().unwrap().visit_counts.clone().iter() {
-                self.apply_count_changes(path, *count, true);
-            }
-
-            for (path, index) in self.patch.as_ref().unwrap().turn_indices.clone().iter() {
-                self.apply_count_changes(path, *index, false);
-            }
-        }
-
         self.patch = None;
-    }
-
-    fn apply_count_changes(&mut self, container: &str, new_count: i32, is_visit: bool) {
-        let counts = if is_visit {
-            &mut self.visit_counts
-        } else {
-            &mut self.turn_indices
-        };
-
-        counts.insert(container.to_string(), new_count);
     }
 
     pub fn pop_from_output_stream(&mut self, count: usize) {
@@ -905,9 +785,7 @@ impl StoryState {
 
         self.set_current_pointer(new_pointer);
 
-        if incrementing_turn_index {
-            self.current_turn_index += 1;
-        }
+        let _ = incrementing_turn_index;
 
         Ok(())
     }
@@ -1081,109 +959,6 @@ impl StoryState {
         Ok(None)
     }
 
-    pub(crate) fn turns_since_for_container(
-        &self,
-        container: &Container,
-    ) -> Result<i32, StoryError> {
-        if !container.turn_index_should_be_counted {
-            return Err(StoryError::InvalidStoryState(format!(
-                "TURNS_SINCE() for target ({}) unknown.",
-                container.name.as_ref().unwrap()
-            )));
-        }
-
-        if self.patch.is_some()
-            && self
-                .patch
-                .as_ref()
-                .unwrap()
-                .get_turn_index(container)
-                .is_some()
-        {
-            let index = *self
-                .patch
-                .as_ref()
-                .unwrap()
-                .get_turn_index(container)
-                .unwrap();
-            return Ok(self.current_turn_index - index);
-        }
-
-        let container_path_str = Object::get_path(container).to_string();
-
-        if self.turn_indices.contains_key(&container_path_str) {
-            let index = *self.turn_indices.get(&container_path_str).unwrap();
-            Ok(self.current_turn_index - index)
-        } else {
-            Ok(-1)
-        }
-    }
-
-    pub(crate) fn switch_flow_internal(&mut self, flow_name: &str) {
-        if flow_name.eq(&self.current_flow.name) {
-            return;
-        }
-
-        if self.named_flows.is_none() {
-            self.named_flows = Some(HashMap::new());
-        }
-
-        let named_flows = self.named_flows.as_mut().unwrap();
-
-        // store the current flow and retrieve and remove the next flow
-        let flow = named_flows.remove(flow_name);
-
-        let mut next_flow = match flow {
-            Some(f) => f,
-            None => {
-                self.alive_flow_names_dirty = true;
-                Flow::new(flow_name, self.main_content_container.clone())
-            }
-        };
-
-        std::mem::swap(&mut self.current_flow, &mut next_flow);
-        named_flows.insert(next_flow.name.clone(), next_flow);
-
-        self.variables_state
-            .set_callstack(self.current_flow.callstack.clone());
-
-        // Cause text to be regenerated from output stream if necessary
-        self.output_stream_dirty();
-    }
-
-    pub fn visit_count_at_path_string(&self, path_string: &str) -> Result<i32, StoryError> {
-        let mut visit_count_out;
-
-        if self.patch.is_some() {
-            let container = self
-                .main_content_container
-                .content_at_path(&Path::new_with_components_string(Some(path_string)), 0, -1)
-                .container();
-            if container.is_none() {
-                return Err(StoryError::InvalidStoryState(format!(
-                    "Content at path not found: {}",
-                    path_string
-                )));
-            }
-
-            visit_count_out = self
-                .patch
-                .as_ref()
-                .unwrap()
-                .get_visit_count(container.as_ref().unwrap());
-            if let Some(visit_count_out) = visit_count_out {
-                return Ok(visit_count_out);
-            }
-        }
-
-        visit_count_out = self.visit_counts.get(path_string).copied();
-        if let Some(visit_count_out) = visit_count_out {
-            return Ok(visit_count_out);
-        }
-
-        Ok(0)
-    }
-
     pub fn to_json(&self) -> Result<String, StoryError> {
         Ok(self.write_json()?.to_string())
     }
@@ -1196,57 +971,34 @@ impl StoryState {
     }
 
     fn write_json(&self) -> Result<serde_json::Value, StoryError> {
+        self.ensure_minimal_save_ready()?;
+
         let mut obj: Map<String, serde_json::Value> = Map::new();
 
-        // Flows
-        let mut flows: Map<String, serde_json::Value> = Map::new();
-
-        // current flow
-        flows.insert(
-            self.current_flow.name.clone(),
-            self.current_flow.write_json()?,
+        let flow = self.current_flow.write_json()?;
+        let flow = flow
+            .as_object()
+            .ok_or_else(|| StoryError::BadJson("Invalid flow save data".to_owned()))?;
+        obj.insert(
+            "callstack".to_owned(),
+            flow.get("callstack")
+                .ok_or_else(|| StoryError::BadJson("Missing callstack".to_owned()))?
+                .clone(),
         );
-
-        // named flows
-        if let Some(named_flows) = &self.named_flows {
-            for (k, v) in named_flows {
-                flows.insert(k.clone(), v.write_json()?);
-            }
+        obj.insert(
+            "currentChoices".to_owned(),
+            flow.get("currentChoices")
+                .ok_or_else(|| StoryError::BadJson("Missing current choices".to_owned()))?
+                .clone(),
+        );
+        if let Some(choice_threads) = flow.get("choiceThreads") {
+            obj.insert("choiceThreads".to_owned(), choice_threads.clone());
         }
-
-        obj.insert("flows".to_owned(), serde_json::Value::Object(flows));
-
-        obj.insert("currentFlowName".to_owned(), json!(self.current_flow.name));
         obj.insert(
             "variablesState".to_owned(),
             self.variables_state.write_json()?,
         );
-        obj.insert(
-            "evalStack".to_owned(),
-            json_write::write_list_rt_objs(&self.evaluation_stack)?,
-        );
 
-        if !self.diverted_pointer.is_null() {
-            obj.insert(
-                "currentDivertTarget".to_owned(),
-                json!(self
-                    .diverted_pointer
-                    .get_path()
-                    .unwrap()
-                    .get_components_string()),
-            );
-        }
-
-        obj.insert(
-            "visitCounts".to_owned(),
-            json_write::write_int_dictionary(&self.visit_counts),
-        );
-        obj.insert(
-            "turnIndices".to_owned(),
-            json_write::write_int_dictionary(&self.turn_indices),
-        );
-
-        obj.insert("turnIdx".to_owned(), json!(self.current_turn_index));
         obj.insert("storySeed".to_owned(), json!(self.story_seed));
         obj.insert("previousRandom".to_owned(), json!(self.previous_random));
 
@@ -1256,6 +1008,28 @@ impl StoryState {
         obj.insert("inkFormatVersion".to_owned(), json!(INK_VERSION_CURRENT));
 
         Ok(serde_json::Value::Object(obj))
+    }
+
+    fn ensure_minimal_save_ready(&self) -> Result<(), StoryError> {
+        if !self.evaluation_stack.is_empty() {
+            return Err(StoryError::InvalidStoryState(
+                "Cannot save while expression evaluation is active.".to_owned(),
+            ));
+        }
+
+        if !self.diverted_pointer.is_null() {
+            return Err(StoryError::InvalidStoryState(
+                "Cannot save while a divert target is pending.".to_owned(),
+            ));
+        }
+
+        if self.in_string_evaluation() {
+            return Err(StoryError::InvalidStoryState(
+                "Cannot save while string generation is active.".to_owned(),
+            ));
+        }
+
+        Ok(())
     }
 
     fn load_json_obj(&mut self, j_object: serde_json::Value) -> Result<(), StoryError> {
@@ -1273,56 +1047,15 @@ impl StoryState {
             )));
         }
 
-        let flows_obj = j_object
-            .get("flows")
-            .ok_or_else(|| StoryError::BadJson("Missing flows object".to_string()))?;
-        let flows_obj_dict = flows_obj
+        let root_obj = j_object
             .as_object()
-            .ok_or_else(|| StoryError::BadJson("Invalid flows object".to_string()))?;
-
-        if flows_obj_dict.len() == 1 {
-            self.named_flows = None;
-        } else if self.named_flows.is_none() {
-            self.named_flows = Some(HashMap::new());
-        } else {
-            self.named_flows.as_mut().unwrap().clear();
-        }
-
-        for (named_flow_name, named_flow_obj) in flows_obj_dict.iter() {
-            let name = named_flow_name.clone();
-            let flow_obj = named_flow_obj
-                .as_object()
-                .ok_or_else(|| StoryError::BadJson("Invalid flow object".to_string()))?;
-
-            let flow = Flow::from_json(&name, self.main_content_container.clone(), flow_obj)?;
-
-            if flows_obj_dict.len() == 1 {
-                self.current_flow = flow;
-            } else {
-                self.named_flows
-                    .as_mut()
-                    .ok_or_else(|| {
-                        StoryError::BadJson("Named flows should be initialized".to_string())
-                    })?
-                    .insert(name, flow);
-            }
-        }
-
-        if let Some(named_flows) = &mut self.named_flows {
-            if named_flows.len() > 1 {
-                if let Some(current_flow_name) = j_object.get("currentFlowName") {
-                    if let Some(curr_flow_name) = current_flow_name.as_str() {
-                        if let Some(curr_flow) = named_flows.get(curr_flow_name) {
-                            self.current_flow = curr_flow.clone();
-                            named_flows.remove(curr_flow_name);
-                        }
-                    }
-                }
-            }
-        }
-
+            .ok_or_else(|| StoryError::BadJson("Invalid save state object".to_string()))?;
+        self.current_flow = Flow::from_json(
+            DEFAULT_FLOW_NAME,
+            self.main_content_container.clone(),
+            root_obj,
+        )?;
         self.output_stream_dirty();
-        self.alive_flow_names_dirty = true;
 
         let variables_state_obj = j_object
             .get("variablesState")
@@ -1335,47 +1068,10 @@ impl StoryState {
         self.variables_state
             .set_callstack(self.current_flow.callstack.clone());
 
-        let eval_stack_obj = j_object
-            .get("evalStack")
-            .ok_or_else(|| StoryError::BadJson("Missing evaluation stack".to_string()))?;
-        self.evaluation_stack = json_read::jarray_to_runtime_obj_list(
-            eval_stack_obj
-                .as_array()
-                .ok_or_else(|| StoryError::BadJson("Invalid evaluation stack".to_string()))?,
-            false,
-        )?;
-
-        if let Some(current_divert_target_path) = j_object.get("currentDivertTarget") {
-            let divert_path = Path::new_with_components_string(current_divert_target_path.as_str());
-            self.diverted_pointer =
-                Story::pointer_at_path(&self.main_content_container, &divert_path)?.clone();
-        }
-
-        let visit_counts_obj = j_object
-            .get("visitCounts")
-            .ok_or_else(|| StoryError::BadJson("Missing visit counts object".to_string()))?;
-        self.visit_counts = json_read::jobject_to_int_hashmap(
-            visit_counts_obj
-                .as_object()
-                .ok_or_else(|| StoryError::BadJson("Invalid visit counts object".to_string()))?,
-        )?;
-
-        let turn_indices_obj = j_object
-            .get("turnIndices")
-            .ok_or_else(|| StoryError::BadJson("Missing turn indices object".to_string()))?;
-        self.turn_indices = json_read::jobject_to_int_hashmap(
-            turn_indices_obj
-                .as_object()
-                .ok_or_else(|| StoryError::BadJson("Invalid turn indices object".to_string()))?,
-        )?;
-
-        let current_turn_index = j_object
-            .get("turnIdx")
-            .ok_or_else(|| StoryError::BadJson("Missing current turn index".to_string()))?;
-        self.current_turn_index = current_turn_index
-            .as_i64()
-            .ok_or_else(|| StoryError::BadJson("Invalid current turn index".to_string()))?
-            as i32;
+        self.evaluation_stack.clear();
+        self.diverted_pointer = pointer::NULL.clone();
+        self.current_flow.output_stream.clear();
+        self.output_stream_dirty();
 
         let story_seed = j_object
             .get("storySeed")
@@ -1394,30 +1090,6 @@ impl StoryState {
             as i32;
 
         Ok(())
-    }
-
-    pub(crate) fn remove_flow_internal(&mut self, flow_name: &str) -> Result<(), StoryError> {
-        if flow_name.eq(DEFAULT_FLOW_NAME) {
-            return Err(StoryError::BadArgument(
-                "Cannot destroy default flow".to_owned(),
-            ));
-        }
-
-        // If we're currently in the flow that's being removed, switch back to default
-        if self.current_flow.name.eq(flow_name) {
-            self.switch_to_default_flow_internal();
-        }
-
-        self.named_flows.as_mut().unwrap().remove(flow_name);
-        self.alive_flow_names_dirty = true;
-
-        Ok(())
-    }
-
-    pub(crate) fn switch_to_default_flow_internal(&mut self) {
-        if self.named_flows.is_some() {
-            self.switch_flow_internal(DEFAULT_FLOW_NAME);
-        }
     }
 
     pub(crate) fn add_error(&mut self, message: String, is_warning: bool) {
@@ -1448,7 +1120,7 @@ mod tests {
         let mut story = Story::new(SIMPLE_STORY_JSON).expect("valid story");
         let mut save: serde_json::Value =
             serde_json::from_str(&story.save_state().expect("save state")).expect("valid save");
-        save["inkSaveVersion"] = json!(0);
+        save["inkSaveVersion"] = json!(1);
 
         let error = story
             .load_state(&save.to_string())
@@ -1460,17 +1132,48 @@ mod tests {
     }
 
     #[test]
-    fn rejects_save_state_without_flows() {
+    fn rejects_save_state_without_callstack() {
         let mut story = Story::new(SIMPLE_STORY_JSON).expect("valid story");
         let mut save: serde_json::Value =
             serde_json::from_str(&story.save_state().expect("save state")).expect("valid save");
-        save.as_object_mut().expect("save object").remove("flows");
+        save.as_object_mut()
+            .expect("save object")
+            .remove("callstack");
 
         let error = story
             .load_state(&save.to_string())
-            .expect_err("expected missing flows error");
+            .expect_err("expected missing callstack error");
 
-        assert!(error.to_string().contains("Missing flows object"));
+        assert!(error.to_string().contains("loading callstack"));
+    }
+
+    #[test]
+    fn save_state_uses_minimal_v2_shape() {
+        let story = Story::new(SIMPLE_STORY_JSON).expect("valid story");
+        let save: serde_json::Value =
+            serde_json::from_str(&story.save_state().expect("save state")).expect("valid save");
+
+        assert_eq!(save["inkSaveVersion"], json!(2));
+        assert!(save.get("callstack").is_some());
+        assert!(save.get("currentChoices").is_some());
+        assert!(save.get("variablesState").is_some());
+        assert!(save.get("storySeed").is_some());
+        assert!(save.get("previousRandom").is_some());
+
+        for removed_field in [
+            "flows",
+            "currentFlowName",
+            "evalStack",
+            "currentDivertTarget",
+            "visitCounts",
+            "turnIndices",
+            "turnIdx",
+        ] {
+            assert!(
+                save.get(removed_field).is_none(),
+                "save should not contain removed field {removed_field}"
+            );
+        }
     }
 
     #[test]

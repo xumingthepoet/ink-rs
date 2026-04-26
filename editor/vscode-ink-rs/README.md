@@ -10,6 +10,7 @@ outside `ink-csharp/` and covers the ink-rs language surface directly:
 - typed `== function name(args) => Type ==` declarations
 - typed `EXTERNAL name(args) => Type` declarations
 - divert target value types such as `: ->` and `: ->[]`
+- explicit dynamic diverts such as `-> {next}` and `-> {route.next}(arg)`
 - choices, gathers, knots, stitches, diverts, glue, tags, comments, and inline
   logic
 

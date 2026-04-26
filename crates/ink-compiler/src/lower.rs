@@ -18,8 +18,7 @@ use ink_story_json_format::{
 use crate::{
     analysis::CheckedStory,
     compiler::StageOutput,
-    parsed::{AssignmentTarget, Choice, Divert, DivertTarget, Expression, Object, TypeName},
-    syntax::parse_initial_expression,
+    parsed::{AssignmentTarget, Choice, Divert, DivertTarget, Expression, Object},
 };
 
 use conditional::lower_conditional_into;
@@ -35,7 +34,7 @@ use indexes::{
 use path::{compact_path_strings_in_container, LabelIndex};
 use sequence::lower_sequence;
 use value::{lower_value_literal, runtime_default_for_type};
-use weave::{choice_container_prefix, lower_choice_weave, lower_content_list_into_context};
+use weave::{lower_choice_weave, lower_content_list_into_context};
 
 pub(crate) fn lower(story: &CheckedStory, count_all_visits: bool) -> StageOutput<RuntimeProgram> {
     let indexes = LoweringIndexes::build(
@@ -150,9 +149,6 @@ fn estimated_choice_content_len(
     global_variables: &HashSet<String>,
 ) -> usize {
     let mut content = Vec::new();
-    if choice.has_start_content() {
-        content.extend(choice_container_prefix(&ChoicePathMode::Root, "c-0", 0, 2));
-    }
     lower_content_list_into_context(
         &mut content,
         choice.inner_content(),
@@ -997,13 +993,14 @@ fn push_divert_with_context(
     constants: &ConstantValues,
     struct_definitions: &StructDefinitions,
 ) {
-    if let Some(dynamic_target) =
-        dynamic_divert_target(divert, path_mode, global_variables, external_signatures)
-    {
+    if let DivertTarget::Dynamic(expression) = divert.target() {
         push_dynamic_divert_with_context(
             content,
             divert,
-            dynamic_target,
+            DynamicDivertTarget {
+                expression: expression.clone(),
+                divert_arguments: divert.arguments().to_vec(),
+            },
             path_mode,
             choice_labels,
             global_labels,
@@ -1041,28 +1038,28 @@ fn push_divert_with_context(
     match divert.target() {
         DivertTarget::Done => content.push(RuntimeObject::ControlCommand(ControlCommand::Done)),
         DivertTarget::End => content.push(RuntimeObject::ControlCommand(ControlCommand::End)),
+        DivertTarget::Dynamic(_) => {
+            unreachable!("dynamic divert targets return before static lowering")
+        }
         DivertTarget::Path(target) => {
-            let resolved_target =
-                if path_mode.is_local_variable(target) || global_variables.contains(target) {
-                    runtime_divert(target.clone(), true, divert.is_tunnel())
-                } else if let Some(choice_target) = choice_labels.get(target) {
-                    runtime_divert(choice_target.to_string(), false, divert.is_tunnel())
-                } else if let Some(label_target) = path_mode
-                    .scoped_label_target(target, global_labels)
-                    .filter(|label_target| *label_target != target)
-                {
-                    runtime_divert(
-                        path_mode.resolve_label_target(label_target),
-                        false,
-                        divert.is_tunnel(),
-                    )
-                } else {
-                    runtime_divert(
-                        path_mode.resolve_divert_target(target),
-                        false,
-                        divert.is_tunnel(),
-                    )
-                };
+            let resolved_target = if let Some(choice_target) = choice_labels.get(target) {
+                runtime_divert(choice_target.to_string(), false, divert.is_tunnel())
+            } else if let Some(label_target) = path_mode
+                .scoped_label_target(target, global_labels)
+                .filter(|label_target| *label_target != target)
+            {
+                runtime_divert(
+                    path_mode.resolve_label_target(label_target),
+                    false,
+                    divert.is_tunnel(),
+                )
+            } else {
+                runtime_divert(
+                    path_mode.resolve_divert_target(target),
+                    false,
+                    divert.is_tunnel(),
+                )
+            };
             content.push(resolved_target);
         }
         DivertTarget::Empty => {
@@ -1074,60 +1071,6 @@ fn push_divert_with_context(
 struct DynamicDivertTarget {
     expression: Expression,
     divert_arguments: Vec<Expression>,
-}
-
-fn dynamic_divert_target(
-    divert: &Divert,
-    path_mode: &ChoicePathMode,
-    global_variables: &HashSet<String>,
-    external_signatures: &ExternalSignatures,
-) -> Option<DynamicDivertTarget> {
-    let DivertTarget::Path(target) = divert.target() else {
-        return None;
-    };
-
-    if divert.has_argument_list()
-        && external_signatures
-            .get(target)
-            .is_some_and(|signature| signature.return_type() == &TypeName::divert_target())
-    {
-        return Some(DynamicDivertTarget {
-            expression: Expression::FunctionCall {
-                name: target.clone(),
-                args: divert.arguments().to_vec(),
-            },
-            divert_arguments: Vec::new(),
-        });
-    }
-
-    let expression = parse_initial_expression(target)?;
-    if matches!(expression, Expression::VariableReference(_)) {
-        return None;
-    }
-    if !expression_starts_with_visible_variable(&expression, path_mode, global_variables) {
-        return None;
-    }
-
-    Some(DynamicDivertTarget {
-        expression,
-        divert_arguments: divert.arguments().to_vec(),
-    })
-}
-
-fn expression_starts_with_visible_variable(
-    expression: &Expression,
-    path_mode: &ChoicePathMode,
-    global_variables: &HashSet<String>,
-) -> bool {
-    match expression {
-        Expression::VariableReference(name) => {
-            path_mode.is_local_variable(name) || global_variables.contains(name)
-        }
-        Expression::FieldAccess { base, .. } | Expression::IndexAccess { base, .. } => {
-            expression_starts_with_visible_variable(base, path_mode, global_variables)
-        }
-        _ => false,
-    }
 }
 
 fn push_dynamic_divert_with_context(
@@ -1222,6 +1165,20 @@ fn lower_tunnel_onwards_into(
     }
     if let Some(target) = tunnel_onwards.override_target() {
         match target {
+            DivertTarget::Dynamic(expression) => {
+                lower_expression_into(
+                    content,
+                    expression,
+                    choice_labels,
+                    global_labels,
+                    global_variables,
+                    external_signatures,
+                    constants,
+                    struct_definitions,
+                    path_mode,
+                    false,
+                );
+            }
             DivertTarget::Path(target) => {
                 if let Some(choice_target) = choice_labels.get(target) {
                     content.push(RuntimeObject::DivertTarget(choice_target.to_string()));

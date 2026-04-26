@@ -55,6 +55,48 @@ Each entry should include:
   `crates/ink-test/tests/language.rs`, plus compiler parser, analysis, and
   lowering unit tests.
 
+## 2026-04-26: Explicit Dynamic Diverts And Minimal Stateful Runtime
+
+- status: removed/supported
+- upstream behavior: upstream Ink allows implicit variable divert targets such
+  as `-> next`, uses visit counts and turn counts for read-count shorthand,
+  `READ_COUNT`, `TURNS`, `TURNS_SINCE`, once-only `*` choices, and multi-flow
+  runtime APIs. Choice square brackets split displayed choice text from selected
+  output.
+- ink-rs behavior: static diverts remain `-> knot.path`. Dynamic diverts must
+  be braced, such as `-> {next}`, `-> {route.next}`, `-> {targets[0]}`, or
+  `-> {pick(flag)}(arg)`, and the expression must type-check as `->`. Old
+  variable-rooted direct diverts produce a migration diagnostic. Choice line
+  text is display-only by default, `*` and `+` are both repeatable, and
+  choice-only square bracket syntax is removed. `READ_COUNT`, `TURNS`,
+  `TURNS_SINCE`, `CHOICE_COUNT`, and `{knot}` read-count shorthand are removed;
+  authors should model state explicitly with variables. Runtime multi-flow APIs
+  and multi-flow save state are removed; threads remain supported.
+- ink-rs save behavior: save JSON is version 2 and stores only the active
+  callstack, generated choices, optional choice thread snapshots, global
+  variables, `storySeed`, `previousRandom`, `inkSaveVersion`, and
+  `inkFormatVersion`. It no longer stores `flows`, `currentFlowName`,
+  `evalStack`, `currentDivertTarget`, `visitCounts`, `turnIndices`, or
+  `turnIdx`. Version 1 saves are rejected rather than migrated.
+- documentation effect: `WritingWithInk-latest.md` describes explicit dynamic
+  divert syntax, repeatable display-only choices, removed count/turn features,
+  and minimal save-state semantics. Runtime and JSON format docs mark remaining
+  count-related runtime tokens as legacy compiled-story compatibility rather
+  than current source-language behavior.
+- rationale: `.` now names both static flow paths and struct field access.
+  Requiring braces for dynamic target expressions removes ambiguous lowering.
+  Removing implicit counts and multi-flow state keeps save files small and makes
+  authored state explicit.
+- migration guidance: rewrite `-> next` to `-> {next}` when `next` is a
+  variable, parameter, constant, field, index expression, or target-returning
+  function call. Move selected response text into the indented choice body.
+  Replace visit/turn/count queries with typed variables maintained by the story
+  or host code. Replace multi-flow runtime usage with separate story instances
+  or explicit story variables.
+- tests: dynamic divert parser, analysis, lowering, choice, save/load, removed
+  count diagnostics, C# compatibility divergence, compiler conformance, runtime
+  unit, and language integration tests updated with this change.
+
 ## 2026-04-26: CONST Declarations Require Explicit Types
 
 - status: supported

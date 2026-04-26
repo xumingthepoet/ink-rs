@@ -47,11 +47,11 @@ fn public_compiler_options_are_constructible() {
 
 #[test]
 fn public_diagnostics_expose_codes() {
-    let output = Compiler::default().compile(SourceInput::new("LIST inventory = sword"));
+    let output = Compiler::default().compile(SourceInput::new("Line {value + }"));
 
     assert!(output.has_errors());
     assert!(output
         .diagnostics
         .iter()
-        .any(|diagnostic| diagnostic.code == Some(DiagnosticCode::RemovedFeature)));
+        .any(|diagnostic| diagnostic.code == Some(DiagnosticCode::InvalidInlineSyntax)));
 }

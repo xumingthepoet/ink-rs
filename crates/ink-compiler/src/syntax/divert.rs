@@ -84,14 +84,11 @@ fn parse_tunnel_onwards(source: Option<&str>, span: SourceSpan) -> Option<Tunnel
 pub(super) fn parse_divert_source(source: &str, span: SourceSpan) -> Option<Divert> {
     let source = source.trim();
     let (target, arguments, has_argument_list) = parse_divert_target_and_arguments(source)?;
+    let target = parse_divert_target(target)?;
     if has_argument_list {
-        Some(Divert::with_arguments(
-            DivertTarget::from_source(target),
-            arguments,
-            span,
-        ))
+        Some(Divert::with_arguments(target, arguments, span))
     } else {
-        Some(Divert::new(DivertTarget::from_source(target), span))
+        Some(Divert::new(target, span))
     }
 }
 
@@ -165,7 +162,10 @@ fn parse_divert_target_and_arguments(source: &str) -> Option<(&str, Vec<Expressi
     }
 
     let target = source[..open_index].trim();
-    if !is_divert_path(target) && parse_initial_expression(target).is_none() {
+    if !is_divert_path(target)
+        && braced_dynamic_target_source(target).is_none()
+        && parse_initial_expression(target).is_none()
+    {
         return None;
     }
 
@@ -180,6 +180,24 @@ fn parse_divert_target_and_arguments(source: &str) -> Option<(&str, Vec<Expressi
     };
 
     Some((target, arguments, true))
+}
+
+fn parse_divert_target(source: &str) -> Option<DivertTarget> {
+    let source = source.trim();
+    if let Some(inner) = braced_dynamic_target_source(source) {
+        return parse_initial_expression(inner).map(DivertTarget::Dynamic);
+    }
+
+    Some(DivertTarget::from_source(source))
+}
+
+fn braced_dynamic_target_source(source: &str) -> Option<&str> {
+    let after_open = source.strip_prefix('{')?;
+    let close_index = scan::find_matching_delimiter(after_open, '{', '}')?;
+    if !after_open[close_index + 1..].trim().is_empty() {
+        return None;
+    }
+    Some(after_open[..close_index].trim())
 }
 
 fn is_divert_path(source: &str) -> bool {

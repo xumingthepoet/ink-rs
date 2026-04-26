@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap};
 
 use crate::parsed::{FlowArgument, TypeName};
 
@@ -74,7 +74,6 @@ impl ParameterSymbol {
 }
 
 pub(super) type TargetSymbolIndex = HashMap<String, FlowSymbol>;
-pub(super) type VariableTargetIndex = HashSet<String>;
 pub(super) type StructTypeIndex = BTreeMap<String, StructTypeSymbol>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]

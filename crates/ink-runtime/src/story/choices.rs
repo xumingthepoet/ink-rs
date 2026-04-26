@@ -41,7 +41,8 @@ impl Story {
         self.get_state_mut()
             .set_chosen_path(p, incrementing_turn_index)?;
 
-        // Take a note of newly visited containers for read counts etc
+        // Preserve the legacy navigation hook. The current runtime no longer
+        // records visit or turn counts here.
         self.visit_changed_containers_due_to_divert();
 
         Ok(())
@@ -71,16 +72,6 @@ impl Story {
 
         if choice_point.has_start_content() {
             start_text = self.pop_choice_string_and_tags(&mut tags);
-        }
-
-        // Don't create choice if player has already read this content
-        if choice_point.once_only() {
-            let visit_count = self
-                .get_state_mut()
-                .visit_count_for_container(choice_point.get_choice_target().as_ref().unwrap());
-            if visit_count > 0 {
-                show_choice = false;
-            }
         }
 
         // We go through the full process of creating the choice above so

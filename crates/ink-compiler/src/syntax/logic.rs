@@ -93,9 +93,6 @@ fn object_contains_function_call(object: &Object) -> bool {
                 || choice.start_content().is_some_and(|content| {
                     content.objects().iter().any(object_contains_function_call)
                 })
-                || choice.choice_only_content().is_some_and(|content| {
-                    content.objects().iter().any(object_contains_function_call)
-                })
                 || choice
                     .inner_content()
                     .objects()
