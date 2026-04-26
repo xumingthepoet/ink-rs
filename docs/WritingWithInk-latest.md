@@ -56,17 +56,20 @@ The full change history lives in `WritingWithInk-updates.md`. The upstream C#
 documentation snapshot lives in `WritingWithInk-origin.md` and should not be
 edited for ink-rs language changes.
 
-### Typed values are required for new value declarations
+### Typed values and story-level globals are required for new value declarations
 
 - status: supported
 - upstream behavior: upstream Ink infers variable, temporary variable,
-  function, and external value shapes dynamically from runtime values.
-- ink-rs behavior: `VAR` and `temp` declarations require `name: Type`, function
-  parameters require `name: Type`, functions require `-> ReturnType`, and
-  `EXTERNAL` declarations require typed arguments and returns. Supported source
-  types are `int`, `float`, `bool`, `string`, user `STRUCT` types, arrays
-  written as `T[]`, nested arrays, and `void` return types for functions and
-  externals that do not return values.
+  function, and external value shapes dynamically from runtime values, and
+  permits `VAR` declarations anywhere in the parsed story.
+- ink-rs behavior: `VAR` declarations must appear at the story top level,
+  outside knots, stitches, functions, choices, conditionals, and sequences.
+  `VAR` and `temp` declarations require `name: Type`, function parameters
+  require `name: Type`, functions require `-> ReturnType`, and `EXTERNAL`
+  declarations require typed arguments and returns. Supported source types are
+  `int`, `float`, `bool`, `string`, user `STRUCT` types, arrays written as
+  `T[]`, nested arrays, and `void` return types for functions and externals
+  that do not return values.
 - ink-rs behavior: structs are declared with `STRUCT Name { field: Type }`,
   object literals use `{ field: value }`, arrays use `[a, b]`, field access uses
   `value.field`, and index access uses `array[index]`. Array and struct values
@@ -75,10 +78,12 @@ edited for ink-rs language changes.
   mutates an array and returns `void`, and direct self tail recursion in
   `return current_function(...)` is lowered without growing the Ink function
   callstack for that recursive step.
-- migration guidance: add explicit types to all `VAR`, `temp`, function, and
-  `EXTERNAL` declarations. Use direct diverts instead of storing divert targets
-  in variables; divert-target values are still accepted in the existing flow
-  APIs such as `TURNS_SINCE(-> knot)` and tunnel parameters.
+- migration guidance: move nested `VAR` declarations to the story top level, or
+  replace local executable state with typed `temp` declarations. Add explicit
+  types to all `VAR`, `temp`, function, and `EXTERNAL` declarations. Use direct
+  diverts instead of storing divert targets in variables; divert-target values
+  are still accepted in the existing flow APIs such as `TURNS_SINCE(-> knot)`
+  and tunnel parameters.
 - tests: typed value behavior is covered by `crates/ink-test/tests/language.rs`
   and the compiler, runtime, and JSON format unit tests.
 
@@ -1283,7 +1288,7 @@ This kind of variable is called "global" because it can be accessed from anywher
 
 ### Defining Global Variables
 
-Global variables can be defined anywhere, via a `VAR` statement. In ink-rs, every `VAR` declaration must include an explicit type using `name: Type`. A declaration may include an initializer, or omit it to use the type's default value.
+In upstream Ink, global variables can be defined anywhere via a `VAR` statement. In ink-rs, `VAR` declarations must appear at the story top level, outside knots, stitches, functions, choices, conditionals, and sequences. Every `VAR` declaration must include an explicit type using `name: Type`. A declaration may include an initializer, or omit it to use the type's default value.
 
 	VAR knowledge_of_the_cure: bool = false
 	VAR players_name: string = "Emilia"

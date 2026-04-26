@@ -737,6 +737,39 @@ fn untyped_global_declaration_reports_missing_type() {
 }
 
 #[test]
+fn nested_global_var_declarations_report_removed_feature_diagnostic() {
+    let cases = [
+        (
+            "nested-var-function.ink",
+            "== function setup() -> void ==\nVAR score: int = 0",
+        ),
+        (
+            "nested-var-knot.ink",
+            "== knot ==\nVAR score: int = 0\n-> DONE",
+        ),
+        (
+            "nested-var-stitch.ink",
+            "== knot ==\n= stitch\nVAR score: int = 0\n-> DONE",
+        ),
+        (
+            "nested-var-conditional.ink",
+            "{ true:\nVAR score: int = 0\n}\n-> DONE",
+        ),
+    ];
+
+    for (name, source) in cases {
+        let diagnostics = diagnostics_for_language_source(name, source);
+
+        assert_diagnostic_code(&diagnostics, DiagnosticCode::RemovedFeature);
+        assert_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "nested VAR declarations",
+        );
+    }
+}
+
+#[test]
 fn untyped_temp_declaration_reports_missing_type() {
     let diagnostics = diagnostics_for_language_source(
         "untyped-temp.ink",

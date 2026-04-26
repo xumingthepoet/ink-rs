@@ -1,5 +1,11 @@
 Story
   Weave(baseIndent=0)
+    VariableAssignment(name="x", global=true, temp=false, type=int)
+      Number(0)
+    VariableAssignment(name="y", global=true, temp=false, type=int)
+      Number(3)
+    VariableAssignment(name="z", global=true, temp=false, type=int)
+      Number(1)
     ContentList
       FunctionCall(derp, args=2)
       Text("\n")
@@ -19,12 +25,8 @@ Story
     Divert(target="-> DONE", empty=false, tunnel=false, thread=false)
   Flow(level=Knot, name="derp", function=true)
     Weave(baseIndent=0)
-      VariableAssignment(name="x", global=true, temp=false, type=int)
-        Number(0)
       VariableAssignment(name="x", global=false, temp=false)
         Binary(-, VariableReference(a), VariableReference(b))
-      VariableAssignment(name="y", global=true, temp=false, type=int)
-        Number(3)
       ContentList
         Conditional
           ConditionalBranch(true=false, else=false, inline=false)
@@ -42,5 +44,3 @@ Story
               VariableAssignment(name="y", global=false, temp=false)
                 Binary(+, VariableReference(x), Number(1))
       Text("\n")
-      VariableAssignment(name="z", global=true, temp=false, type=int)
-        Number(1)

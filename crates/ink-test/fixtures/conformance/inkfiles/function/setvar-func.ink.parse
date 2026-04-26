@@ -1,5 +1,7 @@
 Story
   Weave(baseIndent=0)
+    VariableAssignment(name="x", global=true, temp=false, type=int)
+      Number(0)
     ContentList
       FunctionCall(herp, args=2)
       Text("\n")
@@ -13,7 +15,5 @@ Story
     Divert(target="-> DONE", empty=false, tunnel=false, thread=false)
   Flow(level=Knot, name="herp", function=true)
     Weave(baseIndent=0)
-      VariableAssignment(name="x", global=true, temp=false, type=int)
-        Number(0)
       VariableAssignment(name="x", global=false, temp=false)
         Binary(*, VariableReference(a), VariableReference(b))

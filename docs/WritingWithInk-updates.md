@@ -25,6 +25,32 @@ Each entry should include:
 - migration guidance
 - tests
 
+## 2026-04-26: Global VAR Declarations Restricted To Story Top Level
+
+- status: removed
+- upstream behavior: upstream Ink allows global variables to be introduced with
+  `VAR` anywhere in the parsed story, including inside knots, stitches,
+  functions, choices, conditionals, and sequences.
+- ink-rs behavior: `VAR` declarations are only accepted at the story top level,
+  outside knots, stitches, functions, choices, conditionals, and sequences.
+  Local executable state should use typed `temp` declarations instead.
+- documentation effect: `WritingWithInk-latest.md` records the scope
+  restriction in "Changed from upstream Ink" and in the global variable
+  declaration section.
+- rationale: hidden global declarations inside executable flow content make
+  include expansion and future source organization rules ambiguous. Keeping
+  globals in one story-level declaration area makes global state explicit before
+  flow execution.
+- migration guidance: move nested `VAR` declarations to the story top level. If
+  the value is only needed inside a knot, stitch, function, choice, conditional,
+  or sequence, replace it with a typed `temp` declaration.
+- tests: `nested_global_var_declarations_report_removed_feature_diagnostic` in
+  `crates/ink-test/tests/language.rs`,
+  `global_var_declarations_inside_flows_report_removed_feature` in
+  `crates/ink-compiler/src/syntax/parser.rs`, and
+  `reports_global_var_declarations_outside_story_top_level` in
+  `crates/ink-compiler/src/analysis/flow.rs`.
+
 ## 2026-04-26: Typed Values, Structs, Arrays, Functions, Externals, And Tail Calls
 
 - status: supported

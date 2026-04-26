@@ -27,6 +27,7 @@ pub(super) fn flow_diagnostics(story: &Story) -> Vec<Diagnostic> {
         target_symbols: &target_symbols,
     };
     let mut diagnostics = Vec::new();
+    check_global_var_declaration_scope(story, &mut diagnostics);
     check_nested_choice_termination_in_weave(story.root_weave(), false, &mut diagnostics);
     {
         let mut condition_checker = ConditionTypeChecker {
@@ -39,6 +40,99 @@ pub(super) fn flow_diagnostics(story: &Story) -> Vec<Diagnostic> {
         check_flow(flow, flow.name(), &analysis, &mut diagnostics);
     }
     diagnostics
+}
+
+fn check_global_var_declaration_scope(story: &Story, diagnostics: &mut Vec<Diagnostic>) {
+    for object in story.root_weave().content() {
+        check_global_var_declaration_scope_in_object(object, true, diagnostics);
+    }
+    for flow in story.flows() {
+        check_global_var_declaration_scope_in_flow(flow, diagnostics);
+    }
+}
+
+fn check_global_var_declaration_scope_in_flow(flow: &Flow, diagnostics: &mut Vec<Diagnostic>) {
+    for object in flow.weave().content() {
+        check_global_var_declaration_scope_in_object(object, false, diagnostics);
+    }
+    for child in flow.child_flows() {
+        check_global_var_declaration_scope_in_flow(child, diagnostics);
+    }
+}
+
+fn check_global_var_declaration_scope_in_object(
+    object: &Object,
+    is_story_top_level: bool,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    match object {
+        Object::VariableAssignment(assignment) if assignment.is_global() && !is_story_top_level => {
+            diagnostics.push(nested_global_var_declaration_diagnostic(
+                assignment.span().clone(),
+            ));
+        }
+        Object::Choice(choice) => {
+            if let Some(content) = choice.start_content() {
+                check_global_var_declaration_scope_in_content_list(content, diagnostics);
+            }
+            if let Some(content) = choice.choice_only_content() {
+                check_global_var_declaration_scope_in_content_list(content, diagnostics);
+            }
+            check_global_var_declaration_scope_in_content_list(choice.inner_content(), diagnostics);
+        }
+        Object::ContentList(content) => {
+            check_global_var_declaration_scope_in_content_list(content, diagnostics);
+        }
+        Object::Conditional(conditional) => {
+            for branch in conditional.branches() {
+                for object in branch.content().content() {
+                    check_global_var_declaration_scope_in_object(object, false, diagnostics);
+                }
+            }
+        }
+        Object::Sequence(sequence) => {
+            for element in sequence.elements() {
+                check_global_var_declaration_scope_in_content_list(element, diagnostics);
+            }
+        }
+        Object::Weave(weave) => {
+            for object in weave.content() {
+                check_global_var_declaration_scope_in_object(object, false, diagnostics);
+            }
+        }
+        Object::AuthorWarning(_)
+        | Object::ConstantDeclaration(_)
+        | Object::Divert(_)
+        | Object::Expression(_)
+        | Object::ExternalDeclaration(_)
+        | Object::Gather(_)
+        | Object::Glue(_)
+        | Object::IncDec(_)
+        | Object::LogicLine(_)
+        | Object::Return(_)
+        | Object::StructDeclaration(_)
+        | Object::Tag(_)
+        | Object::Text(_)
+        | Object::TunnelOnwards(_)
+        | Object::VariableAssignment(_) => {}
+    }
+}
+
+fn check_global_var_declaration_scope_in_content_list(
+    content: &ContentList,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    for object in content.objects() {
+        check_global_var_declaration_scope_in_object(object, false, diagnostics);
+    }
+}
+
+fn nested_global_var_declaration_diagnostic(span: SourceSpan) -> Diagnostic {
+    Diagnostic::removed_feature(
+        span,
+        "nested VAR declarations",
+        "Move global VAR declarations to the story top level, outside knots, stitches, functions, choices, conditionals, and sequences.",
+    )
 }
 
 struct FlowAnalysisIndexes<'a> {
@@ -639,6 +733,31 @@ mod tests {
         );
 
         assert_eq!(flow_diagnostics(&story), []);
+    }
+
+    #[test]
+    fn reports_global_var_declarations_outside_story_top_level() {
+        let cases = [
+            "{ true:\n\
+               VAR score: int = 0\n\
+             }\n\
+             -> DONE",
+            "{ cycle:\n\
+             - VAR score: int = 0\n\
+             }\n\
+             -> DONE",
+        ];
+
+        for source in cases {
+            let story = parse_story(source);
+            let diagnostics = flow_diagnostics(&story);
+
+            assert_single_diagnostic(
+                &diagnostics,
+                DiagnosticSeverity::Error,
+                "removed feature: nested VAR declarations. Move global VAR declarations to the story top level, outside knots, stitches, functions, choices, conditionals, and sequences.",
+            );
+        }
     }
 
     #[test]

@@ -92,6 +92,7 @@ pub(crate) fn parse_source(source: SourceFile) -> StageOutput<Story> {
 pub(super) struct Parser {
     source: SourceFile,
     diagnostics: Vec<Diagnostic>,
+    allow_global_var_declarations: bool,
 }
 
 impl Parser {
@@ -99,6 +100,7 @@ impl Parser {
         Self {
             source,
             diagnostics: Vec::new(),
+            allow_global_var_declarations: true,
         }
     }
 
@@ -158,6 +160,14 @@ impl Parser {
 
     pub(super) fn parse_statement(&mut self, line: &SourceLine) -> Vec<Object> {
         if line.text.trim().is_empty() {
+            return Vec::new();
+        }
+
+        if !self.allow_global_var_declarations
+            && is_global_var_declaration_line(line.text.trim_start())
+        {
+            self.diagnostics
+                .push(nested_global_var_declaration_diagnostic(line));
             return Vec::new();
         }
 
@@ -273,6 +283,8 @@ impl Parser {
         *index += 1;
         let mut content = Vec::new();
         let mut child_flows = Vec::new();
+        let previous_global_var_setting = self.allow_global_var_declarations;
+        self.allow_global_var_declarations = false;
 
         while *index < lines.len() {
             let next_line = &lines[*index];
@@ -307,6 +319,7 @@ impl Parser {
             content.extend(self.parse_statement(next_line));
             *index += 1;
         }
+        self.allow_global_var_declarations = previous_global_var_setting;
 
         Some(Flow::new(
             declaration.level,
@@ -336,6 +349,8 @@ impl Parser {
 
         *index += 1;
         let mut content = Vec::new();
+        let previous_global_var_setting = self.allow_global_var_declarations;
+        self.allow_global_var_declarations = false;
 
         while *index < lines.len() {
             let next_line = &lines[*index];
@@ -363,6 +378,7 @@ impl Parser {
             content.extend(self.parse_statement(next_line));
             *index += 1;
         }
+        self.allow_global_var_declarations = previous_global_var_setting;
 
         Some(Flow::new(
             declaration.level,
@@ -537,6 +553,21 @@ impl Parser {
     }
 }
 
+pub(super) fn is_global_var_declaration_line(trimmed: &str) -> bool {
+    let Some(rest) = trimmed.strip_prefix("VAR") else {
+        return false;
+    };
+    rest.chars().next().is_some_and(|ch| ch.is_whitespace())
+}
+
+pub(super) fn nested_global_var_declaration_diagnostic(line: &SourceLine) -> Diagnostic {
+    Diagnostic::removed_feature(
+        line.span.clone(),
+        "nested VAR declarations",
+        "Move global VAR declarations to the story top level, outside knots, stitches, functions, choices, conditionals, and sequences.",
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -677,6 +708,33 @@ mod tests {
             output.diagnostics[0].message,
             "removed feature: LIST declarations. Use variables, functions, or host data instead."
         );
+    }
+
+    #[test]
+    fn global_var_declarations_inside_flows_report_removed_feature() {
+        let cases = [
+            "== knot ==\nVAR score: int = 0\n-> DONE",
+            "== knot ==\n= stitch\nVAR score: int = 0\n-> DONE",
+            "== function setup() -> void ==\nVAR score: int = 0",
+        ];
+
+        for source in cases {
+            let output = parse(SourceInput::new(source));
+
+            assert_eq!(output.diagnostics.len(), 1, "{:#?}", output.diagnostics);
+            assert_eq!(
+                output.diagnostics[0].severity,
+                crate::diagnostic::DiagnosticSeverity::Error
+            );
+            assert_eq!(
+                output.diagnostics[0].code,
+                Some(crate::diagnostic::DiagnosticCode::RemovedFeature)
+            );
+            assert_eq!(
+                output.diagnostics[0].message,
+                "removed feature: nested VAR declarations. Move global VAR declarations to the story top level, outside knots, stitches, functions, choices, conditionals, and sequences."
+            );
+        }
     }
 
     #[test]

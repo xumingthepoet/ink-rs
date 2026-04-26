@@ -6431,6 +6431,7 @@ VAR x: int = 5
                     r#"
 VAR knotCount: int = 0
 VAR stitchCount: int = 0
+VAR gatherCount: int = 0
 
 -> gather_count_test ->
 
@@ -6443,7 +6444,7 @@ VAR stitchCount: int = 0
 -> stitch_count_test ->
 
 == gather_count_test ==
-VAR gatherCount: int = 0
+~ gatherCount = 0
 - (loop)
 ~ gatherCount++
 {gatherCount} {loop}
