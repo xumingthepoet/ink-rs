@@ -4,6 +4,6 @@ B
 A
 {string()}
 B
-=== function string() -> string
+=== function string() => string
     ~ return "{3}"
 }

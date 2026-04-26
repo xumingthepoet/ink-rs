@@ -715,7 +715,7 @@ mod tests {
         let cases = [
             "== knot ==\nVAR score: int = 0\n-> DONE",
             "== knot ==\n= stitch\nVAR score: int = 0\n-> DONE",
-            "== function setup() -> void ==\nVAR score: int = 0",
+            "== function setup() => void ==\nVAR score: int = 0",
         ];
 
         for source in cases {

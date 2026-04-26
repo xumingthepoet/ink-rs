@@ -234,7 +234,7 @@ Typed-value test matrix:
     runtime API cannot provide them yet.
 - Builtins:
   - Positive: `LEN(T[]) -> int` for empty arrays, primitive arrays, struct
-    arrays, and nested arrays; `ARRAY_REMOVE(T[], int) -> void` removing from
+    arrays, and nested arrays; `ARRAY_REMOVE(T[], int) => void` removing from
     beginning, middle, and end.
   - Negative: `LEN` on non-arrays, wrong `LEN` arity, `ARRAY_REMOVE` on
     non-arrays, non-`int` removal index, wrong `ARRAY_REMOVE` arity,
@@ -785,7 +785,7 @@ Checklist:
 
 Implementation method:
 
-- Extend function flow parser to accept typed args and `-> ReturnType`.
+- Extend function flow parser to accept typed args and `=> ReturnType`.
 - Store parameter types and return type on parsed `Flow`.
 - Use `void` for no meaningful return.
 
@@ -821,7 +821,7 @@ Implementation method:
 
 Acceptance method:
 
-- Parser tests cover `EXTERNAL name(a: int, b: string) -> bool`.
+- Parser tests cover `EXTERNAL name(a: int, b: string) => bool`.
 - Parser rejects missing arg or return types.
 - `cargo test -p ink-compiler syntax::declaration`
 - `make gate`
@@ -1274,7 +1274,7 @@ Checklist:
 
 Implementation method:
 
-- Add typed builtin signature `ARRAY_REMOVE(T[], int) -> void`.
+- Add typed builtin signature `ARRAY_REMOVE(T[], int) => void`.
 - Ensure first arg is mutable lvalue if the language requires in-place mutation.
 
 Acceptance method:
@@ -1916,7 +1916,7 @@ Checklist:
 Implementation method:
 
 - Add explicit parameter and return types to function fixtures.
-- Use `-> void` for functions without return value.
+- Use `=> void` for functions without return value.
 
 Acceptance method:
 

@@ -10,14 +10,14 @@ VAR seed_values: int[] = [2, 3]
 {values[0]}|{values[1]}
 -> DONE
 
-== function add(a: int, b: int) -> int ==
+== function add(a: int, b: int) => int ==
 ~ return a + b
 
-== function label(name: string) -> string ==
+== function label(name: string) => string ==
 ~ return name + "!"
 
-== function first_hp(players: Player[]) -> int ==
+== function first_hp(players: Player[]) => int ==
 ~ return players[0].hp
 
-== function identity(values: int[]) -> int[] ==
+== function identity(values: int[]) => int[] ==
 ~ return values

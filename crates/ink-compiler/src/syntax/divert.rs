@@ -83,12 +83,16 @@ fn parse_tunnel_onwards(source: Option<&str>, span: SourceSpan) -> Option<Tunnel
 
 pub(super) fn parse_divert_source(source: &str, span: SourceSpan) -> Option<Divert> {
     let source = source.trim();
-    let (target, arguments) = parse_divert_target_and_arguments(source)?;
-    Some(Divert::with_arguments(
-        DivertTarget::from_source(target),
-        arguments,
-        span,
-    ))
+    let (target, arguments, has_argument_list) = parse_divert_target_and_arguments(source)?;
+    if has_argument_list {
+        Some(Divert::with_arguments(
+            DivertTarget::from_source(target),
+            arguments,
+            span,
+        ))
+    } else {
+        Some(Divert::new(DivertTarget::from_source(target), span))
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -150,16 +154,18 @@ fn split_multidivert_segments(source: &str) -> (Vec<&str>, TrailingDivertSyntax<
     (segments, trailing)
 }
 
-fn parse_divert_target_and_arguments(source: &str) -> Option<(&str, Vec<Expression>)> {
-    let Some(open_index) = source.find('(') else {
-        return Some((source, Vec::new()));
+fn parse_divert_target_and_arguments(source: &str) -> Option<(&str, Vec<Expression>, bool)> {
+    let Some(open_index) =
+        scan::find_top_level_char_with_options(source, '(', scan::ScanOptions::expression())
+    else {
+        return Some((source, Vec::new(), false));
     };
     if !source.ends_with(')') {
         return None;
     }
 
     let target = source[..open_index].trim();
-    if !is_divert_path(target) {
+    if !is_divert_path(target) && parse_initial_expression(target).is_none() {
         return None;
     }
 
@@ -173,7 +179,7 @@ fn parse_divert_target_and_arguments(source: &str) -> Option<(&str, Vec<Expressi
             .collect::<Option<Vec<_>>>()?
     };
 
-    Some((target, arguments))
+    Some((target, arguments, true))
 }
 
 fn is_divert_path(source: &str) -> bool {

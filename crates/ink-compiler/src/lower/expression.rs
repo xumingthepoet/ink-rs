@@ -9,7 +9,7 @@ use super::indexes::{
     CallSignature, ConstantValue, ConstantValues, ExternalSignatures, StructDefinitions,
 };
 use super::path::LabelIndex;
-use super::value::lower_value_literal;
+use super::value::{lower_value_literal, resolve_divert_target_value};
 use super::weave::lower_content_list_into_context;
 use super::{
     collect_assignment_path, lower_assignment_path_update_value_into,
@@ -139,17 +139,12 @@ fn lower_expression_into_with_constants(
         Expression::NumberFloat(value) => content.push(RuntimeObject::Float(value.value())),
         Expression::NumberBool(value) => content.push(RuntimeObject::Bool(*value)),
         Expression::DivertTarget(target) => {
-            let resolved_target = if let Some(choice_target) = choice_labels.get(target) {
-                choice_target.to_string()
-            } else if let Some(label_target) = path_mode
-                .scoped_label_target(target, global_labels)
-                .filter(|label_target| *label_target != target)
-            {
-                path_mode.resolve_label_target(label_target)
-            } else {
-                path_mode.resolve_divert_target(target)
-            };
-            content.push(RuntimeObject::DivertTarget(resolved_target));
+            content.push(RuntimeObject::DivertTarget(resolve_divert_target_value(
+                target,
+                choice_labels,
+                global_labels,
+                path_mode,
+            )));
         }
         Expression::VariableReference(name) => {
             if let Some(constant) = constants.get(name) {
@@ -204,7 +199,14 @@ fn lower_expression_into_with_constants(
             );
         }
         Expression::ArrayLiteral(_) | Expression::StructLiteral(_) => {
-            if let Some(value) = lower_value_literal(expression, None, struct_definitions) {
+            if let Some(value) = lower_value_literal(
+                expression,
+                None,
+                struct_definitions,
+                choice_labels,
+                global_labels,
+                path_mode,
+            ) {
                 content.push(value);
             }
         }
@@ -367,6 +369,9 @@ fn lower_constant_expression_into(
         constant.expression(),
         Some(constant.declared_type()),
         struct_definitions,
+        choice_labels,
+        global_labels,
+        path_mode,
     ) {
         content.push(value);
         return;
@@ -597,7 +602,7 @@ fn lower_function_call_into(
         ) =>
         {
             let expected_args = match external_signatures.get(name) {
-                Some(CallSignature::Ink { args }) => args.as_slice(),
+                Some(CallSignature::Ink { args, .. }) => args.as_slice(),
                 _ => &[],
             };
             for (index, arg) in args.iter().enumerate() {
@@ -747,7 +752,14 @@ pub(super) fn lower_function_arg_into(
 
     if let Expression::ArrayLiteral(_) | Expression::StructLiteral(_) = arg {
         if let Some(expected_type) = expected_arg.and_then(FlowArgument::declared_type) {
-            if let Some(value) = lower_value_literal(arg, Some(expected_type), struct_definitions) {
+            if let Some(value) = lower_value_literal(
+                arg,
+                Some(expected_type),
+                struct_definitions,
+                choice_labels,
+                global_labels,
+                path_mode,
+            ) {
                 content.push(value);
                 return;
             }

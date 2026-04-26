@@ -24,6 +24,7 @@ pub enum PrimitiveType {
     Float,
     Bool,
     String,
+    DivertTarget,
 }
 
 impl TypeName {
@@ -41,6 +42,10 @@ impl TypeName {
 
     pub fn string() -> Self {
         Self::Primitive(PrimitiveType::String)
+    }
+
+    pub fn divert_target() -> Self {
+        Self::Primitive(PrimitiveType::DivertTarget)
     }
 
     pub fn void() -> Self {
@@ -111,6 +116,7 @@ impl fmt::Display for PrimitiveType {
             Self::Float => "float",
             Self::Bool => "bool",
             Self::String => "string",
+            Self::DivertTarget => "->",
         })
     }
 }
@@ -122,6 +128,7 @@ impl DefaultValue {
             TypeName::Primitive(PrimitiveType::Float) => Some(Self::Float(0.0)),
             TypeName::Primitive(PrimitiveType::Bool) => Some(Self::Bool(false)),
             TypeName::Primitive(PrimitiveType::String) => Some(Self::String(String::new())),
+            TypeName::Primitive(PrimitiveType::DivertTarget) => None,
             TypeName::Array(element_type) => Some(Self::Array {
                 element_type: element_type.clone(),
             }),
@@ -159,6 +166,7 @@ mod tests {
             (TypeName::float(), "float"),
             (TypeName::bool(), "bool"),
             (TypeName::string(), "string"),
+            (TypeName::divert_target(), "->"),
             (TypeName::void(), "void"),
         ];
 
@@ -195,6 +203,10 @@ mod tests {
             Some("Player")
         );
         assert_eq!(TypeName::int().primitive_type(), Some(PrimitiveType::Int));
+        assert_eq!(
+            TypeName::divert_target().primitive_type(),
+            Some(PrimitiveType::DivertTarget)
+        );
         assert!(TypeName::void().is_void());
         assert!(!TypeName::string().is_void());
     }
@@ -217,6 +229,7 @@ mod tests {
         }
 
         assert_eq!(TypeName::void().default_value(), None);
+        assert_eq!(TypeName::divert_target().default_value(), None);
     }
 
     #[test]

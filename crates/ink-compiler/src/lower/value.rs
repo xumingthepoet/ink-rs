@@ -4,37 +4,71 @@ use ink_story_json_format::Object as RuntimeObject;
 
 use crate::parsed::{DefaultValue, Expression, StructLiteralField, TypeName};
 
-use super::indexes::StructDefinitions;
+use super::{context::ChoicePathMode, indexes::StructDefinitions, path::LabelIndex};
 
 pub(super) fn lower_value_literal(
     expression: &Expression,
     expected_type: Option<&TypeName>,
     struct_definitions: &StructDefinitions,
+    choice_labels: &LabelIndex,
+    global_labels: &LabelIndex,
+    path_mode: &ChoicePathMode,
 ) -> Option<RuntimeObject> {
     match (expected_type, expression) {
         (Some(TypeName::Array(element_type)), Expression::ArrayLiteral(elements)) => elements
             .iter()
-            .map(|element| lower_value_literal(element, Some(element_type), struct_definitions))
+            .map(|element| {
+                lower_value_literal(
+                    element,
+                    Some(element_type),
+                    struct_definitions,
+                    choice_labels,
+                    global_labels,
+                    path_mode,
+                )
+            })
             .collect::<Option<Vec<_>>>()
             .map(RuntimeObject::ValueArray),
         (Some(TypeName::Struct(struct_name)), Expression::StructLiteral(fields)) => {
-            lower_struct_literal(fields, struct_name, struct_definitions)
+            lower_struct_literal(
+                fields,
+                struct_name,
+                struct_definitions,
+                choice_labels,
+                global_labels,
+                path_mode,
+            )
         }
         (_, Expression::String(value)) => Some(RuntimeObject::String(value.clone())),
         (_, Expression::NumberInt(value)) => Some(RuntimeObject::Int(*value)),
         (_, Expression::NumberFloat(value)) => Some(RuntimeObject::Float(value.value())),
         (_, Expression::NumberBool(value)) => Some(RuntimeObject::Bool(*value)),
+        (_, Expression::DivertTarget(target)) => Some(RuntimeObject::DivertTarget(
+            resolve_divert_target_value(target, choice_labels, global_labels, path_mode),
+        )),
         (None, Expression::ArrayLiteral(elements)) => elements
             .iter()
-            .map(|element| lower_value_literal(element, None, struct_definitions))
+            .map(|element| {
+                lower_value_literal(
+                    element,
+                    None,
+                    struct_definitions,
+                    choice_labels,
+                    global_labels,
+                    path_mode,
+                )
+            })
             .collect::<Option<Vec<_>>>()
             .map(RuntimeObject::ValueArray),
-        (None, Expression::StructLiteral(fields)) => {
-            lower_dynamic_struct_literal(fields, struct_definitions)
-        }
+        (None, Expression::StructLiteral(fields)) => lower_dynamic_struct_literal(
+            fields,
+            struct_definitions,
+            choice_labels,
+            global_labels,
+            path_mode,
+        ),
         (Some(_), Expression::ArrayLiteral(_) | Expression::StructLiteral(_))
         | (_, Expression::StringContent(_))
-        | (_, Expression::DivertTarget(_))
         | (_, Expression::VariableReference(_))
         | (_, Expression::FunctionCall { .. })
         | (_, Expression::FieldAccess { .. })
@@ -106,6 +140,9 @@ fn lower_struct_literal(
     fields: &[StructLiteralField],
     struct_name: &str,
     struct_definitions: &StructDefinitions,
+    choice_labels: &LabelIndex,
+    global_labels: &LabelIndex,
+    path_mode: &ChoicePathMode,
 ) -> Option<RuntimeObject> {
     let field_definitions = struct_definitions.get(struct_name)?;
     let provided_fields = fields
@@ -116,7 +153,14 @@ fn lower_struct_literal(
     let mut object_fields = BTreeMap::new();
     for (field_name, field_type) in field_definitions {
         let field_value = if let Some(expression) = provided_fields.get(field_name.as_str()) {
-            lower_value_literal(expression, Some(field_type), struct_definitions)?
+            lower_value_literal(
+                expression,
+                Some(field_type),
+                struct_definitions,
+                choice_labels,
+                global_labels,
+                path_mode,
+            )?
         } else {
             runtime_default_for_type(field_type, struct_definitions)?
         };
@@ -129,13 +173,41 @@ fn lower_struct_literal(
 fn lower_dynamic_struct_literal(
     fields: &[StructLiteralField],
     struct_definitions: &StructDefinitions,
+    choice_labels: &LabelIndex,
+    global_labels: &LabelIndex,
+    path_mode: &ChoicePathMode,
 ) -> Option<RuntimeObject> {
     let mut object_fields = BTreeMap::new();
     for field in fields {
         object_fields.insert(
             field.name().to_string(),
-            lower_value_literal(field.expression(), None, struct_definitions)?,
+            lower_value_literal(
+                field.expression(),
+                None,
+                struct_definitions,
+                choice_labels,
+                global_labels,
+                path_mode,
+            )?,
         );
     }
     Some(RuntimeObject::ValueObject(object_fields))
+}
+
+pub(super) fn resolve_divert_target_value(
+    target: &str,
+    choice_labels: &LabelIndex,
+    global_labels: &LabelIndex,
+    path_mode: &ChoicePathMode,
+) -> String {
+    if let Some(choice_target) = choice_labels.get(target) {
+        choice_target.to_string()
+    } else if let Some(label_target) = path_mode
+        .scoped_label_target(target, global_labels)
+        .filter(|label_target| *label_target != target)
+    {
+        path_mode.resolve_label_target(label_target)
+    } else {
+        path_mode.resolve_divert_target(target)
+    }
 }

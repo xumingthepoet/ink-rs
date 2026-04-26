@@ -7,6 +7,7 @@ use crate::{
         DivertTarget, Expression, Flow, FlowArgument, Object, Story, TypeName,
     },
     source::SourceSpan,
+    syntax::parse_initial_expression,
 };
 
 use super::{
@@ -87,11 +88,36 @@ impl<'a> CallTargetChecker<'a> {
 
     fn check_plain_divert_target(
         &mut self,
-        target: &str,
-        span: &SourceSpan,
+        divert: &crate::parsed::Divert,
         context: &VisitContext,
     ) {
+        let DivertTarget::Path(target) = divert.target() else {
+            return;
+        };
+        if let Some(expression) = self.dynamic_divert_target_expression(divert, context) {
+            self.check_expression(&expression, divert.span(), context);
+            return;
+        }
+
+        let span = divert.span();
         let current_flow_path = self.current_flow_path(context);
+        if is_simple_target_name(target) {
+            if let Some(Some(declared_type)) = self
+                .variable_scopes
+                .visible_variable_declared_type(target, current_flow_path)
+            {
+                if declared_type != &TypeName::divert_target() {
+                    self.diagnostics.push(Diagnostic::error(
+                        span.clone(),
+                        format!(
+                            "Variable '{target}' has type {} but cannot be used as a divert target",
+                            declared_type.display_name()
+                        ),
+                    ));
+                    return;
+                }
+            }
+        }
         if let Some(symbol) = resolve_target_symbol(target, current_flow_path, self.target_symbols)
         {
             if symbol.is_function() {
@@ -119,6 +145,48 @@ impl<'a> CallTargetChecker<'a> {
                 span.clone(),
                 format!("target not found: '{target}'"),
             ));
+        }
+    }
+
+    fn dynamic_divert_target_expression(
+        &self,
+        divert: &crate::parsed::Divert,
+        context: &VisitContext,
+    ) -> Option<Expression> {
+        let DivertTarget::Path(target) = divert.target() else {
+            return None;
+        };
+        let current_flow_path = self.current_flow_path(context);
+
+        if divert.has_argument_list()
+            && resolve_target_symbol(target, current_flow_path, self.target_symbols).is_some_and(
+                |symbol| symbol.is_function() && symbol.return_type() == &TypeName::divert_target(),
+            )
+        {
+            return Some(Expression::FunctionCall {
+                name: target.clone(),
+                args: divert.arguments().to_vec(),
+            });
+        }
+
+        let expression = parse_initial_expression(target)?;
+        if !expression_starts_with_visible_variable(
+            &expression,
+            self.variable_scopes,
+            current_flow_path,
+        ) {
+            return None;
+        }
+
+        match infer_expression_type(
+            &expression,
+            self.variable_scopes,
+            self.struct_types,
+            self.target_symbols,
+            current_flow_path,
+        ) {
+            Ok(actual_type) if actual_type == TypeName::divert_target() => Some(expression),
+            _ => None,
         }
     }
 
@@ -222,17 +290,52 @@ impl<'a> CallTargetChecker<'a> {
         match name {
             "ARRAY_REMOVE" => self.check_array_remove_call(args, span, context),
             "LEN" => self.check_len_call(args, span, context),
-            "READ_COUNT" | "TURNS_SINCE" => self.check_count_builtin_call(name, args, span),
+            "READ_COUNT" | "TURNS_SINCE" => {
+                self.check_count_builtin_call(name, args, span, context)
+            }
             _ => {}
         }
     }
 
-    fn check_count_builtin_call(&mut self, name: &str, args: &[Expression], span: &SourceSpan) {
+    fn check_count_builtin_call(
+        &mut self,
+        name: &str,
+        args: &[Expression],
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) {
         if args.len() != 1 {
             self.diagnostics.push(Diagnostic::error(
                 span.clone(),
                 format!("Builtin '{name}' expects 1 argument but got {}", args.len()),
             ));
+            return;
+        }
+
+        match infer_expression_type(
+            &args[0],
+            self.variable_scopes,
+            self.struct_types,
+            self.target_symbols,
+            self.current_flow_path(context),
+        ) {
+            Ok(actual_type) if actual_type != TypeName::divert_target() => {
+                self.diagnostics.push(Diagnostic::error(
+                    span.clone(),
+                    format!(
+                        "Builtin '{name}' argument has type {} but expected ->",
+                        actual_type.display_name()
+                    ),
+                ));
+            }
+            Ok(_) => {}
+            Err(error) => self.diagnostics.push(Diagnostic::error(
+                span.clone(),
+                format!(
+                    "Cannot type-check argument for builtin '{name}': {}",
+                    error.message()
+                ),
+            )),
         }
     }
 
@@ -457,6 +560,29 @@ fn is_mutable_lvalue(expression: &Expression) -> bool {
     }
 }
 
+fn expression_starts_with_visible_variable(
+    expression: &Expression,
+    variable_scopes: &VariableScopeIndex,
+    current_flow_path: Option<&str>,
+) -> bool {
+    match expression {
+        Expression::VariableReference(name) => {
+            variable_scopes.contains_visible_variable(name, current_flow_path)
+        }
+        Expression::FieldAccess { base, .. } | Expression::IndexAccess { base, .. } => {
+            expression_starts_with_visible_variable(base, variable_scopes, current_flow_path)
+        }
+        _ => false,
+    }
+}
+
+fn is_simple_target_name(target: &str) -> bool {
+    matches!(
+        parse_initial_expression(target),
+        Some(Expression::VariableReference(name)) if name == target
+    )
+}
+
 impl ParsedVisitor for CallTargetChecker<'_> {
     fn visit_flow(&mut self, flow: &Flow, context: &VisitContext) {
         let Some(flow_path) = self.current_flow_path(context) else {
@@ -475,8 +601,8 @@ impl ParsedVisitor for CallTargetChecker<'_> {
                         divert.span().clone(),
                         "Empty diverts (->) are only valid on choices",
                     )),
-                    DivertTarget::Path(target) if !self.current_flow_is_function(context) => {
-                        self.check_plain_divert_target(target, divert.span(), context);
+                    DivertTarget::Path(_) if !self.current_flow_is_function(context) => {
+                        self.check_plain_divert_target(divert, context);
                     }
                     DivertTarget::Path(_) | DivertTarget::Done | DivertTarget::End => {}
                 }
@@ -593,11 +719,11 @@ mod tests {
              VAR copied_player: Player = echo_player(source_player)\n\
              VAR copied_scores: int[] = echo_scores(source_scores)\n\
              -> DONE\n\
-             == function add(a: int, b: int) -> int ==\n\
+             == function add(a: int, b: int) => int ==\n\
              ~ return a + b\n\
-             == function echo_player(player: Player) -> Player ==\n\
+             == function echo_player(player: Player) => Player ==\n\
              ~ return player\n\
-             == function echo_scores(values: int[]) -> int[] ==\n\
+             == function echo_scores(values: int[]) => int[] ==\n\
              ~ return values",
         );
 
@@ -610,8 +736,8 @@ mod tests {
             "STRUCT Player {\n\
              hp: int\n\
              }\n\
-             EXTERNAL external_score(value: int) -> int\n\
-             EXTERNAL describe(player: Player, scores: int[]) -> string\n\
+             EXTERNAL external_score(value: int) => int\n\
+             EXTERNAL describe(player: Player, scores: int[]) => string\n\
              VAR score: int = 1\n\
              VAR source_player: Player = { hp: 10 }\n\
              VAR scores: int[] = [score]\n\
@@ -626,7 +752,7 @@ mod tests {
     #[test]
     fn reports_typed_external_call_argument_count_mismatch() {
         let story = parse_story(
-            "EXTERNAL external_score(value: int) -> int\n\
+            "EXTERNAL external_score(value: int) => int\n\
              ~ external_score()\n\
              -> DONE",
         );
@@ -643,7 +769,7 @@ mod tests {
     #[test]
     fn reports_typed_external_call_argument_type_mismatch() {
         let story = parse_story(
-            "EXTERNAL external_score(value: int) -> int\n\
+            "EXTERNAL external_score(value: int) => int\n\
              VAR label: string = \"x\"\n\
              ~ external_score(label)\n\
              -> DONE",
@@ -661,7 +787,7 @@ mod tests {
     #[test]
     fn external_return_type_participates_in_expression_type_checks() {
         let story = parse_story(
-            "EXTERNAL external_label() -> string\n\
+            "EXTERNAL external_label() => string\n\
              VAR score: int = external_label()\n\
              -> DONE",
         );
@@ -701,9 +827,16 @@ mod tests {
     #[test]
     fn accepts_count_builtins_as_int_expressions() {
         let story = parse_story(
-            "VAR visits: int = READ_COUNT(-> knot)\n\
+            "VAR target: -> = -> knot\n\
+             VAR visits: int = READ_COUNT(target)\n\
              VAR turns: int = TURNS_SINCE(-> knot)\n\
+             VAR picked_visits: int = READ_COUNT(pick())\n\
+             VAR param_turns: int = since(target)\n\
              -> DONE\n\
+             == function pick() => -> ==\n\
+             ~ return target\n\
+             == function since(x: ->) => int ==\n\
+             ~ return TURNS_SINCE(x)\n\
              == knot ==\n\
              -> DONE",
         );
@@ -725,6 +858,31 @@ mod tests {
             DiagnosticSeverity::Error,
             "Builtin 'READ_COUNT' expects 1 argument but got 0",
         );
+    }
+
+    #[test]
+    fn reports_count_builtin_non_target_arguments() {
+        let cases = [
+            (
+                "VAR value: int = 1\n\
+                 VAR visits: int = READ_COUNT(value)\n\
+                 -> DONE",
+                "Builtin 'READ_COUNT' argument has type int but expected ->",
+            ),
+            (
+                "VAR label: string = \"knot\"\n\
+                 VAR turns: int = TURNS_SINCE(label)\n\
+                 -> DONE",
+                "Builtin 'TURNS_SINCE' argument has type string but expected ->",
+            ),
+        ];
+
+        for (source, expected_message) in cases {
+            let story = parse_story(source);
+            let diagnostics = call_target_diagnostics(&story);
+
+            assert_single_diagnostic(&diagnostics, DiagnosticSeverity::Error, expected_message);
+        }
     }
 
     #[test]
@@ -838,7 +996,7 @@ mod tests {
                 "VAR values: int[] = [1]\n\
                  ~ ARRAY_REMOVE(copy_values(), 0)\n\
                  -> DONE\n\
-                 == function copy_values() -> int[] ==\n\
+                 == function copy_values() => int[] ==\n\
                  ~ return values",
                 "First argument for builtin 'ARRAY_REMOVE' must be a mutable lvalue",
             ),
@@ -857,7 +1015,7 @@ mod tests {
         let story = parse_story(
             "~ add(1)\n\
              -> DONE\n\
-             == function add(a: int, b: int) -> int ==\n\
+             == function add(a: int, b: int) => int ==\n\
              ~ return a",
         );
 
@@ -875,7 +1033,7 @@ mod tests {
         let story = parse_story(
             "~ add(1, \"two\")\n\
              -> DONE\n\
-             == function add(a: int, b: int) -> int ==\n\
+             == function add(a: int, b: int) => int ==\n\
              ~ return a",
         );
 
@@ -897,7 +1055,7 @@ mod tests {
              VAR scores: int[] = [1]\n\
              ~ use_player(scores)\n\
              -> DONE\n\
-             == function use_player(player: Player) -> void ==\n\
+             == function use_player(player: Player) => void ==\n\
              ~ return",
         );
 
@@ -915,7 +1073,7 @@ mod tests {
         let story = parse_story(
             "VAR score: int = label()\n\
              -> DONE\n\
-             == function label() -> string ==\n\
+             == function label() => string ==\n\
              ~ return \"ok\"",
         );
 

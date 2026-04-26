@@ -32,6 +32,7 @@ pub(super) fn infer_primitive_expression_type(
         Expression::NumberInt(_) => Ok(TypeName::int()),
         Expression::NumberFloat(_) => Ok(TypeName::float()),
         Expression::NumberBool(_) => Ok(TypeName::bool()),
+        Expression::DivertTarget(_) => Ok(TypeName::divert_target()),
         Expression::VariableReference(name) => {
             infer_variable_type(name, variable_scopes, current_flow_path)
         }
@@ -63,8 +64,7 @@ pub(super) fn infer_primitive_expression_type(
         Expression::FunctionCall { name, .. } => Err(TypeInferenceError::new(format!(
             "Cannot infer return type for function call '{name}' yet"
         ))),
-        Expression::DivertTarget(_)
-        | Expression::ArrayLiteral(_)
+        Expression::ArrayLiteral(_)
         | Expression::StructLiteral(_)
         | Expression::FieldAccess { .. }
         | Expression::IndexAccess { .. } => Err(TypeInferenceError::new(
@@ -689,6 +689,40 @@ mod tests {
     }
 
     #[test]
+    fn rejects_boolean_operators_for_divert_targets() {
+        let story = parse_story(
+            "VAR next: -> = -> knot\n\
+             -> DONE\n\
+             == knot ==\n\
+             -> DONE",
+        );
+        let scopes = build_variable_scope_index(&story);
+        let structs = build_struct_type_index(&story);
+        let targets = build_target_symbol_index(&story);
+        let cases = [
+            (
+                unary(UnaryOperator::Not, variable("next")),
+                "Operator 'not' is not defined for type ->",
+            ),
+            (
+                binary(
+                    BinaryOperator::AndSymbol,
+                    variable("next"),
+                    Expression::NumberBool(true),
+                ),
+                "Operator '&&' is not defined for types -> and bool",
+            ),
+        ];
+
+        for (expression, expected_message) in cases {
+            let error =
+                infer_expression_type(&expression, &scopes, &structs, &targets, None).unwrap_err();
+
+            assert_eq!(error.message(), expected_message);
+        }
+    }
+
+    #[test]
     fn infers_equality_for_primitive_array_struct_and_nested_types() {
         let story = parse_story(
             "STRUCT Player {\n\
@@ -696,12 +730,18 @@ mod tests {
              }\n\
              VAR score: int = 1\n\
              VAR other_score: int = 2\n\
+             VAR first_target: -> = -> knot\n\
+             VAR second_target: -> = -> other\n\
              VAR source_player: Player = { hp: 10 }\n\
              VAR other_player: Player = { hp: 20 }\n\
              VAR scores: int[] = [score]\n\
              VAR other_scores: int[] = [other_score]\n\
              VAR nested_scores: int[][] = [scores]\n\
              VAR other_nested_scores: int[][] = [other_scores]\n\
+             -> DONE\n\
+             == knot ==\n\
+             -> DONE\n\
+             == other ==\n\
              -> DONE",
         );
         let scopes = build_variable_scope_index(&story);
@@ -712,6 +752,16 @@ mod tests {
                 BinaryOperator::Equals,
                 variable("score"),
                 variable("other_score"),
+            ),
+            binary(
+                BinaryOperator::Equals,
+                variable("first_target"),
+                variable("second_target"),
+            ),
+            binary(
+                BinaryOperator::NotEquals,
+                variable("first_target"),
+                variable("second_target"),
             ),
             binary(
                 BinaryOperator::Equals,
@@ -794,8 +844,14 @@ mod tests {
              VAR score: int = 1\n\
              VAR source_player: Player = { hp: 10 }\n\
              VAR other_player: Player = { hp: 20 }\n\
+             VAR first_target: -> = -> knot\n\
+             VAR second_target: -> = -> other\n\
              VAR scores: int[] = [score]\n\
              VAR other_scores: int[] = [score]\n\
+             -> DONE\n\
+             == knot ==\n\
+             -> DONE\n\
+             == other ==\n\
              -> DONE",
         );
         let scopes = build_variable_scope_index(&story);
@@ -817,6 +873,14 @@ mod tests {
                     variable("other_player"),
                 ),
                 "Operator '<' is not defined for types Player and Player",
+            ),
+            (
+                binary(
+                    BinaryOperator::GreaterThan,
+                    variable("first_target"),
+                    variable("second_target"),
+                ),
+                "Operator '>' is not defined for types -> and ->",
             ),
             (
                 binary(

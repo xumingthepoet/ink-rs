@@ -93,8 +93,22 @@ impl ConstantValue {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum CallSignature {
-    External { args: usize },
-    Ink { args: Vec<FlowArgument> },
+    External {
+        args: usize,
+        return_type: TypeName,
+    },
+    Ink {
+        args: Vec<FlowArgument>,
+        return_type: TypeName,
+    },
+}
+
+impl CallSignature {
+    pub(super) fn return_type(&self) -> &TypeName {
+        match self {
+            Self::External { return_type, .. } | Self::Ink { return_type, .. } => return_type,
+        }
+    }
 }
 
 fn collect_variable_declarations_in_objects<'a>(
@@ -353,6 +367,7 @@ fn collect_ink_call_signatures_in_flow(flow: &Flow, signatures: &mut ExternalSig
             .entry(flow.name().to_string())
             .or_insert_with(|| CallSignature::Ink {
                 args: flow.arguments().to_vec(),
+                return_type: flow.return_type().clone(),
             });
     }
     for child in flow.child_flows() {
@@ -380,6 +395,7 @@ fn collect_external_signatures_in_object(object: &Object, signatures: &mut Exter
                 external.name().to_string(),
                 CallSignature::External {
                     args: external.argument_names().len(),
+                    return_type: external.return_type().clone(),
                 },
             );
         }

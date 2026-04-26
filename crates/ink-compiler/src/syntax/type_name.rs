@@ -6,19 +6,23 @@ pub(super) fn parse_type_name(parser: &mut RuleParser<'_>) -> Option<TypeName> {
     parser.parse_rule(|parser| {
         parser.skip_horizontal_whitespace();
 
-        let name = parser.take_while(is_identifier_continue)?;
-        if !is_identifier(&name) {
-            parser.error(format!("Expected type name but saw '{name}'"));
-            return None;
-        }
+        let mut type_name = if parser.match_string("->").is_some() {
+            TypeName::divert_target()
+        } else {
+            let name = parser.take_while(is_identifier_continue)?;
+            if !is_identifier(&name) {
+                parser.error(format!("Expected type name but saw '{name}'"));
+                return None;
+            }
 
-        let mut type_name = match name.as_str() {
-            "int" => TypeName::int(),
-            "float" => TypeName::float(),
-            "bool" => TypeName::bool(),
-            "string" => TypeName::string(),
-            "void" => TypeName::void(),
-            _ => TypeName::struct_type(name),
+            match name.as_str() {
+                "int" => TypeName::int(),
+                "float" => TypeName::float(),
+                "bool" => TypeName::bool(),
+                "string" => TypeName::string(),
+                "void" => TypeName::void(),
+                _ => TypeName::struct_type(name),
+            }
         };
 
         loop {
@@ -72,6 +76,7 @@ mod tests {
             ("float", TypeName::float()),
             ("bool", TypeName::bool()),
             ("string", TypeName::string()),
+            ("->", TypeName::divert_target()),
             ("void", TypeName::void()),
             ("Player", TypeName::struct_type("Player")),
         ];
@@ -89,6 +94,7 @@ mod tests {
     fn parses_nested_array_type_names() {
         let cases = [
             ("int[]", TypeName::array(TypeName::int())),
+            ("->[]", TypeName::array(TypeName::divert_target())),
             (
                 "Player[][]",
                 TypeName::array(TypeName::array(TypeName::struct_type("Player"))),

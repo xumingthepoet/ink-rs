@@ -78,7 +78,7 @@ fn is_choice_continuation_boundary(trimmed: &str) -> bool {
         || knot::is_stitch_declaration_line(trimmed)
 }
 
-pub(super) fn parse_initial_expression(source: &str) -> Option<crate::parsed::Expression> {
+pub(crate) fn parse_initial_expression(source: &str) -> Option<crate::parsed::Expression> {
     expression::parse_initial_expression(source)
 }
 
@@ -373,7 +373,7 @@ mod tests {
 
     #[test]
     fn parses_return_without_expression() {
-        let output = parse(SourceInput::new("=== function f() -> void ===\n~ return"));
+        let output = parse(SourceInput::new("=== function f() => void ===\n~ return"));
         assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
         let story = output.artifact.unwrap();
 

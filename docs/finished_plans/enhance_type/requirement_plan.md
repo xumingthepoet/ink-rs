@@ -182,14 +182,14 @@ still be stored dynamically in story JSON and save JSON.
 - Function return type syntax:
 
   ```ink
-  == function add(a: int, b: int) -> int ==
+  == function add(a: int, b: int) => int ==
     ~ return a + b
   ```
 
 - Functions without a meaningful return value use `void`:
 
   ```ink
-  == function log(message: string) -> void ==
+  == function log(message: string) => void ==
     ~ return
   ```
 

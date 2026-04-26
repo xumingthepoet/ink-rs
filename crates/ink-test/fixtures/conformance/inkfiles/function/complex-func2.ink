@@ -6,7 +6,7 @@ VAR z: int = 1
     The values are {x} and {y} and {z}.
     -> END
     
-    === function derp(a: int, b: int) -> void ===  
+    === function derp(a: int, b: int) => void ===  
    ~ x = a - b
     {
       - x == 0:

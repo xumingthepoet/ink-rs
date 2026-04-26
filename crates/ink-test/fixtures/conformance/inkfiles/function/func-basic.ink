@@ -3,5 +3,5 @@ VAR x: float = 0.0
   The value of x is {x}.
   -> END
   
-  === function lerp(a: float, b: float, k: float) -> float ===
+  === function lerp(a: float, b: float, k: float) => float ===
       ~ return ((b - a) * k) + a

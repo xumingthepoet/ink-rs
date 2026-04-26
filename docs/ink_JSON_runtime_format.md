@@ -77,7 +77,7 @@ Supported types:
 
 * **variable pointer**: used for references to variables, for example when declaring a function with the following ink:
 
-        == function myFunction(ref x: int) -> void ==
+        == function myFunction(ref x: int) => void ==
 
     Represented in runtime JSON as an object of the form: `{"^var": "varname", "ci": 0}`. Where `ci` is "context index", with the following possible values:
 

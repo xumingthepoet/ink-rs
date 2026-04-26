@@ -817,11 +817,11 @@ mod tests {
              }\n\
              VAR default_player: Player = { hp: 10 }\n\
              VAR default_scores: int[] = [1]\n\
-             == function add(a: int, b: int) -> int ==\n\
+             == function add(a: int, b: int) => int ==\n\
              ~ return a + b\n\
-             == function make_player() -> Player ==\n\
+             == function make_player() => Player ==\n\
              ~ return default_player\n\
-             == function scores() -> int[] ==\n\
+             == function scores() => int[] ==\n\
              ~ return default_scores",
         );
 
@@ -831,7 +831,7 @@ mod tests {
     #[test]
     fn accepts_bare_return_in_void_function() {
         let story = parse_story(
-            "== function log(message: string) -> void ==\n\
+            "== function log(message: string) => void ==\n\
              ~ return",
         );
 
@@ -841,7 +841,7 @@ mod tests {
     #[test]
     fn reports_missing_return_value_in_non_void_function() {
         let story = parse_story(
-            "== function score() -> int ==\n\
+            "== function score() => int ==\n\
              ~ return",
         );
 
@@ -857,7 +857,7 @@ mod tests {
     #[test]
     fn reports_value_return_in_void_function() {
         let story = parse_story(
-            "== function log() -> void ==\n\
+            "== function log() => void ==\n\
              ~ return \"ok\"",
         );
 
@@ -873,7 +873,7 @@ mod tests {
     #[test]
     fn reports_wrong_return_type() {
         let story = parse_story(
-            "== function score(label: string) -> int ==\n\
+            "== function score(label: string) => int ==\n\
              ~ return label",
         );
 
@@ -893,7 +893,7 @@ mod tests {
              hp: int\n\
              }\n\
              VAR scores: int[] = [1]\n\
-             == function make_player() -> Player ==\n\
+             == function make_player() => Player ==\n\
              ~ return scores",
         );
 

@@ -59,10 +59,10 @@ VAR DEBUG: bool = false
 --------------------------------------------------------------------------------*/
 
 
- === function lower(ref x: int) -> void
+ === function lower(ref x: int) => void
  	~ x = x - 1
 
- === function raise(ref x: int) -> void
+ === function raise(ref x: int) => void
  	~ x = x + 1
 
 /*--------------------------------------------------------------------------------

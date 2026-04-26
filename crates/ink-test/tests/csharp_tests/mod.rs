@@ -908,16 +908,16 @@ mod tests {
                     r#"
 VAR global_var: int = 5
 
-~ pass_divert(1)
+~ pass_divert(-> knot_name)
 {variable_param_test(10)}
 
-=== function aTarget() -> bool ===
+=== function aTarget() => bool ===
    ~ return true
 
-=== function pass_divert(aTarget: int) -> void ===
+=== function pass_divert(-> aTarget) => void ===
     Should be a divert target, but is a read count:- {aTarget}
 
-=== function variable_param_test(global_var: int) -> int ===
+=== function variable_param_test(global_var: int) => int ===
     ~ return global_var
 
 === knot_name ===
@@ -953,7 +953,7 @@ VAR global_var: int = 5
 == knot ==
 - (x) -> DONE
 
-== function f(x: int) -> void ==
+== function f(x: int) => void ==
 Nothing
 "#,
                     false,
@@ -1150,7 +1150,7 @@ VAR x: int = 3
             )));
 
             suite
-                .compile_string_without_runtime("== function test -> void ==\n-> END", true)
+                .compile_string_without_runtime("== function test => void ==\n-> END", true)
                 .expect("parse should succeed");
             assert!(suite.had_error(Some("Functions may not contain diverts")));
         });
@@ -1224,9 +1224,9 @@ VAR x: int = 3
             let mut story = suite
                 .compile_string(
                     r#"
-EXTERNAL message(x: string) -> void
-EXTERNAL multiply(x: float, y: int) -> float
-EXTERNAL times(i: int, str: string) -> string
+EXTERNAL message(x: string) => void
+EXTERNAL multiply(x: float, y: int) => float
+EXTERNAL times(i: int, str: string) => string
 ~ message("hello world")
 {multiply(5.0, 3)}
 {times(3, "knock ")}
@@ -1328,7 +1328,7 @@ EXTERNAL times(i: int, str: string) -> string
             let mut story = suite
                 .compile_string(
                     r#"
-EXTERNAL myAction() -> void
+EXTERNAL myAction() => void
 
 One
 ~ myAction()
@@ -1373,7 +1373,7 @@ Two
             let mut story_with_post_glue = suite
                 .compile_string(
                     r#"
-EXTERNAL myAction() -> void
+EXTERNAL myAction() => void
 
 One 
 ~ myAction()
@@ -1427,7 +1427,7 @@ VAR result: int = 0
 ~ factorialByRef(result, 5)
 { result }
 
-== function factorialByRef(ref r: int, n: int) -> void ==
+== function factorialByRef(ref r: int, n: int) => void ==
 { r == 0:
     ~ r = 1
 }
@@ -1471,7 +1471,7 @@ VAR result: int = 0
                     r#"
 { factorial(5) }
 
-== function factorial(n: int) -> int ==
+== function factorial(n: int) => int ==
  { n == 1:
     ~ return 1
  - else:
@@ -1527,7 +1527,7 @@ VAR result: int = 0
 // Not allowed to do this
 -> myFunc
 
-== function myFunc -> void ==
+== function myFunc => void ==
 This is a function.
 ~ return
 
@@ -1596,7 +1596,7 @@ This is a normal knot.
 Not allowed!
 ~ return
 
-== function myFunc -> void ==
+== function myFunc => void ==
 Hello world
 * a choice
 * another choice
@@ -2332,12 +2332,15 @@ Hello
             let mut story = suite
                 .compile_string(
                     r#"
+VAR to_one: -> = -> one
+VAR to_two: -> = -> two
+
+{to_one == to_two:same knot|different knot}
+{to_one == to_one:same knot|different knot}
+{to_two == to_two:same knot|different knot}
 {-> one == -> two:same knot|different knot}
-{-> one == -> one:same knot|different knot}
-{-> two == -> two:same knot|different knot}
-{ -> one == -> two:same knot|different knot}
-{ -> one == -> one:same knot|different knot}
-{ -> one == -> one:same knot|different knot}
+{ -> one == to_one:same knot|different knot}
+{ to_one == -> one:same knot|different knot}
 
 == one
     One
@@ -2556,41 +2559,41 @@ Shuffle: {f_shuffle()} {f_shuffle()} {f_shuffle()} {f_shuffle()}
 Shuffle stopping: {f_shuffle_stopping()} {f_shuffle_stopping()} {f_shuffle_stopping()} {f_shuffle_stopping()}
 Shuffle once: {f_shuffle_once()} {f_shuffle_once()} {f_shuffle_once()} {f_shuffle_once()}
 
-== function f_once -> string ==
+== function f_once => string ==
 {once:
     - one
     - two
 }
 
-== function f_stopping -> string ==
+== function f_stopping => string ==
 {stopping:
     - one
     - two
 }
 
-== function f_default -> string ==
+== function f_default => string ==
 {one|two}
 
-== function f_cycle -> string ==
+== function f_cycle => string ==
 {cycle:
     - one
     - two
 }
 
-== function f_shuffle -> string ==
+== function f_shuffle => string ==
 {shuffle:
     - one
     - two
 }
 
-== function f_shuffle_stopping -> string ==
+== function f_shuffle_stopping => string ==
 {stopping shuffle:
     - one
     - two
     - final
 }
 
-== function f_shuffle_once -> string ==
+== function f_shuffle_once => string ==
 {shuffle once:
     - one
     - two
@@ -2638,13 +2641,13 @@ Shuffle once: {f_shuffle_once()} {f_shuffle_once()} {f_shuffle_once()} {f_shuffl
                    { six() + two() }
                     -> END
 
-                === function six -> int
+                === function six => int
                     ~ return four() + two()
 
-                === function four -> int
+                === function four => int
                     ~ return two() + two()
 
-                === function two -> int
+                === function two => int
                     ~ return 2
 "#,
                     false,
@@ -4376,7 +4379,7 @@ Done.
 * [choice 2]
 - { TURNS_SINCE(-> test) }
 
-== function test -> void ==
+== function test => void ==
 ~ return
 "#,
                     false,
@@ -4478,15 +4481,15 @@ Done.
 -> start
 
 === start ===
-    {beats()}
-    {beats()}
+    {beats(-> start)}
+    {beats(-> start)}
     *   [Choice]  -> next
 = next
-    {beats()}
+    {beats(-> start)}
     -> END
 
-=== function beats() -> int ===
-    ~ return TURNS_SINCE(-> start)
+=== function beats(x: ->) => int ===
+    ~ return TURNS_SINCE(x)
 "#,
                     true,
                     false,
@@ -4831,7 +4834,7 @@ VAR val: int = 5
 {val}
 ->->
 
-== function inc(ref x: int) -> void ==
+== function inc(ref x: int) => void ==
     ~ x = x + 1
 "#,
                     false,
@@ -4871,7 +4874,7 @@ VAR val: int = 5
                     r#"
 ~ f(1, 1)
 
-== function f(x: int, y: int) -> void ==
+== function f(x: int, y: int) => void ==
 { x == 1 and y == 1:
   ~ x = 2
   ~ f(y, x)
@@ -5097,7 +5100,7 @@ opts1
         run_in_both_modes(|suite| {
             suite
                 .compile_string(
-                    r#"=== function knot (a: int) -> void
+                    r#"=== function knot (a: int) => void
                     ~temp a: int = 1"#,
                     false,
                     true,
@@ -5294,13 +5297,15 @@ This is the_esc
             let mut story = suite
                 .compile_string(
                     r#"
-Count start: {READ_COUNT (-> knot)} {READ_COUNT (-> knot)} {knot}
+VAR x: -> = ->knot
 
--> knot (1) ->
--> knot (2) ->
--> knot (3) ->
+Count start: {READ_COUNT (x)} {READ_COUNT (-> knot)} {knot}
 
-Count end: {READ_COUNT (-> knot)} {READ_COUNT (-> knot)} {knot}
+-> x (1) ->
+-> x (2) ->
+-> x (3) ->
+
+Count end: {READ_COUNT (x)} {READ_COUNT (-> knot)} {knot}
 -> END
 
 
@@ -5343,7 +5348,9 @@ Count end: {READ_COUNT (-> knot)} {READ_COUNT (-> knot)} {knot}
             let mut story = suite
                 .compile_string(
                     r#"
--> place (5)
+VAR x: -> = ->place
+
+-> x (5)
 
 == place (a) ==
 {a}
@@ -5473,7 +5480,7 @@ Count end: {READ_COUNT (-> knot)} {READ_COUNT (-> knot)} {knot}
                     r#"
 {RunAThing()}
 
-== function RunAThing -> void ==
+== function RunAThing => void ==
 The first line.
 The second line.
 
@@ -5606,18 +5613,18 @@ End
 In tunnel.
 ->->
 
-=== function function_to_evaluate() -> string ===
+=== function function_to_evaluate() => string ===
     { zero_equals_(1):
         ~ return "WRONG"
     - else:
         ~ return "RIGHT"
     }
 
-=== function zero_equals_(k: int) -> bool ===
+=== function zero_equals_(k: int) => bool ===
     ~ do_nothing(0)
     ~ return  (0 == k)
 
-=== function do_nothing(k: int) -> int
+=== function do_nothing(k: int) => int
     ~ return 0
 "#,
                     false,
@@ -5670,7 +5677,7 @@ Top level content
 = here
 -> DONE
 
-== function test -> string ==
+== function test => string ==
 ~ return "somewhere.here"
 "#,
                     false,
@@ -5739,15 +5746,15 @@ One
 Two
 Three
 
-== function func1 -> int ==
+== function func1 => int ==
 This is a function
 ~ return 5
 
-== function func2 -> void ==
+== function func2 => void ==
 This is a function without a return value
 ~ return
 
-== function add(x: int, y: int) -> int ==
+== function add(x: int, y: int) => int ==
 x = {x}, y = {y}
 ~ return x + y
 "#,
@@ -5966,13 +5973,13 @@ x = {x}, y = {y}
             let mut story = suite
                 .compile_string(
                     r#"
-EXTERNAL gameInc(x: int) -> int
+EXTERNAL gameInc(x: int) => int
 
-== function topExternal(x: int) -> int
+== function topExternal(x: int) => int
 In top external
 ~ return gameInc(x)
 
-== function inkInc(x: int) -> int
+== function inkInc(x: int) => int
 ~ return x + 1
 "#,
                     false,
@@ -6163,7 +6170,7 @@ In top external
                     r#"
 I have {five()} eggs.
 
-== function five -> string ==
+== function five => string ==
 {false:
     Don't print this
 }
@@ -6201,7 +6208,7 @@ five
 A {f():B}
 X
 
-=== function f() -> bool ===
+=== function f() => bool ===
 {true:
     ~ return false
 }
@@ -6240,7 +6247,7 @@ A
 {f():X}
 C
 
-=== function f() -> bool
+=== function f() => bool
 { true:
     ~ return false
 }
@@ -6710,7 +6717,7 @@ A line.
     Another line.
 }
 
-== function f -> bool ==
+== function f => bool ==
 {false:nothing}
 ~ return true
 "#,
@@ -6785,7 +6792,7 @@ VAR negativeLiteral3: bool = !(false)
 * 'Hello {name()}[, your name is {name()}.'],' I said, knowing full well that his name was {name()}.
 -> DONE
 
-== function name -> string ==
+== function name => string ==
 Joe
 "#,
                     false,
@@ -6839,7 +6846,7 @@ text 2
 ~temp tempVar: bool = func ()
 text 2
 
-== function func () -> bool
+== function func () => bool
 	text1
 	~ return true
 "#,
@@ -7144,12 +7151,12 @@ VAR globalVal: int = 5
 
 {globalVal}
 
-== function squaresquare(ref x: int) -> void ==
+== function squaresquare(ref x: int) => void ==
  ~ square(x)
  ~ square(x)
  ~ return
 
-== function square(ref x: int) -> void ==
+== function square(ref x: int) => void ==
  ~ x = x * x
  ~ return
 "#,
@@ -7187,7 +7194,7 @@ VAR globalVal: int = 5
     x
 }
 
-=== function isTrue() -> bool
+=== function isTrue() => bool
     X
     ~ return true
 "#,
@@ -7317,7 +7324,7 @@ world
             let mut story = suite
                 .compile_string(
                     r#"
-EXTERNAL TRUE () -> bool
+EXTERNAL TRUE () => bool
 
 Phrase 1
 { TRUE ():
@@ -7326,7 +7333,7 @@ Phrase 1
 }
 -> END
 
-=== function TRUE () -> bool
+=== function TRUE () => bool
     ~ return true
 "#,
                     false,
@@ -7373,7 +7380,7 @@ A
 {string()}
 B
 
-=== function string() -> string
+=== function string() => string
     ~ return "{3}"
 }
 "#,
@@ -7674,7 +7681,7 @@ Hello {x}.
 * {condFunc()} [choice 4]
 
 
-=== function condFunc() -> bool ===
+=== function condFunc() => bool ===
 {shuffle:
     - ~ return false
     - ~ return true
@@ -7998,12 +8005,12 @@ A {red #red|white #white|blue #blue|green #green} sequence.
 {x}
 -> DONE
 
-=== function f(ref x: int) -> void
+=== function f(ref x: int) => void
 ~temp local: int = 0
 ~x=x
 ~ setTo3(local)
 
-=== function setTo3(ref x: int) -> void
+=== function setTo3(ref x: int) => void
 ~x = 3
 "#,
                     false,
@@ -8401,7 +8408,7 @@ Now in B.
 VAR x: int = 5
 ~ x += one()
 
-=== function one() -> int
+=== function one() => int
 ~ return 1
 "#,
             false,
@@ -8431,10 +8438,12 @@ VAR x: int = 5
             let mut story = suite
                 .compile_string(
                     r#"
+VAR x: -> = -> here
+
 -> there
 
 == there ==
--> here
+-> x
 
 == here ==
 Here.

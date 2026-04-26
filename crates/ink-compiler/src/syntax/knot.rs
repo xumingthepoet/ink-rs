@@ -56,7 +56,7 @@ pub(super) fn parse_knot_declaration(parser: &mut RuleParser<'_>) -> Option<Flow
 
     let arguments = parse_arguments(parser).unwrap_or_default();
     let return_type = if is_function {
-        parse_return_type(parser)
+        parse_return_type(parser, "Function")
     } else {
         None
     };
@@ -122,7 +122,7 @@ pub(super) fn parse_stitch_declaration(parser: &mut RuleParser<'_>) -> Option<Fl
 
     let arguments = parse_arguments(parser).unwrap_or_default();
     let return_type = if is_function {
-        parse_return_type(parser)
+        parse_return_type(parser, "Function")
     } else {
         None
     };
@@ -148,10 +148,17 @@ pub(super) fn parse_stitch_declaration(parser: &mut RuleParser<'_>) -> Option<Fl
     })
 }
 
-fn parse_return_type(parser: &mut RuleParser<'_>) -> Option<TypeName> {
+fn parse_return_type(parser: &mut RuleParser<'_>, signature_kind: &str) -> Option<TypeName> {
     parser.parse_rule(|parser| {
         parser.skip_horizontal_whitespace();
-        parser.match_string("->")?;
+        if parser.match_string("->").is_some() {
+            parser.diagnostic(Diagnostic::error(
+                parser.current_span(),
+                format!("{signature_kind} return types use `=>`, not `->`"),
+            ));
+        } else {
+            parser.match_string("=>")?;
+        }
         parser.skip_horizontal_whitespace();
         parser.expect("return type", type_name::parse_type_name, |parser| {
             parser.skip_to_end();
@@ -248,6 +255,12 @@ fn parse_argument(parser: &mut RuleParser<'_>) -> Option<FlowArgument> {
         let type_span = parser.current_span();
         parser.skip_horizontal_whitespace();
         let declared_type = type_name::parse_type_name(parser)?;
+        if is_divert_target {
+            parser.diagnostic(Diagnostic::error(
+                type_span.clone(),
+                "Divert target parameter shorthand `-> name` cannot also declare a type",
+            ));
+        }
         if declared_type.is_void() {
             parser.diagnostic(Diagnostic::error(
                 type_span,
@@ -255,9 +268,14 @@ fn parse_argument(parser: &mut RuleParser<'_>) -> Option<FlowArgument> {
             ));
         }
         Some(declared_type)
+    } else if is_divert_target {
+        Some(TypeName::divert_target())
     } else {
         None
     };
+    if declared_type.as_ref() == Some(&TypeName::divert_target()) {
+        is_divert_target = true;
+    }
 
     Some(FlowArgument::new(
         name,
@@ -308,7 +326,7 @@ mod tests {
 
     #[test]
     fn parses_primitive_function_signature() {
-        let (declaration, diagnostics) = parse_knot("== function add(a: int, b: float) -> int ==");
+        let (declaration, diagnostics) = parse_knot("== function add(a: int, b: float) => int ==");
 
         assert!(diagnostics.is_empty(), "{diagnostics:#?}");
         let declaration = declaration.expect("expected function declaration");
@@ -329,17 +347,18 @@ mod tests {
     fn parses_array_struct_and_nested_array_function_return_types() {
         let cases = [
             (
-                "== function ids(source: Player) -> int[] ==",
+                "== function ids(source: Player) => int[] ==",
                 TypeName::array(TypeName::int()),
             ),
             (
-                "== function make_player(seed: int) -> Player ==",
+                "== function make_player(seed: int) => Player ==",
                 TypeName::struct_type("Player"),
             ),
             (
-                "== function make_grid(rows: int) -> Player[][] ==",
+                "== function make_grid(rows: int) => Player[][] ==",
                 TypeName::array(TypeName::array(TypeName::struct_type("Player"))),
             ),
+            ("== function pick() => -> ==", TypeName::divert_target()),
         ];
 
         for (source, expected_return_type) in cases {
@@ -370,7 +389,7 @@ mod tests {
 
     #[test]
     fn rejects_missing_parameter_type_in_typed_function_signature() {
-        let (declaration, diagnostics) = parse_knot("== function add(a: int, b) -> int ==");
+        let (declaration, diagnostics) = parse_knot("== function add(a: int, b) => int ==");
 
         assert!(declaration.is_some());
         assert_eq!(diagnostics.len(), 1, "{diagnostics:#?}");
@@ -383,7 +402,7 @@ mod tests {
 
     #[test]
     fn rejects_void_function_parameter_type() {
-        let (declaration, diagnostics) = parse_knot("== function noop(value: void) -> void ==");
+        let (declaration, diagnostics) = parse_knot("== function noop(value: void) => void ==");
 
         assert!(declaration.is_some());
         assert_eq!(diagnostics.len(), 1, "{diagnostics:#?}");
@@ -404,6 +423,50 @@ mod tests {
         assert_eq!(
             diagnostics[0].message,
             "Function parameter 'a' is missing a type"
+        );
+    }
+
+    #[test]
+    fn rejects_old_function_return_marker() {
+        let (declaration, diagnostics) = parse_knot("== function add(a: int) -> int ==");
+
+        assert!(declaration.is_some());
+        assert_eq!(diagnostics.len(), 1, "{diagnostics:#?}");
+        assert_eq!(diagnostics[0].severity, DiagnosticSeverity::Error);
+        assert_eq!(
+            diagnostics[0].message,
+            "Function return types use `=>`, not `->`"
+        );
+    }
+
+    #[test]
+    fn parses_divert_target_parameter_forms() {
+        let (declaration, diagnostics) = parse_knot("== function go(-> target, next: ->) => -> ==");
+
+        assert!(diagnostics.is_empty(), "{diagnostics:#?}");
+        let declaration = declaration.expect("expected function declaration");
+        assert_eq!(declaration.return_type, TypeName::divert_target());
+        assert_eq!(
+            declaration.arguments[0].declared_type(),
+            Some(&TypeName::divert_target())
+        );
+        assert!(declaration.arguments[0].is_divert_target());
+        assert_eq!(
+            declaration.arguments[1].declared_type(),
+            Some(&TypeName::divert_target())
+        );
+        assert!(declaration.arguments[1].is_divert_target());
+    }
+
+    #[test]
+    fn rejects_typed_divert_target_shorthand() {
+        let (_declaration, diagnostics) = parse_knot("== function go(-> target: int) => void ==");
+
+        assert_eq!(diagnostics.len(), 1, "{diagnostics:#?}");
+        assert_eq!(diagnostics[0].severity, DiagnosticSeverity::Error);
+        assert_eq!(
+            diagnostics[0].message,
+            "Divert target parameter shorthand `-> name` cannot also declare a type"
         );
     }
 }

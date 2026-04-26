@@ -25,6 +25,36 @@ Each entry should include:
 - migration guidance
 - tests
 
+## 2026-04-26: Divert Target Values And Return Type Marker
+
+- status: supported
+- upstream behavior: upstream Ink uses divert target values in flow APIs and
+  parameter shorthand such as `-> target`. It also uses `->` in typed function
+  and external signature examples in this fork's earlier documentation.
+- ink-rs behavior: divert targets are first-class typed values written as `->`.
+  They may appear in `VAR`, `temp`, `CONST`, function parameters and returns,
+  `EXTERNAL` parameters and returns, struct fields, and arrays such as `->[]`.
+  A bare `->` declaration has no default initializer; `->[]` defaults to `[]`.
+  Function and `EXTERNAL` return declarations now use `=>`, as in
+  `== function pick() => -> ==` and `EXTERNAL pick() => ->`. The old typed
+  return marker `->` is rejected with a diagnostic. The upstream parameter
+  shorthand `-> target` remains accepted and means `target: ->`.
+- documentation effect: `WritingWithInk-latest.md` documents `->` as a value
+  type, updates function and external signatures to `=>`, and removes language
+  that said divert target variables were unsupported.
+- rationale: `->` previously had two meanings: a flow operator and a typed
+  return marker. Reserving `->` for divert target values and flow syntax makes
+  signatures unambiguous while restoring dynamic divert targets as typed data.
+- migration guidance: rewrite typed function and external returns from
+  `-> Type` to `=> Type`. Declare stored targets as `name: ->`, construct them
+  with `-> knot`, and use `=> ->` for functions or externals that return target
+  values.
+- tests: `typed_divert_target_fixture_runs`,
+  `old_function_return_marker_reports_new_marker`, and
+  `old_external_return_marker_reports_new_marker` in
+  `crates/ink-test/tests/language.rs`, plus compiler parser, analysis, and
+  lowering unit tests.
+
 ## 2026-04-26: CONST Declarations Require Explicit Types
 
 - status: supported
@@ -91,7 +121,7 @@ Each entry should include:
   structs, or nested arrays. Equality and inequality are checked statically and
   compare arrays and structs recursively at runtime.
 - ink-rs behavior: functions require typed parameters and an explicit return
-  type such as `== function add(a: int, b: int) -> int ==`; use `-> void` for
+  type such as `== function add(a: int, b: int) => int ==`; use `=> void` for
   functions that only perform effects. `EXTERNAL` declarations also require
   typed argument and return signatures. `LEN(array)` returns an `int`, and
   `ARRAY_REMOVE(array, index)` mutates the array and returns `void`.
@@ -110,8 +140,7 @@ Each entry should include:
   preserving the existing dynamic story JSON execution model.
 - migration guidance: add explicit type annotations to all `VAR` and `temp`
   declarations, all function parameters and returns, and all `EXTERNAL`
-  signatures. Replace unsupported dynamic divert-target variables with direct
-  diverts or typed values. Use `[]` only where the expected array type is known.
+  signatures. Use `[]` only where the expected array type is known.
 - tests: `typed_default_initializers_run_at_runtime`,
   `typed_default_initializers_are_lowered_to_json`, `array_literals_run_at_runtime`,
   `struct_literals_run_at_runtime`, `field_access_reads_struct_fields_at_runtime`,

@@ -9,6 +9,7 @@ pub struct Divert {
     span: SourceSpan,
     is_tunnel: bool,
     is_thread: bool,
+    has_argument_list: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -27,6 +28,7 @@ impl Divert {
             span,
             is_tunnel: false,
             is_thread: false,
+            has_argument_list: false,
         }
     }
 
@@ -41,6 +43,7 @@ impl Divert {
             span,
             is_tunnel: false,
             is_thread: false,
+            has_argument_list: true,
         }
     }
 
@@ -60,6 +63,10 @@ impl Divert {
 
     pub fn arguments(&self) -> &[Expression] {
         &self.arguments
+    }
+
+    pub fn has_argument_list(&self) -> bool {
+        self.has_argument_list
     }
 
     pub fn span(&self) -> &SourceSpan {

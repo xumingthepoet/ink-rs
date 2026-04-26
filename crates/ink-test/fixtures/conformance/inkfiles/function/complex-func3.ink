@@ -10,7 +10,7 @@ VAR fee: int = 0
       "I will pay you {fee} reales if you get the goods to their destination. The goods will take up {weight} cargo spaces."
      -> END
      
-     === function merchant_init() -> void
+     === function merchant_init() => void
      
      { roll == 0:
         ~ mult = 2

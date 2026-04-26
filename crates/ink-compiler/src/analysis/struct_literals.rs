@@ -312,6 +312,26 @@ mod tests {
     }
 
     #[test]
+    fn rejects_missing_divert_target_struct_field() {
+        let story = parse_story(
+            "STRUCT Route {\n\
+             next: ->\n\
+             visits: int\n\
+             }\n\
+             VAR route: Route = { visits: 1 }\n\
+             -> DONE",
+        );
+
+        let diagnostics = struct_literal_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Missing field 'next' in struct literal for 'Route' cannot be default-initialized",
+        );
+    }
+
+    #[test]
     fn reports_unknown_struct_literal_field() {
         let story = parse_story(
             "STRUCT Player {\n\

@@ -7,8 +7,9 @@ outside `ink-csharp/` and covers the ink-rs language surface directly:
 
 - `STRUCT Name { field: Type }`
 - typed `VAR` and `~ temp` declarations
-- typed `== function name(args) -> Type ==` declarations
-- typed `EXTERNAL name(args) -> Type` declarations
+- typed `== function name(args) => Type ==` declarations
+- typed `EXTERNAL name(args) => Type` declarations
+- divert target value types such as `: ->` and `: ->[]`
 - choices, gathers, knots, stitches, diverts, glue, tags, comments, and inline
   logic
 

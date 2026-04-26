@@ -4,5 +4,5 @@ VAR x: int = 0
   The value is {x}.
   -> END
   
-  === function herp(a: int, b: int) -> void ===
+  === function herp(a: int, b: int) => void ===
   ~x = a * b

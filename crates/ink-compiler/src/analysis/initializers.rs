@@ -244,6 +244,42 @@ mod tests {
     }
 
     #[test]
+    fn accepts_divert_target_initializers_and_rejects_missing_defaults() {
+        let story = parse_story(
+            "CONST fallback: -> = -> knot\n\
+             VAR next: -> = fallback\n\
+             VAR route: ->[] = [-> knot, next]\n\
+             -> DONE\n\
+             == knot ==\n\
+             -> DONE",
+        );
+
+        assert_eq!(super::super::run_analysis_passes(&story), []);
+
+        let missing = parse_story("VAR next: ->\n-> DONE");
+        let diagnostics = variable_initializer_diagnostics(&missing);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Variable 'next' of type -> cannot be default-initialized",
+        );
+    }
+
+    #[test]
+    fn rejects_non_target_initializer_for_divert_target_type() {
+        let story = parse_story("VAR next: -> = 1\n-> DONE");
+
+        let diagnostics = variable_initializer_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Initializer for variable 'next' has type int but declared type is ->",
+        );
+    }
+
+    #[test]
     fn records_default_metadata_for_omitted_typed_temp_initializers() {
         let story = parse_story(
             "== knot ==\n\

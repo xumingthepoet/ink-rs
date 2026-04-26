@@ -137,6 +137,12 @@ fn typed_array_fixture_runs() {
 }
 
 #[test]
+fn typed_divert_target_fixture_runs() {
+    let compiled = compile_language_fixture("typed/divert-targets.ink");
+    assert_story_output(&compiled, "Here.\nStruct.\nArray.\nFallback.\n");
+}
+
+#[test]
 fn typed_nested_fixture_runs() {
     let compiled = compile_language_fixture("typed/nested.ink");
     assert_story_output(&compiled, "2|0|4|1|false\n");
@@ -507,7 +513,7 @@ fn compound_index_assignment_evaluates_index_once() {
             "~ items[idx()] += 1\n",
             "{items[0]}|{calls}\n",
             "-> DONE\n",
-            "=== function idx() -> int ===\n",
+            "=== function idx() => int ===\n",
             "~ calls += 1\n",
             "~ return 0",
         ),
@@ -667,9 +673,9 @@ fn typed_external_calls_keep_runtime_shape_and_return_values() {
             "STRUCT Player {\n",
             "hp: int\n",
             "}\n",
-            "EXTERNAL next_score(value: int) -> int\n",
-            "EXTERNAL make_scores() -> int[]\n",
-            "EXTERNAL make_player() -> Player\n",
+            "EXTERNAL next_score(value: int) => int\n",
+            "EXTERNAL make_scores() => int[]\n",
+            "EXTERNAL make_player() => Player\n",
             "~ temp score: int = next_score(4)\n",
             "~ temp scores: int[] = make_scores()\n",
             "~ temp player: Player = make_player()\n",
@@ -711,19 +717,19 @@ fn tail_recursion_rewrites_parameters_and_preserves_other_recursion() {
         concat!(
             "{count_down(1500, 0)}|{carry(3, 0)}|{fact(5)}\n",
             "-> DONE\n",
-            "=== function count_down(n: int, acc: int) -> int ===\n",
+            "=== function count_down(n: int, acc: int) => int ===\n",
             "{ n <= 0:\n",
             "    ~ return acc\n",
             "- else:\n",
             "    ~ return count_down(n - 1, acc + 1)\n",
             "}\n",
-            "=== function carry(n: int, seen: int) -> int ===\n",
+            "=== function carry(n: int, seen: int) => int ===\n",
             "{ n <= 0:\n",
             "    ~ return seen\n",
             "- else:\n",
             "    ~ return carry(n - 1, n)\n",
             "}\n",
-            "=== function fact(n: int) -> int ===\n",
+            "=== function fact(n: int) => int ===\n",
             "{ n <= 1:\n",
             "    ~ return 1\n",
             "- else:\n",
@@ -779,7 +785,7 @@ fn nested_global_var_declarations_report_removed_feature_diagnostic() {
     let cases = [
         (
             "nested-var-function.ink",
-            "== function setup() -> void ==\nVAR score: int = 0",
+            "== function setup() => void ==\nVAR score: int = 0",
         ),
         (
             "nested-var-knot.ink",
@@ -828,7 +834,7 @@ fn untyped_function_parameter_reports_missing_type() {
         concat!(
             "{add(1, 2)}\n",
             "-> DONE\n",
-            "== function add(a, b: int) -> int ==\n",
+            "== function add(a, b: int) => int ==\n",
             "~ return b"
         ),
     );
@@ -860,11 +866,30 @@ fn missing_function_return_type_reports_missing_type() {
 }
 
 #[test]
+fn old_function_return_marker_reports_new_marker() {
+    let diagnostics = diagnostics_for_language_source(
+        "old-function-return-marker.ink",
+        concat!(
+            "{add(1, 2)}\n",
+            "-> DONE\n",
+            "== function add(a: int, b: int) -> int ==\n",
+            "~ return a + b"
+        ),
+    );
+
+    assert_diagnostic(
+        &diagnostics,
+        DiagnosticSeverity::Error,
+        "Function return types use `=>`, not `->`",
+    );
+}
+
+#[test]
 fn untyped_external_parameter_reports_missing_type() {
     let diagnostics = diagnostics_for_language_source(
         "untyped-external-param.ink",
         concat!(
-            "EXTERNAL ext(a, b: int) -> int\n",
+            "EXTERNAL ext(a, b: int) => int\n",
             "{ext(1, 2)}\n",
             "-> DONE"
         ),
@@ -888,6 +913,20 @@ fn missing_external_return_type_reports_missing_type() {
         &diagnostics,
         DiagnosticSeverity::Error,
         "External declaration 'ext' is missing a return type",
+    );
+}
+
+#[test]
+fn old_external_return_marker_reports_new_marker() {
+    let diagnostics = diagnostics_for_language_source(
+        "old-external-return-marker.ink",
+        concat!("EXTERNAL ext(a: int) -> int\n", "{ext(1)}\n", "-> DONE"),
+    );
+
+    assert_diagnostic(
+        &diagnostics,
+        DiagnosticSeverity::Error,
+        "External return types use `=>`, not `->`",
     );
 }
 

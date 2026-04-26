@@ -1,1 +1,120 @@
-{"inkVersion":1,"root":[["^Count start: ","ev",{"^->":"knot"},"readc","out","/ev","^ ","ev",{"^->":"knot"},"readc","out","/ev","^ ","ev",{"CNT?":"knot"},"out","/ev","\n","ev",1,"/ev",{"->t->":"knot"},"ev",2,"/ev",{"->t->":"knot"},"ev",3,"/ev",{"->t->":"knot"},"^Count end: ","ev",{"^->":"knot"},"readc","out","/ev","^ ","ev",{"^->":"knot"},"readc","out","/ev","^ ","ev",{"CNT?":"knot"},"out","/ev","\n","end",["done",{"#f":5,"#n":"g-0"}],null],"done",{"#f":1,"knot":[{"temp=":"a"},"ev",{"VAR?":"a"},"out","/ev","\n","ev","void","/ev","->->",{"#f":1}]}]}
+{
+  "inkVersion": 1,
+  "root": [
+    [
+      "^Count start: ",
+      "ev",
+      {
+        "VAR?": "x"
+      },
+      "readc",
+      "out",
+      "/ev",
+      "^ ",
+      "ev",
+      {
+        "^->": "knot"
+      },
+      "readc",
+      "out",
+      "/ev",
+      "^ ",
+      "ev",
+      {
+        "CNT?": "knot"
+      },
+      "out",
+      "/ev",
+      "\n",
+      "ev",
+      1,
+      "/ev",
+      {
+        "->t->": "x",
+        "var": true
+      },
+      "ev",
+      2,
+      "/ev",
+      {
+        "->t->": "x",
+        "var": true
+      },
+      "ev",
+      3,
+      "/ev",
+      {
+        "->t->": "x",
+        "var": true
+      },
+      "^Count end: ",
+      "ev",
+      {
+        "VAR?": "x"
+      },
+      "readc",
+      "out",
+      "/ev",
+      "^ ",
+      "ev",
+      {
+        "^->": "knot"
+      },
+      "readc",
+      "out",
+      "/ev",
+      "^ ",
+      "ev",
+      {
+        "CNT?": "knot"
+      },
+      "out",
+      "/ev",
+      "\n",
+      "end",
+      [
+        "done",
+        {
+          "#f": 5,
+          "#n": "g-0"
+        }
+      ],
+      null
+    ],
+    "done",
+    {
+      "#f": 1,
+      "global decl": [
+        "ev",
+        {
+          "^->": "knot"
+        },
+        {
+          "VAR=": "x"
+        },
+        "/ev",
+        "end",
+        null
+      ],
+      "knot": [
+        {
+          "temp=": "a"
+        },
+        "ev",
+        {
+          "VAR?": "a"
+        },
+        "out",
+        "/ev",
+        "\n",
+        "ev",
+        "void",
+        "/ev",
+        "->->",
+        {
+          "#f": 3
+        }
+      ]
+    }
+  ]
+}

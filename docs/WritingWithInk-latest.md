@@ -65,25 +65,25 @@ edited for ink-rs language changes.
 - ink-rs behavior: `VAR` declarations must appear at the story top level,
   outside knots, stitches, functions, choices, conditionals, and sequences.
   `VAR`, `CONST`, and `temp` declarations require `name: Type`, function
-  parameters require `name: Type`, functions require `-> ReturnType`, and
+  parameters require `name: Type`, functions require `=> ReturnType`, and
   `EXTERNAL` declarations require typed arguments and returns. Supported source
   types are `int`, `float`, `bool`, `string`, user `STRUCT` types, arrays
-  written as `T[]`, nested arrays, and `void` return types for functions and
-  externals that do not return values.
+  written as `T[]`, nested arrays, divert target values written as `->`, and
+  `void` return types for functions and externals that do not return values.
 - ink-rs behavior: structs are declared with `STRUCT Name { field: Type }`,
   object literals use `{ field: value }`, arrays use `[a, b]`, field access uses
   `value.field`, and index access uses `array[index]`. Array and struct values
   are copied by value and compare recursively with `==` and `!=`.
 - ink-rs behavior: `LEN(array)` returns `int`, `ARRAY_REMOVE(array, index)`
-  mutates an array and returns `void`, and direct self tail recursion in
-  `return current_function(...)` is lowered without growing the Ink function
-  callstack for that recursive step.
+  mutates an array and returns `void`, `READ_COUNT(target)` and
+  `TURNS_SINCE(target)` accept expressions typed as `->`, and direct self tail
+  recursion in `return current_function(...)` is lowered without growing the
+  Ink function callstack for that recursive step.
 - migration guidance: move nested `VAR` declarations to the story top level, or
   replace local executable state with typed `temp` declarations. Add explicit
   types to all `VAR`, `CONST`, `temp`, function, and `EXTERNAL` declarations.
-  Use direct diverts instead of storing divert targets in variables;
-  divert-target values are still accepted in the existing flow APIs such as
-  `TURNS_SINCE(-> knot)` and tunnel parameters.
+  Divert target variables that previously relied on untyped upstream behavior
+  should be declared explicitly as `name: ->`.
 - tests: typed value behavior is covered by `crates/ink-test/tests/language.rs`
   and the compiler, runtime, and JSON format unit tests.
 
@@ -863,7 +863,10 @@ A value of 0 means "was seen as part of the current chunk". A value of -1 means 
 	*	{TURNS_SINCE(-> sleeping.intro) > 10} You are feeling tired... -> sleeping
 	* 	{TURNS_SINCE(-> laugh) == 0}  You try to stop laughing.
 
-Note that the parameter passed to `TURNS_SINCE` is a "divert target", not simply the knot address itself (because the knot address is a number - the read count - not a location in the story...). In ink-rs, divert-target values are accepted directly by builtins such as `TURNS_SINCE(-> nice_welcome)`, but they are not a typed source value that can be stored in `VAR` declarations or exposed through typed function signatures.
+Note that the parameter passed to `TURNS_SINCE` is a "divert target", not simply the knot address itself (because the knot address is a number - the read count - not a location in the story...). In ink-rs, divert-target values are also a typed source value written as `->`, so they can be stored, passed, returned, and used through fields or array items.
+
+	VAR welcome_target: -> = -> nice_welcome
+	{TURNS_SINCE(welcome_target)}
 
 ### SEED_RANDOM()
 
@@ -1296,8 +1299,10 @@ In upstream Ink, global variables can be defined anywhere via a `VAR` statement.
 	VAR infection_ratio: float = 0.25
 	VAR discovered_clues: string[] = ["ticket", "cipher"]
 	VAR unopened_doors: int[]
+	VAR retreat: -> = -> everybody_dies
+	VAR checkpoints: ->[] = [-> the_train]
 
-The primitive source types are `int`, `float`, `bool`, and `string`. Array types are written as `T[]`, so `string[]` means an array of strings and `int[][]` means an array of integer arrays. Empty array literals are valid when the expected type is known, such as in `VAR unopened_doors: int[] = []`.
+The primitive source types are `int`, `float`, `bool`, `string`, and `->`. The `->` type stores a divert target value such as `-> knot` or `-> knot.stitch`. Array types are written as `T[]`, so `string[]` means an array of strings, `int[][]` means an array of integer arrays, and `->[]` means an array of divert targets. Empty array literals are valid when the expected type is known, such as in `VAR unopened_doors: int[] = []`.
 
 ### Structs and object values
 
@@ -1316,7 +1321,7 @@ Story-specific value shapes can be declared with `STRUCT`. Struct fields also re
 	VAR current_player: Player = { name: "Ada", stats: { hp: 10, ready: true } }
 	VAR party: Player[] = [{ name: "Ada", stats: { hp: 10, ready: true } }, { name: "Bea", stats: { hp: 8, ready: false } }]
 
-Struct literals can omit fields; missing fields are filled from the field type's default value. Fields and array items can be read or assigned with normal logic lines:
+Struct literals can omit fields whose type has a default value; fields of type `->` must be provided explicitly. Fields and array items can be read or assigned with normal logic lines:
 
 	{current_player.stats.hp}
 	~ current_player.stats.hp += 1
@@ -1331,14 +1336,15 @@ We can test global variables to control options, and provide conditional text, i
 		*	{ not knows_about_wager } 'But, Monsieur, why are we travelling?'[] I asked.
 		* 	{ knows_about_wager} I contemplated our strange adventure[]. Would it be possible?
 
-#### Advanced: direct diverts instead of divert variables
+#### Advanced: divert target variables
 
-ink-rs does not expose divert targets as a typed `VAR` value in this phase. Use direct diverts, conditional branches, or host-side state when the destination needs to vary.
+Divert targets are typed values in ink-rs. They can be stored in globals, temps, constants, function parameters, function returns, struct fields, and arrays. A bare `->` declaration has no default value, so provide an initializer unless the type is `->[]`.
 
 	=== continue_or_quit ===
 	Give up now, or keep trying to save your Kingdom?
-	*  [Keep trying!] 	-> more_hopeless_introspection
-	*  [Give up] 		-> everybody_dies
+	~ temp next: -> = -> more_hopeless_introspection
+	*  [Keep trying!] 	-> next
+	*  [Give up] 		-> retreat
 
 
 #### Advanced: Global variables are externally visible
@@ -1714,20 +1720,20 @@ Temporary variables are safe to use in recursion (unlike globals), so the follow
 
 #### Advanced: sending divert targets as parameters
 
-Knot/stitch addresses can be passed to knot and stitch parameters as divert targets, indicated by a `->` character. The following is therefore legal, and often useful:
+Knot/stitch addresses can be passed to knot and stitch parameters as divert targets. In ink-rs the canonical parameter type is `name: ->`, and the upstream shorthand `-> name` is still accepted:
 
 	=== sleeping_in_hut ===
 		You lie down and close your eyes.
 		-> generic_sleep (-> waking_in_the_hut)
 
-	===	 generic_sleep (-> waking)
+	===	 generic_sleep (waking: ->)
 		You sleep perchance to dream etc. etc.
 		-> waking
 
 	=== waking_in_the_hut
 		You get back to your feet, ready to continue your journey.
 
-...but note the `->` in the `generic_sleep` definition: that's the one case in **ink** where a parameter needs to be typed: because it's too easy to otherwise accidentally do the following:
+The `->` argument in the call constructs a divert target value. Passing the bare address name instead would pass its read count, not the location itself:
 
 	=== sleeping_in_hut ===
 		You lie down and close your eyes.
@@ -1755,16 +1761,16 @@ A function:
 
 (Some of these may seem quite limiting, but for more story-oriented call-stack-style features, see the section on [Tunnels](#1-tunnels).)
 
-Function parameters must be declared with explicit types, and every function must declare a return type. Return values are provided via the `~ return` statement. Use `-> void` when a function performs an effect and does not return a value.
+Function parameters must be declared with explicit types, and every function must declare a return type after `=>`. Return values are provided via the `~ return` statement. Use `=> void` when a function performs an effect and does not return a value. Use `=> ->` when a function returns a divert target value.
 
 ### Defining and calling functions
 
 To define a function, simply declare a knot to be one:
 
-	=== function say_yes_to_everything() -> bool ===
+	=== function say_yes_to_everything() => bool ===
 		~ return true
 
-	=== function lerp(a: float, b: float, k: float) -> float ===
+	=== function lerp(a: float, b: float, k: float) => float ===
 		~ return ((b - a) * k) + a
 
 Functions are called by name, and with brackets, even if they have no parameters:
@@ -1775,14 +1781,14 @@ Functions are called by name, and with brackets, even if they have no parameters
 
 As in any other language, a function, once done, returns the flow to wherever it was called from - and despite not being allowed to divert the flow, functions can still call other functions.
 
-	=== function say_no_to_nothing() -> bool ===
+	=== function say_no_to_nothing() => bool ===
 		~ return say_yes_to_everything()
 
 ### Functions don't have to return anything
 
 A function does not need to have a return value, and can simply do something that is worth packaging up:
 
-	=== function harm(x: int) -> void ===
+	=== function harm(x: int) => void ===
 		{ stamina < x:
 			~ stamina = 0
 		- else:
@@ -1799,7 +1805,7 @@ Content is, by default, 'glued in', so the following:
 
 	Monsieur Fogg was looking {describe_health(health)}.
 
-	=== function describe_health(x: int) -> string ===
+	=== function describe_health(x: int) => string ===
 	{
 	- x == 100:
 		~ return "spritely"
@@ -1819,14 +1825,14 @@ produces:
 
 For instance, you might include:
 
-	=== function max(a: int, b: int) -> int ===
+	=== function max(a: int, b: int) => int ===
 		{ a < b:
 			~ return b
 		- else:
 			~ return a
 		}
 
-	=== function exp(x: int, e: int) -> int ===
+	=== function exp(x: int, e: int) => int ===
 		// returns x to the power e where e is an integer
 		{ e <= 0:
 			~ return 1
@@ -1847,7 +1853,7 @@ produces:
 
 The following example is long, but appears in pretty much every inkle game to date. (Recall that a hyphenated line inside multiline curly braces indicates either "a condition to test" or, if the curly brace began with a variable, "a value to compare against".)
 
-    === function print_num(x: int) -> void ===
+    === function print_num(x: int) => void ===
     {
         - x >= 1000:
             {print_num(x / 1000)} thousand { x mod 1000 > 0:{print_num(x mod 1000)}}
@@ -1912,7 +1918,7 @@ Function parameters can also be passed 'by reference', meaning that the function
 
 For instance, most **inkle** stories include the following:
 
-	=== function alter(ref x: int, k: int) -> void ===
+	=== function alter(ref x: int, k: int) => void ===
 		~ x = x + k
 
 Lines such as:
@@ -1998,12 +2004,13 @@ In ink-rs, every `EXTERNAL` declaration needs a typed signature:
 		hp: int
 	}
 
-	EXTERNAL next_score(value: int) -> int
-	EXTERNAL make_scores() -> int[]
-	EXTERNAL make_player() -> Player
-	EXTERNAL log_event(message: string) -> void
+	EXTERNAL next_score(value: int) => int
+	EXTERNAL make_scores() => int[]
+	EXTERNAL make_player() => Player
+	EXTERNAL next_scene(name: string) => ->
+	EXTERNAL log_event(message: string) => void
 
-External calls are type-checked like Ink function calls. Host return values must match the declared runtime shape: primitive values for primitive returns, arrays for `T[]`, and objects with matching fields for struct returns.
+External calls are type-checked like Ink function calls. Host return values must match the declared runtime shape: primitive values for primitive returns, arrays for `T[]`, objects with matching fields for struct returns, and divert target values for `->` returns.
 
 # Part 4: Advanced Flow Control
 

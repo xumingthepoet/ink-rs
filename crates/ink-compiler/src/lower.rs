@@ -18,7 +18,8 @@ use ink_story_json_format::{
 use crate::{
     analysis::CheckedStory,
     compiler::StageOutput,
-    parsed::{AssignmentTarget, Choice, Divert, DivertTarget, Expression, Object},
+    parsed::{AssignmentTarget, Choice, Divert, DivertTarget, Expression, Object, TypeName},
+    syntax::parse_initial_expression,
 };
 
 use conditional::lower_conditional_into;
@@ -413,9 +414,14 @@ fn lower_assignment_initializer_into(
 ) -> bool {
     if let Some(expression) = assignment.expression() {
         if let Expression::ArrayLiteral(_) | Expression::StructLiteral(_) = expression {
-            if let Some(value) =
-                lower_value_literal(expression, assignment.declared_type(), struct_definitions)
-            {
+            if let Some(value) = lower_value_literal(
+                expression,
+                assignment.declared_type(),
+                struct_definitions,
+                choice_labels,
+                global_labels,
+                path_mode,
+            ) {
                 content.push(value);
                 return true;
             }
@@ -783,6 +789,7 @@ fn lower_tail_recursive_return_into(
     };
     let Some(indexes::CallSignature::Ink {
         args: expected_args,
+        ..
     }) = external_signatures.get(flow_name)
     else {
         return false;
@@ -990,6 +997,24 @@ fn push_divert_with_context(
     constants: &ConstantValues,
     struct_definitions: &StructDefinitions,
 ) {
+    if let Some(dynamic_target) =
+        dynamic_divert_target(divert, path_mode, global_variables, external_signatures)
+    {
+        push_dynamic_divert_with_context(
+            content,
+            divert,
+            dynamic_target,
+            path_mode,
+            choice_labels,
+            global_labels,
+            global_variables,
+            external_signatures,
+            constants,
+            struct_definitions,
+        );
+        return;
+    }
+
     if !divert.arguments().is_empty() {
         content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
         for argument in divert.arguments() {
@@ -1017,32 +1042,148 @@ fn push_divert_with_context(
         DivertTarget::Done => content.push(RuntimeObject::ControlCommand(ControlCommand::Done)),
         DivertTarget::End => content.push(RuntimeObject::ControlCommand(ControlCommand::End)),
         DivertTarget::Path(target) => {
-            let resolved_target = if let Some(choice_target) = choice_labels.get(target) {
-                runtime_divert(choice_target.to_string(), false, divert.is_tunnel())
-            } else if let Some(label_target) = path_mode
-                .scoped_label_target(target, global_labels)
-                .filter(|label_target| *label_target != target)
-            {
-                runtime_divert(
-                    path_mode.resolve_label_target(label_target),
-                    false,
-                    divert.is_tunnel(),
-                )
-            } else if path_mode.is_local_variable(target) || global_variables.contains(target) {
-                runtime_divert(target.clone(), true, divert.is_tunnel())
-            } else {
-                runtime_divert(
-                    path_mode.resolve_divert_target(target),
-                    false,
-                    divert.is_tunnel(),
-                )
-            };
+            let resolved_target =
+                if path_mode.is_local_variable(target) || global_variables.contains(target) {
+                    runtime_divert(target.clone(), true, divert.is_tunnel())
+                } else if let Some(choice_target) = choice_labels.get(target) {
+                    runtime_divert(choice_target.to_string(), false, divert.is_tunnel())
+                } else if let Some(label_target) = path_mode
+                    .scoped_label_target(target, global_labels)
+                    .filter(|label_target| *label_target != target)
+                {
+                    runtime_divert(
+                        path_mode.resolve_label_target(label_target),
+                        false,
+                        divert.is_tunnel(),
+                    )
+                } else {
+                    runtime_divert(
+                        path_mode.resolve_divert_target(target),
+                        false,
+                        divert.is_tunnel(),
+                    )
+                };
             content.push(resolved_target);
         }
         DivertTarget::Empty => {
             content.push(runtime_divert(String::new(), false, divert.is_tunnel()))
         }
     }
+}
+
+struct DynamicDivertTarget {
+    expression: Expression,
+    divert_arguments: Vec<Expression>,
+}
+
+fn dynamic_divert_target(
+    divert: &Divert,
+    path_mode: &ChoicePathMode,
+    global_variables: &HashSet<String>,
+    external_signatures: &ExternalSignatures,
+) -> Option<DynamicDivertTarget> {
+    let DivertTarget::Path(target) = divert.target() else {
+        return None;
+    };
+
+    if divert.has_argument_list()
+        && external_signatures
+            .get(target)
+            .is_some_and(|signature| signature.return_type() == &TypeName::divert_target())
+    {
+        return Some(DynamicDivertTarget {
+            expression: Expression::FunctionCall {
+                name: target.clone(),
+                args: divert.arguments().to_vec(),
+            },
+            divert_arguments: Vec::new(),
+        });
+    }
+
+    let expression = parse_initial_expression(target)?;
+    if matches!(expression, Expression::VariableReference(_)) {
+        return None;
+    }
+    if !expression_starts_with_visible_variable(&expression, path_mode, global_variables) {
+        return None;
+    }
+
+    Some(DynamicDivertTarget {
+        expression,
+        divert_arguments: divert.arguments().to_vec(),
+    })
+}
+
+fn expression_starts_with_visible_variable(
+    expression: &Expression,
+    path_mode: &ChoicePathMode,
+    global_variables: &HashSet<String>,
+) -> bool {
+    match expression {
+        Expression::VariableReference(name) => {
+            path_mode.is_local_variable(name) || global_variables.contains(name)
+        }
+        Expression::FieldAccess { base, .. } | Expression::IndexAccess { base, .. } => {
+            expression_starts_with_visible_variable(base, path_mode, global_variables)
+        }
+        _ => false,
+    }
+}
+
+fn push_dynamic_divert_with_context(
+    content: &mut Vec<RuntimeObject>,
+    divert: &Divert,
+    dynamic_target: DynamicDivertTarget,
+    path_mode: &ChoicePathMode,
+    choice_labels: &LabelIndex,
+    global_labels: &LabelIndex,
+    global_variables: &HashSet<String>,
+    external_signatures: &ExternalSignatures,
+    constants: &ConstantValues,
+    struct_definitions: &StructDefinitions,
+) {
+    const DYNAMIC_DIVERT_TARGET_TEMP: &str = "$divertTarget";
+
+    content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
+    for argument in &dynamic_target.divert_arguments {
+        lower_expression_into(
+            content,
+            argument,
+            choice_labels,
+            global_labels,
+            global_variables,
+            external_signatures,
+            constants,
+            struct_definitions,
+            path_mode,
+            false,
+        );
+    }
+    lower_expression_into(
+        content,
+        &dynamic_target.expression,
+        choice_labels,
+        global_labels,
+        global_variables,
+        external_signatures,
+        constants,
+        struct_definitions,
+        path_mode,
+        false,
+    );
+    content.push(RuntimeObject::VariableAssignment(
+        DYNAMIC_DIVERT_TARGET_TEMP.to_string(),
+    ));
+    content.push(RuntimeObject::ControlCommand(ControlCommand::EvalEnd));
+
+    if divert.is_thread() {
+        content.push(RuntimeObject::ControlCommand(ControlCommand::StartThread));
+    }
+    content.push(runtime_divert(
+        DYNAMIC_DIVERT_TARGET_TEMP.to_string(),
+        true,
+        divert.is_tunnel(),
+    ));
 }
 
 fn runtime_divert(target: String, variable: bool, is_tunnel: bool) -> RuntimeObject {
