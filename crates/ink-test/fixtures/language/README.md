@@ -3,7 +3,8 @@
 This directory contains Rust-first language behavior fixtures.
 
 Use these fixtures for current Rust-first language behavior: supported syntax,
-semantics, and diagnostics that define the maintained language. Legacy C#
+semantics, and diagnostics that define the maintained language. Runnable
+fixtures use explicit `module` declarations and a single `main` knot. Legacy C#
 compatibility coverage remains in `fixtures/csharp_tests` and should not be
 treated as the default source of truth for new language design.
 

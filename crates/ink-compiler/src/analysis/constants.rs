@@ -16,7 +16,11 @@ pub(super) fn constant_redefinition_diagnostics(story: &Story) -> Vec<Diagnostic
     }
 
     impl ParsedVisitor for ConstantRedefinitionVisitor {
-        fn visit_object(&mut self, object: &Object, _context: &VisitContext) {
+        fn visit_object(&mut self, object: &Object, context: &VisitContext) {
+            if context.current_module.is_some() {
+                return;
+            }
+
             if let Object::ConstantDeclaration(declaration) = object {
                 if let Some(existing) = self.constants.get(declaration.name()) {
                     if existing.0 != *declaration.declared_type()
@@ -85,5 +89,17 @@ mod tests {
             DiagnosticSeverity::Error,
             "CONST 'score' has been redefined with a different type or value",
         );
+    }
+
+    #[test]
+    fn leaves_module_constants_to_module_namespace_analysis() {
+        let story = parse_story(
+            "=== module first ===\n\
+             CONST score: int = 1\n\
+             === module second ===\n\
+             CONST score: string = \"1\"",
+        );
+
+        assert!(constant_redefinition_diagnostics(&story).is_empty());
     }
 }

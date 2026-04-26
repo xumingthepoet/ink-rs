@@ -7,6 +7,7 @@ mod field_access;
 mod flow;
 mod index_access;
 mod initializers;
+mod modules;
 mod names;
 mod span;
 mod struct_literals;
@@ -33,18 +34,59 @@ use structs::struct_type_diagnostics;
 use targets::call_target_diagnostics;
 use warnings::author_warning_diagnostics;
 
+pub use modules::{
+    ModuleDependencyGraph, ModuleImportIndex, ModuleReachability, ModuleSymbolIndex,
+};
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CheckedStory {
     // Keep analysis indexes pass-local until an index has stable semantics
     // outside diagnostics. Lowering currently builds runtime-path indexes that
     // are tied to JSON container layout rather than the analysis symbol model.
     pub parsed: Story,
+    pub entry_point: Option<ModuleEntryPoint>,
+    pub module_symbols: ModuleSymbolIndex,
+    pub module_dependencies: ModuleDependencyGraph,
+    pub module_imports: ModuleImportIndex,
+    pub module_reachability: ModuleReachability,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ModuleEntryPoint {
+    pub module: String,
+    pub knot: String,
+}
+
+impl ModuleEntryPoint {
+    pub fn new(module: impl Into<String>, knot: impl Into<String>) -> Self {
+        Self {
+            module: module.into(),
+            knot: knot.into(),
+        }
+    }
+
+    pub fn qualified_name(&self) -> String {
+        format!("{}::{}", self.module, self.knot)
+    }
 }
 
 pub(crate) fn analyze(parsed: Story) -> StageOutput<CheckedStory> {
     let diagnostics = run_analysis_passes(&parsed);
+    let entry_point = modules::module_entry_point(&parsed);
+    let module_symbols = modules::build_module_symbol_index(&parsed);
+    let module_dependencies = modules::build_module_dependency_graph(&parsed);
+    let module_imports = modules::build_module_import_index(&parsed);
+    let module_reachability =
+        modules::build_module_reachability(&module_dependencies, entry_point.as_ref());
     StageOutput {
-        artifact: Some(CheckedStory { parsed }),
+        artifact: Some(CheckedStory {
+            parsed,
+            entry_point,
+            module_symbols,
+            module_dependencies,
+            module_imports,
+            module_reachability,
+        }),
         diagnostics,
     }
 }
@@ -57,6 +99,17 @@ fn run_analysis_passes(story: &Story) -> Vec<Diagnostic> {
     diagnostics.extend(constant_redefinition_diagnostics(story));
     diagnostics.extend(author_warning_diagnostics(story));
     diagnostics.extend(struct_type_diagnostics(story));
+    diagnostics.extend(modules::module_symbol_diagnostics(story));
+    diagnostics.extend(modules::module_entry_point_diagnostics(story));
+    diagnostics.extend(modules::module_dependency_diagnostics(story));
+    diagnostics.extend(modules::module_import_diagnostics(story));
+    let graph = modules::build_module_dependency_graph(story);
+    let entry_point = modules::module_entry_point(story);
+    let reachability = modules::build_module_reachability(&graph, entry_point.as_ref());
+    diagnostics.extend(modules::unreachable_module_diagnostics(
+        story,
+        &reachability,
+    ));
 
     // Naming must run before target checks so name collisions are reported
     // independently from downstream target/variable resolution.

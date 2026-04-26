@@ -1,3 +1,5 @@
+use crate::source::SourceSpan;
+
 use super::{push_indent, TypeName};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -6,6 +8,7 @@ pub struct ExternalDeclaration {
     argument_names: Vec<String>,
     argument_types: Vec<TypeName>,
     return_type: TypeName,
+    span: SourceSpan,
 }
 
 impl ExternalDeclaration {
@@ -14,12 +17,22 @@ impl ExternalDeclaration {
         arguments: Vec<(String, TypeName)>,
         return_type: TypeName,
     ) -> Self {
+        Self::with_signature_at(name, arguments, return_type, SourceSpan::new(None, 1, 1))
+    }
+
+    pub fn with_signature_at(
+        name: impl Into<String>,
+        arguments: Vec<(String, TypeName)>,
+        return_type: TypeName,
+        span: SourceSpan,
+    ) -> Self {
         let (argument_names, argument_types) = arguments.into_iter().unzip();
         Self {
             name: name.into(),
             argument_names,
             argument_types,
             return_type,
+            span,
         }
     }
 
@@ -37,6 +50,10 @@ impl ExternalDeclaration {
 
     pub fn return_type(&self) -> &TypeName {
         &self.return_type
+    }
+
+    pub fn span(&self) -> &SourceSpan {
+        &self.span
     }
 
     pub(crate) fn write_parse_snapshot(&self, out: &mut String, indent: usize) {

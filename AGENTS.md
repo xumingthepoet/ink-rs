@@ -72,6 +72,8 @@ The upstream reference lives in `ink-csharp/`.
   only served that old behavior. Do not leave unused `obsolete`, `removed
   behavior`, `dead_code`, ignored-test, or no-op compatibility paths behind.
 - Avoid broad unrelated edits when working on compiler or language behavior.
+- Do not automatically create or switch branches. Stay on the current branch
+  unless the project owner explicitly asks for a branch change.
 - Write repository-authored documentation in English. Avoid non-English prose in
   docs; describe localized user prompts generically unless exact text is
   required.
@@ -87,6 +89,50 @@ The upstream reference lives in `ink-csharp/`.
   complete, move it to `docs/finished_plans/`. Do not update `AGENTS.md` for
   each new plan unless the planning workflow itself changes.
 - Do not edit `docs/WritingWithInk-origin.md`; it is the upstream C# snapshot.
+
+## Active Plan Task Lists
+
+- Task lists under `docs/current_plan/` must be implementation plans, not
+  research logs. A task is not valid if it is only read-only inventory,
+  planning, or context gathering.
+- Put necessary inventory inside the implementation method of the first task
+  that uses it. Do not create standalone read-only tasks whose only output is a
+  note in the task list.
+- Do not write task lists as one-line task tables. Each task must have its own
+  section with enough detail for another implementer to execute it without
+  guessing: goal, implementation method, acceptance criteria, forbidden
+  shortcuts, modification boundaries, validation commands, and commit record.
+- The first non-blank line of every task list must be a progress indicator in
+  `Progress: X/N` form.
+- Every task must be represented by a checkbox in its task heading, such as
+  `### [ ] Task 01: ...`. Do not rely only on table status columns.
+- Group related tasks under milestone sections so parser, analysis, lowering,
+  runtime, fixture, and documentation work are easy to navigate.
+- Prefer task lists with more than 20-25 tasks and fewer than 100 tasks. Split
+  large milestones into reviewable implementation tasks, but do not split out
+  read-only inventory or planning-only tasks.
+- A valid task must produce a reviewable repository change that includes
+  production code, test code, fixtures, editor assets, or another code-adjacent
+  artifact. Maintained documentation should be updated in the same task when
+  behavior changes, but pure prose-only tasks are not valid implementation
+  tasks except for final plan closeout.
+- Task scope should be large enough to make meaningful progress and small
+  enough to review safely. Prefer a cohesive vertical slice that adds tests,
+  implementation, diagnostics, docs, and migration updates together when those
+  pieces are required for the behavior to be correct.
+- Every active-plan task must pass focused validation relevant to the changed
+  surface and then `make gate` before being marked complete. Do not add
+  documentation-only or read-only exceptions to task completion, except for the
+  final plan closeout task after implementation is already validated.
+- Keep the progress counter, status key, acceptance conditions, forbidden
+  shortcuts, and modification boundaries in the task list itself. Update task
+  status and progress only after validation has passed.
+- Record validation and commit metadata inside the relevant task section. Do not
+  append separate notes, logs, journals, or running commentary after the task
+  list.
+- Commit after each completed task and record the commit hash in that task
+  section. Do not start the next task with uncommitted changes from the prior
+  task.
 
 ## User Assumption Checks
 

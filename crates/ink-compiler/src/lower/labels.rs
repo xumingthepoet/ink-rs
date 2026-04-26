@@ -28,6 +28,7 @@ pub(super) fn build_label_index(
         collect_flow_labels(
             flow,
             None,
+            None,
             constants,
             struct_definitions,
             global_variables,
@@ -35,11 +36,26 @@ pub(super) fn build_label_index(
             &mut labels,
         );
     }
+    for module in story.modules() {
+        for flow in module.flows() {
+            collect_flow_labels(
+                flow,
+                Some(module.name()),
+                None,
+                constants,
+                struct_definitions,
+                global_variables,
+                estimator,
+                &mut labels,
+            );
+        }
+    }
     labels
 }
 
 fn collect_flow_labels(
     flow: &Flow,
+    module_name: Option<&str>,
     parent_flow_name: Option<&str>,
     constants: &ConstantValues,
     struct_definitions: &StructDefinitions,
@@ -47,11 +63,14 @@ fn collect_flow_labels(
     estimator: &RuntimeLenEstimator,
     labels: &mut LabelIndex,
 ) {
-    let flow_path = parent_flow_name
+    let source_flow_path = parent_flow_name
         .map(|parent| format!("{parent}.{}", flow.name()))
         .unwrap_or_else(|| flow.name().to_string());
+    let flow_path = module_name
+        .map(|module| format!("{module}.{source_flow_path}"))
+        .unwrap_or_else(|| source_flow_path.clone());
     labels.insert(flow_path.clone(), RuntimePath::new(flow_path.clone()));
-    if parent_flow_name.is_none() {
+    if parent_flow_name.is_none() && module_name.is_none() {
         labels.insert(flow.name().to_string(), RuntimePath::new(flow_path.clone()));
     }
     let weave_container_path = if weave_has_weave_points(flow.weave()) {
@@ -72,7 +91,8 @@ fn collect_flow_labels(
     for child in flow.child_flows() {
         collect_flow_labels(
             child,
-            Some(&flow_path),
+            module_name,
+            Some(&source_flow_path),
             constants,
             struct_definitions,
             global_variables,

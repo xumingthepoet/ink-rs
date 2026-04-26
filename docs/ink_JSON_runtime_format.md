@@ -21,6 +21,12 @@ compiled story JSON versions are not treated as compatible.
 
 Broadly speaking, the entire format is composed of Containers, and individual sub-elements of the Story, within those Containers.
 
+Explicit source modules do not require a new compiled-story JSON schema. The
+root container starts by diverting to the unique `module.main` entry point and
+stores reachable module containers as root named content. Source-qualified flow
+names such as `items::take` are lowered to dot-separated runtime paths such as
+`items.take`.
+
 ## Containers
 
 There is only one type of generalised collection, and this is the **Container** - it's used throughout the engine. In JSON it's represented as an array type.
@@ -140,6 +146,10 @@ Diverts can take the following forms:
 
 Additionally, a `"c"` property set to `true` indicates that the divert is conditional, and should therefore pop a value off the evaluation stack to determine whether the divert should actually happen.
 
+Module external calls use source-qualified host binding names in the `"x()"`
+field, for example `{"x()": "audio::play", "exArgs": 1}`. They are not runtime
+container paths, so they keep the `::` separator.
+
 ## Variable assignment
 
 Pops a value from the evaluation stack, and assigns it to a named variable, either globally or locally (in a `temp`, or a passed parameter). The `"re"` property being set indicates that it's a re-assignment rather than a brand new declaration.
@@ -147,6 +157,9 @@ Pops a value from the evaluation stack, and assigns it to a named variable, eith
 Examples:
 
 * `{"VAR=": "money", "re": true}` - Pop a value from the evaluation stack, and assign it to the already-declared global variable `money`.
+* `{"VAR=": "state::money", "re": true}` - Assign to a module global. Module
+  global variable names keep the `module::name` source form in compiled story
+  JSON and save-state JSON.
 * `{"temp=": "x"}` - Pop a value from the evaluation stack, and assign it to a newly declared temporary variable named `x`.
 
 ## Variable reference
@@ -156,6 +169,8 @@ Obtain the current value of a named variable, and push it to the evaluation stac
 Example:
 
 * `{"VAR?": "danger"}` - Get an existing global or temporary variable named `danger` and push its value to the evaluation stack.
+* `{"VAR?": "state::danger"}` - Get a module global by its source-qualified
+  runtime variable name.
 
 ## Legacy read count
 
@@ -281,4 +296,5 @@ Relative paths *lead* with a dot rather than starting with a name or index.
 Examples:
 
 * `building.entrance.3.0` - the first element of a Container at the fourth element of a Container named `entrance` within a Container named `building` of the root Container.
+* `items.take` - the runtime path for source flow `items::take`.
 * `.^.1` - the second element of the parent Container.

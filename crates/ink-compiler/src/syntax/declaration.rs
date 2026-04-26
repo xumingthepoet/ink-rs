@@ -43,6 +43,7 @@ pub(super) fn constant_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Obje
 
 pub(super) fn external_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
     parser.skip_horizontal_whitespace();
+    let span = parser.current_span();
     parser.match_string("EXTERNAL")?;
     parser.skip_horizontal_whitespace();
     let name = parser.take_while(is_identifier_continue)?;
@@ -82,7 +83,8 @@ pub(super) fn external_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Obje
     for (name, declared_type) in arguments {
         typed_arguments.push((name, declared_type?));
     }
-    let declaration = ExternalDeclaration::with_signature(name, typed_arguments, return_type);
+    let declaration =
+        ExternalDeclaration::with_signature_at(name, typed_arguments, return_type, span);
 
     Some(vec![Object::ExternalDeclaration(declaration)])
 }

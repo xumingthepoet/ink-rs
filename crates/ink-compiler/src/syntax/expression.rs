@@ -1,8 +1,8 @@
 use crate::{
     diagnostic::{Diagnostic, DiagnosticCode},
     parsed::{
-        BinaryOperator, ContentList, Expression, FloatLiteral, Object, StructLiteralField,
-        UnaryOperator,
+        BinaryOperator, ContentList, Expression, FloatLiteral, Object, QualifiedName,
+        StructLiteralField, UnaryOperator,
     },
     source::SourceSpan,
 };
@@ -47,6 +47,7 @@ enum ExpressionTokenKind {
     OpenBrace,
     CloseBrace,
     Colon,
+    DoubleColon,
     Dot,
     Comma,
     Arrow,
@@ -227,6 +228,10 @@ enum ExpressionParseErrorKind {
     ExpectedFieldName {
         found: Option<String>,
     },
+    ExpectedQualifiedSymbol {
+        module: String,
+        found: Option<String>,
+    },
     ExpectedIndexCloseBracket {
         found: Option<String>,
     },
@@ -299,6 +304,12 @@ impl ExpressionParseError {
             ExpressionParseErrorKind::ExpectedFieldName { found } => {
                 format!("expected field name after `.`{}", found_clause(found))
             }
+            ExpressionParseErrorKind::ExpectedQualifiedSymbol { module, found } => {
+                format!(
+                    "expected symbol name after `{module}::`{}",
+                    found_clause(found)
+                )
+            }
             ExpressionParseErrorKind::ExpectedIndexCloseBracket { found } => {
                 format!("expected `]` to close index access{}", found_clause(found))
             }
@@ -356,6 +367,17 @@ fn tokenize_expression_at(source: &str, base_span: &SourceSpan) -> Vec<Expressio
                 base_span,
             ));
             index += "->".len();
+            continue;
+        }
+
+        if rest.starts_with("::") {
+            tokens.push(token_at(
+                source,
+                index,
+                ExpressionTokenKind::DoubleColon,
+                base_span,
+            ));
+            index += "::".len();
             continue;
         }
 
@@ -835,7 +857,17 @@ impl<'a> TokenExpressionParser<'a> {
             return Ok(Expression::NumberBool(false));
         }
 
+        let qualified_name =
+            if self.match_kind(|kind| matches!(kind, ExpressionTokenKind::DoubleColon)) {
+                Some(self.parse_qualified_name_after_module(name, span.clone())?)
+            } else {
+                None
+            };
+
         if !self.match_kind(|kind| matches!(kind, ExpressionTokenKind::OpenParen)) {
+            if let Some(qualified_name) = qualified_name {
+                return Ok(Expression::QualifiedReference(qualified_name));
+            }
             if !is_path_identifier(name) {
                 return Err(ExpressionParseError::new(
                     ExpressionParseErrorKind::ExpectedExpression {
@@ -847,7 +879,7 @@ impl<'a> TokenExpressionParser<'a> {
             return Ok(Expression::VariableReference(name.to_string()));
         }
 
-        if !is_identifier(name) {
+        if qualified_name.is_none() && !is_identifier(name) {
             return Err(ExpressionParseError::new(
                 ExpressionParseErrorKind::ExpectedExpression {
                     found: Some(name.to_string()),
@@ -858,6 +890,12 @@ impl<'a> TokenExpressionParser<'a> {
 
         let mut args = Vec::new();
         if self.match_kind(|kind| matches!(kind, ExpressionTokenKind::CloseParen)) {
+            if let Some(qualified_name) = qualified_name {
+                return Ok(Expression::QualifiedFunctionCall {
+                    name: qualified_name,
+                    args,
+                });
+            }
             return Ok(Expression::FunctionCall {
                 name: name.to_string(),
                 args,
@@ -879,10 +917,57 @@ impl<'a> TokenExpressionParser<'a> {
             break;
         }
 
+        if let Some(qualified_name) = qualified_name {
+            return Ok(Expression::QualifiedFunctionCall {
+                name: qualified_name,
+                args,
+            });
+        }
         Ok(Expression::FunctionCall {
             name: name.to_string(),
             args,
         })
+    }
+
+    fn parse_qualified_name_after_module(
+        &mut self,
+        module: &str,
+        module_span: SourceSpan,
+    ) -> Result<QualifiedName, ExpressionParseError> {
+        let Some(token) = self.advance() else {
+            return Err(
+                self.error_at_eof(ExpressionParseErrorKind::ExpectedQualifiedSymbol {
+                    module: module.to_string(),
+                    found: None,
+                }),
+            );
+        };
+        let kind = token.kind.clone();
+        let ExpressionTokenKind::Identifier(symbol) = kind else {
+            return Err(ExpressionParseError::new(
+                ExpressionParseErrorKind::ExpectedQualifiedSymbol {
+                    module: module.to_string(),
+                    found: Some(describe_token_kind(&kind)),
+                },
+                token.span.clone(),
+            ));
+        };
+        if !is_identifier(module) || !is_identifier(&symbol) {
+            return Err(ExpressionParseError::new(
+                ExpressionParseErrorKind::ExpectedQualifiedSymbol {
+                    module: module.to_string(),
+                    found: Some(symbol),
+                },
+                token.span.clone(),
+            ));
+        }
+
+        Ok(QualifiedName::new(
+            module.to_string(),
+            module_span,
+            symbol,
+            token.span.clone(),
+        ))
     }
 
     fn parse_array_literal(&mut self) -> Result<Expression, ExpressionParseError> {
@@ -972,6 +1057,10 @@ impl<'a> TokenExpressionParser<'a> {
                 token.span.clone(),
             ));
         };
+        if self.match_kind(|kind| matches!(kind, ExpressionTokenKind::DoubleColon)) {
+            let target = self.parse_qualified_name_after_module(&target, token.span.clone())?;
+            return Ok(Expression::DivertTarget(target.as_str().to_string()));
+        }
         let mut target = target;
         while self.match_kind(|kind| matches!(kind, ExpressionTokenKind::Dot)) {
             let Some(token) = self.advance() else {
@@ -1108,6 +1197,7 @@ fn describe_token_kind(kind: &ExpressionTokenKind) -> String {
         ExpressionTokenKind::OpenBrace => "{".to_string(),
         ExpressionTokenKind::CloseBrace => "}".to_string(),
         ExpressionTokenKind::Colon => ":".to_string(),
+        ExpressionTokenKind::DoubleColon => "::".to_string(),
         ExpressionTokenKind::Dot => ".".to_string(),
         ExpressionTokenKind::Comma => ",".to_string(),
         ExpressionTokenKind::Arrow => "->".to_string(),
@@ -1257,6 +1347,9 @@ mod tests {
                 "StructLiteral(stats=StructLiteral(hp=Number(10)), inventory=ArrayLiteral())",
             ),
             ("-> knot.stitch", "DivertTarget(-> knot.stitch)"),
+            ("items::sword", "QualifiedReference(items::sword)"),
+            ("audio::play(\"hit\")", "QualifiedFunctionCall(audio::play, args=1)"),
+            ("-> items::open", "DivertTarget(-> items::open)"),
             ("state.hp", "VariableReference(state.hp)"),
             ("state.stats.hp", "VariableReference(state.stats.hp)"),
             ("knot.stitch.label", "VariableReference(knot.stitch.label)"),
@@ -1335,6 +1428,20 @@ mod tests {
                 token(ExpressionTokenKind::Operator("?".to_string()), 35, 36),
                 token(ExpressionTokenKind::Identifier("item".to_string()), 37, 38),
                 token(ExpressionTokenKind::CloseParen, 41, 42),
+            ]
+        );
+    }
+
+    #[test]
+    fn tokenizer_covers_module_qualified_separator() {
+        let tokens = tokenize_expression("items::sword");
+
+        assert_eq!(
+            tokens,
+            vec![
+                token(ExpressionTokenKind::Identifier("items".to_string()), 0, 1),
+                token(ExpressionTokenKind::DoubleColon, 5, 6),
+                token(ExpressionTokenKind::Identifier("sword".to_string()), 7, 8),
             ]
         );
     }
@@ -1503,6 +1610,9 @@ mod tests {
                 "StructLiteral(stats=StructLiteral(hp=Number(10)), inventory=ArrayLiteral())",
             ),
             ("-> knot.stitch", "DivertTarget(-> knot.stitch)"),
+            ("items::sword", "QualifiedReference(items::sword)"),
+            ("audio::play(\"hit\")", "QualifiedFunctionCall(audio::play, args=1)"),
+            ("-> items::open", "DivertTarget(-> items::open)"),
             ("state.hp", "VariableReference(state.hp)"),
             ("state.stats.hp", "VariableReference(state.stats.hp)"),
             ("knot.stitch.label", "VariableReference(knot.stitch.label)"),
@@ -1597,6 +1707,16 @@ mod tests {
                 7,
             ),
             (
+                "items::",
+                "expected symbol name after `items::` before end of input",
+                8,
+            ),
+            (
+                "items::123",
+                "expected symbol name after `items::`, found `123`",
+                8,
+            ),
+            (
                 "items[0",
                 "expected `]` to close index access before end of input",
                 8,
@@ -1611,5 +1731,18 @@ mod tests {
                 "source: {source}"
             );
         }
+    }
+
+    #[test]
+    fn parsed_qualified_names_preserve_spans() {
+        let parsed = expression("items::sword");
+        let Expression::QualifiedReference(name) = parsed else {
+            panic!("expected qualified reference");
+        };
+
+        assert_eq!(name.module(), "items");
+        assert_eq!(name.symbol(), "sword");
+        assert_eq!(name.module_span().column, 1);
+        assert_eq!(name.symbol_span().column, 8);
     }
 }

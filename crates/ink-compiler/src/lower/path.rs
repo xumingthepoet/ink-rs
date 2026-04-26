@@ -106,6 +106,26 @@ pub(super) fn child_path(parent: &str, child: &str) -> String {
     }
 }
 
+pub(super) fn source_path_to_runtime_path(source_path: &str) -> String {
+    source_path.replace("::", ".")
+}
+
+pub(super) fn module_scoped_source_path_to_runtime_path(
+    module_name: Option<&str>,
+    source_path: &str,
+) -> String {
+    if source_path.contains("::") {
+        return source_path_to_runtime_path(source_path);
+    }
+
+    match module_name {
+        Some(module_name) if is_absolute_runtime_path(source_path) => {
+            child_path(module_name, source_path)
+        }
+        _ => source_path.to_string(),
+    }
+}
+
 pub(super) fn is_absolute_runtime_path(target: &str) -> bool {
     !target.is_empty()
         && !target.starts_with('.')

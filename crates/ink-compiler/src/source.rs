@@ -1,9 +1,4 @@
-use std::{
-    io,
-    path::{Path, PathBuf},
-};
-
-pub(crate) mod preprocess;
+use crate::diagnostic::Diagnostic;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SourceInput {
@@ -27,12 +22,7 @@ impl SourceInput {
     }
 }
 
-pub trait FileHandler: Send + Sync {
-    fn resolve_ink_filename(&self, include_name: &str) -> PathBuf;
-    fn load_ink_file_contents(&self, full_filename: &Path) -> io::Result<String>;
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SourceSpan {
     pub source_name: Option<String>,
     pub line: usize,
@@ -60,21 +50,41 @@ pub(crate) struct SourceFile {
     pub lines: Vec<SourceLine>,
 }
 
+pub(crate) struct SourceLoadOutput {
+    pub(crate) source: Option<SourceFile>,
+    pub(crate) diagnostics: Vec<Diagnostic>,
+}
+
+pub(crate) fn prepare_source_input(
+    input: SourceInput,
+    fallback_source_filename: Option<String>,
+) -> SourceLoadOutput {
+    let source_name = input.filename.clone().or(fallback_source_filename);
+    let comment_eliminated = eliminate_comments(&input.text);
+    let lines = comment_eliminated
+        .lines()
+        .enumerate()
+        .map(|(index, raw_line)| SourceLine {
+            text: raw_line.to_string(),
+            span: SourceSpan::new(source_name.clone(), index + 1, 1),
+        })
+        .collect();
+    let source = SourceFile::from_lines(lines);
+    let diagnostics = diagnose_removed_includes(&source);
+    let source = diagnostics.is_empty().then_some(source);
+
+    SourceLoadOutput {
+        source,
+        diagnostics,
+    }
+}
+
 impl SourceFile {
     #[cfg(test)]
     pub fn from_input(input: SourceInput) -> Self {
-        let source_name = input.filename;
-        let comment_eliminated = eliminate_comments(&input.text);
-        let lines = comment_eliminated
-            .lines()
-            .enumerate()
-            .map(|(index, raw_line)| SourceLine {
-                text: raw_line.to_string(),
-                span: SourceSpan::new(source_name.clone(), index + 1, 1),
-            })
-            .collect();
-
-        Self::from_lines(lines)
+        prepare_source_input(input, None)
+            .source
+            .expect("test source should not contain removed INCLUDE syntax")
     }
 
     pub(crate) fn from_lines(lines: Vec<SourceLine>) -> Self {
@@ -88,6 +98,35 @@ impl SourceFile {
             .collect();
 
         Self { lines }
+    }
+}
+
+fn diagnose_removed_includes(source: &SourceFile) -> Vec<Diagnostic> {
+    source
+        .lines
+        .iter()
+        .filter_map(|line| {
+            removed_include_column(&line.text).map(|column| {
+                Diagnostic::error(
+                    SourceSpan::new(line.span.source_name.clone(), line.span.line, column),
+                    "INCLUDE is no longer supported; use modules and IMPORT instead",
+                )
+            })
+        })
+        .collect()
+}
+
+fn removed_include_column(text: &str) -> Option<usize> {
+    let leading_whitespace = text
+        .chars()
+        .take_while(|ch| matches!(ch, ' ' | '\t'))
+        .count();
+    let trimmed = text.trim_start_matches(|ch| matches!(ch, ' ' | '\t'));
+    let rest = trimmed.strip_prefix("INCLUDE")?;
+    if rest.is_empty() || rest.starts_with(char::is_whitespace) {
+        Some(leading_whitespace + 1)
+    } else {
+        None
     }
 }
 

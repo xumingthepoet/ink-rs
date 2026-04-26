@@ -3,16 +3,16 @@ use crate::source::SourceInput;
 use crate::{
     compiler::StageOutput,
     diagnostic::Diagnostic,
-    parsed::{Flow, Object, Story},
+    parsed::{Flow, ImportDeclaration, Module, Object, Story},
     source::{SourceFile, SourceLine},
 };
 
 use super::rule::RuleParser;
 use super::weave::group_weave_content;
 use super::{
-    author_warning_statement, choice_statement, declaration, divert_statement, gather,
-    is_choice_continuation_boundary, knot, leading_whitespace_count, logic, parse_choice_from_line,
-    structure, text_statement, variable,
+    author_warning_statement, choice_statement, declaration, divert_statement, gather, import,
+    is_choice_continuation_boundary, knot, leading_whitespace_count, logic, module,
+    parse_choice_from_line, structure, text_statement, variable,
 };
 
 type StatementRuleFn = for<'source> fn(&mut RuleParser<'source>) -> Option<Vec<Object>>;
@@ -108,6 +108,11 @@ impl Parser {
         let lines = self.source.lines.clone();
         let mut objects = Vec::new();
         let mut flows = Vec::new();
+        let mut modules = Vec::new();
+        let mut active_module_index = None;
+        let explicit_module_source = lines
+            .iter()
+            .any(|line| module::is_module_like_declaration_line(&line.text));
         let mut index = 0;
 
         while index < lines.len() {
@@ -119,6 +124,72 @@ impl Parser {
             }
 
             if line.text.trim() == "}" {
+                index += 1;
+                continue;
+            }
+
+            if module::is_module_like_declaration_line(&line.text) {
+                if let Some(module) = self.parse_module_header(line) {
+                    modules.push(module);
+                    active_module_index = Some(modules.len() - 1);
+                }
+                index += 1;
+                continue;
+            }
+
+            if explicit_module_source && active_module_index.is_none() {
+                self.diagnostics.push(Diagnostic::error(
+                    line.span.clone(),
+                    "Content and module-scoped declarations must appear after an explicit module declaration",
+                ));
+                index += 1;
+                continue;
+            }
+
+            if let Some(module_index) = active_module_index {
+                if import::is_import_like_declaration_line(&line.text) {
+                    if let Some(import) = self.parse_import_declaration(line) {
+                        modules[module_index].push_import(import);
+                    }
+                    index += 1;
+                    continue;
+                }
+
+                if line.text.trim_start().starts_with("STRUCT ") {
+                    if let Some(parsed) = self.parse_struct_declaration(&lines, &mut index) {
+                        modules[module_index].push_objects(vec![Object::StructDeclaration(parsed)]);
+                        continue;
+                    }
+                }
+
+                if knot::is_knot_declaration_line(&line.text) {
+                    if let Some(flow) = self.parse_flow(&lines, &mut index) {
+                        modules[module_index].push_flow(flow);
+                    } else {
+                        index += 1;
+                    }
+                    continue;
+                }
+
+                if knot::is_stitch_declaration_line(&line.text) {
+                    self.diagnostics.push(Diagnostic::error(
+                        line.span.clone(),
+                        "Stitch declarations must appear inside a knot",
+                    ));
+                    index += 1;
+                    continue;
+                }
+
+                if is_module_scoped_statement_line(&line.text) {
+                    let parsed = self.parse_statement(line);
+                    if parsed.iter().all(is_module_scoped_object) {
+                        modules[module_index].push_objects(parsed);
+                    }
+                    index += 1;
+                    continue;
+                }
+
+                self.diagnostics.push(module_level_content_diagnostic(line));
                 index += 1;
                 continue;
             }
@@ -155,7 +226,7 @@ impl Parser {
             index += 1;
         }
 
-        Story::new(group_weave_content(objects), flows)
+        Story::new_with_modules(group_weave_content(objects), flows, modules)
     }
 
     pub(super) fn parse_statement(&mut self, line: &SourceLine) -> Vec<Object> {
@@ -220,6 +291,33 @@ impl Parser {
         Some(objects)
     }
 
+    fn parse_module_header(&mut self, line: &SourceLine) -> Option<Module> {
+        let mut line_parser = RuleParser::new(line);
+        let declaration = line_parser.parse_rule(module::parse_module_declaration);
+        let had_error = line_parser.had_error();
+        self.diagnostics.extend(line_parser.finish());
+
+        declaration.filter(|_| !had_error).map(|declaration| {
+            Module::new(
+                declaration.name,
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+                declaration.name_span,
+                declaration.span,
+            )
+        })
+    }
+
+    fn parse_import_declaration(&mut self, line: &SourceLine) -> Option<ImportDeclaration> {
+        let mut line_parser = RuleParser::new(line);
+        let declaration = line_parser.parse_rule(import::parse_import_declaration);
+        let had_error = line_parser.had_error();
+        self.diagnostics.extend(line_parser.finish());
+
+        declaration.filter(|_| !had_error)
+    }
+
     fn parse_flow(&mut self, lines: &[SourceLine], index: &mut usize) -> Option<Flow> {
         let line = &lines[*index];
         let mut line_parser = RuleParser::new(line);
@@ -253,6 +351,10 @@ impl Parser {
                 continue;
             }
 
+            if module::is_module_like_declaration_line(&next_line.text) {
+                break;
+            }
+
             if knot::is_knot_declaration_line(&next_line.text) {
                 break;
             }
@@ -276,7 +378,7 @@ impl Parser {
         }
         self.allow_global_var_declarations = previous_global_var_setting;
 
-        Some(Flow::new(
+        Some(Flow::new_with_span(
             declaration.level,
             declaration.name,
             group_weave_content(content),
@@ -284,6 +386,7 @@ impl Parser {
             declaration.arguments,
             declaration.return_type,
             declaration.is_function,
+            line.span.clone(),
         ))
     }
 
@@ -319,6 +422,10 @@ impl Parser {
                 continue;
             }
 
+            if module::is_module_like_declaration_line(&next_line.text) {
+                break;
+            }
+
             if knot::is_knot_declaration_line(&next_line.text)
                 || knot::is_stitch_declaration_line(&next_line.text)
             {
@@ -335,7 +442,7 @@ impl Parser {
         }
         self.allow_global_var_declarations = previous_global_var_setting;
 
-        Some(Flow::new(
+        Some(Flow::new_with_span(
             declaration.level,
             declaration.name,
             group_weave_content(content),
@@ -343,6 +450,7 @@ impl Parser {
             declaration.arguments,
             declaration.return_type,
             declaration.is_function,
+            line.span.clone(),
         ))
     }
 
@@ -522,6 +630,35 @@ pub(super) fn nested_global_var_declaration_diagnostic(line: &SourceLine) -> Dia
     )
 }
 
+fn is_module_scoped_statement_line(line: &str) -> bool {
+    let trimmed = line.trim_start();
+    trimmed.starts_with("CONST ")
+        || is_global_var_declaration_line(trimmed)
+        || trimmed.starts_with("EXTERNAL ")
+}
+
+fn is_module_scoped_object(object: &Object) -> bool {
+    match object {
+        Object::ConstantDeclaration(_) | Object::ExternalDeclaration(_) => true,
+        Object::VariableAssignment(assignment) => assignment.is_global(),
+        _ => false,
+    }
+}
+
+fn module_level_content_diagnostic(line: &SourceLine) -> Diagnostic {
+    if line.text.trim_start().starts_with('#') {
+        return Diagnostic::error(
+            line.span.clone(),
+            "Module-level tags are not allowed; tags must be inside knots or stitches",
+        );
+    }
+
+    Diagnostic::error(
+        line.span.clone(),
+        "Module-level story content is not allowed; put story content inside a knot or stitch",
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -593,6 +730,292 @@ mod tests {
             story.to_parse_snapshot(),
             "Story\n  Weave(baseIndent=0)\n    StructDeclaration(name=\"Player\")\n      Field(name=\"hp\", type=int)\n      Field(name=\"name\", type=string)\n      Field(name=\"inventory\", type=Item[])\n    Gather(name=null, depth=1)\n    Divert(target=\"-> DONE\", empty=false, tunnel=false, thread=false)"
         );
+    }
+
+    #[test]
+    fn parses_module_headers() {
+        let output = parse(SourceInput::new("=== module game ==="));
+
+        assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
+        let story = output.artifact.expect("story should parse");
+        assert_eq!(story.modules().len(), 1);
+        assert_eq!(story.modules()[0].name(), "game");
+        assert_eq!(story.modules()[0].name_span().line, 1);
+        assert_eq!(story.modules()[0].name_span().column, 12);
+        assert_eq!(
+            story.to_parse_snapshot(),
+            "Story\n  Weave(baseIndent=0)\n    Gather(name=null, depth=1)\n    Divert(target=\"-> DONE\", empty=false, tunnel=false, thread=false)\n  Module(name=\"game\")"
+        );
+    }
+
+    #[test]
+    fn parses_multiple_module_headers() {
+        let output = parse(SourceInput::new(
+            "=== module game ===\n\
+             === module items ===",
+        ));
+
+        assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
+        let story = output.artifact.expect("story should parse");
+        assert_eq!(story.modules().len(), 2);
+        assert_eq!(story.modules()[0].name(), "game");
+        assert_eq!(story.modules()[1].name(), "items");
+    }
+
+    #[test]
+    fn parses_module_import_declarations() {
+        let output = parse(SourceInput::new(
+            "=== module game ===\n\
+             IMPORT sword, heal FROM items",
+        ));
+
+        assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
+        let story = output.artifact.expect("story should parse");
+        assert_eq!(story.modules().len(), 1);
+        let imports = story.modules()[0].imports();
+        assert_eq!(imports.len(), 1);
+        assert_eq!(imports[0].source_module(), "items");
+        assert_eq!(imports[0].imported_names()[0].name(), "sword");
+        assert_eq!(imports[0].imported_names()[1].name(), "heal");
+        assert_eq!(
+            story.to_parse_snapshot(),
+            "Story\n  Weave(baseIndent=0)\n    Gather(name=null, depth=1)\n    Divert(target=\"-> DONE\", empty=false, tunnel=false, thread=false)\n  Module(name=\"game\")\n    Import(from=\"items\", names=[\"sword\", \"heal\"])"
+        );
+    }
+
+    #[test]
+    fn attaches_imports_to_active_module() {
+        let output = parse(SourceInput::new(
+            "=== module game ===\n\
+             IMPORT start FROM flow\n\
+             === module items ===\n\
+             IMPORT sword FROM gear",
+        ));
+
+        assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
+        let story = output.artifact.expect("story should parse");
+        assert_eq!(story.modules().len(), 2);
+        assert_eq!(story.modules()[0].imports()[0].source_module(), "flow");
+        assert_eq!(story.modules()[1].imports()[0].source_module(), "gear");
+    }
+
+    #[test]
+    fn rejects_invalid_module_headers_without_falling_through_to_text() {
+        let cases = [
+            (
+                "== module game ==",
+                "Module declarations must use `=== module name ===`",
+            ),
+            (
+                "= module game",
+                "Module declarations must use `=== module name ===`",
+            ),
+            (
+                "=== Module game ===",
+                "Module declarations must use lowercase `module`",
+            ),
+            (
+                "=== module game(seed) ===",
+                "Module declarations do not accept parameters",
+            ),
+            (
+                "=== module game.seed ===",
+                "Module names must be single identifiers; hierarchical module names are not supported",
+            ),
+            (
+                "=== module 123 ===",
+                "Module name must be a single identifier",
+            ),
+        ];
+
+        for (source, expected_message) in cases {
+            let output = parse(SourceInput::new(source));
+
+            assert_eq!(
+                output.diagnostics.len(),
+                1,
+                "{source}: {:#?}",
+                output.diagnostics
+            );
+            assert_eq!(output.diagnostics[0].message, expected_message);
+            let story = output.artifact.expect("story should still be returned");
+            assert!(story.modules().is_empty(), "{source}");
+            assert!(
+                story.root_weave().content().is_empty(),
+                "invalid module header should not be parsed as text: {source}"
+            );
+            assert!(story.flows().is_empty(), "{source}");
+        }
+    }
+
+    #[test]
+    fn rejects_invalid_module_import_declarations() {
+        let cases = [
+            (
+                "=== module game ===\nimport sword FROM items",
+                "Import declarations must use uppercase `IMPORT`",
+            ),
+            (
+                "=== module game ===\nIMPORT sword from items",
+                "Import declarations must use uppercase `FROM`",
+            ),
+            (
+                "=== module game ===\nIMPORT FROM items",
+                "IMPORT declarations must name at least one symbol before FROM",
+            ),
+            (
+                "=== module game ===\nIMPORT sword AS blade FROM items",
+                "Import aliases are not supported in the first module-support phase",
+            ),
+            (
+                "=== module game ===\nIMPORT function play FROM audio",
+                "IMPORT names do not include kind annotations",
+            ),
+            (
+                "=== module game ===\nIMPORT sword,",
+                "IMPORT declarations must include an imported symbol name after ','",
+            ),
+        ];
+
+        for (source, expected_message) in cases {
+            let output = parse(SourceInput::new(source));
+
+            assert_eq!(
+                output.diagnostics.len(),
+                1,
+                "{source}: {:#?}",
+                output.diagnostics
+            );
+            assert_eq!(output.diagnostics[0].message, expected_message);
+            let story = output.artifact.expect("story should still be returned");
+            assert_eq!(story.modules().len(), 1);
+            assert!(story.modules()[0].imports().is_empty());
+        }
+    }
+
+    #[test]
+    fn explicit_modules_own_top_level_declarations_and_flows() {
+        let output = parse(SourceInput::new(
+            "=== module game ===\n\
+             IMPORT sword FROM items\n\
+             CONST START: int = 1\n\
+             VAR score: int = 0\n\
+             STRUCT Player { hp: int }\n\
+             EXTERNAL play(name: string) => void\n\
+             == function setup() => void ==\n\
+             ~ return\n\
+             == main ==\n\
+             = intro\n\
+             -> END",
+        ));
+
+        assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
+        let story = output.artifact.expect("story should parse");
+        assert!(story.root_weave().content().is_empty());
+        assert!(story.flows().is_empty());
+        let module = &story.modules()[0];
+        assert_eq!(module.imports().len(), 1);
+        assert_eq!(module.weave().content().len(), 4);
+        assert!(matches!(
+            &module.weave().content()[0],
+            Object::ConstantDeclaration(_)
+        ));
+        assert!(matches!(
+            &module.weave().content()[1],
+            Object::VariableAssignment(assignment) if assignment.is_global()
+        ));
+        assert!(matches!(
+            &module.weave().content()[2],
+            Object::StructDeclaration(_)
+        ));
+        assert!(matches!(
+            &module.weave().content()[3],
+            Object::ExternalDeclaration(_)
+        ));
+        assert_eq!(module.flows().len(), 2);
+        assert_eq!(module.flows()[0].name(), "setup");
+        assert!(module.flows()[0].is_function());
+        assert_eq!(module.flows()[1].name(), "main");
+        assert_eq!(module.flows()[1].child_flows().len(), 1);
+        assert_eq!(module.flows()[1].child_flows()[0].name(), "intro");
+    }
+
+    #[test]
+    fn explicit_module_parse_snapshot_shows_owned_declarations() {
+        let output = parse(SourceInput::new(
+            "=== module game ===\n\
+             CONST START: int = 1\n\
+             == main ==\n\
+             -> END",
+        ));
+
+        assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
+        let story = output.artifact.expect("story should parse");
+        assert_eq!(
+            story.to_parse_snapshot(),
+            "Story\n  Weave(baseIndent=0)\n    Gather(name=null, depth=1)\n    Divert(target=\"-> DONE\", empty=false, tunnel=false, thread=false)\n  Module(name=\"game\")\n    Weave(baseIndent=0)\n      ConstantDeclaration(name=\"START\", type=int)\n        Number(1)\n    Flow(level=Knot, name=\"main\", function=false)\n      Weave(baseIndent=0)\n        Divert(target=\"-> END\", empty=false, tunnel=false, thread=false)"
+        );
+    }
+
+    #[test]
+    fn explicit_module_headers_stop_previous_flow() {
+        let output = parse(SourceInput::new(
+            "=== module first ===\n\
+             == main ==\n\
+             First.\n\
+             === module second ===\n\
+             == main ==\n\
+             Second.",
+        ));
+
+        assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
+        let story = output.artifact.expect("story should parse");
+        assert_eq!(story.modules().len(), 2);
+        assert_eq!(story.modules()[0].flows().len(), 1);
+        assert_eq!(story.modules()[0].flows()[0].name(), "main");
+        assert_eq!(story.modules()[1].flows().len(), 1);
+        assert_eq!(story.modules()[1].flows()[0].name(), "main");
+    }
+
+    #[test]
+    fn explicit_module_sources_reject_content_before_first_module() {
+        let output = parse(SourceInput::new("Line.\n=== module game ==="));
+
+        assert_eq!(output.diagnostics.len(), 1, "{:#?}", output.diagnostics);
+        assert_eq!(
+            output.diagnostics[0].message,
+            "Content and module-scoped declarations must appear after an explicit module declaration"
+        );
+        let story = output.artifact.expect("story should still be returned");
+        assert!(story.root_weave().content().is_empty());
+        assert_eq!(story.modules().len(), 1);
+    }
+
+    #[test]
+    fn explicit_modules_reject_direct_content_tags_and_top_level_stitches() {
+        let output = parse(SourceInput::new(
+            "=== module game ===\n\
+             Line.\n\
+             # module tag\n\
+             = stitch",
+        ));
+
+        assert_eq!(output.diagnostics.len(), 3, "{:#?}", output.diagnostics);
+        assert_eq!(
+            output.diagnostics[0].message,
+            "Module-level story content is not allowed; put story content inside a knot or stitch"
+        );
+        assert_eq!(
+            output.diagnostics[1].message,
+            "Module-level tags are not allowed; tags must be inside knots or stitches"
+        );
+        assert_eq!(
+            output.diagnostics[2].message,
+            "Stitch declarations must appear inside a knot"
+        );
+        let story = output.artifact.expect("story should still be returned");
+        assert!(story.modules()[0].weave().content().is_empty());
+        assert!(story.modules()[0].flows().is_empty());
     }
 
     #[test]

@@ -3,7 +3,7 @@ use crate::parsed::{
     Flow, Object, Story,
 };
 
-use super::context::VariableScopeIndex;
+use super::context::{VariableScopeIndex, VariableSymbolKind};
 
 pub(super) fn build_variable_scope_index(story: &Story) -> VariableScopeIndex {
     #[derive(Default)]
@@ -18,6 +18,7 @@ pub(super) fn build_variable_scope_index(story: &Story) -> VariableScopeIndex {
             };
             for argument in flow.arguments() {
                 self.index.insert_local(
+                    context.current_module.as_deref(),
                     flow_path.clone(),
                     argument.name().to_string(),
                     argument.declared_type().cloned(),
@@ -29,27 +30,34 @@ pub(super) fn build_variable_scope_index(story: &Story) -> VariableScopeIndex {
             match object {
                 Object::ConstantDeclaration(declaration) => {
                     self.index.insert_global(
+                        context.current_module.as_deref(),
                         declaration.name().to_string(),
                         Some(declaration.declared_type().clone()),
+                        VariableSymbolKind::Constant,
                     );
                 }
                 Object::VariableAssignment(assignment) if assignment.is_global() => {
                     self.index.insert_global(
+                        context.current_module.as_deref(),
                         assignment.name().to_string(),
                         assignment.declared_type().cloned(),
+                        VariableSymbolKind::GlobalVariable,
                     );
                 }
                 Object::VariableAssignment(assignment)
                     if assignment.is_temporary() && context.current_flow_path.is_none() =>
                 {
                     self.index.insert_global(
+                        context.current_module.as_deref(),
                         assignment.name().to_string(),
                         assignment.declared_type().cloned(),
+                        VariableSymbolKind::GlobalVariable,
                     );
                 }
                 Object::VariableAssignment(assignment) if assignment.is_temporary() => {
                     if let Some(flow_path) = &context.current_flow_path {
                         self.index.insert_local(
+                            context.current_module.as_deref(),
                             flow_path.clone(),
                             assignment.name().to_string(),
                             assignment.declared_type().cloned(),
@@ -85,12 +93,12 @@ mod tests {
 
         let index = build_variable_scope_index(&story);
 
-        assert!(index.contains_visible_variable("score", None));
-        assert!(index.contains_visible_variable("score", Some("knot")));
-        assert!(index.contains_visible_variable("arg", Some("knot")));
-        assert!(index.contains_visible_variable("local", Some("knot")));
-        assert!(!index.contains_visible_variable("arg", None));
-        assert!(!index.contains_visible_variable("local", Some("other")));
+        assert!(index.contains_visible_variable("score", None, None));
+        assert!(index.contains_visible_variable("score", None, Some("knot")));
+        assert!(index.contains_visible_variable("arg", None, Some("knot")));
+        assert!(index.contains_visible_variable("local", None, Some("knot")));
+        assert!(!index.contains_visible_variable("arg", None, None));
+        assert!(!index.contains_visible_variable("local", None, Some("other")));
     }
 
     #[test]
@@ -105,19 +113,19 @@ mod tests {
         let index = build_variable_scope_index(&story);
 
         assert_eq!(
-            index.visible_variable_declared_type("score", None),
+            index.visible_variable_declared_type("score", None, None),
             Some(Some(&TypeName::int()))
         );
         assert_eq!(
-            index.visible_variable_declared_type("score", Some("knot")),
+            index.visible_variable_declared_type("score", None, Some("knot")),
             Some(Some(&TypeName::int()))
         );
         assert_eq!(
-            index.visible_variable_declared_type("arg", Some("knot")),
+            index.visible_variable_declared_type("arg", None, Some("knot")),
             Some(Some(&TypeName::string()))
         );
         assert_eq!(
-            index.visible_variable_declared_type("local", Some("knot")),
+            index.visible_variable_declared_type("local", None, Some("knot")),
             Some(Some(&TypeName::bool()))
         );
     }
@@ -133,11 +141,11 @@ mod tests {
         let index = build_variable_scope_index(&story);
 
         assert_eq!(
-            index.visible_variable_declared_type("derived", None),
+            index.visible_variable_declared_type("derived", None, None),
             Some(Some(&TypeName::int()))
         );
         assert_eq!(
-            index.visible_variable_declared_type("arg", Some("knot")),
+            index.visible_variable_declared_type("arg", None, Some("knot")),
             Some(None)
         );
     }
@@ -153,11 +161,11 @@ mod tests {
         let index = build_variable_scope_index(&story);
 
         assert_eq!(
-            index.visible_variable_declared_type("value", None),
+            index.visible_variable_declared_type("value", None, None),
             Some(Some(&TypeName::int()))
         );
         assert_eq!(
-            index.visible_variable_declared_type("value", Some("knot")),
+            index.visible_variable_declared_type("value", None, Some("knot")),
             Some(Some(&TypeName::string()))
         );
     }
@@ -175,19 +183,92 @@ mod tests {
         let index = build_variable_scope_index(&story);
 
         assert_eq!(
-            index.visible_variable_declared_type("arg", Some("one")),
+            index.visible_variable_declared_type("arg", None, Some("one")),
             Some(Some(&TypeName::int()))
         );
         assert_eq!(
-            index.visible_variable_declared_type("local", Some("one")),
+            index.visible_variable_declared_type("local", None, Some("one")),
             Some(Some(&TypeName::bool()))
         );
         assert_eq!(
-            index.visible_variable_declared_type("arg", Some("two")),
+            index.visible_variable_declared_type("arg", None, Some("two")),
             Some(Some(&TypeName::string()))
         );
         assert_eq!(
-            index.visible_variable_declared_type("local", Some("two")),
+            index.visible_variable_declared_type("local", None, Some("two")),
+            None
+        );
+    }
+
+    #[test]
+    fn module_globals_are_visible_only_inside_their_module() {
+        let story = parse_story(
+            "=== module game ===\n\
+             VAR value: int = 0\n\
+             == main(arg: string) ==\n\
+             ~ temp local: bool = true\n\
+             -> DONE\n\
+             === module items ===\n\
+             VAR value: string = \"item\"\n\
+             == helper ==\n\
+             -> DONE",
+        );
+
+        let index = build_variable_scope_index(&story);
+
+        assert_eq!(
+            index.visible_variable_declared_type("value", Some("game"), Some("main")),
+            Some(Some(&TypeName::int()))
+        );
+        assert_eq!(
+            index.visible_variable_declared_type("value", Some("items"), Some("helper")),
+            Some(Some(&TypeName::string()))
+        );
+        assert_eq!(
+            index.visible_variable_declared_type("arg", Some("game"), Some("main")),
+            Some(Some(&TypeName::string()))
+        );
+        assert_eq!(
+            index.visible_variable_declared_type("local", Some("game"), Some("main")),
+            Some(Some(&TypeName::bool()))
+        );
+        assert_eq!(
+            index.visible_variable_declared_type("arg", Some("items"), Some("helper")),
+            None
+        );
+    }
+
+    #[test]
+    fn qualified_global_lookups_distinguish_constants_from_variables() {
+        let story = parse_story(
+            "=== module items ===\n\
+             CONST MAX_SCORE: int = 3\n\
+             VAR score: int = 0\n\
+             == main ==\n\
+             -> DONE",
+        );
+
+        let index = build_variable_scope_index(&story);
+
+        assert_eq!(
+            index.qualified_constant_declared_type("items::MAX_SCORE"),
+            Some(Some(&TypeName::int()))
+        );
+        assert_eq!(index.qualified_constant_declared_type("items::score"), None);
+        assert_eq!(
+            index.qualified_global_variable_declared_type("items::score"),
+            Some(Some(&TypeName::int()))
+        );
+        assert_eq!(
+            index.qualified_global_variable_declared_type("items::MAX_SCORE"),
+            None
+        );
+        assert_eq!(
+            index.qualified_constant_declared_type("missing::MAX_SCORE"),
+            None
+        );
+        assert_eq!(
+            index.qualified_global_variable_declared_type("missing::score"),
             None
         );
     }

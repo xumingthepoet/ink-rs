@@ -75,6 +75,7 @@ impl<'a> FieldAccessChecker<'a> {
             self.variable_scopes,
             self.struct_types,
             self.target_symbols,
+            context.current_module.as_deref(),
             context.current_flow_path.as_deref(),
         ) {
             if is_unknown_variable_error(error.message()) {
@@ -119,8 +120,11 @@ fn assignment_expected_type(
         .target()
         .variable_name()
         .and_then(|name| {
-            variable_scopes
-                .visible_variable_declared_type(name, context.current_flow_path.as_deref())
+            variable_scopes.visible_variable_declared_type(
+                name,
+                context.current_module.as_deref(),
+                context.current_flow_path.as_deref(),
+            )
         })
         .and_then(|declared_type| declared_type.cloned())
 }
@@ -136,6 +140,7 @@ fn mark_field_accesses(expression: &Expression, field_access_ids: &mut HashSet<u
             mark_field_accesses(index, field_access_ids);
         }
         Expression::FunctionCall { args, .. }
+        | Expression::QualifiedFunctionCall { args, .. }
         | Expression::ArrayLiteral(args)
         | Expression::MultipleCondition(args) => {
             for arg in args {
@@ -160,7 +165,8 @@ fn mark_field_accesses(expression: &Expression, field_access_ids: &mut HashSet<u
         | Expression::NumberFloat(_)
         | Expression::NumberBool(_)
         | Expression::DivertTarget(_)
-        | Expression::VariableReference(_) => {}
+        | Expression::VariableReference(_)
+        | Expression::QualifiedReference(_) => {}
     }
 }
 

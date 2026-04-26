@@ -14,13 +14,19 @@
       "include": "#struct-declaration"
     },
     {
+      "include": "#module-declaration"
+    },
+    {
       "include": "#knot-declaration"
     },
     {
       "include": "#stitch-declaration"
     },
     {
-      "include": "#include-declaration"
+      "include": "#import-declaration"
+    },
+    {
+      "include": "#removed-include-declaration"
     },
     {
       "include": "#external-declaration"
@@ -53,6 +59,9 @@
   "repository": {
     "identifier": {
       "match": "[A-Za-z_][A-Za-z0-9_]*"
+    },
+    "type-name": {
+      "match": "(?:->|[A-Za-z_][A-Za-z0-9_]*(?:\\s*::\\s*[A-Za-z_][A-Za-z0-9_]*)?)(?:\\s*\\[\\])*"
     },
     "comments": {
       "patterns": [
@@ -132,7 +141,7 @@
           "include": "#comments"
         },
         {
-          "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\s*(:)\\s*((?:->|[A-Za-z_][A-Za-z0-9_]*)(?:\\s*\\[\\])*)",
+          "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\s*(:)\\s*((?:->|[A-Za-z_][A-Za-z0-9_]*(?:\\s*::\\s*[A-Za-z_][A-Za-z0-9_]*)?)(?:\\s*\\[\\])*)",
           "captures": {
             "1": {
               "name": "variable.other.member.declaration.ink"
@@ -148,8 +157,26 @@
         }
       ]
     },
+    "module-declaration": {
+      "match": "^\\s*(===)\\s*(module)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*(===)\\s*$",
+      "captures": {
+        "1": {
+          "name": "punctuation.definition.heading.module.begin.ink"
+        },
+        "2": {
+          "name": "storage.type.module.ink"
+        },
+        "3": {
+          "name": "entity.name.namespace.module.ink"
+        },
+        "4": {
+          "name": "punctuation.definition.heading.module.end.ink"
+        }
+      },
+      "name": "meta.module.declaration.ink"
+    },
     "knot-declaration": {
-      "begin": "^\\s*(={2,})\\s*(?:(function)\\s+)?([A-Za-z_][A-Za-z0-9_]*)",
+      "begin": "^\\s*(==)\\s*(?:(function)\\s+)?([A-Za-z_][A-Za-z0-9_]*)",
       "beginCaptures": {
         "1": {
           "name": "punctuation.definition.heading.ink"
@@ -171,7 +198,7 @@
           "include": "#return-type"
         },
         {
-          "match": "={2,}",
+          "match": "==",
           "name": "punctuation.definition.heading.ink"
         }
       ]
@@ -200,17 +227,35 @@
         }
       ]
     },
-    "include-declaration": {
+    "import-declaration": {
+      "match": "^\\s*(IMPORT)\\s+([A-Za-z_][A-Za-z0-9_]*(?:\\s*,\\s*[A-Za-z_][A-Za-z0-9_]*)*)\\s+(FROM)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*$",
+      "captures": {
+        "1": {
+          "name": "keyword.control.import.ink"
+        },
+        "2": {
+          "name": "variable.other.imported-symbols.ink"
+        },
+        "3": {
+          "name": "keyword.control.import.from.ink"
+        },
+        "4": {
+          "name": "entity.name.namespace.import-source.ink"
+        }
+      },
+      "name": "meta.import.ink"
+    },
+    "removed-include-declaration": {
       "match": "^\\s*(INCLUDE)\\s+(\\S+)\\s*$",
       "captures": {
         "1": {
-          "name": "keyword.control.import.include.ink"
+          "name": "invalid.deprecated.include.ink"
         },
         "2": {
-          "name": "string.unquoted.path.ink"
+          "name": "invalid.deprecated.include.path.ink"
         }
       },
-      "name": "meta.include.ink"
+      "name": "meta.include.removed.ink"
     },
     "external-declaration": {
       "begin": "^\\s*(EXTERNAL)\\s+([A-Za-z_][A-Za-z0-9_]*)",
@@ -234,7 +279,7 @@
       ]
     },
     "variable-declaration": {
-      "begin": "^\\s*(VAR)\\s+([A-Za-z_][A-Za-z0-9_]*)(?:\\s*(:)\\s*((?:->|[A-Za-z_][A-Za-z0-9_]*)(?:\\s*\\[\\])*))?",
+      "begin": "^\\s*(VAR)\\s+([A-Za-z_][A-Za-z0-9_]*)(?:\\s*(:)\\s*((?:->|[A-Za-z_][A-Za-z0-9_]*(?:\\s*::\\s*[A-Za-z_][A-Za-z0-9_]*)?)(?:\\s*\\[\\])*))?",
       "beginCaptures": {
         "1": {
           "name": "storage.modifier.global.ink"
@@ -262,7 +307,7 @@
       ]
     },
     "constant-declaration": {
-      "begin": "^\\s*(CONST)\\s+([A-Za-z_][A-Za-z0-9_]*)(?:\\s*(:)\\s*((?:->|[A-Za-z_][A-Za-z0-9_]*)(?:\\s*\\[\\])*))?",
+      "begin": "^\\s*(CONST)\\s+([A-Za-z_][A-Za-z0-9_]*)(?:\\s*(:)\\s*((?:->|[A-Za-z_][A-Za-z0-9_]*(?:\\s*::\\s*[A-Za-z_][A-Za-z0-9_]*)?)(?:\\s*\\[\\])*))?",
       "beginCaptures": {
         "1": {
           "name": "storage.modifier.constant.ink"
@@ -367,7 +412,7 @@
           "name": "keyword.control.return.ink"
         },
         {
-          "match": "\\b(temp)\\s+([A-Za-z_][A-Za-z0-9_]*)(?:\\s*(:)\\s*((?:->|[A-Za-z_][A-Za-z0-9_]*)(?:\\s*\\[\\])*))?",
+          "match": "\\b(temp)\\s+([A-Za-z_][A-Za-z0-9_]*)(?:\\s*(:)\\s*((?:->|[A-Za-z_][A-Za-z0-9_]*(?:\\s*::\\s*[A-Za-z_][A-Za-z0-9_]*)?)(?:\\s*\\[\\])*))?",
           "captures": {
             "1": {
               "name": "storage.modifier.local.ink"
@@ -481,7 +526,7 @@
       "name": "constant.language.glue.ink"
     },
     "divert": {
-      "match": "(->->|->t->|->|<-)\\s*((?:(DONE)|(END)|([A-Za-z_][A-Za-z0-9_]*))(?:\\s*\\.\\s*[A-Za-z_][A-Za-z0-9_]*)*(?:\\s*\\([^)]*\\))?)?",
+      "match": "(->->|->t->|->|<-)\\s*((?:(DONE)|(END)|([A-Za-z_][A-Za-z0-9_]*))(?:\\s*(?:::|\\.)\\s*[A-Za-z_][A-Za-z0-9_]*)*(?:\\s*\\([^)]*\\))?)?",
       "captures": {
         "1": {
           "name": "keyword.operator.divert.ink"
@@ -641,7 +686,7 @@
       ]
     },
     "type-annotation": {
-      "match": "(:)\\s*((?:->|[A-Za-z_][A-Za-z0-9_]*)(?:\\s*\\[\\])*)",
+      "match": "(:)\\s*((?:->|[A-Za-z_][A-Za-z0-9_]*(?:\\s*::\\s*[A-Za-z_][A-Za-z0-9_]*)?)(?:\\s*\\[\\])*)",
       "captures": {
         "1": {
           "name": "punctuation.separator.type.ink"
@@ -653,7 +698,7 @@
       "name": "meta.type.annotation.ink"
     },
     "return-type": {
-      "match": "(=>)\\s*((?:->|[A-Za-z_][A-Za-z0-9_]*)(?:\\s*\\[\\])*)",
+      "match": "(=>)\\s*((?:->|[A-Za-z_][A-Za-z0-9_]*(?:\\s*::\\s*[A-Za-z_][A-Za-z0-9_]*)?)(?:\\s*\\[\\])*)",
       "captures": {
         "1": {
           "name": "keyword.operator.return-type.ink"
@@ -680,6 +725,9 @@
         },
         {
           "include": "#builtins"
+        },
+        {
+          "include": "#qualified-name"
         },
         {
           "include": "#field-key"
@@ -752,6 +800,21 @@
           "name": "variable.other.member.ink"
         }
       }
+    },
+    "qualified-name": {
+      "match": "\\b([A-Za-z_][A-Za-z0-9_]*)(::)([A-Za-z_][A-Za-z0-9_]*)\\b",
+      "captures": {
+        "1": {
+          "name": "entity.name.namespace.ink"
+        },
+        "2": {
+          "name": "punctuation.accessor.namespace.ink"
+        },
+        "3": {
+          "name": "variable.other.qualified-symbol.ink"
+        }
+      },
+      "name": "meta.qualified-name.ink"
     },
     "operators": {
       "match": "==|!=|<=|>=|&&|\\|\\||\\?|!?\\?|\\b(?:and|or|not|mod|has|hasnt)\\b|[+\\-*/%<>!=]",

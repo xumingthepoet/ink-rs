@@ -1,10 +1,13 @@
 use std::collections::HashSet;
 
-use super::path::{child_path, LabelIndex};
+use super::path::{child_path, module_scoped_source_path_to_runtime_path, LabelIndex};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum ChoicePathMode {
     Root,
+    Module {
+        module_name: String,
+    },
     RootGather {
         gather_name: String,
     },
@@ -14,6 +17,7 @@ pub(super) enum ChoicePathMode {
         allow_ancestor_fallback: bool,
     },
     Flow {
+        module_name: Option<String>,
         flow_name: String,
         container_path: String,
         parent_flow_name: Option<String>,
@@ -25,6 +29,14 @@ pub(super) enum ChoicePathMode {
 }
 
 impl ChoicePathMode {
+    pub(super) fn current_module_name(&self) -> Option<&str> {
+        match self {
+            ChoicePathMode::Module { module_name } => Some(module_name.as_str()),
+            ChoicePathMode::Flow { module_name, .. } => module_name.as_deref(),
+            _ => None,
+        }
+    }
+
     pub(super) fn for_choice_nested_content(
         &self,
         choice_container_name: &str,
@@ -32,6 +44,11 @@ impl ChoicePathMode {
         has_following_gather: bool,
     ) -> Self {
         match self {
+            ChoicePathMode::Module { .. } => ChoicePathMode::Root.for_choice_nested_content(
+                choice_container_name,
+                gather_container_name,
+                has_following_gather,
+            ),
             ChoicePathMode::Root => ChoicePathMode::NestedRoot {
                 container_path: format!("0.{choice_container_name}"),
                 gather_target: format!("0.{gather_container_name}"),
@@ -56,6 +73,7 @@ impl ChoicePathMode {
                 allow_ancestor_fallback: *allow_ancestor_fallback,
             },
             ChoicePathMode::Flow {
+                module_name,
                 flow_name,
                 container_path,
                 parent_flow_name,
@@ -63,6 +81,7 @@ impl ChoicePathMode {
                 local_variables,
                 ..
             } => ChoicePathMode::Flow {
+                module_name: module_name.clone(),
                 flow_name: flow_name.clone(),
                 container_path: format!("{container_path}.{choice_container_name}"),
                 parent_flow_name: parent_flow_name.clone(),
@@ -80,6 +99,7 @@ impl ChoicePathMode {
 
     pub(super) fn for_nested_weave(&self, container_index: usize) -> Self {
         match self {
+            ChoicePathMode::Module { .. } => ChoicePathMode::Root.for_nested_weave(container_index),
             ChoicePathMode::NestedRoot {
                 container_path,
                 gather_target,
@@ -100,6 +120,7 @@ impl ChoicePathMode {
                 allow_ancestor_fallback: true,
             },
             ChoicePathMode::Flow {
+                module_name,
                 flow_name,
                 container_path,
                 parent_flow_name,
@@ -108,6 +129,7 @@ impl ChoicePathMode {
                 self_target_relative,
                 fallback_gather_target,
             } => ChoicePathMode::Flow {
+                module_name: module_name.clone(),
                 flow_name: flow_name.clone(),
                 container_path: format!("{container_path}.{container_index}"),
                 parent_flow_name: parent_flow_name.clone(),
@@ -121,6 +143,9 @@ impl ChoicePathMode {
 
     pub(super) fn for_gather(&self, gather_name: &str) -> Self {
         match self {
+            ChoicePathMode::Module { .. } => ChoicePathMode::RootGather {
+                gather_name: gather_name.to_string(),
+            },
             ChoicePathMode::Root => ChoicePathMode::RootGather {
                 gather_name: gather_name.to_string(),
             },
@@ -134,6 +159,7 @@ impl ChoicePathMode {
                 allow_ancestor_fallback: *allow_ancestor_fallback,
             },
             ChoicePathMode::Flow {
+                module_name,
                 flow_name,
                 container_path,
                 parent_flow_name,
@@ -142,6 +168,7 @@ impl ChoicePathMode {
                 self_target_relative,
                 fallback_gather_target,
             } => ChoicePathMode::Flow {
+                module_name: module_name.clone(),
                 flow_name: flow_name.clone(),
                 container_path: format!("{container_path}.{gather_name}"),
                 parent_flow_name: parent_flow_name.clone(),
@@ -157,25 +184,27 @@ impl ChoicePathMode {
     pub(super) fn for_conditional_branch(&self, branch_index: usize) -> Self {
         let container_path = format!("{}.b", self.runtime_index_path(branch_index));
         match self {
-            ChoicePathMode::Root | ChoicePathMode::RootGather { .. } => {
-                ChoicePathMode::NestedRoot {
-                    container_path,
-                    gather_target: "0.g-0".to_string(),
-                    allow_ancestor_fallback: false,
-                }
-            }
+            ChoicePathMode::Root
+            | ChoicePathMode::Module { .. }
+            | ChoicePathMode::RootGather { .. } => ChoicePathMode::NestedRoot {
+                container_path,
+                gather_target: "0.g-0".to_string(),
+                allow_ancestor_fallback: false,
+            },
             ChoicePathMode::NestedRoot { gather_target, .. } => ChoicePathMode::NestedRoot {
                 container_path,
                 gather_target: gather_target.clone(),
                 allow_ancestor_fallback: false,
             },
             ChoicePathMode::Flow {
+                module_name,
                 flow_name,
                 parent_flow_name,
                 sibling_stitch_names,
                 local_variables,
                 ..
             } => ChoicePathMode::Flow {
+                module_name: module_name.clone(),
                 flow_name: flow_name.clone(),
                 container_path,
                 parent_flow_name: parent_flow_name.clone(),
@@ -194,19 +223,20 @@ impl ChoicePathMode {
     ) -> Self {
         let container_path = format!("{sequence_container_path}.{branch_name}");
         match self {
-            ChoicePathMode::Root | ChoicePathMode::RootGather { .. } => {
-                ChoicePathMode::NestedRoot {
-                    container_path,
-                    gather_target: "0.g-0".to_string(),
-                    allow_ancestor_fallback: false,
-                }
-            }
+            ChoicePathMode::Root
+            | ChoicePathMode::Module { .. }
+            | ChoicePathMode::RootGather { .. } => ChoicePathMode::NestedRoot {
+                container_path,
+                gather_target: "0.g-0".to_string(),
+                allow_ancestor_fallback: false,
+            },
             ChoicePathMode::NestedRoot { gather_target, .. } => ChoicePathMode::NestedRoot {
                 container_path,
                 gather_target: gather_target.clone(),
                 allow_ancestor_fallback: false,
             },
             ChoicePathMode::Flow {
+                module_name,
                 flow_name,
                 parent_flow_name,
                 sibling_stitch_names,
@@ -214,6 +244,7 @@ impl ChoicePathMode {
                 self_target_relative,
                 ..
             } => ChoicePathMode::Flow {
+                module_name: module_name.clone(),
                 flow_name: flow_name.clone(),
                 container_path,
                 parent_flow_name: parent_flow_name.clone(),
@@ -253,12 +284,14 @@ impl ChoicePathMode {
     pub(super) fn should_include_choice_gather(&self) -> bool {
         matches!(
             self,
-            ChoicePathMode::Root | ChoicePathMode::RootGather { .. }
+            ChoicePathMode::Root
+                | ChoicePathMode::Module { .. }
+                | ChoicePathMode::RootGather { .. }
         ) || self.fallback_gather_target().is_some()
     }
 
     pub(super) fn is_root(&self) -> bool {
-        matches!(self, ChoicePathMode::Root)
+        matches!(self, ChoicePathMode::Root | ChoicePathMode::Module { .. })
     }
 
     pub(super) fn is_nested_root(&self) -> bool {
@@ -289,6 +322,7 @@ impl ChoicePathMode {
     pub(super) fn runtime_index_path(&self, index: usize) -> String {
         match self {
             ChoicePathMode::Root => format!("0.{index}"),
+            ChoicePathMode::Module { .. } => format!("0.{index}"),
             ChoicePathMode::RootGather { gather_name } => format!("0.{gather_name}.{index}"),
             ChoicePathMode::NestedRoot { container_path, .. }
             | ChoicePathMode::Flow { container_path, .. } => format!("{container_path}.{index}"),
@@ -306,6 +340,7 @@ impl ChoicePathMode {
     pub(super) fn container_path(&self) -> String {
         match self {
             ChoicePathMode::Root => "0".to_string(),
+            ChoicePathMode::Module { .. } => "0".to_string(),
             ChoicePathMode::RootGather { gather_name } => format!("0.{gather_name}"),
             ChoicePathMode::NestedRoot { container_path, .. }
             | ChoicePathMode::Flow { container_path, .. } => container_path.clone(),
@@ -327,6 +362,7 @@ impl ChoicePathMode {
     ) -> String {
         match self {
             ChoicePathMode::Root => format!("0.{gather_container_name}"),
+            ChoicePathMode::Module { .. } => format!("0.{gather_container_name}"),
             ChoicePathMode::RootGather { .. } => self.absolute_child_path(gather_container_name),
             ChoicePathMode::NestedRoot { .. } if has_following_gather => {
                 self.absolute_child_path(gather_container_name)
@@ -353,10 +389,16 @@ impl ChoicePathMode {
     /// choice container.
     pub(super) fn resolve_divert_target(&self, target: &str) -> String {
         match self {
+            ChoicePathMode::Module { module_name } => {
+                module_scoped_source_path_to_runtime_path(Some(module_name), target)
+            }
             ChoicePathMode::Root
             | ChoicePathMode::RootGather { .. }
-            | ChoicePathMode::NestedRoot { .. } => target.to_string(),
+            | ChoicePathMode::NestedRoot { .. } => {
+                module_scoped_source_path_to_runtime_path(None, target)
+            }
             ChoicePathMode::Flow {
+                module_name,
                 parent_flow_name,
                 flow_name,
                 sibling_stitch_names,
@@ -367,12 +409,21 @@ impl ChoicePathMode {
                         && first_part == flow_name
                         && sibling_stitch_names.iter().any(|name| name == second_part)
                     {
-                        return self.resolve_single_stitch_target(second_part);
+                        return module_scoped_source_path_to_runtime_path(
+                            module_name.as_deref(),
+                            &self.resolve_single_stitch_target(second_part),
+                        );
                     }
-                    return target.to_string();
+                    return module_scoped_source_path_to_runtime_path(
+                        module_name.as_deref(),
+                        target,
+                    );
                 }
 
-                self.resolve_single_stitch_target(target)
+                module_scoped_source_path_to_runtime_path(
+                    module_name.as_deref(),
+                    &self.resolve_single_stitch_target(target),
+                )
             }
         }
     }
@@ -393,15 +444,20 @@ impl ChoicePathMode {
     fn current_flow_path(&self) -> Option<String> {
         match self {
             ChoicePathMode::Flow {
+                module_name,
                 flow_name,
                 parent_flow_name,
                 ..
-            } => Some(
-                parent_flow_name
+            } => {
+                let flow_path = parent_flow_name
                     .as_ref()
                     .map(|parent| format!("{parent}.{flow_name}"))
-                    .unwrap_or_else(|| flow_name.clone()),
-            ),
+                    .unwrap_or_else(|| flow_name.clone());
+                Some(module_scoped_source_path_to_runtime_path(
+                    module_name.as_deref(),
+                    &flow_path,
+                ))
+            }
             _ => None,
         }
     }
@@ -410,6 +466,7 @@ impl ChoicePathMode {
     pub(super) fn resolve_single_stitch_target(&self, target: &str) -> String {
         match self {
             ChoicePathMode::Root
+            | ChoicePathMode::Module { .. }
             | ChoicePathMode::RootGather { .. }
             | ChoicePathMode::NestedRoot { .. } => target.to_string(),
             ChoicePathMode::Flow {

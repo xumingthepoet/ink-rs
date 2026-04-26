@@ -7,6 +7,12 @@ use crate::{
 
 use super::context::{StructTypeIndex, StructTypeSymbol};
 
+#[derive(Debug, Clone, Copy)]
+struct StructDeclarationRecord<'a> {
+    module: Option<&'a str>,
+    declaration: &'a StructDeclaration,
+}
+
 pub(super) fn struct_type_diagnostics(story: &Story) -> Vec<Diagnostic> {
     let declarations = collect_struct_declarations(story);
     let (index, mut diagnostics) = build_struct_type_index_from_declarations(&declarations);
@@ -21,13 +27,15 @@ pub(super) fn build_struct_type_index(story: &Story) -> StructTypeIndex {
 }
 
 fn build_struct_type_index_from_declarations(
-    declarations: &[&StructDeclaration],
+    declarations: &[StructDeclarationRecord<'_>],
 ) -> (StructTypeIndex, Vec<Diagnostic>) {
     let mut index = StructTypeIndex::new();
     let mut diagnostics = Vec::new();
 
-    for declaration in declarations {
-        if index.contains_key(declaration.name()) {
+    for record in declarations {
+        let declaration = record.declaration;
+        let key = scoped_struct_name(record.module, declaration.name());
+        if index.contains_key(&key) {
             diagnostics.push(Diagnostic::error(
                 declaration.span().clone(),
                 format!("Duplicate struct declaration '{}'", declaration.name()),
@@ -52,25 +60,23 @@ fn build_struct_type_index_from_declarations(
             fields.insert(field.name().to_string(), field.type_name().clone());
         }
 
-        index.insert(
-            declaration.name().to_string(),
-            StructTypeSymbol::new(fields),
-        );
+        index.insert(key, StructTypeSymbol::new(fields));
     }
 
     (index, diagnostics)
 }
 
 fn unknown_field_type_diagnostics(
-    declarations: &[&StructDeclaration],
+    declarations: &[StructDeclarationRecord<'_>],
     index: &StructTypeIndex,
 ) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
-    for declaration in declarations {
+    for record in declarations {
+        let declaration = record.declaration;
         for field in declaration.fields() {
-            for struct_name in referenced_struct_names(field.type_name()) {
-                if !index.contains_key(struct_name) {
+            for (struct_name, key) in referenced_struct_names(field.type_name(), record.module) {
+                if !index.contains_key(&key) {
                     diagnostics.push(Diagnostic::error(
                         field.span().clone(),
                         format!(
@@ -89,23 +95,27 @@ fn unknown_field_type_diagnostics(
 }
 
 fn recursive_struct_diagnostics(
-    declarations: &[&StructDeclaration],
+    declarations: &[StructDeclarationRecord<'_>],
     index: &StructTypeIndex,
 ) -> Vec<Diagnostic> {
     let adjacency = struct_dependency_graph(index);
     let mut diagnostics = Vec::new();
     let mut reported = BTreeSet::new();
 
-    for declaration in declarations {
-        let name = declaration.name();
-        if !index.contains_key(name) || reported.contains(name) {
+    for record in declarations {
+        let declaration = record.declaration;
+        let key = scoped_struct_name(record.module, declaration.name());
+        if !index.contains_key(&key) || reported.contains(&key) {
             continue;
         }
-        if reaches_struct(name, name, &adjacency, &mut BTreeSet::new()) {
-            reported.insert(name.to_string());
+        if reaches_struct(&key, &key, &adjacency, &mut BTreeSet::new()) {
+            reported.insert(key);
             diagnostics.push(Diagnostic::error(
                 declaration.span().clone(),
-                format!("Recursive struct type '{}' is not supported", name),
+                format!(
+                    "Recursive struct type '{}' is not supported",
+                    declaration.name()
+                ),
             ));
         }
     }
@@ -120,9 +130,9 @@ fn struct_dependency_graph(index: &StructTypeIndex) -> BTreeMap<String, BTreeSet
             let dependencies = symbol
                 .fields()
                 .values()
-                .flat_map(referenced_struct_names)
-                .filter(|referenced| index.contains_key(*referenced))
-                .map(ToString::to_string)
+                .flat_map(|type_name| referenced_struct_names(type_name, module_name(name)))
+                .map(|(_, referenced)| referenced)
+                .filter(|referenced| index.contains_key(referenced))
                 .collect();
             (name.clone(), dependencies)
         })
@@ -151,74 +161,123 @@ fn reaches_struct(
     false
 }
 
-fn referenced_struct_names(type_name: &TypeName) -> Vec<&str> {
+pub(super) fn scoped_struct_name(module: Option<&str>, name: &str) -> String {
+    module
+        .map(|module| format!("{module}::{name}"))
+        .unwrap_or_else(|| name.to_string())
+}
+
+pub(super) fn resolve_struct_symbol<'a>(
+    index: &'a StructTypeIndex,
+    struct_name: &str,
+    current_module: Option<&str>,
+) -> Option<&'a StructTypeSymbol> {
+    let key = if struct_name.contains("::") {
+        struct_name.to_string()
+    } else {
+        scoped_struct_name(current_module, struct_name)
+    };
+    index.get(&key)
+}
+
+fn module_name(scoped_name: &str) -> Option<&str> {
+    scoped_name.split_once("::").map(|(module, _)| module)
+}
+
+fn referenced_struct_names(
+    type_name: &TypeName,
+    current_module: Option<&str>,
+) -> Vec<(String, String)> {
     match type_name {
-        TypeName::Struct(name) => vec![name.as_str()],
-        TypeName::Array(element_type) => referenced_struct_names(element_type),
+        TypeName::Struct(name) => {
+            vec![(name.clone(), scoped_struct_name(current_module, name))]
+        }
+        TypeName::QualifiedStruct(name) => {
+            vec![(name.as_str().to_string(), name.as_str().to_string())]
+        }
+        TypeName::Array(element_type) => referenced_struct_names(element_type, current_module),
         TypeName::Primitive(_) | TypeName::Void => Vec::new(),
     }
 }
 
-fn collect_struct_declarations(story: &Story) -> Vec<&StructDeclaration> {
+fn collect_struct_declarations(story: &Story) -> Vec<StructDeclarationRecord<'_>> {
     let mut declarations = Vec::new();
-    collect_struct_declarations_in_weave(story.root_weave(), &mut declarations);
+    collect_struct_declarations_in_weave(None, story.root_weave(), &mut declarations);
     for flow in story.flows() {
-        collect_struct_declarations_in_flow(flow, &mut declarations);
+        collect_struct_declarations_in_flow(None, flow, &mut declarations);
+    }
+    for module in story.modules() {
+        collect_struct_declarations_in_weave(
+            Some(module.name()),
+            module.weave(),
+            &mut declarations,
+        );
+        for flow in module.flows() {
+            collect_struct_declarations_in_flow(Some(module.name()), flow, &mut declarations);
+        }
     }
     declarations
 }
 
 fn collect_struct_declarations_in_flow<'a>(
+    module: Option<&'a str>,
     flow: &'a Flow,
-    declarations: &mut Vec<&'a StructDeclaration>,
+    declarations: &mut Vec<StructDeclarationRecord<'a>>,
 ) {
-    collect_struct_declarations_in_weave(flow.weave(), declarations);
+    collect_struct_declarations_in_weave(module, flow.weave(), declarations);
     for child in flow.child_flows() {
-        collect_struct_declarations_in_flow(child, declarations);
+        collect_struct_declarations_in_flow(module, child, declarations);
     }
 }
 
 fn collect_struct_declarations_in_content_list<'a>(
+    module: Option<&'a str>,
     content: &'a ContentList,
-    declarations: &mut Vec<&'a StructDeclaration>,
+    declarations: &mut Vec<StructDeclarationRecord<'a>>,
 ) {
-    collect_struct_declarations_in_objects(content.objects(), declarations);
+    collect_struct_declarations_in_objects(module, content.objects(), declarations);
 }
 
 fn collect_struct_declarations_in_weave<'a>(
+    module: Option<&'a str>,
     weave: &'a Weave,
-    declarations: &mut Vec<&'a StructDeclaration>,
+    declarations: &mut Vec<StructDeclarationRecord<'a>>,
 ) {
-    collect_struct_declarations_in_objects(weave.content(), declarations);
+    collect_struct_declarations_in_objects(module, weave.content(), declarations);
 }
 
 fn collect_struct_declarations_in_objects<'a>(
+    module: Option<&'a str>,
     objects: &'a [Object],
-    declarations: &mut Vec<&'a StructDeclaration>,
+    declarations: &mut Vec<StructDeclarationRecord<'a>>,
 ) {
     for object in objects {
-        collect_struct_declarations_in_object(object, declarations);
+        collect_struct_declarations_in_object(module, object, declarations);
     }
 }
 
 fn collect_struct_declarations_in_object<'a>(
+    module: Option<&'a str>,
     object: &'a Object,
-    declarations: &mut Vec<&'a StructDeclaration>,
+    declarations: &mut Vec<StructDeclarationRecord<'a>>,
 ) {
     match object {
-        Object::StructDeclaration(declaration) => declarations.push(declaration),
+        Object::StructDeclaration(declaration) => declarations.push(StructDeclarationRecord {
+            module,
+            declaration,
+        }),
         Object::ContentList(content) => {
-            collect_struct_declarations_in_content_list(content, declarations)
+            collect_struct_declarations_in_content_list(module, content, declarations)
         }
         Object::Conditional(conditional) => {
             for branch in conditional.branches() {
-                collect_struct_declarations_in_weave(branch.content(), declarations);
+                collect_struct_declarations_in_weave(module, branch.content(), declarations);
             }
         }
         Object::Sequence(sequence) => {
-            collect_struct_declarations_in_sequence(sequence, declarations)
+            collect_struct_declarations_in_sequence(module, sequence, declarations)
         }
-        Object::Weave(weave) => collect_struct_declarations_in_weave(weave, declarations),
+        Object::Weave(weave) => collect_struct_declarations_in_weave(module, weave, declarations),
         Object::AuthorWarning(_)
         | Object::Choice(_)
         | Object::ConstantDeclaration(_)
@@ -238,11 +297,12 @@ fn collect_struct_declarations_in_object<'a>(
 }
 
 fn collect_struct_declarations_in_sequence<'a>(
+    module: Option<&'a str>,
     sequence: &'a Sequence,
-    declarations: &mut Vec<&'a StructDeclaration>,
+    declarations: &mut Vec<StructDeclarationRecord<'a>>,
 ) {
     for content in sequence.elements() {
-        collect_struct_declarations_in_content_list(content, declarations);
+        collect_struct_declarations_in_content_list(module, content, declarations);
     }
 }
 
@@ -284,6 +344,40 @@ mod tests {
     }
 
     #[test]
+    fn indexes_module_structs_by_module_scope() {
+        let story = parse_story(
+            "=== module game ===\n\
+             STRUCT Item {\n\
+             hp: int\n\
+             }\n\
+             == main ==\n\
+             -> DONE\n\
+             === module items ===\n\
+             STRUCT Item {\n\
+             label: string\n\
+             }\n\
+             == helper ==\n\
+             -> DONE",
+        );
+
+        let index = build_struct_type_index(&story);
+
+        assert_eq!(
+            index
+                .get("game::Item")
+                .and_then(|symbol| symbol.fields().get("hp")),
+            Some(&TypeName::int())
+        );
+        assert_eq!(
+            index
+                .get("items::Item")
+                .and_then(|symbol| symbol.fields().get("label")),
+            Some(&TypeName::string())
+        );
+        assert!(struct_type_diagnostics(&story).is_empty());
+    }
+
+    #[test]
     fn reports_duplicate_struct_names() {
         let story = parse_story(
             "STRUCT Player {\n\
@@ -301,6 +395,35 @@ mod tests {
             &diagnostics,
             DiagnosticSeverity::Error,
             "Duplicate struct declaration 'Player'",
+        );
+    }
+
+    #[test]
+    fn reports_duplicate_struct_names_only_inside_one_module() {
+        let story = parse_story(
+            "=== module game ===\n\
+             STRUCT Item {\n\
+             hp: int\n\
+             }\n\
+             STRUCT Item {\n\
+             label: string\n\
+             }\n\
+             == main ==\n\
+             -> DONE\n\
+             === module items ===\n\
+             STRUCT Item {\n\
+             label: string\n\
+             }\n\
+             == helper ==\n\
+             -> DONE",
+        );
+
+        let diagnostics = struct_type_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Duplicate struct declaration 'Item'",
         );
     }
 
@@ -339,6 +462,49 @@ mod tests {
             DiagnosticSeverity::Error,
             "Unknown struct type 'Item' for field 'inventory' in struct 'Player'",
         );
+    }
+
+    #[test]
+    fn resolves_unqualified_field_types_only_inside_current_module() {
+        let story = parse_story(
+            "=== module game ===\n\
+             STRUCT Box {\n\
+             item: Item\n\
+             }\n\
+             == main ==\n\
+             -> DONE\n\
+             === module items ===\n\
+             STRUCT Item {\n\
+             label: string\n\
+             }\n\
+             == helper ==\n\
+             -> DONE",
+        );
+
+        let diagnostics = struct_type_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Unknown struct type 'Item' for field 'item' in struct 'Box'",
+        );
+    }
+
+    #[test]
+    fn resolves_unqualified_field_types_inside_same_module() {
+        let story = parse_story(
+            "=== module game ===\n\
+             STRUCT Item {\n\
+             hp: int\n\
+             }\n\
+             STRUCT Box {\n\
+             item: Item\n\
+             }\n\
+             == main ==\n\
+             -> DONE",
+        );
+
+        assert!(struct_type_diagnostics(&story).is_empty());
     }
 
     #[test]

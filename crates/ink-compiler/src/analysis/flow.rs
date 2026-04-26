@@ -179,6 +179,7 @@ impl ConditionTypeChecker<'_> {
             condition,
             self.analysis.variable_scopes,
             self.analysis.target_symbols,
+            context.current_module.as_deref(),
             current_flow_path,
         )
         .is_some_and(|signal| signal == ConditionTypeSignal::Typed);
@@ -188,6 +189,7 @@ impl ConditionTypeChecker<'_> {
             self.analysis.variable_scopes,
             self.analysis.struct_types,
             self.analysis.target_symbols,
+            context.current_module.as_deref(),
             current_flow_path,
         ) {
             Ok(condition_type) if condition_type == TypeName::bool() => {}
@@ -218,6 +220,7 @@ fn condition_type_signal(
     expression: &Expression,
     variable_scopes: &VariableScopeIndex,
     target_symbols: &TargetSymbolIndex,
+    current_module: Option<&str>,
     current_flow_path: Option<&str>,
 ) -> Option<ConditionTypeSignal> {
     match expression {
@@ -229,7 +232,14 @@ fn condition_type_signal(
         | Expression::ArrayLiteral(_)
         | Expression::StructLiteral(_) => Some(ConditionTypeSignal::LiteralOnly),
         Expression::VariableReference(name) => matches!(
-            variable_scopes.visible_variable_declared_type(name, current_flow_path),
+            variable_scopes.visible_variable_declared_type(name, current_module, current_flow_path),
+            Some(Some(_))
+        )
+        .then_some(ConditionTypeSignal::Typed),
+        Expression::QualifiedReference(name) => matches!(
+            variable_scopes
+                .qualified_constant_declared_type(name.as_str())
+                .or_else(|| variable_scopes.qualified_global_variable_declared_type(name.as_str())),
             Some(Some(_))
         )
         .then_some(ConditionTypeSignal::Typed),
@@ -237,23 +247,50 @@ fn condition_type_signal(
             Some(ConditionTypeSignal::Typed)
         }
         Expression::FunctionCall { name, .. } => {
-            resolve_target_symbol(name, current_flow_path, target_symbols)
+            resolve_target_symbol(name, current_module, current_flow_path, target_symbols)
                 .is_some_and(|symbol| symbol.is_function() && symbol.has_typed_signature())
                 .then_some(ConditionTypeSignal::Typed)
         }
+        Expression::QualifiedFunctionCall { name, .. } => resolve_target_symbol(
+            name.as_str(),
+            current_module,
+            current_flow_path,
+            target_symbols,
+        )
+        .is_some_and(|symbol| symbol.is_function() && symbol.has_typed_signature())
+        .then_some(ConditionTypeSignal::Typed),
         Expression::FieldAccess { base, .. } | Expression::IndexAccess { base, .. } => {
-            condition_type_signal(base, variable_scopes, target_symbols, current_flow_path)
-                .filter(|signal| *signal == ConditionTypeSignal::Typed)
+            condition_type_signal(
+                base,
+                variable_scopes,
+                target_symbols,
+                current_module,
+                current_flow_path,
+            )
+            .filter(|signal| *signal == ConditionTypeSignal::Typed)
         }
         Expression::Unary { expression, .. } => condition_type_signal(
             expression,
             variable_scopes,
             target_symbols,
+            current_module,
             current_flow_path,
         ),
         Expression::Binary { left, right, .. } => combine_condition_signals(
-            condition_type_signal(left, variable_scopes, target_symbols, current_flow_path),
-            condition_type_signal(right, variable_scopes, target_symbols, current_flow_path),
+            condition_type_signal(
+                left,
+                variable_scopes,
+                target_symbols,
+                current_module,
+                current_flow_path,
+            ),
+            condition_type_signal(
+                right,
+                variable_scopes,
+                target_symbols,
+                current_module,
+                current_flow_path,
+            ),
         ),
         Expression::MultipleCondition(expressions) => expressions
             .iter()
@@ -262,6 +299,7 @@ fn condition_type_signal(
                     expression,
                     variable_scopes,
                     target_symbols,
+                    current_module,
                     current_flow_path,
                 )
             })
@@ -550,6 +588,7 @@ impl FunctionFlowControlVisitor<'_> {
             self.analysis.variable_scopes,
             self.analysis.struct_types,
             self.analysis.target_symbols,
+            context.current_module.as_deref(),
             context.current_flow_path.as_deref(),
         ) {
             Ok(actual_type) if &actual_type != self.return_type => {

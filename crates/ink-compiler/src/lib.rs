@@ -13,7 +13,9 @@ mod parsed;
 mod source;
 mod syntax;
 
-pub use analysis::CheckedStory;
+pub use analysis::{
+    CheckedStory, ModuleDependencyGraph, ModuleEntryPoint, ModuleImportIndex, ModuleReachability,
+};
 pub use compiler::{CompiledStory, Compiler, CompilerOptions, StageOutput};
 pub use diagnostic::{Diagnostic, DiagnosticCode, DiagnosticSeverity};
 pub use ink_story_json_format::{
@@ -21,7 +23,7 @@ pub use ink_story_json_format::{
     NamedContainer as RuntimeNamedContainer, Object as RuntimeObject, Program as RuntimeProgram,
 };
 pub use parsed::{
-    Choice, ContentList, DefaultValue, Divert, DivertTarget, Object, PrimitiveType,
-    Story as ParsedStory, Text, TypeName, Weave,
+    Choice, ContentList, DefaultValue, Divert, DivertTarget, ImportDeclaration, ImportedName,
+    Module, Object, PrimitiveType, Story as ParsedStory, Text, TypeName, Weave,
 };
-pub use source::{eliminate_comments, FileHandler, SourceInput, SourceSpan};
+pub use source::{eliminate_comments, SourceInput, SourceSpan};

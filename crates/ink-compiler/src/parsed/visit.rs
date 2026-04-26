@@ -1,7 +1,12 @@
-use super::{Choice, Conditional, ContentList, Expression, Flow, Object, Sequence, Story, Weave};
+use super::{
+    Choice, Conditional, ContentList, Expression, Flow, ImportDeclaration, Module, Object,
+    Sequence, Story, Weave,
+};
 
 pub(crate) trait ParsedVisitor {
     fn visit_story(&mut self, _story: &Story, _context: &VisitContext) {}
+    fn visit_module(&mut self, _module: &Module, _context: &VisitContext) {}
+    fn visit_import(&mut self, _import: &ImportDeclaration, _context: &VisitContext) {}
     fn visit_flow(&mut self, _flow: &Flow, _context: &VisitContext) {}
     fn visit_weave(&mut self, _weave: &Weave, _context: &VisitContext) {}
     fn visit_content_list(&mut self, _content: &ContentList, _context: &VisitContext) {}
@@ -11,6 +16,7 @@ pub(crate) trait ParsedVisitor {
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub(crate) struct VisitContext {
+    pub(crate) current_module: Option<String>,
     pub(crate) current_flow_path: Option<String>,
     pub(crate) parent_flow_path: Option<String>,
     pub(crate) inside_function: bool,
@@ -19,6 +25,17 @@ pub(crate) struct VisitContext {
 }
 
 impl VisitContext {
+    fn enter_module(&self, module: &Module) -> Self {
+        Self {
+            current_module: Some(module.name().to_string()),
+            current_flow_path: None,
+            parent_flow_path: None,
+            inside_function: false,
+            inside_choice_content: false,
+            inside_expression: false,
+        }
+    }
+
     fn enter_flow(&self, flow: &Flow) -> Self {
         let current_flow_path = self
             .current_flow_path
@@ -26,6 +43,7 @@ impl VisitContext {
             .map(|parent| format!("{parent}.{}", flow.name()))
             .unwrap_or_else(|| flow.name().to_string());
         Self {
+            current_module: self.current_module.clone(),
             current_flow_path: Some(current_flow_path),
             parent_flow_path: self.current_flow_path.clone(),
             inside_function: self.inside_function || flow.is_function(),
@@ -57,6 +75,24 @@ where
     visitor.visit_story(story, &context);
     walk_weave(story.root_weave(), visitor, &context);
     for flow in story.flows() {
+        walk_flow(flow, visitor, &context);
+    }
+    for module in story.modules() {
+        walk_module(module, visitor, &context);
+    }
+}
+
+fn walk_module<V>(module: &Module, visitor: &mut V, parent_context: &VisitContext)
+where
+    V: ParsedVisitor + ?Sized,
+{
+    let context = parent_context.enter_module(module);
+    visitor.visit_module(module, &context);
+    for import in module.imports() {
+        visitor.visit_import(import, &context);
+    }
+    walk_weave(module.weave(), visitor, &context);
+    for flow in module.flows() {
         walk_flow(flow, visitor, &context);
     }
 }
@@ -189,7 +225,7 @@ where
         Expression::StringContent(content) => {
             walk_content_list(content, visitor, &expression_context)
         }
-        Expression::FunctionCall { args, .. } => {
+        Expression::FunctionCall { args, .. } | Expression::QualifiedFunctionCall { args, .. } => {
             for argument in args {
                 walk_expression(argument, visitor, &expression_context);
             }
@@ -226,7 +262,8 @@ where
         | Expression::NumberFloat(_)
         | Expression::NumberBool(_)
         | Expression::DivertTarget(_)
-        | Expression::VariableReference(_) => {}
+        | Expression::VariableReference(_)
+        | Expression::QualifiedReference(_) => {}
     }
 }
 
@@ -244,9 +281,13 @@ mod tests {
     #[derive(Default)]
     struct RecordingVisitor {
         saw_story: bool,
+        modules: Vec<String>,
+        imports: Vec<String>,
         flows: Vec<String>,
-        flow_contexts: Vec<(Option<String>, Option<String>, bool)>,
-        story_context: Option<(Option<String>, Option<String>, bool)>,
+        module_contexts: Vec<Option<String>>,
+        import_contexts: Vec<Option<String>>,
+        flow_contexts: Vec<(Option<String>, Option<String>, Option<String>, bool)>,
+        story_context: Option<(Option<String>, Option<String>, Option<String>, bool)>,
         weave_count: usize,
         content_list_count: usize,
         objects: Vec<&'static str>,
@@ -257,15 +298,36 @@ mod tests {
         fn visit_story(&mut self, _story: &Story, context: &VisitContext) {
             self.saw_story = true;
             self.story_context = Some((
+                context.current_module.clone(),
                 context.current_flow_path.clone(),
                 context.parent_flow_path.clone(),
                 context.inside_function,
             ));
         }
 
+        fn visit_module(&mut self, module: &Module, context: &VisitContext) {
+            self.modules.push(module.name().to_string());
+            self.module_contexts.push(context.current_module.clone());
+        }
+
+        fn visit_import(&mut self, import: &ImportDeclaration, context: &VisitContext) {
+            self.imports.push(format!(
+                "{}::{}",
+                import.source_module(),
+                import
+                    .imported_names()
+                    .iter()
+                    .map(|name| name.name())
+                    .collect::<Vec<_>>()
+                    .join(",")
+            ));
+            self.import_contexts.push(context.current_module.clone());
+        }
+
         fn visit_flow(&mut self, flow: &Flow, context: &VisitContext) {
             self.flows.push(flow.name().to_string());
             self.flow_contexts.push((
+                context.current_module.clone(),
                 context.current_flow_path.clone(),
                 context.parent_flow_path.clone(),
                 context.inside_function,
@@ -389,13 +451,14 @@ mod tests {
         walk_story(&story, &mut visitor);
 
         assert!(visitor.saw_story);
-        assert_eq!(visitor.story_context, Some((None, None, false)));
+        assert_eq!(visitor.story_context, Some((None, None, None, false)));
         assert_eq!(visitor.flows, vec!["knot", "stitch"]);
         assert_eq!(
             visitor.flow_contexts,
             vec![
-                (Some("knot".to_string()), None, false),
+                (None, Some("knot".to_string()), None, false),
                 (
+                    None,
                     Some("knot.stitch".to_string()),
                     Some("knot".to_string()),
                     true
@@ -436,6 +499,57 @@ mod tests {
                 "missing visited expression kind: {expected}"
             );
         }
+    }
+
+    #[test]
+    fn walks_modules_imports_and_module_owned_flows() {
+        let story = Story::new_with_modules(
+            Vec::new(),
+            Vec::new(),
+            vec![Module::new(
+                "game",
+                vec![ImportDeclaration::new(
+                    vec![
+                        crate::parsed::ImportedName::new("sword", span()),
+                        crate::parsed::ImportedName::new("heal", span()),
+                    ],
+                    "items",
+                    span(),
+                    span(),
+                )],
+                vec![Object::Text(Text::new("module text", span()))],
+                vec![Flow::new(
+                    FlowLevel::Knot,
+                    "main",
+                    Vec::new(),
+                    Vec::new(),
+                    Vec::new(),
+                    crate::parsed::TypeName::void(),
+                    false,
+                )],
+                span(),
+                span(),
+            )],
+        );
+
+        let mut visitor = RecordingVisitor::default();
+        walk_story(&story, &mut visitor);
+
+        assert_eq!(visitor.modules, vec!["game"]);
+        assert_eq!(visitor.module_contexts, vec![Some("game".to_string())]);
+        assert_eq!(visitor.imports, vec!["items::sword,heal"]);
+        assert_eq!(visitor.import_contexts, vec![Some("game".to_string())]);
+        assert_eq!(visitor.flows, vec!["main"]);
+        assert_eq!(
+            visitor.flow_contexts,
+            vec![(
+                Some("game".to_string()),
+                Some("main".to_string()),
+                None,
+                false
+            )]
+        );
+        assert!(visitor.objects.contains(&"text"));
     }
 
     fn choice_with_all_content() -> Choice {

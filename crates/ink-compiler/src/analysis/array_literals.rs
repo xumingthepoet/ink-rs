@@ -13,7 +13,7 @@ use crate::{
 use super::{
     context::{StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
     expression_types::infer_expression_type,
-    structs::build_struct_type_index,
+    structs::{build_struct_type_index, resolve_struct_symbol},
     target_symbols::build_target_symbol_index,
     variables::build_variable_scope_index,
 };
@@ -93,7 +93,11 @@ impl<'a> ArrayLiteralChecker<'a> {
 
     fn visible_declared_type(&self, name: &str, context: &VisitContext) -> Option<TypeName> {
         self.variable_scopes
-            .visible_variable_declared_type(name, context.current_flow_path.as_deref())
+            .visible_variable_declared_type(
+                name,
+                context.current_module.as_deref(),
+                context.current_flow_path.as_deref(),
+            )
             .and_then(|declared_type| declared_type.cloned())
     }
 
@@ -187,7 +191,18 @@ impl<'a> ArrayLiteralChecker<'a> {
                     StructLiteralMode::Full,
                 );
             }
-            (TypeName::Struct(_), _) | (TypeName::Primitive(_), _) => {
+            (TypeName::QualifiedStruct(struct_name), Expression::StructLiteral(fields)) => {
+                self.check_struct_literal(
+                    struct_name.as_str(),
+                    fields,
+                    span,
+                    context,
+                    StructLiteralMode::Full,
+                );
+            }
+            (TypeName::Struct(_), _)
+            | (TypeName::QualifiedStruct(_), _)
+            | (TypeName::Primitive(_), _) => {
                 self.check_exact_expression_type(
                     element,
                     element_type,
@@ -213,6 +228,7 @@ impl<'a> ArrayLiteralChecker<'a> {
             self.variable_scopes,
             self.struct_types,
             self.target_symbols,
+            context.current_module.as_deref(),
             context.current_flow_path.as_deref(),
         ) {
             Ok(actual_type) if &actual_type != expected_type => {
@@ -248,6 +264,7 @@ impl<'a> ArrayLiteralChecker<'a> {
             self.variable_scopes,
             self.struct_types,
             self.target_symbols,
+            context.current_module.as_deref(),
             context.current_flow_path.as_deref(),
         ) {
             Ok(actual_type) if &actual_type != expected_type => {
@@ -281,7 +298,11 @@ impl<'a> ArrayLiteralChecker<'a> {
         context: &VisitContext,
         mode: StructLiteralMode,
     ) {
-        let Some(symbol) = self.struct_types.get(struct_name) else {
+        let Some(symbol) = resolve_struct_symbol(
+            self.struct_types,
+            struct_name,
+            context.current_module.as_deref(),
+        ) else {
             if mode == StructLiteralMode::Full {
                 self.diagnostics.push(Diagnostic::error(
                     span.clone(),
@@ -338,6 +359,17 @@ impl<'a> ArrayLiteralChecker<'a> {
                     if let Expression::StructLiteral(nested_fields) = field.expression() {
                         self.check_struct_literal(
                             nested_struct_name,
+                            nested_fields,
+                            span,
+                            context,
+                            StructLiteralMode::ArraysOnly,
+                        );
+                    }
+                }
+                (StructLiteralMode::ArraysOnly, TypeName::QualifiedStruct(nested_struct_name)) => {
+                    if let Expression::StructLiteral(nested_fields) = field.expression() {
+                        self.check_struct_literal(
+                            nested_struct_name.as_str(),
                             nested_fields,
                             span,
                             context,

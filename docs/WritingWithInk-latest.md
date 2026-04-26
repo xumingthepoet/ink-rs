@@ -4,13 +4,14 @@
   <summary>Table of Contents</summary>
 
   * [Introduction](#introduction)
+  * [Current ink-rs Source Shape](#current-ink-rs-source-shape)
   * [Part One: The Basics](#part-one-the-basics)
     * [1) Content](#1-content)
     * [2) Choices](#2-choices)
     * [3) Knots](#3-knots)
     * [4) Diverts](#4-diverts)
     * [5) Branching The Flow](#5-branching-the-flow)
-    * [6) Includes and Stitches](#6-includes-and-stitches)
+    * [6) Modules and Stitches](#6-modules-and-stitches)
     * [7) Varying Choices](#7-varying-choices)
     * [8) Variable Text](#8-variable-text)
     * [9) Game Queries and Functions](#9-game-queries-and-functions)
@@ -44,19 +45,59 @@ The script aims to be clean and logically ordered, so branching dialogue can be 
 
 It's also designed with redrafting in mind; so editing a flow should be fast.
 
+## Current ink-rs Source Shape
+
+Every runnable ink-rs story is built from explicit modules. A module starts
+with `=== module name ===`; knots and functions inside modules use `==`; and
+stitches still use `=`. Exactly one module in a compilation must define
+`== main ==`, which is the story entry point.
+
+Story content and tags belong inside knots or stitches, not at module level.
+Source files are passed to the compiler explicitly; `INCLUDE` is removed. A
+module can use another module's knots, functions, constants, globals, structs,
+or externals only after an explicit `IMPORT`, and cross-module references use
+`module::symbol`.
+
+For example:
+
+	=== module game ===
+	IMPORT price, describe FROM shop
+	VAR gold: int = 5
+
+	== main ==
+	{shop::describe()}
+	Gold: {gold}
+	Price: {shop::price}
+	~ shop::price += 2
+	Updated price: {shop::price}
+	-> END
+
+	=== module shop ===
+	VAR price: int = 3
+
+	== function describe() => string ==
+	~ return "The shop is open."
+
+Many examples below show snippets that live inside a knot or stitch. A complete
+runnable file still needs the explicit module and `main` structure shown above.
+
 # Part One: The Basics
 
 ## 1) Content
 
 ### The simplest ink script
 
-The most basic ink script is just text in a .ink file.
+The most basic runnable ink-rs script contains an explicit module and a `main`
+knot:
 
+	=== module game ===
+	== main ==
 	Hello, world!
+	-> END
 
 On running, this will output the content, and then stop.
 
-Text on separate lines produces new paragraphs. The script:
+Inside a knot or stitch, text on separate lines produces new paragraphs:
 
 	Hello, world!
 	Hello?
@@ -67,7 +108,8 @@ produces output that looks the same.
 
 ### Comments
 
-By default, all text in your file will appear in the output content, unless specially marked up.
+By default, text inside knots and stitches will appear in the output content,
+unless specially marked up.
 
 The simplest mark-up is a comment. **ink** supports two kinds of comment. There's the kind used for someone reading the code, which the compiler ignores:
 
@@ -328,7 +370,33 @@ Oh, and the following is legal and not a great idea:
 	and
 	-> round
 
-## 6) Includes and Stitches
+## 6) Modules and Stitches
+
+### Modules organize source files
+
+Modules are the top-level namespace for ink-rs source. They can live in one
+file or be spread across multiple source inputs supplied by the host compiler
+API. The compiler does not scan directories or follow `INCLUDE`; the caller
+passes every source file explicitly.
+
+	=== module travel ===
+	IMPORT ticket_price FROM shop
+
+	== main ==
+	We boarded the train.
+	Ticket price: {shop::ticket_price}
+	-> the_orient_express
+
+	== the_orient_express ==
+	We were underway.
+	-> END
+
+	=== module shop ===
+	VAR ticket_price: int = 3
+
+Imports are exact allow-lists. Importing `ticket_price` from `shop` permits
+`shop::ticket_price`; it does not make `ticket_price` visible unqualified, and
+it does not re-export anything imported by `shop`.
 
 ### Knots can be subdivided
 
@@ -336,7 +404,8 @@ As stories get longer, they become more confusing to keep organised without some
 
 Knots can include sub-sections called "stitches". These are marked using a single equals sign.
 
-	=== the_orient_express ===
+	=== module travel ===
+	== the_orient_express ==
 	= in_first_class
 		...
 	= in_third_class
@@ -376,7 +445,7 @@ is the same as:
 
 You can also include content at the top of a knot outside of any stitch. However, you need to remember to divert out of it - the engine *won't* automatically enter the first stitch once it's worked its way through the header content.
 
-	=== the_orient_express ===
+	== the_orient_express ==
 
 	We boarded the train, but where?
 	*	First class -> in_first_class
@@ -394,7 +463,7 @@ From inside a knot, you don't need to use the full address for a stitch.
 
 	-> the_orient_express
 
-	=== the_orient_express ===
+	== the_orient_express ==
 	= in_first_class
 		I settled my master.
 		*	Move to third class
@@ -407,17 +476,21 @@ This means stitches and knots can't share names, but several knots can contain t
 
 The compiler will warn you if ambiguous names are used.
 
-### Script files can be combined
+### Replacing INCLUDE
 
-You can also split your content across multiple files, using an include statement.
+`INCLUDE` is removed in ink-rs. Split content by declaring modules in the files
+you pass to the compiler, then import the specific symbols you use:
 
-	INCLUDE newspaper.ink
-	INCLUDE cities/vienna.ink
-	INCLUDE journeys/orient_express.ink
+	=== module game ===
+	IMPORT start FROM newspaper
 
-Include statements should always go at the top of a file, and not inside knots.
+	== main ==
+	-> newspaper::start
 
-There are no rules about what file a knot must be in to be diverted to. (In other words, separating files has no effect on the game's namespacing).
+	=== module newspaper ===
+	== start ==
+	The headline was impossible to ignore.
+	-> END
 
 
 ## 7) Varying Choices
@@ -1171,12 +1244,20 @@ So far we've made conditional text, and conditional choices, using tests based o
 
 The most powerful kind of variable, and arguably the most useful for a story, is a variable to store some unique property about the state of the game - anything from the amount of money in the protagonist's pocket, to a value representing the protagonist's state of mind.
 
-This kind of variable is called "global" because it can be accessed from anywhere in the story - both set, and read from. (Traditionally, programming tries to avoid this kind of thing, as it allows one part of a program to mess with another, unrelated part. But a story is a story, and stories are all about consequences: what happens in Vegas rarely stays there.)
+This kind of variable is "global" runtime state, but in ink-rs it still belongs
+to a module namespace. Code in the same module can read and write it by
+unqualified name. Code in another module must import it and then use the
+qualified form, such as `state::gold`.
 
 ### Defining Global Variables
 
-Global variables are defined with `VAR` at the story top level, outside knots, stitches, functions, choices, conditionals, and sequences. Every `VAR` declaration must include an explicit type using `name: Type`. A declaration may include an initializer, or omit it to use the type's default value.
+Global variables are defined with `VAR` at module top level, after the module
+header and imports and outside knots, stitches, functions, choices,
+conditionals, and sequences. Every `VAR` declaration must include an explicit
+type using `name: Type`. A declaration may include an initializer, or omit it to
+use the type's default value.
 
+	=== module state ===
 	VAR knowledge_of_the_cure: bool = false
 	VAR players_name: string = "Emilia"
 	VAR number_of_infected_people: int = 521
@@ -1835,7 +1916,7 @@ Wrapping up simple operations in function can also provide a simple place to put
 
 Interactive stories often rely on state machines, tracking what stage some higher level process has reached. There are lots of ways to do this, but the most conveninent is to use constants.
 
-In ink-rs, every constant declaration must include an explicit type using `CONST name: Type = value`. Constants can use the same maintained value types as variables, including structs and arrays such as `Player` and `Player[]`.
+In ink-rs, every module-level constant declaration must include an explicit type using `CONST name: Type = value`. Constants can use the same maintained value types as variables, including structs and arrays such as `Player` and `Player[]`.
 
 Sometimes, it's convenient to define constants to be strings, so you can print them out, for gameplay or debugging purposes.
 
@@ -1884,8 +1965,9 @@ Constants are simply a way to allow you to give story states easy-to-understand 
 
 There are two core ways to provide game hooks in the **ink** engine. External function declarations in ink allow you to directly call host functions in the game, and variable observers are callbacks that are fired in the game when ink variables are modified. The runtime integration guide describes these concepts in [Running your ink](../ink-csharp/Documentation/RunningYourInk.md).
 
-In ink-rs, every `EXTERNAL` declaration needs a typed signature:
+In ink-rs, every `EXTERNAL` declaration is module-level and needs a typed signature:
 
+	=== module audio ===
 	STRUCT Player {
 		hp: int
 	}
@@ -1896,7 +1978,11 @@ In ink-rs, every `EXTERNAL` declaration needs a typed signature:
 	EXTERNAL next_scene(name: string) => ->
 	EXTERNAL log_event(message: string) => void
 
-External calls are type-checked like Ink function calls. Host return values must match the declared runtime shape: primitive values for primitive returns, arrays for `T[]`, objects with matching fields for struct returns, and divert target values for `->` returns.
+External calls are type-checked like Ink function calls. Host bindings use the
+module-qualified source name, such as `audio::next_score`. Host return values
+must match the declared runtime shape: primitive values for primitive returns,
+arrays for `T[]`, objects with matching fields for struct returns, and divert
+target values for `->` returns.
 
 # Part 4: Advanced Flow Control
 

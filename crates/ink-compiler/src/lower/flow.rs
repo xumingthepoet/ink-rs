@@ -58,6 +58,24 @@ pub(super) fn lower_flow(
     indexes: &LoweringIndexes<'_>,
     count_all_visits: bool,
 ) -> Container {
+    lower_flow_in_module(None, flow, indexes, count_all_visits)
+}
+
+pub(super) fn lower_module_flow(
+    module_name: &str,
+    flow: &Flow,
+    indexes: &LoweringIndexes<'_>,
+    count_all_visits: bool,
+) -> Container {
+    lower_flow_in_module(Some(module_name), flow, indexes, count_all_visits)
+}
+
+fn lower_flow_in_module(
+    module_name: Option<&str>,
+    flow: &Flow,
+    indexes: &LoweringIndexes<'_>,
+    count_all_visits: bool,
+) -> Container {
     let child_stitch_names: Vec<String> = flow
         .child_flows()
         .iter()
@@ -65,6 +83,7 @@ pub(super) fn lower_flow(
         .collect();
     lower_flow_with_context(
         flow,
+        module_name,
         None,
         &child_stitch_names,
         &indexes.global_labels,
@@ -79,6 +98,7 @@ pub(super) fn lower_flow(
 
 fn lower_flow_with_context(
     flow: &Flow,
+    module_name: Option<&str>,
     parent_knot_name: Option<&str>,
     sibling_stitch_names: &[String],
     global_labels: &LabelIndex,
@@ -90,18 +110,30 @@ fn lower_flow_with_context(
     count_all_visits: bool,
 ) -> Container {
     let mut content = Vec::new();
-    let flow_path = parent_knot_name
+    let source_flow_path = parent_knot_name
         .map(|parent| format!("{parent}.{}", flow.name()))
         .unwrap_or_else(|| flow.name().to_string());
+    let flow_path = module_name
+        .map(|module| format!("{module}.{source_flow_path}"))
+        .unwrap_or_else(|| source_flow_path.clone());
     let local_variables = collect_flow_local_variables(flow);
 
     lower_flow_arguments_into(&mut content, flow);
 
     if weave_has_weave_points(flow.weave()) {
         let flow_container_path = parent_knot_name
-            .map(|parent| format!("{parent}.{}.{}", flow.name(), content.len()))
-            .unwrap_or_else(|| format!("{}.{}", flow.name(), content.len()));
+            .map(|parent| {
+                module_name
+                    .map(|module| format!("{module}.{parent}.{}.{}", flow.name(), content.len()))
+                    .unwrap_or_else(|| format!("{parent}.{}.{}", flow.name(), content.len()))
+            })
+            .unwrap_or_else(|| {
+                module_name
+                    .map(|module| format!("{module}.{}.{}", flow.name(), content.len()))
+                    .unwrap_or_else(|| format!("{}.{}", flow.name(), content.len()))
+            });
         let path_mode = ChoicePathMode::Flow {
+            module_name: module_name.map(str::to_string),
             flow_name: flow.name().to_string(),
             container_path: flow_container_path,
             parent_flow_name: parent_knot_name.map(|s| s.to_string()),
@@ -122,6 +154,7 @@ fn lower_flow_with_context(
         )));
     } else if !flow.weave().content().is_empty() {
         let path_mode = ChoicePathMode::Flow {
+            module_name: module_name.map(str::to_string),
             flow_name: flow.name().to_string(),
             container_path: flow_path.clone(),
             parent_flow_name: parent_knot_name.map(str::to_string),
@@ -163,6 +196,7 @@ fn lower_flow_with_context(
             .map(|child| {
                 named_container(lower_flow_with_context(
                     child,
+                    module_name,
                     Some(flow.name()),
                     &child_stitch_names,
                     global_labels,

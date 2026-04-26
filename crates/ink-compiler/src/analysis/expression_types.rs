@@ -2,6 +2,7 @@ use crate::parsed::{BinaryOperator, Expression, TypeName, UnaryOperator};
 
 use super::{
     context::{StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
+    structs::resolve_struct_symbol,
     target_symbols::resolve_target_symbol,
 };
 
@@ -25,6 +26,7 @@ impl TypeInferenceError {
 pub(super) fn infer_primitive_expression_type(
     expression: &Expression,
     variable_scopes: &VariableScopeIndex,
+    current_module: Option<&str>,
     current_flow_path: Option<&str>,
 ) -> Result<TypeName, TypeInferenceError> {
     match expression {
@@ -34,22 +36,39 @@ pub(super) fn infer_primitive_expression_type(
         Expression::NumberBool(_) => Ok(TypeName::bool()),
         Expression::DivertTarget(_) => Ok(TypeName::divert_target()),
         Expression::VariableReference(name) => {
-            infer_variable_type(name, variable_scopes, current_flow_path)
+            infer_variable_type(name, variable_scopes, current_module, current_flow_path)
+        }
+        Expression::QualifiedReference(name) => {
+            infer_qualified_global_type(name.as_str(), variable_scopes)
         }
         Expression::Unary {
             operator,
             expression,
-        } => infer_unary_type(*operator, expression, variable_scopes, current_flow_path),
+        } => infer_unary_type(
+            *operator,
+            expression,
+            variable_scopes,
+            current_module,
+            current_flow_path,
+        ),
         Expression::Binary {
             operator,
             left,
             right,
-        } => infer_binary_type(*operator, left, right, variable_scopes, current_flow_path),
+        } => infer_binary_type(
+            *operator,
+            left,
+            right,
+            variable_scopes,
+            current_module,
+            current_flow_path,
+        ),
         Expression::MultipleCondition(expressions) => {
             for expression in expressions {
                 let expression_type = infer_primitive_expression_type(
                     expression,
                     variable_scopes,
+                    current_module,
                     current_flow_path,
                 )?;
                 if expression_type != TypeName::bool() {
@@ -63,6 +82,10 @@ pub(super) fn infer_primitive_expression_type(
         }
         Expression::FunctionCall { name, .. } => Err(TypeInferenceError::new(format!(
             "Cannot infer return type for function call '{name}' yet"
+        ))),
+        Expression::QualifiedFunctionCall { name, .. } => Err(TypeInferenceError::new(format!(
+            "Cannot infer return type for function call '{}' yet",
+            name.as_str()
         ))),
         Expression::ArrayLiteral(_)
         | Expression::StructLiteral(_)
@@ -78,6 +101,7 @@ pub(super) fn infer_expression_type(
     variable_scopes: &VariableScopeIndex,
     struct_types: &StructTypeIndex,
     target_symbols: &TargetSymbolIndex,
+    current_module: Option<&str>,
     current_flow_path: Option<&str>,
 ) -> Result<TypeName, TypeInferenceError> {
     match expression {
@@ -87,13 +111,26 @@ pub(super) fn infer_expression_type(
                 variable_scopes,
                 struct_types,
                 target_symbols,
+                current_module,
                 current_flow_path,
             )?;
-            infer_field_type(&base_type, field, struct_types)
+            infer_field_type(&base_type, field, struct_types, current_module)
         }
-        Expression::FunctionCall { name, .. } => typed_builtin_return_type(name)
+        Expression::FunctionCall { name, .. } => {
+            typed_builtin_return_type(name).map(Ok).unwrap_or_else(|| {
+                infer_function_return_type(name, target_symbols, current_module, current_flow_path)
+            })
+        }
+        Expression::QualifiedFunctionCall { name, .. } => typed_builtin_return_type(name.as_str())
             .map(Ok)
-            .unwrap_or_else(|| infer_function_return_type(name, target_symbols, current_flow_path)),
+            .unwrap_or_else(|| {
+                infer_function_return_type(
+                    name.as_str(),
+                    target_symbols,
+                    current_module,
+                    current_flow_path,
+                )
+            }),
         Expression::Unary {
             operator,
             expression,
@@ -103,6 +140,7 @@ pub(super) fn infer_expression_type(
             variable_scopes,
             struct_types,
             target_symbols,
+            current_module,
             current_flow_path,
         ),
         Expression::Binary {
@@ -116,6 +154,7 @@ pub(super) fn infer_expression_type(
             variable_scopes,
             struct_types,
             target_symbols,
+            current_module,
             current_flow_path,
         ),
         Expression::MultipleCondition(expressions) => {
@@ -125,6 +164,7 @@ pub(super) fn infer_expression_type(
                     variable_scopes,
                     struct_types,
                     target_symbols,
+                    current_module,
                     current_flow_path,
                 )?;
                 if expression_type != TypeName::bool() {
@@ -142,6 +182,7 @@ pub(super) fn infer_expression_type(
                 variable_scopes,
                 struct_types,
                 target_symbols,
+                current_module,
                 current_flow_path,
             )?;
             let index_type = infer_expression_type(
@@ -149,6 +190,7 @@ pub(super) fn infer_expression_type(
                 variable_scopes,
                 struct_types,
                 target_symbols,
+                current_module,
                 current_flow_path,
             )?;
             infer_index_type(&base_type, &index_type)
@@ -159,11 +201,15 @@ pub(super) fn infer_expression_type(
         | Expression::NumberFloat(_)
         | Expression::NumberBool(_)
         | Expression::VariableReference(_)
+        | Expression::QualifiedReference(_)
         | Expression::DivertTarget(_)
         | Expression::ArrayLiteral(_)
-        | Expression::StructLiteral(_) => {
-            infer_primitive_expression_type(expression, variable_scopes, current_flow_path)
-        }
+        | Expression::StructLiteral(_) => infer_primitive_expression_type(
+            expression,
+            variable_scopes,
+            current_module,
+            current_flow_path,
+        ),
     }
 }
 
@@ -178,9 +224,10 @@ pub(super) fn typed_builtin_return_type(name: &str) -> Option<TypeName> {
 fn infer_variable_type(
     name: &str,
     variable_scopes: &VariableScopeIndex,
+    current_module: Option<&str>,
     current_flow_path: Option<&str>,
 ) -> Result<TypeName, TypeInferenceError> {
-    match variable_scopes.visible_variable_declared_type(name, current_flow_path) {
+    match variable_scopes.visible_variable_declared_type(name, current_module, current_flow_path) {
         Some(Some(type_name)) => Ok(type_name.clone()),
         Some(None) => Err(TypeInferenceError::new(format!(
             "Variable '{name}' has no declared type"
@@ -191,19 +238,38 @@ fn infer_variable_type(
     }
 }
 
+fn infer_qualified_global_type(
+    name: &str,
+    variable_scopes: &VariableScopeIndex,
+) -> Result<TypeName, TypeInferenceError> {
+    match variable_scopes
+        .qualified_constant_declared_type(name)
+        .or_else(|| variable_scopes.qualified_global_variable_declared_type(name))
+    {
+        Some(Some(type_name)) => Ok(type_name.clone()),
+        Some(None) => Err(TypeInferenceError::new(format!(
+            "Qualified global '{name}' has no declared type"
+        ))),
+        None => Err(TypeInferenceError::new(format!(
+            "Unknown qualified global '{name}'"
+        ))),
+    }
+}
+
 fn infer_field_type(
     base_type: &TypeName,
     field: &str,
     struct_types: &StructTypeIndex,
+    current_module: Option<&str>,
 ) -> Result<TypeName, TypeInferenceError> {
-    let TypeName::Struct(struct_name) = base_type else {
+    let Some(struct_name) = base_type.as_struct_name() else {
         return Err(TypeInferenceError::new(format!(
             "Cannot access field '{field}' on non-struct type {}",
             base_type.display_name()
         )));
     };
 
-    let Some(symbol) = struct_types.get(struct_name) else {
+    let Some(symbol) = resolve_struct_symbol(struct_types, struct_name, current_module) else {
         return Err(TypeInferenceError::new(format!(
             "Unknown struct type '{struct_name}' for field access"
         )));
@@ -217,9 +283,12 @@ fn infer_field_type(
 fn infer_function_return_type(
     name: &str,
     target_symbols: &TargetSymbolIndex,
+    current_module: Option<&str>,
     current_flow_path: Option<&str>,
 ) -> Result<TypeName, TypeInferenceError> {
-    let Some(symbol) = resolve_target_symbol(name, current_flow_path, target_symbols) else {
+    let Some(symbol) =
+        resolve_target_symbol(name, current_module, current_flow_path, target_symbols)
+    else {
         return Err(TypeInferenceError::new(format!(
             "Unknown function '{name}'"
         )));
@@ -257,10 +326,15 @@ fn infer_unary_type(
     operator: UnaryOperator,
     expression: &Expression,
     variable_scopes: &VariableScopeIndex,
+    current_module: Option<&str>,
     current_flow_path: Option<&str>,
 ) -> Result<TypeName, TypeInferenceError> {
-    let expression_type =
-        infer_primitive_expression_type(expression, variable_scopes, current_flow_path)?;
+    let expression_type = infer_primitive_expression_type(
+        expression,
+        variable_scopes,
+        current_module,
+        current_flow_path,
+    )?;
     match operator {
         UnaryOperator::Negate if expression_type == TypeName::int() => Ok(TypeName::int()),
         UnaryOperator::Negate if expression_type == TypeName::float() => Ok(TypeName::float()),
@@ -278,6 +352,7 @@ fn infer_unary_expression_type(
     variable_scopes: &VariableScopeIndex,
     struct_types: &StructTypeIndex,
     target_symbols: &TargetSymbolIndex,
+    current_module: Option<&str>,
     current_flow_path: Option<&str>,
 ) -> Result<TypeName, TypeInferenceError> {
     let expression_type = infer_expression_type(
@@ -285,6 +360,7 @@ fn infer_unary_expression_type(
         variable_scopes,
         struct_types,
         target_symbols,
+        current_module,
         current_flow_path,
     )?;
     match operator {
@@ -303,10 +379,13 @@ fn infer_binary_type(
     left: &Expression,
     right: &Expression,
     variable_scopes: &VariableScopeIndex,
+    current_module: Option<&str>,
     current_flow_path: Option<&str>,
 ) -> Result<TypeName, TypeInferenceError> {
-    let left_type = infer_primitive_expression_type(left, variable_scopes, current_flow_path)?;
-    let right_type = infer_primitive_expression_type(right, variable_scopes, current_flow_path)?;
+    let left_type =
+        infer_primitive_expression_type(left, variable_scopes, current_module, current_flow_path)?;
+    let right_type =
+        infer_primitive_expression_type(right, variable_scopes, current_module, current_flow_path)?;
 
     match operator {
         BinaryOperator::Add => infer_add_type(left_type, right_type),
@@ -373,6 +452,7 @@ fn infer_binary_expression_type(
     variable_scopes: &VariableScopeIndex,
     struct_types: &StructTypeIndex,
     target_symbols: &TargetSymbolIndex,
+    current_module: Option<&str>,
     current_flow_path: Option<&str>,
 ) -> Result<TypeName, TypeInferenceError> {
     let left_type = infer_expression_type(
@@ -380,6 +460,7 @@ fn infer_binary_expression_type(
         variable_scopes,
         struct_types,
         target_symbols,
+        current_module,
         current_flow_path,
     )?;
     let right_type = infer_expression_type(
@@ -387,6 +468,7 @@ fn infer_binary_expression_type(
         variable_scopes,
         struct_types,
         target_symbols,
+        current_module,
         current_flow_path,
     )?;
 
@@ -517,7 +599,7 @@ fn is_numeric_type(type_name: &TypeName) -> bool {
 
 fn supports_equality(type_name: &TypeName) -> bool {
     match type_name {
-        TypeName::Primitive(_) | TypeName::Struct(_) => true,
+        TypeName::Primitive(_) | TypeName::Struct(_) | TypeName::QualifiedStruct(_) => true,
         TypeName::Array(element_type) => supports_equality(element_type),
         TypeName::Void => false,
     }
@@ -537,7 +619,10 @@ fn operator_type_error(operator: &str, types: &[TypeName]) -> TypeInferenceError
 
 #[cfg(test)]
 mod tests {
-    use crate::parsed::FloatLiteral;
+    use crate::{
+        parsed::{FloatLiteral, QualifiedName},
+        source::SourceSpan,
+    };
 
     use super::{
         super::{
@@ -570,6 +655,15 @@ mod tests {
         Expression::VariableReference(name.to_string())
     }
 
+    fn qualified_reference(module: &str, symbol: &str) -> Expression {
+        Expression::QualifiedReference(QualifiedName::new(
+            module,
+            SourceSpan::new(None, 1, 1),
+            symbol,
+            SourceSpan::new(None, 1, 1),
+        ))
+    }
+
     #[test]
     fn infers_literal_and_variable_primitive_types() {
         let story = parse_story(
@@ -583,6 +677,7 @@ mod tests {
             infer_primitive_expression_type(
                 &Expression::VariableReference("score".to_string()),
                 &scopes,
+                None,
                 Some("knot")
             ),
             Ok(TypeName::int())
@@ -591,13 +686,53 @@ mod tests {
             infer_primitive_expression_type(
                 &Expression::VariableReference("flag".to_string()),
                 &scopes,
+                None,
                 Some("knot")
             ),
             Ok(TypeName::bool())
         );
         assert_eq!(
-            infer_primitive_expression_type(&Expression::String("text".to_string()), &scopes, None),
+            infer_primitive_expression_type(
+                &Expression::String("text".to_string()),
+                &scopes,
+                None,
+                None
+            ),
             Ok(TypeName::string())
+        );
+    }
+
+    #[test]
+    fn infers_qualified_constant_and_variable_types() {
+        let story = parse_story(
+            "=== module game ===\n\
+             == main ==\n\
+             -> DONE\n\
+             === module items ===\n\
+             CONST MAX_SCORE: int = 3\n\
+             VAR score: int = 0\n\
+             == helper ==\n\
+             -> DONE",
+        );
+        let scopes = build_variable_scope_index(&story);
+
+        assert_eq!(
+            infer_primitive_expression_type(
+                &qualified_reference("items", "MAX_SCORE"),
+                &scopes,
+                Some("game"),
+                Some("main")
+            ),
+            Ok(TypeName::int())
+        );
+        assert_eq!(
+            infer_primitive_expression_type(
+                &qualified_reference("items", "score"),
+                &scopes,
+                Some("game"),
+                Some("main")
+            ),
+            Ok(TypeName::int())
         );
     }
 
@@ -615,11 +750,11 @@ mod tests {
         );
 
         assert_eq!(
-            infer_primitive_expression_type(&int_add, &scopes, None),
+            infer_primitive_expression_type(&int_add, &scopes, None, None),
             Ok(TypeName::int())
         );
         assert_eq!(
-            infer_primitive_expression_type(&float_negate, &scopes, None),
+            infer_primitive_expression_type(&float_negate, &scopes, None, None),
             Ok(TypeName::float())
         );
     }
@@ -633,7 +768,7 @@ mod tests {
             Expression::NumberFloat(FloatLiteral::new(2.0)),
         );
 
-        let error = infer_primitive_expression_type(&mixed_add, &scopes, None).unwrap_err();
+        let error = infer_primitive_expression_type(&mixed_add, &scopes, None, None).unwrap_err();
 
         assert_eq!(
             error.message(),
@@ -656,11 +791,11 @@ mod tests {
         );
 
         assert_eq!(
-            infer_primitive_expression_type(&concat, &scopes, None),
+            infer_primitive_expression_type(&concat, &scopes, None, None),
             Ok(TypeName::string())
         );
         assert_eq!(
-            infer_primitive_expression_type(&mixed, &scopes, None)
+            infer_primitive_expression_type(&mixed, &scopes, None, None)
                 .unwrap_err()
                 .message(),
             "Operator '+' is not defined for types string and int"
@@ -678,11 +813,11 @@ mod tests {
         let not_expression = unary(UnaryOperator::Not, Expression::NumberBool(true));
 
         assert_eq!(
-            infer_primitive_expression_type(&and_expression, &scopes, None),
+            infer_primitive_expression_type(&and_expression, &scopes, None, None),
             Ok(TypeName::bool())
         );
         assert_eq!(
-            infer_primitive_expression_type(&not_expression, &scopes, None),
+            infer_primitive_expression_type(&not_expression, &scopes, None, None),
             Ok(TypeName::bool())
         );
     }
@@ -714,8 +849,8 @@ mod tests {
         ];
 
         for (expression, expected_message) in cases {
-            let error =
-                infer_expression_type(&expression, &scopes, &structs, &targets, None).unwrap_err();
+            let error = infer_expression_type(&expression, &scopes, &structs, &targets, None, None)
+                .unwrap_err();
 
             assert_eq!(error.message(), expected_message);
         }
@@ -786,7 +921,7 @@ mod tests {
 
         for expression in expressions {
             assert_eq!(
-                infer_expression_type(&expression, &scopes, &structs, &targets, None),
+                infer_expression_type(&expression, &scopes, &structs, &targets, None, None),
                 Ok(TypeName::bool())
             );
         }
@@ -827,8 +962,8 @@ mod tests {
         ];
 
         for (expression, expected_message) in cases {
-            let error =
-                infer_expression_type(&expression, &scopes, &structs, &targets, None).unwrap_err();
+            let error = infer_expression_type(&expression, &scopes, &structs, &targets, None, None)
+                .unwrap_err();
 
             assert_eq!(error.message(), expected_message);
         }
@@ -892,8 +1027,8 @@ mod tests {
         ];
 
         for (expression, expected_message) in cases {
-            let error =
-                infer_expression_type(&expression, &scopes, &structs, &targets, None).unwrap_err();
+            let error = infer_expression_type(&expression, &scopes, &structs, &targets, None, None)
+                .unwrap_err();
 
             assert_eq!(error.message(), expected_message);
         }

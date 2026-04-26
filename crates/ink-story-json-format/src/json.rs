@@ -512,6 +512,41 @@ mod tests {
     }
 
     #[test]
+    fn roundtrips_module_shaped_named_content_without_schema_changes() {
+        let input = json!({
+            "inkVersion": 1,
+            "root": [
+                {"->": "game.main"},
+                "done",
+                {
+                    "game": [
+                        {
+                            "main": ["^Start", "\n", {"->": "support.helper"}, null]
+                        }
+                    ],
+                    "support": [
+                        {
+                            "helper": ["^Support", "\n", "end", null]
+                        }
+                    ],
+                    "global decl": [
+                        "ev",
+                        1,
+                        {"VAR=": "support::shown"},
+                        "/ev",
+                        "end",
+                        null
+                    ]
+                }
+            ]
+        });
+
+        let program = program_from_value(input.clone()).expect("format should parse modules");
+
+        assert_eq!(program_to_value(&program), input);
+    }
+
+    #[test]
     fn roundtrips_dynamic_array_values() {
         let object = Object::ValueArray(vec![
             Object::Int(1),

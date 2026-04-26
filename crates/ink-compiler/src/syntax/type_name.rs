@@ -1,4 +1,7 @@
-use crate::parsed::TypeName;
+use crate::{
+    parsed::{QualifiedName, TypeName},
+    source::SourceSpan,
+};
 
 use super::{error, is_identifier, is_identifier_continue, rule::RuleParser};
 
@@ -9,6 +12,7 @@ pub(super) fn parse_type_name(parser: &mut RuleParser<'_>) -> Option<TypeName> {
         let mut type_name = if parser.match_string("->").is_some() {
             TypeName::divert_target()
         } else {
+            let name_span = parser.current_span();
             let name = parser.take_while(is_identifier_continue)?;
             if !is_identifier(&name) {
                 parser.error(format!("Expected type name but saw '{name}'"));
@@ -21,7 +25,22 @@ pub(super) fn parse_type_name(parser: &mut RuleParser<'_>) -> Option<TypeName> {
                 "bool" => TypeName::bool(),
                 "string" => TypeName::string(),
                 "void" => TypeName::void(),
-                _ => TypeName::struct_type(name),
+                _ => {
+                    if parser.match_string("::").is_some() {
+                        let Some((symbol, symbol_span)) = identifier_with_span(parser) else {
+                            parser.error(format!("Expected symbol name after `{name}::`"));
+                            return None;
+                        };
+                        TypeName::qualified_struct_type(QualifiedName::new(
+                            name,
+                            name_span,
+                            symbol,
+                            symbol_span,
+                        ))
+                    } else {
+                        TypeName::struct_type(name)
+                    }
+                }
             }
         };
 
@@ -42,6 +61,12 @@ pub(super) fn parse_type_name(parser: &mut RuleParser<'_>) -> Option<TypeName> {
 
         Some(type_name)
     })
+}
+
+fn identifier_with_span(parser: &mut RuleParser<'_>) -> Option<(String, SourceSpan)> {
+    let span = parser.current_span();
+    let name = parser.take_while(is_identifier_continue)?;
+    is_identifier(&name).then_some((name, span))
 }
 
 #[cfg(test)]
@@ -111,11 +136,30 @@ mod tests {
     }
 
     #[test]
+    fn parses_qualified_struct_type_names_with_spans() {
+        let (parsed, remainder, diagnostics) = parse_type_name_text("items::Item[]");
+
+        assert_eq!(remainder, "");
+        assert!(diagnostics.is_empty(), "{diagnostics:#?}");
+        let Some(TypeName::Array(element_type)) = parsed else {
+            panic!("expected array type");
+        };
+        let TypeName::QualifiedStruct(name) = element_type.as_ref() else {
+            panic!("expected qualified struct type");
+        };
+        assert_eq!(name.module(), "items");
+        assert_eq!(name.symbol(), "Item");
+        assert_eq!(name.module_span().column, 1);
+        assert_eq!(name.symbol_span().column, 8);
+    }
+
+    #[test]
     fn reports_invalid_type_syntax() {
         let cases = [
             ("", "Expected type name but saw end of line"),
             ("[]", "Expected type name but saw '[]'"),
             ("123", "Expected type name but saw '123'"),
+            ("items::", "Expected symbol name after `items::`"),
             ("int[", "Expected ']' but saw end of line"),
         ];
 

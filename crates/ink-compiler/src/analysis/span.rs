@@ -17,6 +17,7 @@ pub(super) fn object_span(object: &Object) -> SourceSpan {
         Object::AuthorWarning(author_warning) => author_warning.span().clone(),
         Object::ConstantDeclaration(declaration) => declaration.span().clone(),
         Object::Divert(divert) => divert.span().clone(),
+        Object::ExternalDeclaration(external) => external.span().clone(),
         Object::Gather(gather) => gather.span().clone(),
         Object::IncDec(inc_dec) => inc_dec.span().clone(),
         Object::Return(ret) => ret.span().clone(),
@@ -44,11 +45,9 @@ pub(super) fn object_span(object: &Object) -> SourceSpan {
             .map(object_span)
             .unwrap_or_else(default_span),
         Object::Weave(weave) => first_span_in_weave(weave),
-        Object::Expression(_)
-        | Object::ExternalDeclaration(_)
-        | Object::Glue(_)
-        | Object::LogicLine(_)
-        | Object::Tag(_) => default_span(),
+        Object::Expression(_) | Object::Glue(_) | Object::LogicLine(_) | Object::Tag(_) => {
+            default_span()
+        }
     }
 }
 

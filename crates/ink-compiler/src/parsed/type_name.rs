@@ -1,9 +1,12 @@
 use std::fmt;
 
+use super::QualifiedName;
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum TypeName {
     Primitive(PrimitiveType),
     Struct(String),
+    QualifiedStruct(QualifiedName),
     Void,
     Array(Box<TypeName>),
 }
@@ -56,6 +59,10 @@ impl TypeName {
         Self::Struct(name.into())
     }
 
+    pub fn qualified_struct_type(name: QualifiedName) -> Self {
+        Self::QualifiedStruct(name)
+    }
+
     pub fn array(element_type: TypeName) -> Self {
         Self::Array(Box::new(element_type))
     }
@@ -78,6 +85,7 @@ impl TypeName {
     pub fn as_struct_name(&self) -> Option<&str> {
         match self {
             Self::Struct(name) => Some(name),
+            Self::QualifiedStruct(name) => Some(name.as_str()),
             _ => None,
         }
     }
@@ -103,6 +111,7 @@ impl fmt::Display for TypeName {
         match self {
             Self::Primitive(primitive) => primitive.fmt(formatter),
             Self::Struct(name) => formatter.write_str(name),
+            Self::QualifiedStruct(name) => formatter.write_str(name.as_str()),
             Self::Void => formatter.write_str("void"),
             Self::Array(element_type) => write!(formatter, "{element_type}[]"),
         }
@@ -134,6 +143,9 @@ impl DefaultValue {
             }),
             TypeName::Struct(type_name) => Some(Self::Struct {
                 type_name: type_name.clone(),
+            }),
+            TypeName::QualifiedStruct(type_name) => Some(Self::Struct {
+                type_name: type_name.as_str().to_string(),
             }),
             TypeName::Void => None,
         }

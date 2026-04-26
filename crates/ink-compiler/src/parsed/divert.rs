@@ -1,6 +1,6 @@
 use crate::source::SourceSpan;
 
-use super::{escape_snapshot_text, push_indent, Expression};
+use super::{escape_snapshot_text, push_indent, Expression, QualifiedName};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Divert {
@@ -15,6 +15,7 @@ pub struct Divert {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DivertTarget {
     Path(String),
+    QualifiedPath(QualifiedName),
     Dynamic(Expression),
     Done,
     End,
@@ -112,9 +113,14 @@ impl DivertTarget {
         }
     }
 
+    pub fn from_qualified(name: QualifiedName) -> Self {
+        Self::QualifiedPath(name)
+    }
+
     pub fn as_runtime_target(&self) -> Option<&str> {
         match self {
             Self::Path(target) => Some(target),
+            Self::QualifiedPath(target) => Some(target.as_str()),
             Self::Dynamic(_) | Self::Done | Self::End | Self::Empty => None,
         }
     }
@@ -122,6 +128,7 @@ impl DivertTarget {
     pub fn to_snapshot_string(&self) -> String {
         match self {
             Self::Path(target) => target.clone(),
+            Self::QualifiedPath(target) => target.as_str().to_string(),
             Self::Dynamic(expression) => format!("{{{}}}", expression.to_source_string()),
             Self::Done => "DONE".to_string(),
             Self::End => "END".to_string(),

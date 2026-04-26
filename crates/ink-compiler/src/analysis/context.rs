@@ -94,68 +94,130 @@ impl StructTypeSymbol {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct VariableSymbol {
     declared_type: Option<TypeName>,
+    kind: VariableSymbolKind,
 }
 
 impl VariableSymbol {
-    pub(super) fn new(declared_type: Option<TypeName>) -> Self {
-        Self { declared_type }
+    pub(super) fn new(declared_type: Option<TypeName>, kind: VariableSymbolKind) -> Self {
+        Self {
+            declared_type,
+            kind,
+        }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum VariableSymbolKind {
+    Constant,
+    GlobalVariable,
+    Local,
 }
 
 #[derive(Debug, Default)]
 pub(super) struct VariableScopeIndex {
-    globals: HashMap<String, VariableSymbol>,
-    locals_by_flow_path: HashMap<String, HashMap<String, VariableSymbol>>,
+    globals_by_module: HashMap<Option<String>, HashMap<String, VariableSymbol>>,
+    locals_by_scope: HashMap<(Option<String>, String), HashMap<String, VariableSymbol>>,
 }
 
 impl VariableScopeIndex {
     pub(super) fn insert_global(
         &mut self,
+        module: Option<&str>,
         name: impl Into<String>,
         declared_type: Option<TypeName>,
+        kind: VariableSymbolKind,
     ) {
-        self.globals
-            .insert(name.into(), VariableSymbol::new(declared_type));
+        self.globals_by_module
+            .entry(module.map(str::to_string))
+            .or_default()
+            .insert(name.into(), VariableSymbol::new(declared_type, kind));
     }
 
     pub(super) fn insert_local(
         &mut self,
+        module: Option<&str>,
         flow_path: impl Into<String>,
         name: impl Into<String>,
         declared_type: Option<TypeName>,
     ) {
-        self.locals_by_flow_path
-            .entry(flow_path.into())
+        self.locals_by_scope
+            .entry((module.map(str::to_string), flow_path.into()))
             .or_default()
-            .insert(name.into(), VariableSymbol::new(declared_type));
+            .insert(
+                name.into(),
+                VariableSymbol::new(declared_type, VariableSymbolKind::Local),
+            );
     }
 
     pub(super) fn contains_visible_variable(
         &self,
         name: &str,
+        current_module: Option<&str>,
         current_flow_path: Option<&str>,
     ) -> bool {
-        self.visible_variable_declared_type(name, current_flow_path)
+        self.visible_variable_declared_type(name, current_module, current_flow_path)
             .is_some()
     }
 
     pub(super) fn visible_variable_declared_type(
         &self,
         name: &str,
+        current_module: Option<&str>,
         current_flow_path: Option<&str>,
     ) -> Option<Option<&TypeName>> {
         if let Some(flow_path) = current_flow_path {
             if let Some(symbol) = self
-                .locals_by_flow_path
-                .get(flow_path)
+                .locals_by_scope
+                .get(&(current_module.map(str::to_string), flow_path.to_string()))
                 .and_then(|locals| locals.get(name))
             {
                 return Some(symbol.declared_type.as_ref());
             }
         }
 
-        self.globals
-            .get(name)
+        self.globals_by_module
+            .get(&current_module.map(str::to_string))
+            .and_then(|globals| globals.get(name))
+            .or_else(|| {
+                if current_module.is_some() {
+                    None
+                } else {
+                    self.globals_by_module
+                        .get(&None)
+                        .and_then(|globals| globals.get(name))
+                }
+            })
+            .map(|symbol| symbol.declared_type.as_ref())
+    }
+
+    pub(super) fn qualified_constant_declared_type(
+        &self,
+        qualified_name: &str,
+    ) -> Option<Option<&TypeName>> {
+        self.qualified_declared_type(qualified_name, VariableSymbolKind::Constant)
+    }
+
+    pub(super) fn qualified_global_variable_declared_type(
+        &self,
+        qualified_name: &str,
+    ) -> Option<Option<&TypeName>> {
+        self.qualified_declared_type(qualified_name, VariableSymbolKind::GlobalVariable)
+    }
+
+    fn qualified_declared_type(
+        &self,
+        qualified_name: &str,
+        kind: VariableSymbolKind,
+    ) -> Option<Option<&TypeName>> {
+        let (module, name) = qualified_name.split_once("::")?;
+        if module.is_empty() || name.is_empty() || name.contains("::") || name.contains('.') {
+            return None;
+        }
+
+        self.globals_by_module
+            .get(&Some(module.to_string()))
+            .and_then(|globals| globals.get(name))
+            .filter(|symbol| symbol.kind == kind)
             .map(|symbol| symbol.declared_type.as_ref())
     }
 }

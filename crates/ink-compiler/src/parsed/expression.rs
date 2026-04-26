@@ -1,4 +1,4 @@
-use super::{push_indent, ContentList, Object};
+use super::{push_indent, ContentList, Object, QualifiedName};
 
 #[derive(Debug, Clone, Copy)]
 pub struct FloatLiteral(f64);
@@ -53,8 +53,13 @@ pub enum Expression {
     NumberBool(bool),
     DivertTarget(String),
     VariableReference(String),
+    QualifiedReference(QualifiedName),
     FunctionCall {
         name: String,
+        args: Vec<Expression>,
+    },
+    QualifiedFunctionCall {
+        name: QualifiedName,
         args: Vec<Expression>,
     },
     ArrayLiteral(Vec<Expression>),
@@ -149,9 +154,21 @@ impl Expression {
                 out.push_str(name);
                 out.push(')');
             }
+            Expression::QualifiedReference(name) => {
+                out.push_str("QualifiedReference(");
+                out.push_str(name.as_str());
+                out.push(')');
+            }
             Expression::FunctionCall { name, args } => {
                 out.push_str("FunctionCall(");
                 out.push_str(name);
+                out.push_str(", args=");
+                out.push_str(&args.len().to_string());
+                out.push(')');
+            }
+            Expression::QualifiedFunctionCall { name, args } => {
+                out.push_str("QualifiedFunctionCall(");
+                out.push_str(name.as_str());
                 out.push_str(", args=");
                 out.push_str(&args.len().to_string());
                 out.push(')');
@@ -245,6 +262,7 @@ impl Expression {
     pub fn dotted_path(&self) -> Option<String> {
         match self {
             Expression::VariableReference(name) => Some(name.clone()),
+            Expression::QualifiedReference(name) => Some(name.as_str().to_string()),
             Expression::FieldAccess { base, field } => {
                 let mut path = base.dotted_path()?;
                 path.push('.');
@@ -302,6 +320,7 @@ fn expression_display(expression: &Expression) -> String {
         Expression::NumberBool(value) => value.to_string(),
         Expression::DivertTarget(target) => format!("-> {target}"),
         Expression::VariableReference(name) => name.clone(),
+        Expression::QualifiedReference(name) => name.as_str().to_string(),
         Expression::FunctionCall { name, args } => {
             let args = args
                 .iter()
@@ -309,6 +328,14 @@ fn expression_display(expression: &Expression) -> String {
                 .collect::<Vec<_>>()
                 .join(", ");
             format!("{name}({args})")
+        }
+        Expression::QualifiedFunctionCall { name, args } => {
+            let args = args
+                .iter()
+                .map(expression_display)
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!("{}({args})", name.as_str())
         }
         Expression::ArrayLiteral(elements) => {
             let elements = elements

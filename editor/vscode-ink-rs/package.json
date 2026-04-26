@@ -1,7 +1,7 @@
 {
   "name": "ink-rs-syntax",
   "displayName": "Ink RS Syntax",
-  "description": "Syntax highlighting for ink-rs .ink files, including structs and typed declarations.",
+  "description": "Syntax highlighting for ink-rs .ink files, including modules, imports, structs, and typed declarations.",
   "version": "0.1.0",
   "publisher": "ink-rs",
   "engines": {

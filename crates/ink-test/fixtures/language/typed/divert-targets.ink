@@ -1,3 +1,4 @@
+=== module game ===
 VAR next: -> = -> here
 CONST fallback: -> = -> fallback_target
 VAR targets: ->[] = [-> array_target]
@@ -8,6 +9,7 @@ next: ->
 
 VAR route: Route = { next: -> struct_target }
 
+== main ==
 -> {next}
 
 == here

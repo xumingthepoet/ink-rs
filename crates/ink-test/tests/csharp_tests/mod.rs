@@ -7,16 +7,14 @@
 
 use crate::api::{ExternalFunction, Story as RuntimeStory, ValueType, VariableObserver};
 use ink_compiler::{
-    eliminate_comments, Compiler, CompilerOptions, Diagnostic, DiagnosticSeverity, FileHandler,
-    ParsedStory, SourceInput,
+    eliminate_comments, Compiler, CompilerOptions, Diagnostic, DiagnosticSeverity, ParsedStory,
+    SourceInput,
 };
 use ink_runtime::{
     choice::Choice,
     story::errors::{ErrorHandler, ErrorType},
 };
 use std::cell::RefCell;
-use std::io;
-use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
@@ -143,29 +141,6 @@ pub struct CSharpTestSuite {
     mode: TestMode,
     testing_errors: bool,
     buckets: Arc<Mutex<MessageBuckets>>,
-    file_handler: Arc<dyn FileHandler>,
-}
-
-#[derive(Clone, Debug, Default)]
-struct CSharpTestsFileHandler;
-
-impl FileHandler for CSharpTestsFileHandler {
-    fn resolve_ink_filename(&self, include_name: &str) -> PathBuf {
-        let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let tests_dir = manifest_dir.join("fixtures/csharp_tests/includes");
-        let candidate = tests_dir.join(include_name);
-        if candidate.exists() {
-            return candidate;
-        }
-
-        std::env::current_dir()
-            .unwrap_or_else(|_| PathBuf::from("."))
-            .join(include_name)
-    }
-
-    fn load_ink_file_contents(&self, full_filename: &Path) -> io::Result<String> {
-        std::fs::read_to_string(full_filename)
-    }
 }
 
 struct RuntimeErrorHandler {
@@ -205,7 +180,6 @@ impl CSharpTestSuite {
             mode,
             testing_errors: false,
             buckets: Arc::new(Mutex::new(MessageBuckets::default())),
-            file_handler: Arc::new(CSharpTestsFileHandler),
         }
     }
 
@@ -248,7 +222,6 @@ impl CSharpTestSuite {
         let options = CompilerOptions {
             source_filename: None,
             count_all_visits,
-            file_handler: Some(Arc::clone(&self.file_handler)),
         };
 
         let compiler = Compiler::with_options(options);
@@ -305,7 +278,6 @@ impl CSharpTestSuite {
         let options = CompilerOptions {
             source_filename: None,
             count_all_visits: false,
-            file_handler: Some(Arc::clone(&self.file_handler)),
         };
 
         let compiler = Compiler::with_options(options);
@@ -1110,12 +1082,15 @@ VAR x: int = 3
             let mut story = suite
                 .compile_string(
                     r#"
+=== module game ===
 EXTERNAL message(x: string) => void
 EXTERNAL multiply(x: float, y: int) => float
 EXTERNAL times(i: int, str: string) => string
+== main ==
 ~ message("hello world")
 {multiply(5.0, 3)}
 {times(3, "knock ")}
+-> END
 "#,
                     false,
                     false,
@@ -1124,7 +1099,7 @@ EXTERNAL times(i: int, str: string) => string
             let message = Arc::new(Mutex::new(None::<String>));
             let message_clone = Arc::clone(&message);
             story.bind_external_function(
-                "message",
+                "game::message",
                 boxed_external_function(move |_func, args| {
                     if let Some(ValueType::String(arg)) = args.into_iter().next() {
                         *message_clone.lock().unwrap() = Some(format!("MESSAGE: {}", arg));
@@ -1135,7 +1110,7 @@ EXTERNAL times(i: int, str: string) => string
             );
 
             story.bind_external_function(
-                "multiply",
+                "game::multiply",
                 boxed_external_function(|_func, args| match args.as_slice() {
                     [ValueType::Float(a), ValueType::Int(b)] => {
                         Some(ValueType::Float(a * (*b as f32)))
@@ -1147,7 +1122,7 @@ EXTERNAL times(i: int, str: string) => string
             );
 
             story.bind_external_function(
-                "times",
+                "game::times",
                 boxed_external_function(|_func, args| match args.as_slice() {
                     [ValueType::Int(number_of_times), ValueType::String(str)] => {
                         Some(ValueType::String(str.repeat(*number_of_times as usize)))
@@ -1214,11 +1189,14 @@ EXTERNAL times(i: int, str: string) => string
             let mut story = suite
                 .compile_string(
                     r#"
+=== module game ===
 EXTERNAL myAction() => void
 
+== main ==
 One
 ~ myAction()
 Two
+-> END
 "#,
                     false,
                     false,
@@ -1228,7 +1206,7 @@ Two
             let call_count = Arc::new(Mutex::new(0usize));
             let safe_count = Arc::clone(&call_count);
             story.bind_external_function(
-                "myAction",
+                "game::myAction",
                 boxed_external_function(move |_func, _args| {
                     *safe_count.lock().unwrap() += 1;
                     None
@@ -1241,11 +1219,11 @@ Two
 
             *call_count.lock().unwrap() = 0;
             story.ResetState();
-            story.UnbindExternalFunction("myAction".to_string());
+            story.UnbindExternalFunction("game::myAction".to_string());
 
             let unsafe_count = Arc::clone(&call_count);
             story.bind_external_function(
-                "myAction",
+                "game::myAction",
                 boxed_external_function(move |_func, _args| {
                     *unsafe_count.lock().unwrap() += 1;
                     None
@@ -1259,11 +1237,14 @@ Two
             let mut story_with_post_glue = suite
                 .compile_string(
                     r#"
+=== module game ===
 EXTERNAL myAction() => void
 
+== main ==
 One 
 ~ myAction()
 <> Two
+-> END
 "#,
                     false,
                     false,
@@ -1271,7 +1252,7 @@ One
                 .expect("compile should succeed");
 
             story_with_post_glue.bind_external_function(
-                "myAction",
+                "game::myAction",
                 boxed_external_function(|_func, _args| None),
                 false,
             );
@@ -4534,22 +4515,20 @@ C
     #[test]
     fn TestInclude() {
         run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
+            suite.compile_string(
+                r#"
 INCLUDE test_included_file.ink
   INCLUDE test_included_file2.ink
 
 This is the main file.
 "#,
-                    false,
-                    false,
-                )
-                .expect("compile should succeed");
-            assert_eq!(
-                "This is include 1.\nThis is include 2.\nThis is the main file.\n",
-                story.cont_maximally()
+                false,
+                true,
             );
+            assert_eq!(2, suite.error_messages().len());
+            assert!(suite.had_error(Some(
+                "INCLUDE is no longer supported; use modules and IMPORT instead"
+            )));
         });
     }
 
@@ -4935,23 +4914,21 @@ VAR varStr: string = CONST_STR
     #[test]
     fn TestNestedInclude() {
         run_in_both_modes(|suite| {
-            let mut story = suite
-                .compile_string(
-                    r#"
+            suite.compile_string(
+                r#"
 INCLUDE test_included_file3.ink
 
 This is the main file
 
 -> knot_in_2
 "#,
-                    false,
-                    false,
-                )
-                .expect("compile should succeed");
-            assert_eq!(
-                "The value of a variable in test file 2 is 5.\nThis is the main file\nThe value when accessed from knot_in_2 is 5.\n",
-                story.cont_maximally()
+                false,
+                true,
             );
+            assert_eq!(1, suite.error_messages().len());
+            assert!(suite.had_error(Some(
+                "INCLUDE is no longer supported; use modules and IMPORT instead"
+            )));
         });
     }
 
@@ -5312,10 +5289,12 @@ Text.
             let mut story = suite
                 .compile_string(
                     r#"
+=== module game ===
 VAR x: int = 2
-# author: Joe
-# title: My Great Story
+== main ==
+# scene: opening
 This is the content
+-> game::knot
 
 == knot ==
 # knot tag
@@ -5333,22 +5312,22 @@ Stitch content
                     false,
                 )
                 .expect("compile should succeed");
-            let global_tags = vec![
-                "author: Joe".to_string(),
-                "title: My Great Story".to_string(),
-            ];
+            let main_tags = vec!["scene: opening".to_string()];
             let knot_tags = vec!["knot tag".to_string()];
             let knot_tag_when_continued_twice = vec!["end of knot tag".to_string()];
             let stitch_tags = vec!["stitch tag".to_string()];
-            assert_eq!(global_tags, story.global_tags());
+            assert_eq!(Vec::<String>::new(), story.global_tags());
             assert_eq!("This is the content\n", story.cont());
-            assert_eq!(global_tags, story.current_tags());
-            assert_eq!(knot_tags, story.TagsForContentAtPath("knot".to_string()));
+            assert_eq!(main_tags, story.current_tags());
+            assert_eq!(
+                knot_tags,
+                story.TagsForContentAtPath("game.knot".to_string())
+            );
             assert_eq!(
                 stitch_tags,
-                story.TagsForContentAtPath("knot.stitch".to_string())
+                story.TagsForContentAtPath("game.knot.stitch".to_string())
             );
-            story.choose_path_string_simple("knot");
+            story.choose_path_string_simple("game.knot");
             assert_eq!("Knot content\n", story.cont());
             assert_eq!(knot_tags, story.current_tags());
             assert_eq!("", story.cont());

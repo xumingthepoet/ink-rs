@@ -1,5 +1,5 @@
 use crate::{
-    parsed::{Divert, DivertTarget, Expression, Object, TunnelOnwards},
+    parsed::{Divert, DivertTarget, Expression, Object, QualifiedName, TunnelOnwards},
     source::SourceSpan,
 };
 
@@ -84,7 +84,7 @@ fn parse_tunnel_onwards(source: Option<&str>, span: SourceSpan) -> Option<Tunnel
 pub(super) fn parse_divert_source(source: &str, span: SourceSpan) -> Option<Divert> {
     let source = source.trim();
     let (target, arguments, has_argument_list) = parse_divert_target_and_arguments(source)?;
-    let target = parse_divert_target(target)?;
+    let target = parse_divert_target(target, &span)?;
     if has_argument_list {
         Some(Divert::with_arguments(target, arguments, span))
     } else {
@@ -182,13 +182,41 @@ fn parse_divert_target_and_arguments(source: &str) -> Option<(&str, Vec<Expressi
     Some((target, arguments, true))
 }
 
-fn parse_divert_target(source: &str) -> Option<DivertTarget> {
+fn parse_divert_target(source: &str, span: &SourceSpan) -> Option<DivertTarget> {
     let source = source.trim();
     if let Some(inner) = braced_dynamic_target_source(source) {
         return parse_initial_expression(inner).map(DivertTarget::Dynamic);
     }
 
+    if let Some(name) = parse_qualified_path(source, span) {
+        return Some(DivertTarget::from_qualified(name));
+    }
+
     Some(DivertTarget::from_source(source))
+}
+
+fn parse_qualified_path(source: &str, span: &SourceSpan) -> Option<QualifiedName> {
+    let (module, symbol) = source.split_once("::")?;
+    if symbol.contains("::") || module.contains('.') || symbol.contains('.') {
+        return None;
+    }
+    let module = module.trim();
+    let symbol = symbol.trim();
+    if !super::is_identifier(module) || !super::is_identifier(symbol) {
+        return None;
+    }
+    let module_span = SourceSpan::new(span.source_name.clone(), span.line, span.column);
+    let symbol_span = SourceSpan::new(
+        span.source_name.clone(),
+        span.line,
+        span.column + module.chars().count() + "::".chars().count(),
+    );
+    Some(QualifiedName::new(
+        module.to_string(),
+        module_span,
+        symbol.to_string(),
+        symbol_span,
+    ))
 }
 
 fn braced_dynamic_target_source(source: &str) -> Option<&str> {
@@ -201,6 +229,9 @@ fn braced_dynamic_target_source(source: &str) -> Option<&str> {
 }
 
 fn is_divert_path(source: &str) -> bool {
+    if source.contains("::") {
+        return parse_qualified_path(source, &SourceSpan::new(None, 1, 1)).is_some();
+    }
     !source.is_empty()
         && source
             .split('.')
@@ -229,5 +260,35 @@ mod tests {
             trailing,
             TrailingDivertSyntax::TunnelOnwards(Some(r#"escape("->")"#))
         );
+    }
+
+    #[test]
+    fn parses_qualified_divert_target() {
+        let span = SourceSpan::new(None, 1, 1);
+        let divert = parse_divert_source("items::open", span).expect("expected divert");
+
+        let DivertTarget::QualifiedPath(name) = divert.target() else {
+            panic!("expected qualified target");
+        };
+        assert_eq!(name.module(), "items");
+        assert_eq!(name.symbol(), "open");
+        assert_eq!(name.module_span().column, 1);
+        assert_eq!(name.symbol_span().column, 8);
+    }
+
+    #[test]
+    fn parses_qualified_tunnel_onwards_override() {
+        let span = SourceSpan::new(None, 1, 1);
+        let objects = parse_divert_objects_source("-> first ->-> items::open", span)
+            .expect("expected tunnel onwards");
+
+        let Object::TunnelOnwards(tunnel_onwards) = objects.last().expect("expected object") else {
+            panic!("expected tunnel onwards");
+        };
+        assert!(matches!(
+            tunnel_onwards.override_target(),
+            Some(DivertTarget::QualifiedPath(name))
+                if name.module() == "items" && name.symbol() == "open"
+        ));
     }
 }

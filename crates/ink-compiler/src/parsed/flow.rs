@@ -26,6 +26,7 @@ pub struct Flow {
     arguments: Vec<FlowArgument>,
     return_type: TypeName,
     is_function: bool,
+    span: SourceSpan,
 }
 
 impl FlowArgument {
@@ -76,6 +77,28 @@ impl Flow {
         return_type: TypeName,
         is_function: bool,
     ) -> Self {
+        Self::new_with_span(
+            level,
+            name,
+            content,
+            child_flows,
+            arguments,
+            return_type,
+            is_function,
+            SourceSpan::new(None, 1, 1),
+        )
+    }
+
+    pub fn new_with_span(
+        level: FlowLevel,
+        name: impl Into<String>,
+        content: Vec<Object>,
+        child_flows: Vec<Flow>,
+        arguments: Vec<FlowArgument>,
+        return_type: TypeName,
+        is_function: bool,
+        span: SourceSpan,
+    ) -> Self {
         Self {
             level,
             name: name.into(),
@@ -84,6 +107,7 @@ impl Flow {
             arguments,
             return_type,
             is_function,
+            span,
         }
     }
 
@@ -93,6 +117,10 @@ impl Flow {
 
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    pub fn span(&self) -> &SourceSpan {
+        &self.span
     }
 
     pub fn weave(&self) -> &Weave {

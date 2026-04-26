@@ -73,6 +73,7 @@ impl<'a> VariableInitializerChecker<'a> {
             self.variable_scopes,
             self.struct_types,
             self.target_symbols,
+            context.current_module.as_deref(),
             context.current_flow_path.as_deref(),
         ) {
             Ok(actual_type) if &actual_type != declared_type => {
@@ -103,6 +104,7 @@ impl<'a> VariableInitializerChecker<'a> {
             self.variable_scopes,
             self.struct_types,
             self.target_symbols,
+            context.current_module.as_deref(),
             context.current_flow_path.as_deref(),
         ) {
             Ok(actual_type) if &actual_type != declaration.declared_type() => {
@@ -189,6 +191,65 @@ mod tests {
         );
 
         assert_eq!(variable_initializer_diagnostics(&story), []);
+    }
+
+    #[test]
+    fn accepts_imported_qualified_constant_initializers() {
+        let story = parse_story(
+            "=== module game ===\n\
+             IMPORT MAX_SCORE FROM items\n\
+             VAR score: int = items::MAX_SCORE\n\
+             == main ==\n\
+             -> DONE\n\
+             === module items ===\n\
+             CONST MAX_SCORE: int = 10\n\
+             == helper ==\n\
+             -> DONE",
+        );
+
+        assert_eq!(super::super::run_analysis_passes(&story), []);
+    }
+
+    #[test]
+    fn accepts_default_initializers_for_imported_qualified_struct_types() {
+        let story = parse_story(
+            "=== module game ===\n\
+             IMPORT Item FROM items\n\
+             VAR item: items::Item\n\
+             == main ==\n\
+             -> DONE\n\
+             === module items ===\n\
+             STRUCT Item {\n\
+             hp: int\n\
+             }\n\
+             == helper ==\n\
+             -> DONE",
+        );
+
+        assert_eq!(variable_initializer_diagnostics(&story), []);
+    }
+
+    #[test]
+    fn reports_wrong_type_for_imported_qualified_constant_initializers() {
+        let story = parse_story(
+            "=== module game ===\n\
+             IMPORT MAX_SCORE FROM items\n\
+             VAR score: string = items::MAX_SCORE\n\
+             == main ==\n\
+             -> DONE\n\
+             === module items ===\n\
+             CONST MAX_SCORE: int = 10\n\
+             == helper ==\n\
+             -> DONE",
+        );
+
+        let diagnostics = variable_initializer_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Initializer for variable 'score' has type int but declared type is string",
+        );
     }
 
     #[test]

@@ -17,7 +17,7 @@ The high-level compiler pipeline is:
 
 ```text
 SourceInput
-  -> source preprocessing
+  -> source preparation
   -> syntax parsing
   -> parsed model
   -> analysis
@@ -30,23 +30,27 @@ SourceInput
 together. Each stage returns a `StageOutput<T>` with an optional artifact and a
 list of `Diagnostic` values.
 
+Module-aware callers should prefer `Compiler::compile_sources(Vec<SourceInput>)`
+when a story spans multiple files. The compiler does not discover sibling files
+or expand includes; the caller supplies every source input in the compilation
+unit.
+
 ## Compiler Pipeline
 
 ### Source
 
 Source ownership lives in `crates/ink-compiler/src/source.rs` and
-`crates/ink-compiler/src/source/preprocess.rs`.
+is intentionally limited to explicit source inputs.
 
 - `SourceInput` is the public source entry point.
-- `FileHandler` resolves and loads `INCLUDE` files.
 - `SourceFile` is the compiler-internal line model passed to syntax parsing.
 - `SourceLine` carries normalized line text plus a `SourceSpan`.
-- `preprocess_includes` expands `INCLUDE` statements before syntax parsing,
-  preserves root/flow ordering, detects recursive includes, and keeps per-line
-  source spans for included files.
+- Source preparation removes comments, preserves source filenames and line
+  spans, and reports removed `INCLUDE` syntax before parsing.
 
-Source preprocessing should stay limited to file-level concerns: comments,
-includes, file names, and line spans. It should not parse language constructs.
+Source preparation should stay limited to file-level concerns: comments, file
+names, line spans, and removed source-file constructs. It should not parse
+language declarations or expressions.
 
 ### Diagnostics
 
@@ -73,6 +77,11 @@ order. The parser should own syntax decisions and diagnostics for malformed
 source. Lowering should not compensate for syntax shapes that were parsed
 ambiguously.
 
+Explicit modules are part of syntax parsing. `=== module name ===` opens a
+module block, `IMPORT ... FROM ...` declarations belong at module top level,
+knots and functions inside modules use `==`, and stitches use `=`. Direct
+module-level story content and module-level tags are syntax errors.
+
 Important syntax modules:
 
 - `rule.rs`: `RuleParser`, the local parser facade for one source line.
@@ -94,11 +103,12 @@ management.
 
 The parsed model lives in `crates/ink-compiler/src/parsed/`.
 
-Parsed types represent high-level Ink concepts: `Story`, `Flow`, `Weave`,
-`Choice`, `Gather`, `Divert`, `Expression`, `Conditional`, `Sequence`,
-`VariableAssignment`, and related nodes. Parsed objects should preserve semantic
-information that later stages need. Avoid sending raw source strings into
-analysis or lowering when a typed parsed node can own the concept.
+Parsed types represent high-level Ink concepts: `Story`, `Module`,
+`ImportDeclaration`, `Flow`, `Weave`, `Choice`, `Gather`, `Divert`,
+`Expression`, `Conditional`, `Sequence`, `VariableAssignment`, and related
+nodes. Parsed objects should preserve semantic information that later stages
+need. Avoid sending raw source strings into analysis or lowering when a typed
+parsed node can own the concept.
 
 `parsed/visit.rs` provides traversal helpers used by analysis and tests. Add to
 the parsed model first when a feature exposes structural data; lowering should
@@ -116,6 +126,8 @@ This stage checks story-wide semantic rules before lowering:
 - `flow.rs`: termination and loose-end checks
 - `constants.rs`: constant collection and redefinition behavior
 - `warnings.rs`: author warnings
+- `modules.rs`: module namespaces, imports, entry point, dependency reachability,
+  and module-specific diagnostics
 - `target_symbols.rs` and `variable_targets.rs`: typed lookup support
 - `span.rs`: span helpers for diagnostics
 
@@ -147,6 +159,14 @@ Lowering should be deterministic and mostly diagnostic-free. If lowering needs
 to know whether a target, variable, or symbol exists, prefer adding a typed
 analysis/index result rather than searching strings locally.
 
+For explicit module stories, lowering emits the root container as an auto-divert
+to the unique `module.main` runtime path. Root named content contains one
+container per reachable module, and each module container owns its lowered knots
+and functions. Source `module::flow` names become dot-separated runtime paths
+such as `module.flow`. Module globals and externals keep source-qualified names
+such as `state::score` and `audio::play` because those strings are runtime state
+and host-binding identifiers, not container paths.
+
 ### Emit
 
 `crates/ink-compiler/src/emit.rs` serializes the lowered
@@ -161,8 +181,10 @@ The public API is intentionally small and re-exported from `ink_compiler`:
 
 - `Compiler`, `CompilerOptions`, `StageOutput<T>`, and `CompiledStory` are the
   main entry points.
-- `SourceInput`, `SourceSpan`, `FileHandler`, and `eliminate_comments` cover
-  source integration.
+- `Compiler::compile_sources` and `Compiler::parse_sources` accept explicit
+  multi-source compilation units for module stories.
+- `SourceInput`, `SourceSpan`, and `eliminate_comments` cover source
+  integration.
 - `Diagnostic`, `DiagnosticSeverity`, and `DiagnosticCode` are the stable
   diagnostic surface.
 - `ParsedStory` and parsed node types are exported for tools that inspect
@@ -211,6 +233,8 @@ The save format no longer stores named flow maps, `currentFlowName`,
 Version 1 saves are rejected rather than migrated. Saving is supported only at
 stable public pause points; mid-expression, string-generation, or pending-divert
 state should produce a clear error instead of serializing runtime internals.
+Module globals appear in `variablesState` under their module-qualified names,
+for example `state::score`.
 
 ## Reference Implementation
 

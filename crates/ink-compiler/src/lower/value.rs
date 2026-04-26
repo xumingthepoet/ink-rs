@@ -39,6 +39,16 @@ pub(super) fn lower_value_literal(
                 path_mode,
             )
         }
+        (Some(TypeName::QualifiedStruct(struct_name)), Expression::StructLiteral(fields)) => {
+            lower_struct_literal(
+                fields,
+                struct_name.as_str(),
+                struct_definitions,
+                choice_labels,
+                global_labels,
+                path_mode,
+            )
+        }
         (_, Expression::String(value)) => Some(RuntimeObject::String(value.clone())),
         (_, Expression::NumberInt(value)) => Some(RuntimeObject::Int(*value)),
         (_, Expression::NumberFloat(value)) => Some(RuntimeObject::Float(value.value())),
@@ -70,7 +80,9 @@ pub(super) fn lower_value_literal(
         (Some(_), Expression::ArrayLiteral(_) | Expression::StructLiteral(_))
         | (_, Expression::StringContent(_))
         | (_, Expression::VariableReference(_))
+        | (_, Expression::QualifiedReference(_))
         | (_, Expression::FunctionCall { .. })
+        | (_, Expression::QualifiedFunctionCall { .. })
         | (_, Expression::FieldAccess { .. })
         | (_, Expression::IndexAccess { .. })
         | (_, Expression::Binary { .. })
@@ -82,24 +94,37 @@ pub(super) fn lower_value_literal(
 pub(super) fn runtime_default_for_type(
     type_name: &TypeName,
     struct_definitions: &StructDefinitions,
+    module_name: Option<&str>,
 ) -> Option<RuntimeObject> {
     let mut visiting_structs = HashSet::new();
-    runtime_default_for_type_with_seen(type_name, struct_definitions, &mut visiting_structs)
+    runtime_default_for_type_with_seen(
+        type_name,
+        struct_definitions,
+        &mut visiting_structs,
+        module_name,
+    )
 }
 
 fn runtime_default_for_type_with_seen(
     type_name: &TypeName,
     struct_definitions: &StructDefinitions,
     visiting_structs: &mut HashSet<String>,
+    module_name: Option<&str>,
 ) -> Option<RuntimeObject> {
     let default_value = type_name.default_value()?;
-    runtime_default_value(&default_value, struct_definitions, visiting_structs)
+    runtime_default_value(
+        &default_value,
+        struct_definitions,
+        visiting_structs,
+        module_name,
+    )
 }
 
 fn runtime_default_value(
     default_value: &DefaultValue,
     struct_definitions: &StructDefinitions,
     visiting_structs: &mut HashSet<String>,
+    module_name: Option<&str>,
 ) -> Option<RuntimeObject> {
     match default_value {
         DefaultValue::Int(value) => Some(RuntimeObject::Int(*value)),
@@ -108,12 +133,14 @@ fn runtime_default_value(
         DefaultValue::String(value) => Some(RuntimeObject::String(value.clone())),
         DefaultValue::Array { .. } => Some(RuntimeObject::ValueArray(Vec::new())),
         DefaultValue::Struct { type_name } => {
-            if !visiting_structs.insert(type_name.clone()) {
+            let definition_name =
+                resolve_struct_definition_name(type_name, module_name, struct_definitions)?;
+            if !visiting_structs.insert(definition_name.clone()) {
                 return None;
             }
 
-            let Some(fields) = struct_definitions.get(type_name) else {
-                visiting_structs.remove(type_name);
+            let Some(fields) = struct_definitions.get(&definition_name) else {
+                visiting_structs.remove(&definition_name);
                 return None;
             };
 
@@ -123,14 +150,15 @@ fn runtime_default_value(
                     field_type,
                     struct_definitions,
                     visiting_structs,
+                    module_name,
                 ) else {
-                    visiting_structs.remove(type_name);
+                    visiting_structs.remove(&definition_name);
                     return None;
                 };
                 object_fields.insert(field_name.clone(), field_value);
             }
 
-            visiting_structs.remove(type_name);
+            visiting_structs.remove(&definition_name);
             Some(RuntimeObject::ValueObject(object_fields))
         }
     }
@@ -144,7 +172,12 @@ fn lower_struct_literal(
     global_labels: &LabelIndex,
     path_mode: &ChoicePathMode,
 ) -> Option<RuntimeObject> {
-    let field_definitions = struct_definitions.get(struct_name)?;
+    let definition_name = resolve_struct_definition_name(
+        struct_name,
+        path_mode.current_module_name(),
+        struct_definitions,
+    )?;
+    let field_definitions = struct_definitions.get(&definition_name)?;
     let provided_fields = fields
         .iter()
         .map(|field| (field.name(), field.expression()))
@@ -162,7 +195,11 @@ fn lower_struct_literal(
                 path_mode,
             )?
         } else {
-            runtime_default_for_type(field_type, struct_definitions)?
+            runtime_default_for_type(
+                field_type,
+                struct_definitions,
+                path_mode.current_module_name(),
+            )?
         };
         object_fields.insert(field_name.clone(), field_value);
     }
@@ -210,4 +247,22 @@ pub(super) fn resolve_divert_target_value(
     } else {
         path_mode.resolve_divert_target(target)
     }
+}
+
+fn resolve_struct_definition_name(
+    struct_name: &str,
+    module_name: Option<&str>,
+    struct_definitions: &StructDefinitions,
+) -> Option<String> {
+    if struct_definitions.contains_key(struct_name) {
+        return Some(struct_name.to_string());
+    }
+
+    if struct_name.contains("::") {
+        return None;
+    }
+
+    module_name
+        .map(|module_name| format!("{module_name}::{struct_name}"))
+        .filter(|qualified_name| struct_definitions.contains_key(qualified_name))
 }

@@ -276,9 +276,7 @@ fn parse_inline_braced_object(
         )?));
     }
 
-    if let Some((condition_source, branch_source)) =
-        scan::split_top_level_once_with_options(source, ':', scan::ScanOptions::inline_text())
-    {
+    if let Some((condition_source, branch_source)) = split_inline_conditional(source) {
         let condition = super::parse_initial_expression(condition_source.trim())?;
         let alternatives = scan::split_top_level_preserving_whitespace_with_options(
             branch_source,
@@ -327,6 +325,21 @@ fn parse_inline_braced_object(
     Some(Object::Expression(super::parse_initial_expression(
         trimmed,
     )?))
+}
+
+fn split_inline_conditional(source: &str) -> Option<(&str, &str)> {
+    let index = scan::top_level_token_matches_with_options(
+        source,
+        &[":"],
+        scan::ScanOptions::inline_text(),
+    )
+    .into_iter()
+    .map(|(index, _)| index)
+    .find(|index| {
+        !source[..*index].ends_with(':') && !source[index + ':'.len_utf8()..].starts_with(':')
+    })?;
+
+    Some((&source[..index], &source[index + ':'.len_utf8()..]))
 }
 
 fn parse_inline_sequence(
@@ -405,4 +418,47 @@ fn normalize_divert_separator_whitespace(text: &str) -> String {
     }
 
     text[..trimmed.len() + 1].to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        parsed::{Expression, Object},
+        source::SourceSpan,
+    };
+
+    use super::*;
+
+    #[test]
+    fn inline_braced_qualified_reference_is_not_split_as_conditional() {
+        let objects = parse_inline_content(
+            "{state::score}",
+            &SourceSpan::new(Some("module.ink".to_string()), 1, 1),
+        )
+        .expect("inline content should parse");
+
+        let [Object::ContentList(content)] = objects.as_slice() else {
+            panic!("expected braced content list, got {objects:#?}");
+        };
+        let [Object::Expression(Expression::QualifiedReference(name))] = content.objects() else {
+            panic!("expected qualified reference expression, got {content:#?}");
+        };
+
+        assert_eq!(name.as_str(), "state::score");
+    }
+
+    #[test]
+    fn inline_braced_single_colon_still_parses_as_conditional() {
+        let objects = parse_inline_content(
+            "{ready: go}",
+            &SourceSpan::new(Some("conditional.ink".to_string()), 1, 1),
+        )
+        .expect("inline content should parse");
+
+        let [Object::ContentList(content)] = objects.as_slice() else {
+            panic!("expected braced content list, got {objects:#?}");
+        };
+
+        assert!(matches!(content.objects(), [Object::Conditional(_)]));
+    }
 }

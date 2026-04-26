@@ -8,7 +8,9 @@ use super::context::ChoicePathMode;
 use super::indexes::{
     CallSignature, ConstantValue, ConstantValues, ExternalSignatures, StructDefinitions,
 };
-use super::path::LabelIndex;
+use super::path::{
+    module_scoped_source_path_to_runtime_path, source_path_to_runtime_path, LabelIndex,
+};
 use super::value::{lower_value_literal, resolve_divert_target_value};
 use super::weave::lower_content_list_into_context;
 use super::{
@@ -147,8 +149,12 @@ fn lower_expression_into_with_constants(
             )));
         }
         Expression::VariableReference(name) => {
-            if let Some(constant) = constants.get(name) {
-                if visiting_constants.insert(name.clone()) {
+            let resolved_name = resolve_runtime_variable_name(name, path_mode, global_variables);
+            if let Some(constant_name) = resolve_constant_name(name, path_mode, constants) {
+                let constant = constants
+                    .get(constant_name.as_str())
+                    .expect("resolved constant name must exist");
+                if visiting_constants.insert(constant_name.clone()) {
                     lower_constant_expression_into(
                         content,
                         constant,
@@ -162,17 +168,56 @@ fn lower_expression_into_with_constants(
                         has_start_content,
                         visiting_constants,
                     );
-                    visiting_constants.remove(name);
+                    visiting_constants.remove(constant_name.as_str());
                     return;
                 }
             }
 
-            content.push(RuntimeObject::VariableReference(name.clone()));
+            content.push(RuntimeObject::VariableReference(resolved_name));
+        }
+        Expression::QualifiedReference(name) => {
+            if let Some(constant) = constants.get(name.as_str()) {
+                if visiting_constants.insert(name.as_str().to_string()) {
+                    lower_constant_expression_into(
+                        content,
+                        constant,
+                        choice_labels,
+                        global_labels,
+                        global_variables,
+                        external_signatures,
+                        constants,
+                        struct_definitions,
+                        path_mode,
+                        has_start_content,
+                        visiting_constants,
+                    );
+                    visiting_constants.remove(name.as_str());
+                    return;
+                }
+            }
+
+            content.push(RuntimeObject::VariableReference(name.as_str().to_string()));
         }
         Expression::FunctionCall { name, args } => {
             lower_function_call_into(
                 content,
                 name,
+                args,
+                choice_labels,
+                global_labels,
+                global_variables,
+                external_signatures,
+                constants,
+                struct_definitions,
+                path_mode,
+                has_start_content,
+                visiting_constants,
+            );
+        }
+        Expression::QualifiedFunctionCall { name, args } => {
+            lower_function_call_into(
+                content,
+                name.as_str(),
                 args,
                 choice_labels,
                 global_labels,
@@ -376,6 +421,7 @@ fn lower_function_call_into(
     has_start_content: bool,
     visiting_constants: &mut HashSet<String>,
 ) {
+    let resolved_name = resolve_callable_name(name, external_signatures, path_mode);
     match name {
         "ARRAY_REMOVE" => {
             lower_array_remove_call_into(
@@ -449,7 +495,7 @@ fn lower_function_call_into(
             content.push(RuntimeObject::NativeFunction(name.to_string()));
         }
         _ if matches!(
-            external_signatures.get(name),
+            external_signatures.get(resolved_name.as_str()),
             Some(CallSignature::External { .. })
         ) =>
         {
@@ -470,16 +516,16 @@ fn lower_function_call_into(
                 );
             }
             content.push(RuntimeObject::ExternalFunction {
-                target: name.to_string(),
+                target: resolved_name.clone(),
                 args: args.len(),
             });
         }
         _ if matches!(
-            external_signatures.get(name),
+            external_signatures.get(resolved_name.as_str()),
             Some(CallSignature::Ink { .. })
         ) =>
         {
-            let expected_args = match external_signatures.get(name) {
+            let expected_args = match external_signatures.get(resolved_name.as_str()) {
                 Some(CallSignature::Ink { args, .. }) => args.as_slice(),
                 _ => &[],
             };
@@ -500,7 +546,7 @@ fn lower_function_call_into(
                 );
             }
             content.push(RuntimeObject::FunctionDivert {
-                target: name.to_string(),
+                target: runtime_function_target(resolved_name.as_str(), path_mode),
             });
         }
         _ => {
@@ -521,10 +567,18 @@ fn lower_function_call_into(
                 );
             }
             content.push(RuntimeObject::FunctionDivert {
-                target: name.to_string(),
+                target: runtime_function_target(resolved_name.as_str(), path_mode),
             });
         }
     }
+}
+
+fn runtime_function_target(name: &str, path_mode: &ChoicePathMode) -> String {
+    if name.contains("::") {
+        return source_path_to_runtime_path(name);
+    }
+
+    module_scoped_source_path_to_runtime_path(path_mode.current_module_name(), name)
 }
 
 fn lower_array_remove_call_into(
@@ -564,9 +618,10 @@ fn lower_array_remove_call_into(
         path_mode,
         struct_definitions,
     );
+    let resolved_root_name = resolve_runtime_variable_name(root_name, path_mode, global_variables);
 
     if cached_components.is_empty() {
-        content.push(RuntimeObject::VariableReference(root_name.to_string()));
+        content.push(RuntimeObject::VariableReference(resolved_root_name.clone()));
         lower_expression_into_with_constants(
             content,
             index_expression,
@@ -584,7 +639,7 @@ fn lower_array_remove_call_into(
     } else {
         lower_assignment_path_update_value_into(
             content,
-            root_name,
+            resolved_root_name.as_str(),
             &cached_components,
             0,
             AssignmentUpdateValue::ArrayRemove {
@@ -600,7 +655,7 @@ fn lower_array_remove_call_into(
         );
     }
 
-    push_reassignment_for_name(content, root_name, path_mode);
+    push_reassignment_for_name(content, resolved_root_name.as_str(), path_mode);
     content.push(RuntimeObject::Void);
 }
 
@@ -621,7 +676,14 @@ pub(super) fn lower_function_arg_into(
     if expected_arg.is_some_and(FlowArgument::is_by_reference) {
         if let Expression::VariableReference(name) = arg {
             content.push(RuntimeObject::VariablePointer {
-                name: name.clone(),
+                name: resolve_runtime_variable_name(name, path_mode, global_variables),
+                context_index: -1,
+            });
+            return;
+        }
+        if let Expression::QualifiedReference(name) = arg {
+            content.push(RuntimeObject::VariablePointer {
+                name: name.as_str().to_string(),
                 context_index: -1,
             });
             return;
@@ -668,4 +730,55 @@ fn is_builtin_function(name: &str) -> bool {
         name,
         "MIN" | "MAX" | "POW" | "FLOOR" | "CEILING" | "INT" | "FLOAT" | "LEN"
     )
+}
+
+fn resolve_runtime_variable_name(
+    name: &str,
+    path_mode: &ChoicePathMode,
+    global_variables: &HashSet<String>,
+) -> String {
+    if name.contains("::") || path_mode.is_local_variable(name) {
+        return name.to_string();
+    }
+
+    path_mode
+        .current_module_name()
+        .map(|module_name| format!("{module_name}::{name}"))
+        .filter(|qualified_name| global_variables.contains(qualified_name))
+        .unwrap_or_else(|| name.to_string())
+}
+
+fn resolve_constant_name(
+    name: &str,
+    path_mode: &ChoicePathMode,
+    constants: &ConstantValues,
+) -> Option<String> {
+    if constants.contains_key(name) {
+        return Some(name.to_string());
+    }
+
+    if name.contains("::") {
+        return None;
+    }
+
+    path_mode
+        .current_module_name()
+        .map(|module_name| format!("{module_name}::{name}"))
+        .filter(|qualified_name| constants.contains_key(qualified_name))
+}
+
+fn resolve_callable_name(
+    name: &str,
+    external_signatures: &ExternalSignatures,
+    path_mode: &ChoicePathMode,
+) -> String {
+    if external_signatures.contains_key(name) || name.contains("::") {
+        return name.to_string();
+    }
+
+    path_mode
+        .current_module_name()
+        .map(|module_name| format!("{module_name}::{name}"))
+        .filter(|qualified_name| external_signatures.contains_key(qualified_name))
+        .unwrap_or_else(|| name.to_string())
 }

@@ -207,7 +207,8 @@ pub(super) fn assignment_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Ob
 fn complex_inc_dec_statement(source: &str, span: crate::source::SourceSpan) -> Option<Vec<Object>> {
     let (target_source, operator, value_source) = split_compound_once(source)?;
     let target_source = target_source.trim();
-    if !target_source.contains('.') && !target_source.contains('[') {
+    if !target_source.contains('.') && !target_source.contains('[') && !target_source.contains("::")
+    {
         return None;
     }
     let target_expression = parse_initial_expression(target_source)?;
@@ -260,7 +261,8 @@ fn complex_assignment_statement(
 ) -> Option<Vec<Object>> {
     let (target_source, value_source) = split_assignment_once(source)?;
     let target_source = target_source.trim();
-    if !target_source.contains('.') && !target_source.contains('[') {
+    if !target_source.contains('.') && !target_source.contains('[') && !target_source.contains("::")
+    {
         return None;
     }
     let target_expression = parse_initial_expression(target_source)?;
@@ -461,6 +463,43 @@ mod tests {
             assignment.target(),
             AssignmentTarget::Variable(name) if name == "score"
         ));
+    }
+
+    #[test]
+    fn parses_qualified_assignment_target() {
+        let line = line("~ items::count = 2");
+        let mut parser = RuleParser::new(&line);
+        let objects = assignment_statement(&mut parser).expect("expected qualified assignment");
+
+        assert!(parser.finish().is_empty());
+        let Object::VariableAssignment(assignment) = &objects[0] else {
+            panic!("expected variable assignment");
+        };
+        assert_eq!(assignment.name(), "items::count");
+        let AssignmentTarget::QualifiedVariable(name) = assignment.target() else {
+            panic!("expected qualified target");
+        };
+        assert_eq!(name.module(), "items");
+        assert_eq!(name.symbol(), "count");
+    }
+
+    #[test]
+    fn parses_qualified_compound_assignment_target() {
+        let line = line("~ items::count += 1");
+        let mut parser = RuleParser::new(&line);
+        let objects = assignment_statement(&mut parser).expect("expected qualified compound");
+
+        assert!(parser.finish().is_empty());
+        let Object::IncDec(inc_dec) = &objects[0] else {
+            panic!("expected inc/dec");
+        };
+        assert_eq!(inc_dec.name(), "items::count");
+        assert!(inc_dec.is_increment());
+        let AssignmentTarget::QualifiedVariable(name) = inc_dec.target() else {
+            panic!("expected qualified target");
+        };
+        assert_eq!(name.module(), "items");
+        assert_eq!(name.symbol(), "count");
     }
 
     #[test]

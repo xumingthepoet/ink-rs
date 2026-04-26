@@ -15,7 +15,9 @@ use super::{
     expression_types::{infer_expression_type, typed_builtin_return_type},
     span::object_span,
     structs::build_struct_type_index,
-    target_symbols::{build_target_symbol_index, resolve_target_symbol},
+    target_symbols::{
+        build_target_symbol_index, is_cross_module_stitch_target, resolve_target_symbol,
+    },
     variables::build_variable_scope_index,
 };
 
@@ -58,9 +60,15 @@ impl<'a> CallTargetChecker<'a> {
         context.current_flow_path.as_deref()
     }
 
+    fn current_module<'context>(&self, context: &'context VisitContext) -> Option<&'context str> {
+        context.current_module.as_deref()
+    }
+
     fn current_flow_context(&self, context: &VisitContext) -> Option<&FlowContext> {
-        self.current_flow_path(context)
-            .and_then(|flow_path| self.flow_contexts_by_path.get(flow_path))
+        self.current_flow_path(context).and_then(|flow_path| {
+            self.flow_contexts_by_path
+                .get(&scoped_context_key(self.current_module(context), flow_path))
+        })
     }
 
     fn current_flow_arguments(&self, context: &VisitContext) -> Option<&[FlowArgument]> {
@@ -78,7 +86,7 @@ impl<'a> CallTargetChecker<'a> {
         divert: &crate::parsed::Divert,
         context: &VisitContext,
     ) {
-        let DivertTarget::Path(target) = divert.target() else {
+        let Some(target) = static_divert_target_name(divert.target()) else {
             return;
         };
 
@@ -87,9 +95,17 @@ impl<'a> CallTargetChecker<'a> {
         }
 
         let span = divert.span();
+        if self.check_cross_module_stitch_target(target, span, context) {
+            return;
+        }
+
         let current_flow_path = self.current_flow_path(context);
-        if let Some(symbol) = resolve_target_symbol(target, current_flow_path, self.target_symbols)
-        {
+        if let Some(symbol) = resolve_target_symbol(
+            target,
+            self.current_module(context),
+            current_flow_path,
+            self.target_symbols,
+        ) {
             if symbol.is_function() {
                 self.diagnostics.push(Diagnostic::error(
                     span.clone(),
@@ -129,9 +145,15 @@ impl<'a> CallTargetChecker<'a> {
         let current_flow_path = self.current_flow_path(context);
 
         if divert.has_argument_list()
-            && resolve_target_symbol(target, current_flow_path, self.target_symbols).is_some_and(
-                |symbol| symbol.is_function() && symbol.return_type() == &TypeName::divert_target(),
+            && resolve_target_symbol(
+                target,
+                self.current_module(context),
+                current_flow_path,
+                self.target_symbols,
             )
+            .is_some_and(|symbol| {
+                symbol.is_function() && symbol.return_type() == &TypeName::divert_target()
+            })
         {
             let args = divert
                 .arguments()
@@ -153,10 +175,11 @@ impl<'a> CallTargetChecker<'a> {
         };
 
         if let Some(root) = expression_root_variable_name(&expression) {
-            if self
-                .variable_scopes
-                .contains_visible_variable(root, current_flow_path)
-            {
+            if self.variable_scopes.contains_visible_variable(
+                root,
+                self.current_module(context),
+                current_flow_path,
+            ) {
                 self.diagnostics.push(Diagnostic::error(
                     divert.span().clone(),
                     format!(
@@ -182,6 +205,7 @@ impl<'a> CallTargetChecker<'a> {
             self.variable_scopes,
             self.struct_types,
             self.target_symbols,
+            self.current_module(context),
             self.current_flow_path(context),
         ) {
             Ok(actual_type) if actual_type == TypeName::divert_target() => {}
@@ -211,6 +235,9 @@ impl<'a> CallTargetChecker<'a> {
         match expression {
             Expression::FunctionCall { name, args } => {
                 self.check_function_call(name, args, span, context);
+            }
+            Expression::QualifiedFunctionCall { name, args } => {
+                self.check_function_call(name.as_str(), args, span, context);
             }
             Expression::ArrayLiteral(elements) => {
                 for element in elements {
@@ -247,6 +274,9 @@ impl<'a> CallTargetChecker<'a> {
             Expression::VariableReference(name) => {
                 self.check_variable_reference(name, span, context);
             }
+            Expression::QualifiedReference(name) => {
+                self.check_variable_reference(name.as_str(), span, context);
+            }
             Expression::StringContent(_)
             | Expression::String(_)
             | Expression::NumberInt(_)
@@ -262,6 +292,13 @@ impl<'a> CallTargetChecker<'a> {
         span: &SourceSpan,
         context: &VisitContext,
     ) {
+        if self.check_cross_module_stitch_target(name, span, context) {
+            for arg in args {
+                self.check_expression(arg, span, context);
+            }
+            return;
+        }
+
         if typed_builtin_return_type(name).is_some() {
             self.check_typed_builtin_call(name, args, span, context);
             for arg in args {
@@ -277,9 +314,13 @@ impl<'a> CallTargetChecker<'a> {
             return;
         }
 
-        let symbol =
-            resolve_target_symbol(name, self.current_flow_path(context), self.target_symbols)
-                .cloned();
+        let symbol = resolve_target_symbol(
+            name,
+            self.current_module(context),
+            self.current_flow_path(context),
+            self.target_symbols,
+        )
+        .cloned();
 
         if let Some(symbol) = symbol {
             if !symbol.is_function() {
@@ -347,6 +388,7 @@ impl<'a> CallTargetChecker<'a> {
             self.variable_scopes,
             self.struct_types,
             self.target_symbols,
+            self.current_module(context),
             self.current_flow_path(context),
         ) {
             Ok(argument_type) if argument_type.array_element_type().is_none() => {
@@ -373,6 +415,7 @@ impl<'a> CallTargetChecker<'a> {
             self.variable_scopes,
             self.struct_types,
             self.target_symbols,
+            self.current_module(context),
             self.current_flow_path(context),
         ) {
             Ok(argument_type) if argument_type != TypeName::int() => {
@@ -409,6 +452,7 @@ impl<'a> CallTargetChecker<'a> {
             self.variable_scopes,
             self.struct_types,
             self.target_symbols,
+            self.current_module(context),
             self.current_flow_path(context),
         ) {
             Ok(argument_type) if argument_type.array_element_type().is_none() => {
@@ -461,6 +505,7 @@ impl<'a> CallTargetChecker<'a> {
                 self.variable_scopes,
                 self.struct_types,
                 self.target_symbols,
+                self.current_module(context),
                 self.current_flow_path(context),
             ) {
                 Ok(actual_type) if &actual_type != expected_type => {
@@ -489,14 +534,28 @@ impl<'a> CallTargetChecker<'a> {
 
     fn check_variable_reference(&mut self, name: &str, span: &SourceSpan, context: &VisitContext) {
         let current_flow_path = self.current_flow_path(context);
+        if name.contains("::")
+            && self
+                .variable_scopes
+                .qualified_constant_declared_type(name)
+                .or_else(|| {
+                    self.variable_scopes
+                        .qualified_global_variable_declared_type(name)
+                })
+                .is_some()
+        {
+            return;
+        }
+
         if name.contains('.') {
             return;
         }
 
-        if self
-            .variable_scopes
-            .contains_visible_variable(name, current_flow_path)
-        {
+        if self.variable_scopes.contains_visible_variable(
+            name,
+            self.current_module(context),
+            current_flow_path,
+        ) {
             return;
         }
 
@@ -512,11 +571,16 @@ impl<'a> CallTargetChecker<'a> {
         span: &SourceSpan,
         context: &VisitContext,
     ) {
+        if self.check_cross_module_stitch_target(target, span, context) {
+            return;
+        }
+
         let variable_name = target.split('.').next().unwrap_or(target);
-        if self
-            .variable_scopes
-            .contains_visible_variable(variable_name, self.current_flow_path(context))
-        {
+        if self.variable_scopes.contains_visible_variable(
+            variable_name,
+            self.current_module(context),
+            self.current_flow_path(context),
+        ) {
             self.diagnostics.push(Diagnostic::error(
                 span.clone(),
                 format!(
@@ -525,11 +589,41 @@ impl<'a> CallTargetChecker<'a> {
             ));
         }
     }
+
+    fn check_cross_module_stitch_target(
+        &mut self,
+        target: &str,
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) -> bool {
+        if !is_cross_module_stitch_target(target, self.current_module(context)) {
+            return false;
+        }
+
+        self.diagnostics.push(Diagnostic::error(
+            span.clone(),
+            format!(
+                "Cross-module direct stitch access is not allowed: '{target}'. Import and reference the parent knot instead."
+            ),
+        ));
+        true
+    }
+}
+
+fn static_divert_target_name(target: &DivertTarget) -> Option<&str> {
+    match target {
+        DivertTarget::Path(target) => Some(target),
+        DivertTarget::QualifiedPath(target) => Some(target.as_str()),
+        DivertTarget::Dynamic(_) | DivertTarget::Done | DivertTarget::End | DivertTarget::Empty => {
+            None
+        }
+    }
 }
 
 fn is_mutable_lvalue(expression: &Expression) -> bool {
     match expression {
         Expression::VariableReference(_) => true,
+        Expression::QualifiedReference(_) => true,
         Expression::FieldAccess { base, .. } | Expression::IndexAccess { base, .. } => {
             is_mutable_lvalue(base)
         }
@@ -547,11 +641,18 @@ fn is_runtime_builtin_function(name: &str) -> bool {
 fn expression_root_variable_name(expression: &Expression) -> Option<&str> {
     match expression {
         Expression::VariableReference(name) => Some(name),
+        Expression::QualifiedReference(name) => Some(name.as_str()),
         Expression::FieldAccess { base, .. } | Expression::IndexAccess { base, .. } => {
             expression_root_variable_name(base)
         }
         _ => None,
     }
+}
+
+fn scoped_context_key(module: Option<&str>, flow_path: &str) -> String {
+    module
+        .map(|module| format!("{module}::{flow_path}"))
+        .unwrap_or_else(|| flow_path.to_string())
 }
 
 impl ParsedVisitor for CallTargetChecker<'_> {
@@ -560,7 +661,10 @@ impl ParsedVisitor for CallTargetChecker<'_> {
             return;
         };
         self.flow_contexts_by_path
-            .entry(flow_path.to_string())
+            .entry(scoped_context_key(
+                context.current_module.as_deref(),
+                flow_path,
+            ))
             .or_insert_with(|| FlowContext::new(flow.arguments().to_vec(), flow.is_function()));
     }
 
@@ -575,10 +679,15 @@ impl ParsedVisitor for CallTargetChecker<'_> {
                     DivertTarget::Dynamic(expression) => {
                         self.check_dynamic_divert_target(expression, divert.span(), context);
                     }
-                    DivertTarget::Path(_) if !self.current_flow_is_function(context) => {
+                    DivertTarget::Path(_) | DivertTarget::QualifiedPath(_)
+                        if !self.current_flow_is_function(context) =>
+                    {
                         self.check_plain_divert_target(divert, context);
                     }
-                    DivertTarget::Path(_) | DivertTarget::Done | DivertTarget::End => {}
+                    DivertTarget::Path(_)
+                    | DivertTarget::QualifiedPath(_)
+                    | DivertTarget::Done
+                    | DivertTarget::End => {}
                 }
                 for argument in divert.arguments() {
                     self.check_expression(argument, divert.span(), context);
@@ -623,8 +732,26 @@ impl ParsedVisitor for CallTargetChecker<'_> {
                 for argument in tunnel_onwards.arguments() {
                     self.check_expression(argument, tunnel_onwards.span(), context);
                 }
-                if let Some(DivertTarget::Dynamic(expression)) = tunnel_onwards.override_target() {
-                    self.check_dynamic_divert_target(expression, tunnel_onwards.span(), context);
+                if let Some(target) = tunnel_onwards.override_target() {
+                    match target {
+                        DivertTarget::Dynamic(expression) => {
+                            self.check_dynamic_divert_target(
+                                expression,
+                                tunnel_onwards.span(),
+                                context,
+                            );
+                        }
+                        DivertTarget::Path(_) | DivertTarget::QualifiedPath(_) => {
+                            if let Some(target) = static_divert_target_name(target) {
+                                self.check_cross_module_stitch_target(
+                                    target,
+                                    tunnel_onwards.span(),
+                                    context,
+                                );
+                            }
+                        }
+                        DivertTarget::Done | DivertTarget::End | DivertTarget::Empty => {}
+                    }
                 }
             }
             Object::AuthorWarning(_)
@@ -1002,6 +1129,202 @@ mod tests {
                     == "Initializer for variable 'score' has type string but declared type is int"
             }),
             "{diagnostics:#?}"
+        );
+    }
+
+    #[test]
+    fn module_function_lookup_uses_current_module_only() {
+        let story = parse_story(
+            "=== module game ===\n\
+             == main ==\n\
+             ~ helper()\n\
+             -> DONE\n\
+             === module items ===\n\
+             == function helper() => void ==\n\
+             ~ return",
+        );
+
+        let diagnostics = call_target_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Function 'helper' is not declared",
+        );
+    }
+
+    #[test]
+    fn module_function_lookup_accepts_same_module_functions() {
+        let story = parse_story(
+            "=== module game ===\n\
+             == main ==\n\
+             ~ helper()\n\
+             -> DONE\n\
+             == function helper() => void ==\n\
+             ~ return\n\
+             === module items ===\n\
+             == function helper() => void ==\n\
+             ~ return",
+        );
+
+        assert_eq!(call_target_diagnostics(&story), []);
+    }
+
+    #[test]
+    fn qualified_module_function_calls_are_type_checked() {
+        let story = parse_story(
+            "=== module game ===\n\
+             IMPORT add FROM math\n\
+             == main ==\n\
+             ~ temp total: int = math::add(1, 2)\n\
+             -> END\n\
+             === module math ===\n\
+             == function add(left: int, right: int) => int ==\n\
+             ~ return left + right",
+        );
+
+        assert_eq!(call_target_diagnostics(&story), []);
+    }
+
+    #[test]
+    fn qualified_module_function_calls_report_argument_type_errors() {
+        let story = parse_story(
+            "=== module game ===\n\
+             IMPORT add FROM math\n\
+             == main ==\n\
+             ~ temp total: int = math::add(1, \"two\")\n\
+             -> END\n\
+             === module math ===\n\
+             == function add(left: int, right: int) => int ==\n\
+             ~ return left + right",
+        );
+
+        let diagnostics = call_target_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Argument 'right' for function 'math::add' has type string but expected int",
+        );
+    }
+
+    #[test]
+    fn qualified_external_calls_are_type_checked() {
+        let story = parse_story(
+            "=== module game ===\n\
+             IMPORT play FROM audio\n\
+             == main ==\n\
+             ~ temp code: int = audio::play(\"intro\")\n\
+             -> END\n\
+             === module audio ===\n\
+             EXTERNAL play(name: string) => int\n\
+             == helper ==\n\
+             -> END",
+        );
+
+        assert_eq!(call_target_diagnostics(&story), []);
+    }
+
+    #[test]
+    fn module_diverts_accept_same_module_knot_stitch_paths() {
+        let story = parse_story(
+            "=== module game ===\n\
+             == main ==\n\
+             -> scene.intro\n\
+             == scene ==\n\
+             = intro\n\
+             -> END",
+        );
+
+        assert_eq!(call_target_diagnostics(&story), []);
+    }
+
+    #[test]
+    fn module_diverts_accept_relative_stitch_shorthand() {
+        let story = parse_story(
+            "=== module game ===\n\
+             == main ==\n\
+             -> intro\n\
+             = intro\n\
+             -> END",
+        );
+
+        assert_eq!(call_target_diagnostics(&story), []);
+    }
+
+    #[test]
+    fn module_diverts_accept_same_module_self_qualified_stitches() {
+        let story = parse_story(
+            "=== module game ===\n\
+             == main ==\n\
+             -> game::scene.intro\n\
+             == scene ==\n\
+             = intro\n\
+             -> END",
+        );
+
+        assert_eq!(call_target_diagnostics(&story), []);
+    }
+
+    #[test]
+    fn module_diverts_reject_cross_module_direct_stitch_paths() {
+        let story = parse_story(
+            "=== module game ===\n\
+             IMPORT scene FROM items\n\
+             == main ==\n\
+             -> items::scene.intro\n\
+             === module items ===\n\
+             == scene ==\n\
+             = intro\n\
+             -> END",
+        );
+
+        let diagnostics = call_target_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Cross-module direct stitch access is not allowed: 'items::scene.intro'. Import and reference the parent knot instead.",
+        );
+    }
+
+    #[test]
+    fn module_diverts_accept_cross_module_parent_knots_for_target_resolution() {
+        let story = parse_story(
+            "=== module game ===\n\
+             IMPORT scene FROM items\n\
+             == main ==\n\
+             -> items::scene\n\
+             === module items ===\n\
+             == scene ==\n\
+             = intro\n\
+             -> END",
+        );
+
+        assert_eq!(call_target_diagnostics(&story), []);
+    }
+
+    #[test]
+    fn module_tunnel_onwards_reject_cross_module_direct_stitch_paths() {
+        let story = parse_story(
+            "=== module game ===\n\
+             IMPORT scene FROM items\n\
+             == main ==\n\
+             -> tunnel ->-> items::scene.intro\n\
+             == tunnel ==\n\
+             ->->\n\
+             === module items ===\n\
+             == scene ==\n\
+             = intro\n\
+             -> END",
+        );
+
+        let diagnostics = call_target_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Cross-module direct stitch access is not allowed: 'items::scene.intro'. Import and reference the parent knot instead.",
         );
     }
 }

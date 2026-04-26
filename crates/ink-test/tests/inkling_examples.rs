@@ -55,7 +55,7 @@ impl Story {
 }
 
 fn compile_story(source: &str) -> Story {
-    let result = Compiler::new().compile(SourceInput::new(source));
+    let result = Compiler::new().compile(SourceInput::new(explicit_game_module(source)));
     let errors = result
         .diagnostics
         .iter()
@@ -78,7 +78,7 @@ fn story_is_ended(story: &Story) -> bool {
 
 fn compile_error_messages(source: &str) -> Vec<String> {
     Compiler::new()
-        .compile(SourceInput::new(source))
+        .compile(SourceInput::new(explicit_game_module(source)))
         .diagnostics
         .into_iter()
         .filter(|diagnostic| diagnostic.severity == DiagnosticSeverity::Error)
@@ -95,6 +95,74 @@ fn assert_compile_errors(source: &str) -> Vec<String> {
 fn choose(story: &mut Story, index: usize) -> String {
     story.choose_choice_index(index);
     story.cont_maximally()
+}
+
+fn explicit_game_module(source: &str) -> String {
+    let source = source.trim_matches('\n');
+    if source.contains("=== module ") {
+        return source.to_string();
+    }
+
+    let lines = source.lines().collect::<Vec<_>>();
+    let mut index = 0;
+    let mut declarations = Vec::new();
+    while index < lines.len() {
+        let trimmed = lines[index].trim_start();
+        if trimmed.is_empty() {
+            declarations.push(lines[index]);
+            index += 1;
+            continue;
+        }
+        if trimmed.starts_with("VAR ")
+            || trimmed.starts_with("CONST ")
+            || trimmed.starts_with("EXTERNAL ")
+        {
+            declarations.push(lines[index]);
+            index += 1;
+            continue;
+        }
+        if trimmed.starts_with("STRUCT ") {
+            declarations.push(lines[index]);
+            index += 1;
+            while index < lines.len() {
+                declarations.push(lines[index]);
+                let field_line = lines[index].trim();
+                index += 1;
+                if field_line == "}" {
+                    break;
+                }
+            }
+            continue;
+        }
+        break;
+    }
+
+    let body = lines[index..].join("\n");
+    let mut module = String::from("=== module game ===\n");
+    if !declarations.is_empty() {
+        module.push_str(&declarations.join("\n"));
+        module.push('\n');
+    }
+    module.push_str("== main ==\n");
+    if let Some(first_flow) = first_flow_name(&body) {
+        module.push_str("-> ");
+        module.push_str(first_flow);
+        module.push('\n');
+    }
+    module.push_str(&body);
+    if !body.contains("-> END") && !body.contains("-> DONE") {
+        module.push_str("\n-> END");
+    }
+    module
+}
+
+fn first_flow_name(source: &str) -> Option<&str> {
+    let first_content = source.lines().find(|line| !line.trim().is_empty())?.trim();
+    if !first_content.starts_with("==") || first_content.starts_with("== function ") {
+        return None;
+    }
+
+    first_content.trim_matches('=').split_whitespace().next()
 }
 
 // The tests below are ports of scenarios from pjohansson/inkling's `tests/`
@@ -198,7 +266,9 @@ After: {a} + {b} = {a + b}.
     );
     assert_eq!(
         Some(7),
-        story.get_variable("a").and_then(|value| value.get::<i32>())
+        story
+            .get_variable("game::a")
+            .and_then(|value| value.get::<i32>())
     );
 }
 
@@ -539,7 +609,7 @@ The latest measurement is {value} {unit}.
     assert_eq!(
         Some(false),
         story
-            .get_variable("is_hazardous")
+            .get_variable("game::is_hazardous")
             .and_then(|value| value.get::<bool>())
     );
 }
@@ -557,7 +627,7 @@ The latest measurement is {value} {unit}.
     );
 
     story
-        .set_variable("value", &ValueType::Float(15000.0))
+        .set_variable("game::value", &ValueType::Float(15000.0))
         .unwrap();
     assert_eq!(
         "The latest measurement is 15000 Röntgen.\n",
@@ -587,7 +657,7 @@ The latest measurement is {value} {unit}. {value < threshold: Not terrible, not 
         story.cont_maximally()
     );
     story
-        .set_variable("value", &ValueType::Float(15000.0))
+        .set_variable("game::value", &ValueType::Float(15000.0))
         .unwrap();
     assert_eq!(
         "The latest measurement is 15000 Röntgen. Oh no.\n",
@@ -617,10 +687,10 @@ The latest measurement is {value} {unit}. {not is_hazardous: Not terrible, not g
         story.cont_maximally()
     );
     story
-        .set_variable("value", &ValueType::Float(15000.0))
+        .set_variable("game::value", &ValueType::Float(15000.0))
         .unwrap();
     story
-        .set_variable("is_hazardous", &ValueType::Bool(true))
+        .set_variable("game::is_hazardous", &ValueType::Bool(true))
         .unwrap();
     assert_eq!(
         "The latest measurement is 15000 Röntgen. Oh no.\n",

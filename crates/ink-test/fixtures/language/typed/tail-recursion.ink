@@ -1,3 +1,5 @@
+=== module game ===
+== main ==
 {count_down(1500, 0)}|{sum_to(5, 0)}
 -> DONE
 

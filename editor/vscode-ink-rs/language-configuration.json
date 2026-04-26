@@ -62,7 +62,7 @@
   ],
   "folding": {
     "markers": {
-      "start": "^\\s*(STRUCT\\s+[A-Za-z_][A-Za-z0-9_]*\\s*\\{|={1,}\\s*(?:function\\s+)?[A-Za-z_][A-Za-z0-9_]*)",
+      "start": "^\\s*(STRUCT\\s+[A-Za-z_][A-Za-z0-9_]*\\s*\\{|===\\s*module\\s+[A-Za-z_][A-Za-z0-9_]*\\s*===|==\\s*(?:function\\s+)?[A-Za-z_][A-Za-z0-9_]*)",
       "end": "^\\s*\\}"
     }
   },

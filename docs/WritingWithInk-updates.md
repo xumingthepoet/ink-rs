@@ -25,6 +25,39 @@ Each entry should include:
 - migration guidance
 - tests
 
+## 2026-04-27: Explicit Modules And Imports Replace Include
+
+- status: supported/removed
+- upstream behavior: upstream Ink permits root-level story content, top-level
+  knots in an implicit root namespace, story-global tags before the first knot,
+  file concatenation through `INCLUDE`, and cross-file/global lookup without an
+  explicit dependency declaration.
+- ink-rs behavior: runnable stories require explicit modules. A module starts
+  with `=== module name ===`; knots and functions inside modules use `==`;
+  stitches still use `=`. Exactly one module must define `== main ==`, which is
+  the story entry point. Module-level direct content and module-level tags are
+  rejected; content and tags belong inside knots or stitches. Source files are
+  passed explicitly to the compiler, and `INCLUDE` is removed. Cross-module
+  access requires an `IMPORT name FROM module` declaration and qualified source
+  references such as `shop::price`. Module `VAR` and `EXTERNAL` runtime names
+  are module-qualified, for example `shop::price` and `audio::play`.
+- documentation effect: `WritingWithInk-latest.md` documents explicit modules
+  as the current source shape, replaces the include section with module/import
+  guidance, and describes module-scoped globals and host bindings.
+- rationale: modules make source ownership, dependency checks, namespace
+  boundaries, and multi-source compilation explicit instead of depending on
+  text concatenation order or global visibility leaks.
+- migration guidance: wrap runnable content in a module with `== main ==`,
+  move top-level declarations to module top level, move root content and root
+  tags into knots, replace `INCLUDE` with explicit compiler source inputs plus
+  `IMPORT`, and rewrite cross-module references as `module::symbol`.
+- tests: `docs_module_import_example_runs`,
+  `module_imported_global_variable_reads_and_writes_run`, and
+  `explicit_module_removed_root_behaviors_emit_diagnostics` in
+  `crates/ink-test/tests/language.rs`, plus module parser, analysis, lowering,
+  compiler API, fixture, C# compatibility divergence, and runtime-loading
+  tests.
+
 ## 2026-04-26: Divert Target Values And Return Type Marker
 
 - status: supported
@@ -119,26 +152,25 @@ Each entry should include:
   `crates/ink-test/tests/language.rs`, plus compiler parser, initializer,
   struct literal, and array literal unit tests.
 
-## 2026-04-26: Global VAR Declarations Restricted To Story Top Level
+## 2026-04-26: Global VAR Declarations Restricted To Module Top Level
 
 - status: removed
 - upstream behavior: upstream Ink allows global variables to be introduced with
   `VAR` anywhere in the parsed story, including inside knots, stitches,
   functions, choices, conditionals, and sequences.
-- ink-rs behavior: `VAR` declarations are only accepted at the story top level,
+- ink-rs behavior: `VAR` declarations are only accepted at module top level,
   outside knots, stitches, functions, choices, conditionals, and sequences.
   Local executable state should use typed `temp` declarations instead.
 - documentation effect: `WritingWithInk-latest.md` records the scope
   restriction in "Changed from upstream Ink" and in the global variable
   declaration section.
 - rationale: hidden global declarations inside executable flow content make
-  include expansion and future source organization rules ambiguous. Keeping
-  globals in one story-level declaration area makes global state explicit before
-  flow execution.
-- migration guidance: move nested `VAR` declarations to the story top level. If
+  source organization rules ambiguous. Keeping globals in module-level
+  declaration areas makes global state explicit before flow execution.
+- migration guidance: move nested `VAR` declarations to module top level. If
   the value is only needed inside a knot, stitch, function, choice, conditional,
   or sequence, replace it with a typed `temp` declaration.
-- tests: `nested_global_var_declarations_report_removed_feature_diagnostic` in
+- tests: `nested_global_var_declarations_report_current_syntax_error` in
   `crates/ink-test/tests/language.rs`,
   `global_var_declarations_inside_flows_report_removed_feature` in
   `crates/ink-compiler/src/syntax/parser.rs`, and

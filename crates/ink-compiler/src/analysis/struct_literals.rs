@@ -13,7 +13,7 @@ use crate::{
 use super::{
     context::{StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
     expression_types::infer_expression_type,
-    structs::build_struct_type_index,
+    structs::{build_struct_type_index, resolve_struct_symbol},
     target_symbols::build_target_symbol_index,
     variables::build_variable_scope_index,
 };
@@ -87,7 +87,11 @@ impl<'a> StructLiteralChecker<'a> {
 
     fn visible_declared_type(&self, name: &str, context: &VisitContext) -> Option<TypeName> {
         self.variable_scopes
-            .visible_variable_declared_type(name, context.current_flow_path.as_deref())
+            .visible_variable_declared_type(
+                name,
+                context.current_module.as_deref(),
+                context.current_flow_path.as_deref(),
+            )
             .and_then(|declared_type| declared_type.cloned())
     }
 
@@ -103,7 +107,10 @@ impl<'a> StructLiteralChecker<'a> {
             (TypeName::Struct(struct_name), Expression::StructLiteral(fields)) => {
                 self.check_struct_literal(struct_name, fields, span, context);
             }
-            (TypeName::Struct(_), _) => {
+            (TypeName::QualifiedStruct(struct_name), Expression::StructLiteral(fields)) => {
+                self.check_struct_literal(struct_name.as_str(), fields, span, context);
+            }
+            (TypeName::Struct(_), _) | (TypeName::QualifiedStruct(_), _) => {
                 self.check_non_literal_expression(
                     expression,
                     expected_type,
@@ -127,6 +134,7 @@ impl<'a> StructLiteralChecker<'a> {
                     self.variable_scopes,
                     self.struct_types,
                     self.target_symbols,
+                    context.current_module.as_deref(),
                     context.current_flow_path.as_deref(),
                 ) {
                     if &actual_type != expected_type {
@@ -156,6 +164,7 @@ impl<'a> StructLiteralChecker<'a> {
             self.variable_scopes,
             self.struct_types,
             self.target_symbols,
+            context.current_module.as_deref(),
             context.current_flow_path.as_deref(),
         ) {
             Ok(actual_type) if &actual_type != expected_type => {
@@ -188,7 +197,11 @@ impl<'a> StructLiteralChecker<'a> {
         span: &SourceSpan,
         context: &VisitContext,
     ) {
-        let Some(symbol) = self.struct_types.get(struct_name) else {
+        let Some(symbol) = resolve_struct_symbol(
+            self.struct_types,
+            struct_name,
+            context.current_module.as_deref(),
+        ) else {
             self.diagnostics.push(Diagnostic::error(
                 span.clone(),
                 format!("Unknown struct type '{struct_name}' for struct literal"),
@@ -295,6 +308,72 @@ mod tests {
         );
 
         assert_eq!(struct_literal_diagnostics(&story), []);
+    }
+
+    #[test]
+    fn resolves_struct_literals_against_current_module_structs() {
+        let story = parse_story(
+            "=== module game ===\n\
+             STRUCT Item {\n\
+             hp: int\n\
+             }\n\
+             VAR item: Item = { hp: 1 }\n\
+             == main ==\n\
+             -> DONE\n\
+             === module items ===\n\
+             STRUCT Item {\n\
+             label: string\n\
+             }\n\
+             VAR item: Item = { label: \"sword\" }\n\
+             == helper ==\n\
+             -> DONE",
+        );
+
+        assert_eq!(struct_literal_diagnostics(&story), []);
+    }
+
+    #[test]
+    fn accepts_imported_qualified_struct_literals() {
+        let story = parse_story(
+            "=== module game ===\n\
+             IMPORT Item FROM items\n\
+             VAR item: items::Item = { hp: 1 }\n\
+             == main ==\n\
+             -> DONE\n\
+             === module items ===\n\
+             STRUCT Item {\n\
+             hp: int\n\
+             }\n\
+             == helper ==\n\
+             -> DONE",
+        );
+
+        assert_eq!(super::super::run_analysis_passes(&story), []);
+    }
+
+    #[test]
+    fn reports_wrong_type_for_imported_qualified_struct_literals() {
+        let story = parse_story(
+            "=== module game ===\n\
+             IMPORT Item FROM items\n\
+             VAR item: items::Item = { hp: \"full\" }\n\
+             == main ==\n\
+             -> DONE\n\
+             === module items ===\n\
+             STRUCT Item {\n\
+             hp: int\n\
+             }\n\
+             == helper ==\n\
+             -> DONE",
+        );
+
+        let diagnostics = struct_literal_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Value for 'items::Item.hp' has type string but expected int",
+        );
     }
 
     #[test]

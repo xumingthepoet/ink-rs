@@ -1,3 +1,4 @@
+=== module game ===
 STRUCT Player {
     hp: int
 }
@@ -5,6 +6,7 @@ STRUCT Player {
 VAR party: Player[] = [{ hp: 7 }]
 VAR seed_values: int[] = [2, 3]
 
+== main ==
 {add(2, 3)}|{label("Ada")}|{first_hp(party)}
 ~ temp values: int[] = identity(seed_values)
 {values[0]}|{values[1]}

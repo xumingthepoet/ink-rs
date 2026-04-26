@@ -40,7 +40,7 @@ pub(super) fn line_statement(parser: &mut RuleParser<'_>) -> Option<Vec<Object>>
 
 pub(super) fn expression_contains_function_call(expr: &Expression) -> bool {
     match expr {
-        Expression::FunctionCall { .. } => true,
+        Expression::FunctionCall { .. } | Expression::QualifiedFunctionCall { .. } => true,
         Expression::StringContent(content) => {
             content.objects().iter().any(object_contains_function_call)
         }

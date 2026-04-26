@@ -1,36 +1,6 @@
-use std::{
-    env, fs, io,
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use std::{env, fs, path::PathBuf};
 
-use ink_compiler::{Compiler, CompilerOptions, FileHandler, SourceInput};
-
-#[derive(Debug)]
-struct CliFileHandler {
-    base_dir: PathBuf,
-}
-
-impl CliFileHandler {
-    fn new(base_dir: PathBuf) -> Self {
-        Self { base_dir }
-    }
-}
-
-impl FileHandler for CliFileHandler {
-    fn resolve_ink_filename(&self, include_name: &str) -> PathBuf {
-        let include_path = Path::new(include_name);
-        if include_path.is_absolute() {
-            include_path.to_path_buf()
-        } else {
-            self.base_dir.join(include_path)
-        }
-    }
-
-    fn load_ink_file_contents(&self, full_filename: &Path) -> io::Result<String> {
-        fs::read_to_string(full_filename)
-    }
-}
+use ink_compiler::{Compiler, CompilerOptions, SourceInput};
 
 fn main() {
     if let Err(message) = run() {
@@ -51,20 +21,17 @@ fn run() -> Result<(), String> {
     let source_path = PathBuf::from(source_path);
     let source_text = fs::read_to_string(&source_path)
         .map_err(|error| format!("Failed to read '{}': {error}", source_path.display()))?;
-    let base_dir = source_path
-        .parent()
-        .map(Path::to_path_buf)
-        .unwrap_or_else(|| env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
-    let file_handler: Arc<dyn FileHandler> = Arc::new(CliFileHandler::new(base_dir));
     let source_filename = source_path.display().to_string();
 
     let compiler = Compiler::with_options(CompilerOptions {
         source_filename: Some(source_filename.clone()),
         count_all_visits: false,
-        file_handler: Some(file_handler),
     });
 
-    let result = compiler.compile(SourceInput::named(source_text, source_filename.clone()));
+    let result = compiler.compile_sources(vec![SourceInput::named(
+        source_text,
+        source_filename.clone(),
+    )]);
     for diagnostic in &result.diagnostics {
         eprintln!("{}", format_diagnostic(diagnostic, &source_filename));
     }
@@ -98,4 +65,34 @@ fn format_diagnostic(diagnostic: &ink_compiler::Diagnostic, fallback_source: &st
 
 fn usage() -> String {
     "Usage: ink_compile <story.ink> [output.json]".to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use ink_compiler::{Diagnostic, SourceSpan};
+
+    use super::*;
+
+    #[test]
+    fn formats_diagnostic_with_source_filename() {
+        let diagnostic = Diagnostic::error(
+            SourceSpan::new(Some("story.ink".to_string()), 3, 5),
+            "bad syntax",
+        );
+
+        assert_eq!(
+            format_diagnostic(&diagnostic, "fallback.ink"),
+            "story.ink:3:5: bad syntax"
+        );
+    }
+
+    #[test]
+    fn formats_diagnostic_with_fallback_filename() {
+        let diagnostic = Diagnostic::error(SourceSpan::new(None, 7, 2), "bad syntax");
+
+        assert_eq!(
+            format_diagnostic(&diagnostic, "fallback.ink"),
+            "fallback.ink:7:2: bad syntax"
+        );
+    }
 }

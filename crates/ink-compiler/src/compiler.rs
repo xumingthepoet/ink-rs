@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use ink_story_json_format::Program as RuntimeProgram;
 
 use crate::{
@@ -7,10 +5,7 @@ use crate::{
     diagnostic::{Diagnostic, DiagnosticSeverity},
     emit, lower,
     parsed::Story as ParsedStory,
-    source::{
-        preprocess::{preprocess_includes, PreprocessOptions},
-        FileHandler, SourceInput,
-    },
+    source::{prepare_source_input, SourceInput, SourceSpan},
     syntax,
 };
 
@@ -18,7 +13,6 @@ use crate::{
 pub struct CompilerOptions {
     pub source_filename: Option<String>,
     pub count_all_visits: bool,
-    pub file_handler: Option<Arc<dyn FileHandler>>,
 }
 
 #[derive(Default)]
@@ -56,21 +50,15 @@ impl Compiler {
     }
 
     pub fn parse(&self, input: SourceInput) -> StageOutput<ParsedStory> {
-        let preprocessed = preprocess_includes(
-            input,
-            PreprocessOptions {
-                source_filename: self.options.source_filename.clone(),
-                file_handler: self.options.file_handler.as_deref(),
-            },
-        );
-        let mut diagnostics = preprocessed.diagnostics;
+        let source_load = prepare_source_input(input, self.options.source_filename.clone());
+        let mut diagnostics = source_load.diagnostics;
         if diagnostics_have_errors(&diagnostics) {
             return StageOutput {
                 artifact: None,
                 diagnostics,
             };
         }
-        let Some(source) = preprocessed.source else {
+        let Some(source) = source_load.source else {
             return StageOutput {
                 artifact: None,
                 diagnostics,
@@ -81,6 +69,44 @@ impl Compiler {
         diagnostics.extend(parsed.diagnostics);
         StageOutput {
             artifact: parsed.artifact,
+            diagnostics,
+        }
+    }
+
+    fn parse_source_inputs(
+        &self,
+        inputs: Vec<SourceInput>,
+        api_name: &str,
+    ) -> StageOutput<ParsedStory> {
+        if inputs.is_empty() {
+            return StageOutput {
+                artifact: None,
+                diagnostics: vec![Diagnostic::error(
+                    SourceSpan::new(None, 1, 1),
+                    format!("{api_name} requires at least one source input"),
+                )],
+            };
+        }
+
+        let mut diagnostics = Vec::new();
+        let mut stories = Vec::new();
+
+        for input in inputs {
+            let parsed = self.parse(input);
+            diagnostics.extend(parsed.diagnostics);
+            if let Some(story) = parsed.artifact {
+                stories.push(story);
+            }
+        }
+
+        let artifact = if diagnostics_have_errors(&diagnostics) || stories.is_empty() {
+            None
+        } else {
+            Some(merge_parsed_stories(stories))
+        };
+
+        StageOutput {
+            artifact,
             diagnostics,
         }
     }
@@ -98,9 +124,17 @@ impl Compiler {
     }
 
     pub fn compile(&self, input: SourceInput) -> StageOutput<CompiledStory> {
+        self.compile_sources(vec![input])
+    }
+
+    pub fn parse_sources(&self, inputs: Vec<SourceInput>) -> StageOutput<ParsedStory> {
+        self.parse_source_inputs(inputs, "Compiler::parse_sources")
+    }
+
+    pub fn compile_sources(&self, inputs: Vec<SourceInput>) -> StageOutput<CompiledStory> {
         let mut diagnostics = Vec::new();
 
-        let parsed = self.parse(input);
+        let parsed = self.parse_source_inputs(inputs, "Compiler::compile_sources");
         diagnostics.extend(parsed.diagnostics);
         if diagnostics_have_errors(&diagnostics) {
             return StageOutput {
@@ -160,6 +194,20 @@ impl Compiler {
     }
 }
 
+fn merge_parsed_stories(stories: Vec<ParsedStory>) -> ParsedStory {
+    let mut root_content = Vec::new();
+    let mut flows = Vec::new();
+    let mut modules = Vec::new();
+
+    for story in stories {
+        root_content.extend(story.root_weave().content().iter().cloned());
+        flows.extend(story.flows().iter().cloned());
+        modules.extend(story.modules().iter().cloned());
+    }
+
+    ParsedStory::new_with_modules(root_content, flows, modules)
+}
+
 fn diagnostics_have_errors(diagnostics: &[Diagnostic]) -> bool {
     diagnostics
         .iter()
@@ -168,44 +216,9 @@ fn diagnostics_have_errors(diagnostics: &[Diagnostic]) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        collections::HashMap,
-        io,
-        path::{Path, PathBuf},
-        sync::Arc,
-    };
-
     use serde_json::json;
 
     use super::*;
-
-    struct MemoryFileHandler {
-        files: HashMap<PathBuf, String>,
-    }
-
-    impl MemoryFileHandler {
-        fn new(files: &[(&str, &str)]) -> Self {
-            Self {
-                files: files
-                    .iter()
-                    .map(|(path, contents)| (PathBuf::from(path), contents.to_string()))
-                    .collect(),
-            }
-        }
-    }
-
-    impl FileHandler for MemoryFileHandler {
-        fn resolve_ink_filename(&self, include_name: &str) -> PathBuf {
-            PathBuf::from(include_name)
-        }
-
-        fn load_ink_file_contents(&self, full_filename: &Path) -> io::Result<String> {
-            self.files
-                .get(full_filename)
-                .cloned()
-                .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "include file not found"))
-        }
-    }
 
     #[test]
     fn compiles_plain_text_json() {
@@ -237,24 +250,24 @@ mod tests {
     }
 
     #[test]
-    fn diagnostics_from_included_content_use_include_filename() {
-        let compiler = Compiler::with_options(CompilerOptions {
-            file_handler: Some(Arc::new(MemoryFileHandler::new(&[(
-                "inc.ink",
-                "VAR score = 1",
-            )]))),
-            ..Default::default()
-        });
-
-        let output = compiler.parse(SourceInput::named("INCLUDE inc.ink", "main.ink"));
+    fn include_statement_is_removed_diagnostic() {
+        let compiler = Compiler::default();
+        let output = compiler.parse(SourceInput::named(
+            "Line.\n  INCLUDE inc.ink\nAfter.",
+            "main.ink",
+        ));
 
         assert_eq!(output.diagnostics.len(), 1);
         let diagnostic = &output.diagnostics[0];
         assert_eq!(diagnostic.severity, DiagnosticSeverity::Error);
         assert_eq!(diagnostic.code, None);
-        assert_eq!(diagnostic.source_filename.as_deref(), Some("inc.ink"));
-        assert_eq!(diagnostic.line, 1);
-        assert_eq!(diagnostic.column, 11);
-        assert_eq!(diagnostic.message, "Variable 'score' is missing a type");
+        assert_eq!(diagnostic.source_filename.as_deref(), Some("main.ink"));
+        assert_eq!(diagnostic.line, 2);
+        assert_eq!(diagnostic.column, 3);
+        assert_eq!(
+            diagnostic.message,
+            "INCLUDE is no longer supported; use modules and IMPORT instead"
+        );
+        assert!(output.artifact.is_none());
     }
 }

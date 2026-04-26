@@ -16,7 +16,10 @@ fn compile_language_fixture(filename: &str) -> ink_compiler::CompiledStory {
 }
 
 fn compile_language_source(name: &str, source: impl Into<String>) -> ink_compiler::CompiledStory {
-    let output = Compiler::default().compile(SourceInput::named(source, name));
+    let output = Compiler::default().compile(SourceInput::named(
+        explicit_game_module(source.into()),
+        name,
+    ));
     assert!(
         output.diagnostics.is_empty(),
         "compile for {name} should not emit diagnostics: {:#?}",
@@ -26,12 +29,90 @@ fn compile_language_source(name: &str, source: impl Into<String>) -> ink_compile
 }
 
 fn diagnostics_for_language_source(name: &str, source: impl Into<String>) -> Vec<Diagnostic> {
-    let output = Compiler::default().compile(SourceInput::named(source, name));
+    let output = Compiler::default().compile(SourceInput::named(
+        explicit_game_module(source.into()),
+        name,
+    ));
     assert!(
         output.artifact.is_none(),
         "compile for {name} should fail when asserting diagnostics"
     );
     output.diagnostics
+}
+
+fn explicit_game_module(source: String) -> String {
+    let source = source.trim_matches('\n');
+    if source.contains("=== module ") {
+        return source.to_string();
+    }
+
+    let lines = source.lines().collect::<Vec<_>>();
+    let mut index = 0;
+    let mut declarations = Vec::new();
+    while index < lines.len() {
+        let trimmed = lines[index].trim_start();
+        if trimmed.is_empty() {
+            declarations.push(lines[index]);
+            index += 1;
+            continue;
+        }
+        if trimmed.starts_with("VAR ")
+            || trimmed.starts_with("CONST ")
+            || trimmed.starts_with("EXTERNAL ")
+        {
+            declarations.push(lines[index]);
+            index += 1;
+            continue;
+        }
+        if trimmed.starts_with("STRUCT ") {
+            declarations.push(lines[index]);
+            index += 1;
+            while index < lines.len() {
+                declarations.push(lines[index]);
+                let field_line = lines[index].trim();
+                index += 1;
+                if field_line == "}" {
+                    break;
+                }
+            }
+            continue;
+        }
+        break;
+    }
+
+    let body = lines[index..].join("\n");
+    let mut module = String::from("=== module game ===\n");
+    if !declarations.is_empty() {
+        module.push_str(&declarations.join("\n"));
+        module.push('\n');
+    }
+
+    match first_flow_name(&body) {
+        Some("main") => {}
+        Some(first_flow) => {
+            module.push_str("== main ==\n-> ");
+            module.push_str(first_flow);
+            module.push('\n');
+        }
+        None => {
+            module.push_str("== main ==\n");
+        }
+    }
+
+    module.push_str(&body);
+    if !body.contains("-> END") && !body.contains("-> DONE") {
+        module.push_str("\n-> END");
+    }
+    module
+}
+
+fn first_flow_name(source: &str) -> Option<&str> {
+    let first_content = source.lines().find(|line| !line.trim().is_empty())?.trim();
+    if !first_content.starts_with("==") || first_content.starts_with("== function ") {
+        return None;
+    }
+
+    first_content.trim_matches('=').split_whitespace().next()
 }
 
 fn assert_diagnostic(
@@ -45,6 +126,43 @@ fn assert_diagnostic(
             .any(|diagnostic| diagnostic.severity == severity
                 && diagnostic.message.contains(message_fragment)),
         "expected {severity:?} diagnostic containing {message_fragment:?}, got {diagnostics:#?}"
+    );
+}
+
+#[test]
+fn explicit_module_removed_root_behaviors_emit_diagnostics() {
+    let root_output = Compiler::default().parse_sources(vec![SourceInput::named(
+        "Line before modules.\n=== module game ===\n== main ==\n-> END",
+        "root-content.ink",
+    )]);
+
+    assert!(root_output.has_errors());
+    assert_diagnostic(
+        &root_output.diagnostics,
+        DiagnosticSeverity::Error,
+        "Content and module-scoped declarations must appear after an explicit module declaration",
+    );
+
+    let module_output = Compiler::default().parse(SourceInput::named(
+        "=== module game ===\nLine at module level.\n# module tag\n= stitch\n== main ==\n-> END",
+        "module-content.ink",
+    ));
+
+    assert!(module_output.has_errors());
+    assert_diagnostic(
+        &module_output.diagnostics,
+        DiagnosticSeverity::Error,
+        "Module-level story content is not allowed",
+    );
+    assert_diagnostic(
+        &module_output.diagnostics,
+        DiagnosticSeverity::Error,
+        "Module-level tags are not allowed",
+    );
+    assert_diagnostic(
+        &module_output.diagnostics,
+        DiagnosticSeverity::Error,
+        "Stitch declarations must appear inside a knot",
     );
 }
 
@@ -131,6 +249,258 @@ fn typed_array_fixture_runs() {
 fn typed_divert_target_fixture_runs() {
     let compiled = compile_language_fixture("typed/divert-targets.ink");
     assert_story_output(&compiled, "Here.\nStruct.\nArray.\nFallback.\n");
+}
+
+#[test]
+fn module_imported_global_variable_reads_and_writes_run() {
+    let compiled = compile_language_source(
+        "module-imported-global-vars.ink",
+        concat!(
+            "=== module game ===\n",
+            "IMPORT score FROM state\n",
+            "== main ==\n",
+            "{state::score}\n",
+            "~ state::score += 2\n",
+            "{state::score}\n",
+            "~ state::score = state::score + 3\n",
+            "{state::score}\n",
+            "-> END\n",
+            "=== module state ===\n",
+            "VAR score: int = 1\n",
+            "== helper ==\n",
+            "-> END\n",
+        ),
+    );
+
+    assert_story_output(&compiled, "1\n3\n6\n");
+}
+
+#[test]
+fn docs_module_import_example_runs() {
+    let compiled = compile_language_source(
+        "docs-module-imports.ink",
+        concat!(
+            "=== module game ===\n",
+            "IMPORT price, describe FROM shop\n",
+            "VAR gold: int = 5\n",
+            "== main ==\n",
+            "{shop::describe()}\n",
+            "Gold: {gold}\n",
+            "Price: {shop::price}\n",
+            "~ shop::price += 2\n",
+            "Updated price: {shop::price}\n",
+            "-> END\n",
+            "=== module shop ===\n",
+            "VAR price: int = 3\n",
+            "== function describe() => string ==\n",
+            "~ return \"The shop is open.\"\n",
+        ),
+    );
+
+    assert_story_output(
+        &compiled,
+        "The shop is open.\nGold: 5\nPrice: 3\nUpdated price: 5\n",
+    );
+}
+
+#[test]
+fn module_qualified_function_and_external_calls_run() {
+    let compiled = compile_language_source(
+        "module-qualified-calls.ink",
+        concat!(
+            "=== module game ===\n",
+            "IMPORT add FROM math\n",
+            "IMPORT play FROM audio\n",
+            "== main ==\n",
+            "{math::add(2, 3)}\n",
+            "{audio::play(\"intro\")}\n",
+            "-> END\n",
+            "=== module math ===\n",
+            "== function add(left: int, right: int) => int ==\n",
+            "~ return left + right\n",
+            "=== module audio ===\n",
+            "EXTERNAL play(name: string) => int\n",
+            "== helper ==\n",
+            "-> END\n",
+        ),
+    );
+
+    let mut story = Story::new(&compiled.json).expect("compiled JSON should load");
+    story
+        .bind_external_function("audio::play", Rc::new(RefCell::new(TypedExternal)), true)
+        .expect("module external binding should succeed");
+    let output = story
+        .continue_maximally()
+        .expect("module qualified call story should run");
+
+    assert_eq!(output, "5\n7\n");
+    assert!(
+        story.get_current_errors().is_empty(),
+        "story should not emit runtime errors: {:#?}",
+        story.get_current_errors()
+    );
+}
+
+#[test]
+fn module_qualified_flow_paths_run_without_runtime_colon_separator() {
+    let compiled = compile_language_source(
+        "module-qualified-flow-paths.ink",
+        concat!(
+            "=== module game ===\n",
+            "IMPORT target, tunnel, value FROM routes\n",
+            "== main ==\n",
+            "{routes::value()}\n",
+            "-> routes::tunnel ->\n",
+            "After tunnel.\n",
+            "-> routes::target\n",
+            "=== module routes ===\n",
+            "== function value() => int ==\n",
+            "~ return 9\n",
+            "== tunnel ==\n",
+            "Tunnel.\n",
+            "->->\n",
+            "== target ==\n",
+            "Target.\n",
+            "-> END\n",
+        ),
+    );
+
+    assert_story_output(&compiled, "9\nTunnel.\nAfter tunnel.\nTarget.\n");
+    assert!(
+        !compiled.json.to_string().contains("::"),
+        "runtime flow paths should use dot-separated container paths: {:#}",
+        compiled.json
+    );
+}
+
+#[test]
+fn module_dynamic_qualified_divert_target_values_run() {
+    let compiled = compile_language_source(
+        "module-dynamic-qualified-divert-target.ink",
+        concat!(
+            "=== module game ===\n",
+            "IMPORT target FROM routes\n",
+            "== main ==\n",
+            "~ temp next: -> = -> routes::target\n",
+            "-> {next}\n",
+            "=== module routes ===\n",
+            "== target ==\n",
+            "Dynamic target.\n",
+            "-> END\n",
+        ),
+    );
+
+    assert_story_output(&compiled, "Dynamic target.\n");
+    assert!(
+        !compiled.json.to_string().contains("::"),
+        "runtime divert target values should use dot-separated container paths: {:#}",
+        compiled.json
+    );
+}
+
+#[test]
+fn module_same_module_stitch_paths_run() {
+    let compiled = compile_language_source(
+        "module-same-module-stitch-paths.ink",
+        concat!(
+            "=== module game ===\n",
+            "== main ==\n",
+            "-> intro\n",
+            "= intro\n",
+            "Intro.\n",
+            "-> scene.open\n",
+            "== scene ==\n",
+            "= open\n",
+            "Open.\n",
+            "-> END\n",
+        ),
+    );
+
+    assert_story_output(&compiled, "Intro.\nOpen.\n");
+}
+
+#[test]
+fn module_globals_and_externals_use_module_qualified_runtime_names() {
+    let compiled = compile_language_source(
+        "module-qualified-globals-and-externals.ink",
+        concat!(
+            "=== module game ===\n",
+            "IMPORT level FROM left\n",
+            "IMPORT level FROM right\n",
+            "IMPORT play FROM audio\n",
+            "IMPORT play FROM video\n",
+            "== main ==\n",
+            "{audio::play(\"intro\")}|{video::play(\"intro\")}\n",
+            "~ left::level += 10\n",
+            "~ right::level += 20\n",
+            "Ready.\n",
+            "* Continue\n",
+            "  {left::level}|{right::level}\n",
+            "  -> END\n",
+            "=== module left ===\n",
+            "VAR level: int = 1\n",
+            "== helper ==\n",
+            "-> END\n",
+            "=== module right ===\n",
+            "VAR level: int = 2\n",
+            "== helper ==\n",
+            "-> END\n",
+            "=== module audio ===\n",
+            "EXTERNAL play(name: string) => int\n",
+            "== helper ==\n",
+            "-> END\n",
+            "=== module video ===\n",
+            "EXTERNAL play(name: string) => int\n",
+            "== helper ==\n",
+            "-> END\n",
+        ),
+    );
+
+    let mut story = Story::new(&compiled.json).expect("compiled JSON should load");
+    for name in ["audio::play", "video::play"] {
+        story
+            .bind_external_function(name, Rc::new(RefCell::new(TypedExternal)), true)
+            .expect("module external binding should succeed");
+    }
+    let output = story
+        .continue_maximally()
+        .expect("module qualified global story should run");
+
+    assert_eq!(output, "7|8\nReady.\n");
+    assert_eq!(
+        story
+            .get_variable("left::level")
+            .and_then(|value| value.get::<i32>()),
+        Some(11)
+    );
+    assert_eq!(
+        story
+            .get_variable("right::level")
+            .and_then(|value| value.get::<i32>()),
+        Some(22)
+    );
+    assert!(story.get_variable("level").is_none());
+
+    let save_string = story.save_state().expect("module state should save");
+    let save: Value = serde_json::from_str(&save_string).expect("valid save JSON");
+    assert_eq!(save["variablesState"]["left::level"], json!(11));
+    assert_eq!(save["variablesState"]["right::level"], json!(22));
+    assert!(
+        save["variablesState"].get("level").is_none(),
+        "module globals should not save under unqualified names: {save:#}"
+    );
+
+    let mut reloaded = Story::new(&compiled.json).expect("compiled JSON should load");
+    for name in ["audio::play", "video::play"] {
+        reloaded
+            .bind_external_function(name, Rc::new(RefCell::new(TypedExternal)), true)
+            .expect("module external binding should succeed after reload");
+    }
+    reloaded
+        .load_state(&save_string)
+        .expect("module state should reload");
+    reloaded.choose_choice_index(0).unwrap();
+    assert_eq!(reloaded.continue_maximally().unwrap(), "11|22\n");
 }
 
 #[test]
@@ -593,11 +963,17 @@ fn typed_default_initializers_are_lowered_to_json() {
         "ready": false,
     });
 
-    assert_json_sequence(&json, vec![json!(0), json!({"VAR=": "global_score"})]);
-    assert_json_sequence(&json, vec![json!([]), json!({"VAR=": "global_values"})]);
+    assert_json_sequence(&json, vec![json!(0), json!({"VAR=": "game::global_score"})]);
     assert_json_sequence(
         &json,
-        vec![default_player.clone(), json!({"VAR=": "global_player"})],
+        vec![json!([]), json!({"VAR=": "game::global_values"})],
+    );
+    assert_json_sequence(
+        &json,
+        vec![
+            default_player.clone(),
+            json!({"VAR=": "game::global_player"}),
+        ],
     );
     assert_json_sequence(
         &json,
@@ -734,7 +1110,7 @@ fn field_access_reads_struct_fields_at_runtime() {
     assert_story_output(&compiled, "9|true\n");
     assert_json_sequence(
         &compiled.program.to_json_value(),
-        vec![json!({"VAR?": "state"}), json!("^hp"), json!("FIELD")],
+        vec![json!({"VAR?": "game::state"}), json!("^hp"), json!("FIELD")],
     );
 }
 
@@ -746,7 +1122,7 @@ fn field_access_prefers_visible_variables_over_matching_story_paths() {
             "STRUCT Player {\n",
             "hp: int\n",
             "}\n",
-            "VAR player: Player = { hp: 7 }\n",
+            "~ temp player: Player = { hp: 7 }\n",
             "{player.hp}\n",
             "-> DONE\n",
             "== player ==\n",
@@ -776,7 +1152,7 @@ fn index_access_reads_array_items_at_runtime() {
     assert_story_output(&compiled, "4|9\n");
     assert_json_sequence(
         &compiled.program.to_json_value(),
-        vec![json!({"VAR?": "items"}), json!(0), json!("INDEX")],
+        vec![json!({"VAR?": "game::items"}), json!(0), json!("INDEX")],
     );
 }
 
@@ -994,19 +1370,27 @@ struct TypedExternal;
 impl ExternalFunction for TypedExternal {
     fn call(&mut self, func_name: &str, args: Vec<ValueType>) -> Option<ValueType> {
         match func_name {
-            "next_score" => {
+            "next_score" | "game::next_score" => {
                 assert!(args == vec![ValueType::Int(4)]);
                 Some(ValueType::Int(5))
             }
-            "make_scores" => {
+            "make_scores" | "game::make_scores" => {
                 assert!(args.is_empty());
                 Some(ValueType::Array(vec![ValueType::Int(2), ValueType::Int(3)]))
             }
-            "make_player" => {
+            "make_player" | "game::make_player" => {
                 assert!(args.is_empty());
                 let mut fields = BTreeMap::new();
                 fields.insert("hp".to_string(), ValueType::Int(7));
                 Some(ValueType::Object(fields))
+            }
+            "audio::play" => {
+                assert!(args == vec![ValueType::from("intro")]);
+                Some(ValueType::Int(7))
+            }
+            "video::play" => {
+                assert!(args == vec![ValueType::from("intro")]);
+                Some(ValueType::Int(8))
             }
             _ => panic!("unexpected external function: {func_name}"),
         }
@@ -1017,7 +1401,7 @@ impl ExternalFunction for TypedExternal {
 fn typed_external_fixture_runs() {
     let compiled = compile_language_fixture("typed/externals.ink");
     let mut story = Story::new(&compiled.json).expect("compiled JSON should load");
-    for name in ["next_score", "make_scores", "make_player"] {
+    for name in ["game::next_score", "game::make_scores", "game::make_player"] {
         story
             .bind_external_function(name, Rc::new(RefCell::new(TypedExternal)), true)
             .expect("external binding should succeed");
@@ -1056,13 +1440,13 @@ fn typed_external_calls_keep_runtime_shape_and_return_values() {
     let json = compiled.program.to_json_value();
     assert_json_sequence(
         &json,
-        vec![json!(4), json!({"x()": "next_score", "exArgs": 1})],
+        vec![json!(4), json!({"x()": "game::next_score", "exArgs": 1})],
     );
-    assert_json_sequence(&json, vec![json!({"x()": "make_scores"})]);
-    assert_json_sequence(&json, vec![json!({"x()": "make_player"})]);
+    assert_json_sequence(&json, vec![json!({"x()": "game::make_scores"})]);
+    assert_json_sequence(&json, vec![json!({"x()": "game::make_player"})]);
 
     let mut story = Story::new(&compiled.json).expect("compiled JSON should load");
-    for name in ["next_score", "make_scores", "make_player"] {
+    for name in ["game::next_score", "game::make_scores", "game::make_player"] {
         story
             .bind_external_function(name, Rc::new(RefCell::new(TypedExternal)), true)
             .expect("external binding should succeed");

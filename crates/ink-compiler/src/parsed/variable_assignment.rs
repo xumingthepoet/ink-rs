@@ -1,10 +1,11 @@
 use crate::source::SourceSpan;
 
-use super::{push_indent, Expression, TypeName};
+use super::{push_indent, Expression, QualifiedName, TypeName};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AssignmentTarget {
     Variable(String),
+    QualifiedVariable(QualifiedName),
     FieldAccess {
         base: Box<AssignmentTarget>,
         field: String,
@@ -23,6 +24,7 @@ impl AssignmentTarget {
     pub fn from_expression(expression: Expression) -> Option<Self> {
         match expression {
             Expression::VariableReference(name) => Some(Self::Variable(name)),
+            Expression::QualifiedReference(name) => Some(Self::QualifiedVariable(name)),
             Expression::FieldAccess { base, field } => {
                 let base = Self::from_expression(*base)?;
                 Some(Self::FieldAccess {
@@ -44,6 +46,7 @@ impl AssignmentTarget {
     pub fn variable_name(&self) -> Option<&str> {
         match self {
             AssignmentTarget::Variable(name) => Some(name),
+            AssignmentTarget::QualifiedVariable(name) => Some(name.as_str()),
             AssignmentTarget::FieldAccess { .. } | AssignmentTarget::IndexAccess { .. } => None,
         }
     }
@@ -51,6 +54,7 @@ impl AssignmentTarget {
     pub fn display_name(&self) -> String {
         match self {
             AssignmentTarget::Variable(name) => name.clone(),
+            AssignmentTarget::QualifiedVariable(name) => name.as_str().to_string(),
             AssignmentTarget::FieldAccess { base, field } => {
                 format!("{}.{}", base.display_name(), field)
             }
