@@ -1,0 +1,36 @@
+{
+  "name": "ink-rs-syntax",
+  "displayName": "Ink RS Syntax",
+  "description": "Syntax highlighting for ink-rs .ink files, including structs and typed declarations.",
+  "version": "0.1.0",
+  "publisher": "ink-rs",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "ink",
+        "aliases": [
+          "Ink",
+          "ink"
+        ],
+        "extensions": [
+          ".ink",
+          ".ink2"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "ink",
+        "scopeName": "source.ink",
+        "path": "./syntaxes/ink.tmLanguage.json"
+      }
+    ]
+  }
+}
