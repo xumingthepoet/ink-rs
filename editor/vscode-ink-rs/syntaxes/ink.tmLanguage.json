@@ -381,7 +381,7 @@
       ]
     },
     "multiline-logic": {
-      "begin": "^\\s*(\\{)",
+      "begin": "^\\s*(\\{)(?![^\\n{}]*\\})",
       "beginCaptures": {
         "1": {
           "name": "punctuation.section.logic.begin.ink"
