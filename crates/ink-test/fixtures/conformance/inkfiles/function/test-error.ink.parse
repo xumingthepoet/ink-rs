@@ -1,6 +1,6 @@
 Story
   Weave(baseIndent=0)
-    VariableAssignment(name="roll", global=true, temp=false)
+    VariableAssignment(name="roll", global=true, temp=false, type=int)
       Number(0)
     ContentList
       Conditional

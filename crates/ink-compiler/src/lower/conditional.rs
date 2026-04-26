@@ -6,7 +6,7 @@ use crate::parsed::{Conditional, Expression};
 
 use super::context::ChoicePathMode;
 use super::expression::lower_expression_into;
-use super::indexes::ExternalSignatures;
+use super::indexes::{ExternalSignatures, StructDefinitions};
 use super::lower_object_into_with_context;
 use super::path::LabelIndex;
 use super::weave::{lower_choice_weave_with_initial_content, weave_has_choice};
@@ -20,6 +20,7 @@ pub(super) fn lower_conditional_into(
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
+    struct_definitions: &StructDefinitions,
     path_mode: &ChoicePathMode,
 ) {
     if let Some(condition) = conditional.initial_condition() {
@@ -31,6 +32,7 @@ pub(super) fn lower_conditional_into(
             global_labels,
             external_signatures,
             constants,
+            struct_definitions,
             path_mode,
             false,
         );
@@ -74,6 +76,7 @@ pub(super) fn lower_conditional_into(
                     global_labels,
                     external_signatures,
                     constants,
+                    struct_definitions,
                     path_mode,
                     false,
                 );
@@ -119,6 +122,7 @@ pub(super) fn lower_conditional_into(
                 global_variables,
                 external_signatures,
                 constants,
+                struct_definitions,
                 false,
                 initial_content,
             );
@@ -157,6 +161,7 @@ pub(super) fn lower_conditional_into(
                     global_variables,
                     external_signatures,
                     constants,
+                    struct_definitions,
                 );
             }
             content_container.push(RuntimeObject::Divert {

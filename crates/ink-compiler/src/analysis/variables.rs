@@ -1,8 +1,6 @@
-use std::collections::HashSet;
-
 use crate::parsed::{
     visit::{walk_story, ParsedVisitor, VisitContext},
-    Flow, Object, Story,
+    Expression, Flow, Object, Story, TypeName,
 };
 
 use super::context::VariableScopeIndex;
@@ -18,37 +16,44 @@ pub(super) fn build_variable_scope_index(story: &Story) -> VariableScopeIndex {
             let Some(flow_path) = &context.current_flow_path else {
                 return;
             };
-            let locals = flow
-                .arguments()
-                .iter()
-                .map(|argument| argument.name().to_string())
-                .collect::<HashSet<_>>();
-            self.index
-                .locals_by_flow_path
-                .entry(flow_path.clone())
-                .or_insert(locals);
+            for argument in flow.arguments() {
+                self.index.insert_local(
+                    flow_path.clone(),
+                    argument.name().to_string(),
+                    argument.declared_type().cloned(),
+                );
+            }
         }
 
         fn visit_object(&mut self, object: &Object, context: &VisitContext) {
             match object {
                 Object::ConstantDeclaration(declaration) => {
-                    self.index.globals.insert(declaration.name().to_string());
+                    self.index.insert_global(
+                        declaration.name().to_string(),
+                        literal_constant_type(declaration.expression()),
+                    );
                 }
                 Object::VariableAssignment(assignment) if assignment.is_global() => {
-                    self.index.globals.insert(assignment.name().to_string());
+                    self.index.insert_global(
+                        assignment.name().to_string(),
+                        assignment.declared_type().cloned(),
+                    );
                 }
                 Object::VariableAssignment(assignment)
                     if assignment.is_temporary() && context.current_flow_path.is_none() =>
                 {
-                    self.index.globals.insert(assignment.name().to_string());
+                    self.index.insert_global(
+                        assignment.name().to_string(),
+                        assignment.declared_type().cloned(),
+                    );
                 }
                 Object::VariableAssignment(assignment) if assignment.is_temporary() => {
                     if let Some(flow_path) = &context.current_flow_path {
-                        self.index
-                            .locals_by_flow_path
-                            .entry(flow_path.clone())
-                            .or_default()
-                            .insert(assignment.name().to_string());
+                        self.index.insert_local(
+                            flow_path.clone(),
+                            assignment.name().to_string(),
+                            assignment.declared_type().cloned(),
+                        );
                     }
                 }
                 _ => {}
@@ -61,6 +66,16 @@ pub(super) fn build_variable_scope_index(story: &Story) -> VariableScopeIndex {
     visitor.index
 }
 
+fn literal_constant_type(expression: &Expression) -> Option<TypeName> {
+    match expression {
+        Expression::NumberInt(_) => Some(TypeName::int()),
+        Expression::NumberFloat(_) => Some(TypeName::float()),
+        Expression::NumberBool(_) => Some(TypeName::bool()),
+        Expression::String(_) | Expression::StringContent(_) => Some(TypeName::string()),
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{super::test_support::parse_story, *};
@@ -68,9 +83,9 @@ mod tests {
     #[test]
     fn indexes_globals_and_flow_local_variables() {
         let story = parse_story(
-            "VAR score = 0\n\
+            "VAR score: int = 0\n\
              == knot(arg) ==\n\
-             ~ temp local = arg\n\
+             ~ temp local: int = 0\n\
              -> DONE\n\
              == other ==\n\
              -> DONE",
@@ -84,5 +99,104 @@ mod tests {
         assert!(index.contains_visible_variable("local", Some("knot")));
         assert!(!index.contains_visible_variable("arg", None));
         assert!(!index.contains_visible_variable("local", Some("other")));
+    }
+
+    #[test]
+    fn indexes_declared_types_for_globals_temps_and_arguments() {
+        let story = parse_story(
+            "VAR score: int = 0\n\
+             == knot(arg: string) ==\n\
+             ~ temp local: bool = true\n\
+             -> DONE",
+        );
+
+        let index = build_variable_scope_index(&story);
+
+        assert_eq!(
+            index.visible_variable_declared_type("score", None),
+            Some(Some(&TypeName::int()))
+        );
+        assert_eq!(
+            index.visible_variable_declared_type("score", Some("knot")),
+            Some(Some(&TypeName::int()))
+        );
+        assert_eq!(
+            index.visible_variable_declared_type("arg", Some("knot")),
+            Some(Some(&TypeName::string()))
+        );
+        assert_eq!(
+            index.visible_variable_declared_type("local", Some("knot")),
+            Some(Some(&TypeName::bool()))
+        );
+    }
+
+    #[test]
+    fn indexes_non_literal_constants_without_inferring_types() {
+        let story = parse_story(
+            "CONST derived = other\n\
+             == knot(arg) ==\n\
+             -> DONE",
+        );
+
+        let index = build_variable_scope_index(&story);
+
+        assert_eq!(
+            index.visible_variable_declared_type("derived", None),
+            Some(None)
+        );
+        assert_eq!(
+            index.visible_variable_declared_type("arg", Some("knot")),
+            Some(None)
+        );
+    }
+
+    #[test]
+    fn local_declared_types_shadow_global_declared_types() {
+        let story = parse_story(
+            "VAR value: int = 0\n\
+             == knot(value: string) ==\n\
+             -> DONE",
+        );
+
+        let index = build_variable_scope_index(&story);
+
+        assert_eq!(
+            index.visible_variable_declared_type("value", None),
+            Some(Some(&TypeName::int()))
+        );
+        assert_eq!(
+            index.visible_variable_declared_type("value", Some("knot")),
+            Some(Some(&TypeName::string()))
+        );
+    }
+
+    #[test]
+    fn typed_locals_stay_within_flow_boundaries() {
+        let story = parse_story(
+            "== one(arg: int) ==\n\
+             ~ temp local: bool = true\n\
+             -> DONE\n\
+             == two(arg: string) ==\n\
+             -> DONE",
+        );
+
+        let index = build_variable_scope_index(&story);
+
+        assert_eq!(
+            index.visible_variable_declared_type("arg", Some("one")),
+            Some(Some(&TypeName::int()))
+        );
+        assert_eq!(
+            index.visible_variable_declared_type("local", Some("one")),
+            Some(Some(&TypeName::bool()))
+        );
+        assert_eq!(
+            index.visible_variable_declared_type("arg", Some("two")),
+            Some(Some(&TypeName::string()))
+        );
+        assert_eq!(
+            index.visible_variable_declared_type("local", Some("two")),
+            None
+        );
     }
 }

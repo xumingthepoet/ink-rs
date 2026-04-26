@@ -1003,9 +1003,11 @@ impl StoryState {
                     ValueType::Int(v) => Value::new::<i32>(*v),
                     ValueType::Float(v) => Value::new::<f32>(*v),
                     ValueType::String(v) => Value::new::<&str>(&v.string),
+                    ValueType::Array(v) => Value::new_value_type(ValueType::Array(v.clone())),
+                    ValueType::Object(v) => Value::new_value_type(ValueType::Object(v.clone())),
                     _ => {
                         return Err(StoryError::InvalidStoryState("ink arguments when calling EvaluateFunction / ChoosePathStringWithParameters must be \
-                        int, float, string or bool.".to_owned()));
+                        int, float, string, bool, array or object.".to_owned()));
                     }
                 };
 
@@ -1433,9 +1435,11 @@ impl StoryState {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
     use serde_json::json;
 
-    use crate::story::Story;
+    use crate::{story::Story, value_type::ValueType};
 
     const SIMPLE_STORY_JSON: &str = r#"{"inkVersion":1,"root":["done",null]}"#;
 
@@ -1483,5 +1487,62 @@ mod tests {
             .expect_err("expected missing previous random error");
 
         assert!(error.to_string().contains("Missing previous random value"));
+    }
+
+    #[test]
+    fn save_state_roundtrips_array_and_object_variables() {
+        let json = r#"{
+            "inkVersion": 1,
+            "root": [
+                "done",
+                {
+                    "global decl": [
+                        "ev", 0, {"VAR=": "items"}, "/ev",
+                        "ev", 0, {"VAR=": "player"}, "/ev",
+                        "end",
+                        null
+                    ]
+                }
+            ]
+        }"#;
+        let items = ValueType::Array(vec![ValueType::Int(1), ValueType::Bool(true)]);
+        let mut player_fields = BTreeMap::new();
+        player_fields.insert("items".to_string(), items.clone());
+        player_fields.insert("name".to_string(), ValueType::new("Ada"));
+        let player = ValueType::Object(player_fields);
+
+        let mut story = Story::new(json).expect("valid story");
+        story
+            .set_variable("items", &items)
+            .expect("array variable should be set");
+        story
+            .set_variable("player", &player)
+            .expect("object variable should be set");
+
+        let save_string = story.save_state().expect("save state");
+        let save: serde_json::Value =
+            serde_json::from_str(&save_string).expect("save should be JSON");
+        assert_eq!(save["variablesState"]["items"], json!([1, true]));
+        assert_eq!(
+            save["variablesState"]["player"],
+            json!({
+                "items": [1, true],
+                "name": "^Ada"
+            })
+        );
+
+        let mut reloaded = Story::new(json).expect("valid story");
+        reloaded
+            .load_state(&save_string)
+            .expect("save state should reload");
+
+        assert!(matches!(
+            reloaded.get_variable("items"),
+            Some(restored) if restored == items
+        ));
+        assert!(matches!(
+            reloaded.get_variable("player"),
+            Some(restored) if restored == player
+        ));
     }
 }

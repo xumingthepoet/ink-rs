@@ -1,29 +1,212 @@
 use crate::{
     diagnostic::Diagnostic,
     parsed::{
-        visit::{walk_weave, ParsedVisitor, VisitContext},
-        Choice, ContentList, DivertTarget, Flow, FlowLevel, Object, Return, Story, Weave,
+        visit::{walk_story, walk_weave, ParsedVisitor, VisitContext},
+        Choice, ContentList, DivertTarget, Expression, Flow, FlowLevel, Object, Return, Story,
+        TypeName, Weave,
     },
     source::SourceSpan,
 };
 
-use super::span::{first_span_in_weave, object_span};
+use super::{
+    context::{StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
+    expression_types::{infer_expression_type, typed_builtin_return_type},
+    span::{first_span_in_weave, object_span},
+    structs::build_struct_type_index,
+    target_symbols::{build_target_symbol_index, resolve_target_symbol},
+    variables::build_variable_scope_index,
+};
 
 pub(super) fn flow_diagnostics(story: &Story) -> Vec<Diagnostic> {
+    let variable_scopes = build_variable_scope_index(story);
+    let struct_types = build_struct_type_index(story);
+    let target_symbols = build_target_symbol_index(story);
+    let analysis = FlowAnalysisIndexes {
+        variable_scopes: &variable_scopes,
+        struct_types: &struct_types,
+        target_symbols: &target_symbols,
+    };
     let mut diagnostics = Vec::new();
     check_nested_choice_termination_in_weave(story.root_weave(), false, &mut diagnostics);
+    {
+        let mut condition_checker = ConditionTypeChecker {
+            diagnostics: &mut diagnostics,
+            analysis: &analysis,
+        };
+        walk_story(story, &mut condition_checker);
+    }
     for flow in story.flows() {
-        check_flow(flow, &mut diagnostics);
+        check_flow(flow, flow.name(), &analysis, &mut diagnostics);
     }
     diagnostics
 }
 
-fn check_flow(flow: &Flow, diagnostics: &mut Vec<Diagnostic>) {
+struct FlowAnalysisIndexes<'a> {
+    variable_scopes: &'a VariableScopeIndex,
+    struct_types: &'a StructTypeIndex,
+    target_symbols: &'a TargetSymbolIndex,
+}
+
+struct ConditionTypeChecker<'a> {
+    diagnostics: &'a mut Vec<Diagnostic>,
+    analysis: &'a FlowAnalysisIndexes<'a>,
+}
+
+impl ParsedVisitor for ConditionTypeChecker<'_> {
+    fn visit_object(&mut self, object: &Object, context: &VisitContext) {
+        match object {
+            Object::Choice(choice) => {
+                if let Some(condition) = choice.condition() {
+                    self.check_condition("Choice", condition, choice.span(), context);
+                }
+            }
+            Object::Conditional(conditional) => {
+                let span = object_span(object);
+                if let Some(condition) = conditional.initial_condition() {
+                    self.check_condition("Conditional", condition, &span, context);
+                }
+                for branch in conditional.branches() {
+                    if let Some(condition) = branch.own_condition() {
+                        self.check_condition("Conditional", condition, &span, context);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+impl ConditionTypeChecker<'_> {
+    fn check_condition(
+        &mut self,
+        label: &str,
+        condition: &Expression,
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) {
+        let current_flow_path = context.current_flow_path.as_deref();
+        let has_typed_signal = condition_type_signal(
+            condition,
+            self.analysis.variable_scopes,
+            self.analysis.target_symbols,
+            current_flow_path,
+        )
+        .is_some_and(|signal| signal == ConditionTypeSignal::Typed);
+
+        match infer_expression_type(
+            condition,
+            self.analysis.variable_scopes,
+            self.analysis.struct_types,
+            self.analysis.target_symbols,
+            current_flow_path,
+        ) {
+            Ok(condition_type) if condition_type == TypeName::bool() => {}
+            Ok(condition_type) if has_typed_signal => self.diagnostics.push(Diagnostic::error(
+                span.clone(),
+                format!(
+                    "{label} condition has type {} but expected bool",
+                    condition_type.display_name()
+                ),
+            )),
+            Ok(_) => {}
+            Err(error) if has_typed_signal => self.diagnostics.push(Diagnostic::error(
+                span.clone(),
+                format!("Cannot type-check {label} condition: {}", error.message()),
+            )),
+            Err(_) => {}
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ConditionTypeSignal {
+    LiteralOnly,
+    Typed,
+}
+
+fn condition_type_signal(
+    expression: &Expression,
+    variable_scopes: &VariableScopeIndex,
+    target_symbols: &TargetSymbolIndex,
+    current_flow_path: Option<&str>,
+) -> Option<ConditionTypeSignal> {
+    match expression {
+        Expression::String(_)
+        | Expression::StringContent(_)
+        | Expression::NumberInt(_)
+        | Expression::NumberFloat(_)
+        | Expression::NumberBool(_)
+        | Expression::ArrayLiteral(_)
+        | Expression::StructLiteral(_) => Some(ConditionTypeSignal::LiteralOnly),
+        Expression::VariableReference(name) => matches!(
+            variable_scopes.visible_variable_declared_type(name, current_flow_path),
+            Some(Some(_))
+        )
+        .then_some(ConditionTypeSignal::Typed),
+        Expression::FunctionCall { name, .. } if typed_builtin_return_type(name).is_some() => {
+            Some(ConditionTypeSignal::Typed)
+        }
+        Expression::FunctionCall { name, .. } => {
+            resolve_target_symbol(name, current_flow_path, target_symbols)
+                .is_some_and(|symbol| symbol.is_function() && symbol.has_typed_signature())
+                .then_some(ConditionTypeSignal::Typed)
+        }
+        Expression::FieldAccess { base, .. } | Expression::IndexAccess { base, .. } => {
+            condition_type_signal(base, variable_scopes, target_symbols, current_flow_path)
+                .filter(|signal| *signal == ConditionTypeSignal::Typed)
+        }
+        Expression::Unary { expression, .. } => condition_type_signal(
+            expression,
+            variable_scopes,
+            target_symbols,
+            current_flow_path,
+        ),
+        Expression::Binary { left, right, .. } => combine_condition_signals(
+            condition_type_signal(left, variable_scopes, target_symbols, current_flow_path),
+            condition_type_signal(right, variable_scopes, target_symbols, current_flow_path),
+        ),
+        Expression::MultipleCondition(expressions) => expressions
+            .iter()
+            .map(|expression| {
+                condition_type_signal(
+                    expression,
+                    variable_scopes,
+                    target_symbols,
+                    current_flow_path,
+                )
+            })
+            .reduce(combine_condition_signals)
+            .flatten(),
+        Expression::DivertTarget(_) => None,
+    }
+}
+
+fn combine_condition_signals(
+    left: Option<ConditionTypeSignal>,
+    right: Option<ConditionTypeSignal>,
+) -> Option<ConditionTypeSignal> {
+    match (left, right) {
+        (Some(ConditionTypeSignal::Typed), _) | (_, Some(ConditionTypeSignal::Typed)) => {
+            Some(ConditionTypeSignal::Typed)
+        }
+        (Some(ConditionTypeSignal::LiteralOnly), Some(ConditionTypeSignal::LiteralOnly)) => {
+            Some(ConditionTypeSignal::LiteralOnly)
+        }
+        _ => None,
+    }
+}
+
+fn check_flow(
+    flow: &Flow,
+    current_flow_path: &str,
+    analysis: &FlowAnalysisIndexes<'_>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
     check_nested_choice_termination_in_weave(flow.weave(), false, diagnostics);
     let found_return = find_return_in_flow(flow);
 
     if flow.is_function() {
-        check_function_flow_control(flow, diagnostics);
+        check_function_flow_control(flow, current_flow_path, analysis, diagnostics);
     } else if let Some(found_return) = found_return {
         diagnostics.push(Diagnostic::error(
             found_return.span().clone(),
@@ -40,7 +223,8 @@ fn check_flow(flow: &Flow, diagnostics: &mut Vec<Diagnostic>) {
     }
 
     for child in flow.child_flows() {
-        check_flow(child, diagnostics);
+        let child_flow_path = format!("{current_flow_path}.{}", child.name());
+        check_flow(child, &child_flow_path, analysis, diagnostics);
     }
 }
 
@@ -107,6 +291,7 @@ fn check_nested_choice_termination_in_weave(
             | Object::IncDec(_)
             | Object::LogicLine(_)
             | Object::Return(_)
+            | Object::StructDeclaration(_)
             | Object::Tag(_)
             | Object::Text(_)
             | Object::TunnelOnwards(_)
@@ -151,6 +336,7 @@ fn check_nested_choice_termination_in_content_list(
             | Object::IncDec(_)
             | Object::LogicLine(_)
             | Object::Return(_)
+            | Object::StructDeclaration(_)
             | Object::Tag(_)
             | Object::Text(_)
             | Object::TunnelOnwards(_)
@@ -176,7 +362,12 @@ fn choice_flow_terminates(choice: &Choice, following: &[Object]) -> bool {
     terminating.is_some_and(object_terminates_flow)
 }
 
-fn check_function_flow_control(flow: &Flow, diagnostics: &mut Vec<Diagnostic>) {
+fn check_function_flow_control(
+    flow: &Flow,
+    current_flow_path: &str,
+    analysis: &FlowAnalysisIndexes<'_>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
     if flow.level() != FlowLevel::Knot {
         diagnostics.push(Diagnostic::error(
             first_span_in_weave(flow.weave()),
@@ -195,12 +386,27 @@ fn check_function_flow_control(flow: &Flow, diagnostics: &mut Vec<Diagnostic>) {
         ));
     }
 
-    let mut visitor = FunctionFlowControlVisitor { diagnostics };
-    walk_weave(flow.weave(), &mut visitor, &VisitContext::default());
+    let mut visitor = FunctionFlowControlVisitor {
+        diagnostics,
+        function_name: flow.name(),
+        return_type: flow.return_type(),
+        check_return_types: flow.has_typed_signature(),
+        analysis,
+    };
+    let context = VisitContext {
+        current_flow_path: Some(current_flow_path.to_string()),
+        inside_function: true,
+        ..VisitContext::default()
+    };
+    walk_weave(flow.weave(), &mut visitor, &context);
 }
 
 struct FunctionFlowControlVisitor<'a> {
     diagnostics: &'a mut Vec<Diagnostic>,
+    function_name: &'a str,
+    return_type: &'a TypeName,
+    check_return_types: bool,
+    analysis: &'a FlowAnalysisIndexes<'a>,
 }
 
 impl ParsedVisitor for FunctionFlowControlVisitor<'_> {
@@ -221,7 +427,68 @@ impl ParsedVisitor for FunctionFlowControlVisitor<'_> {
                 choice.span().clone(),
                 "Functions may not contain choices",
             )),
+            Object::Return(ret) if self.check_return_types => self.check_return(ret, context),
             _ => {}
+        }
+    }
+}
+
+impl FunctionFlowControlVisitor<'_> {
+    fn check_return(&mut self, ret: &Return, context: &VisitContext) {
+        match (ret.returned_expression(), self.return_type.is_void()) {
+            (None, true) => {}
+            (None, false) => self.diagnostics.push(Diagnostic::error(
+                ret.span().clone(),
+                format!(
+                    "Function '{}' must return {} but return has no value",
+                    self.function_name,
+                    self.return_type.display_name()
+                ),
+            )),
+            (Some(_), true) => self.diagnostics.push(Diagnostic::error(
+                ret.span().clone(),
+                format!(
+                    "Function '{}' returns void but return has a value",
+                    self.function_name
+                ),
+            )),
+            (Some(expression), false) => self.check_return_expression(expression, ret, context),
+        }
+    }
+
+    fn check_return_expression(
+        &mut self,
+        expression: &crate::parsed::Expression,
+        ret: &Return,
+        context: &VisitContext,
+    ) {
+        match infer_expression_type(
+            expression,
+            self.analysis.variable_scopes,
+            self.analysis.struct_types,
+            self.analysis.target_symbols,
+            context.current_flow_path.as_deref(),
+        ) {
+            Ok(actual_type) if &actual_type != self.return_type => {
+                self.diagnostics.push(Diagnostic::error(
+                    ret.span().clone(),
+                    format!(
+                        "Function '{}' returns {} but declared return type is {}",
+                        self.function_name,
+                        actual_type.display_name(),
+                        self.return_type.display_name()
+                    ),
+                ));
+            }
+            Ok(_) => {}
+            Err(error) => self.diagnostics.push(Diagnostic::error(
+                ret.span().clone(),
+                format!(
+                    "Cannot type-check return value for function '{}': {}",
+                    self.function_name,
+                    error.message()
+                ),
+            )),
         }
     }
 }
@@ -270,6 +537,7 @@ fn find_return_in_object(object: &Object) -> Option<&Return> {
         | Object::Glue(_)
         | Object::IncDec(_)
         | Object::LogicLine(_)
+        | Object::StructDeclaration(_)
         | Object::Tag(_)
         | Object::Text(_)
         | Object::TunnelOnwards(_)
@@ -294,6 +562,7 @@ fn is_termination_ignored_object(object: &Object) -> bool {
         || matches!(object, Object::AuthorWarning(_))
         || matches!(object, Object::ConstantDeclaration(_))
         || matches!(object, Object::ExternalDeclaration(_))
+        || matches!(object, Object::StructDeclaration(_))
         || matches!(object, Object::VariableAssignment(assignment) if assignment.is_global())
 }
 
@@ -330,6 +599,7 @@ fn object_terminates_flow(object: &Object) -> bool {
         | Object::Glue(_)
         | Object::IncDec(_)
         | Object::LogicLine(_)
+        | Object::StructDeclaration(_)
         | Object::Tag(_)
         | Object::Text(_)
         | Object::VariableAssignment(_) => false,
@@ -354,6 +624,166 @@ mod tests {
             &diagnostics,
             DiagnosticSeverity::Warning,
             "Apparent loose end exists where the flow runs out. Do you need a '-> DONE' statement, choice or divert?",
+        );
+    }
+
+    #[test]
+    fn accepts_bool_conditions() {
+        let story = parse_story(
+            "VAR ready: bool = true\n\
+             { ready:\n\
+               Conditional text.\n\
+             }\n\
+             * { ready } Choice text\n\
+             -> DONE",
+        );
+
+        assert_eq!(flow_diagnostics(&story), []);
+    }
+
+    #[test]
+    fn reports_non_bool_typed_conditions() {
+        let cases = [
+            (
+                "VAR value: int = 1\n\
+                 { value:\n\
+                   Text.\n\
+                 }",
+                "Conditional condition has type int but expected bool",
+            ),
+            (
+                "VAR value: float = 1.0\n\
+                 { value:\n\
+                   Text.\n\
+                 }",
+                "Conditional condition has type float but expected bool",
+            ),
+            (
+                "VAR label: string = \"yes\"\n\
+                 * { label } Choice text",
+                "Choice condition has type string but expected bool",
+            ),
+            (
+                "VAR values: int[] = [1]\n\
+                 { values:\n\
+                   Text.\n\
+                 }",
+                "Conditional condition has type int[] but expected bool",
+            ),
+            (
+                "STRUCT Player {\n\
+                 hp: int\n\
+                 }\n\
+                 VAR player: Player = { hp: 10 }\n\
+                 { player:\n\
+                   Text.\n\
+                 }",
+                "Conditional condition has type Player but expected bool",
+            ),
+        ];
+
+        for (source, expected_message) in cases {
+            let story = parse_story(source);
+            let diagnostics = flow_diagnostics(&story);
+
+            assert_single_diagnostic(&diagnostics, DiagnosticSeverity::Error, expected_message);
+        }
+    }
+
+    #[test]
+    fn accepts_valid_primitive_and_composite_function_returns() {
+        let story = parse_story(
+            "STRUCT Player {\n\
+             hp: int\n\
+             }\n\
+             VAR default_player: Player = { hp: 10 }\n\
+             VAR default_scores: int[] = [1]\n\
+             == function add(a: int, b: int) -> int ==\n\
+             ~ return a + b\n\
+             == function make_player() -> Player ==\n\
+             ~ return default_player\n\
+             == function scores() -> int[] ==\n\
+             ~ return default_scores",
+        );
+
+        assert_eq!(flow_diagnostics(&story), []);
+    }
+
+    #[test]
+    fn accepts_bare_return_in_void_function() {
+        let story = parse_story(
+            "== function log(message: string) -> void ==\n\
+             ~ return",
+        );
+
+        assert_eq!(flow_diagnostics(&story), []);
+    }
+
+    #[test]
+    fn reports_missing_return_value_in_non_void_function() {
+        let story = parse_story(
+            "== function score() -> int ==\n\
+             ~ return",
+        );
+
+        let diagnostics = flow_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Function 'score' must return int but return has no value",
+        );
+    }
+
+    #[test]
+    fn reports_value_return_in_void_function() {
+        let story = parse_story(
+            "== function log() -> void ==\n\
+             ~ return \"ok\"",
+        );
+
+        let diagnostics = flow_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Function 'log' returns void but return has a value",
+        );
+    }
+
+    #[test]
+    fn reports_wrong_return_type() {
+        let story = parse_story(
+            "== function score(label: string) -> int ==\n\
+             ~ return label",
+        );
+
+        let diagnostics = flow_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Function 'score' returns string but declared return type is int",
+        );
+    }
+
+    #[test]
+    fn reports_wrong_composite_return_type() {
+        let story = parse_story(
+            "STRUCT Player {\n\
+             hp: int\n\
+             }\n\
+             VAR scores: int[] = [1]\n\
+             == function make_player() -> Player ==\n\
+             ~ return scores",
+        );
+
+        let diagnostics = flow_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Function 'make_player' returns int[] but declared return type is Player",
         );
     }
 }

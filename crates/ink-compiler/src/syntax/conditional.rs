@@ -372,4 +372,20 @@ mod tests {
         });
         assert!(has_conditional);
     }
+
+    #[test]
+    fn parses_multiline_conditional_after_struct_literal_expression_support() {
+        let output = parse(SourceInput::new("{ score > 0:\n- yes\n- else: no\n}"));
+
+        assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
+        let story = output.artifact.expect("expected story");
+        let has_conditional = story.root_weave().content().iter().any(|object| {
+            matches!(
+                object,
+                Object::ContentList(content)
+                    if matches!(content.objects().first(), Some(Object::Conditional(_)))
+            )
+        });
+        assert!(has_conditional);
+    }
 }

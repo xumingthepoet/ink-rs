@@ -1,6 +1,6 @@
 
-        VAR x = 2
-        VAR y = 0
+        VAR x: int = 2
+        VAR y: int = 0
         { x > 0:
             ~ y = x - 1
         }

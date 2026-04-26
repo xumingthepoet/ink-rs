@@ -1,4 +1,4 @@
-VAR x = 0
+VAR x: int = 0
 
 ~ x = 5
 

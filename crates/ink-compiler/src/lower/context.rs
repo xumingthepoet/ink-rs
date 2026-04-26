@@ -274,6 +274,18 @@ impl ChoicePathMode {
         }
     }
 
+    pub(super) fn current_flow_name(&self) -> Option<&str> {
+        match self {
+            ChoicePathMode::Flow { flow_name, .. } => Some(flow_name),
+            _ => None,
+        }
+    }
+
+    pub(super) fn current_flow_body_start_target(&self, argument_count: usize) -> Option<String> {
+        self.current_flow_path()
+            .map(|flow_path| format!("{flow_path}.{argument_count}"))
+    }
+
     pub(super) fn runtime_index_path(&self, index: usize) -> String {
         match self {
             ChoicePathMode::Root => format!("0.{index}"),

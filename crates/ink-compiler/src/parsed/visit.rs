@@ -126,13 +126,16 @@ where
             }
         }
         Object::VariableAssignment(assignment) => {
-            walk_expression(assignment.expression(), visitor, context)
+            if let Some(expression) = assignment.expression() {
+                walk_expression(expression, visitor, context);
+            }
         }
         Object::Weave(weave) => walk_weave(weave, visitor, context),
         Object::AuthorWarning(_)
         | Object::ExternalDeclaration(_)
         | Object::Gather(_)
         | Object::Glue(_)
+        | Object::StructDeclaration(_)
         | Object::Tag(_)
         | Object::Text(_) => {}
     }
@@ -193,6 +196,21 @@ where
             for argument in args {
                 walk_expression(argument, visitor, &expression_context);
             }
+        }
+        Expression::ArrayLiteral(elements) => {
+            for element in elements {
+                walk_expression(element, visitor, &expression_context);
+            }
+        }
+        Expression::StructLiteral(fields) => {
+            for field in fields {
+                walk_expression(field.expression(), visitor, &expression_context);
+            }
+        }
+        Expression::FieldAccess { base, .. } => walk_expression(base, visitor, &expression_context),
+        Expression::IndexAccess { base, index } => {
+            walk_expression(base, visitor, &expression_context);
+            walk_expression(index, visitor, &expression_context);
         }
         Expression::Binary { left, right, .. } => {
             walk_expression(left, visitor, &expression_context);
@@ -280,10 +298,14 @@ mod tests {
 
         fn visit_expression(&mut self, expression: &Expression, _context: &VisitContext) {
             self.expressions.push(match expression {
+                Expression::ArrayLiteral(_) => "array",
                 Expression::Binary { .. } => "binary",
                 Expression::DivertTarget(_) => "divert_target",
+                Expression::FieldAccess { .. } => "field_access",
+                Expression::IndexAccess { .. } => "index_access",
                 Expression::FunctionCall { .. } => "function_call",
                 Expression::MultipleCondition(_) => "multiple_condition",
+                Expression::StructLiteral(_) => "struct",
                 Expression::StringContent(_) => "string_content",
                 Expression::Unary { .. } => "unary",
                 Expression::VariableReference(_) => "variable",
@@ -315,6 +337,34 @@ mod tests {
                         )),
                     }),
                 ]))),
+                Object::Expression(Expression::ArrayLiteral(vec![
+                    Expression::VariableReference("array_value".to_string()),
+                    Expression::FunctionCall {
+                        name: "array_call".to_string(),
+                        args: Vec::new(),
+                    },
+                ])),
+                Object::Expression(Expression::StructLiteral(vec![
+                    crate::parsed::StructLiteralField::new(
+                        "struct_value",
+                        Expression::VariableReference("field_value".to_string()),
+                    ),
+                    crate::parsed::StructLiteralField::new(
+                        "struct_call",
+                        Expression::FunctionCall {
+                            name: "field_call".to_string(),
+                            args: Vec::new(),
+                        },
+                    ),
+                ])),
+                Object::Expression(Expression::FieldAccess {
+                    base: Box::new(Expression::VariableReference("field_base".to_string())),
+                    field: "hp".to_string(),
+                }),
+                Object::Expression(Expression::IndexAccess {
+                    base: Box::new(Expression::VariableReference("items".to_string())),
+                    index: Box::new(Expression::NumberInt(0)),
+                }),
                 Object::Weave(Weave::new(vec![Object::Gather(Gather::new(span(), 1))], 1)),
             ],
             vec![Flow::new(
@@ -329,9 +379,11 @@ mod tests {
                     vec![Object::Text(Text::new("nested", span()))],
                     Vec::new(),
                     Vec::new(),
+                    crate::parsed::TypeName::void(),
                     true,
                 )],
                 Vec::new(),
+                crate::parsed::TypeName::void(),
                 false,
             )],
         );
@@ -370,10 +422,14 @@ mod tests {
         }
 
         for expected in [
+            "array",
             "binary",
             "divert_target",
+            "field_access",
+            "index_access",
             "function_call",
             "multiple_condition",
+            "struct",
             "string_content",
             "unary",
             "variable",

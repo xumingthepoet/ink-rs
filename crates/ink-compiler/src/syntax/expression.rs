@@ -1,6 +1,9 @@
 use crate::{
     diagnostic::{Diagnostic, DiagnosticCode},
-    parsed::{BinaryOperator, ContentList, Expression, FloatLiteral, Object, UnaryOperator},
+    parsed::{
+        BinaryOperator, ContentList, Expression, FloatLiteral, Object, StructLiteralField,
+        UnaryOperator,
+    },
     source::SourceSpan,
 };
 
@@ -39,6 +42,12 @@ enum ExpressionTokenKind {
     Operator(String),
     OpenParen,
     CloseParen,
+    OpenBracket,
+    CloseBracket,
+    OpenBrace,
+    CloseBrace,
+    Colon,
+    Dot,
     Comma,
     Arrow,
 }
@@ -202,6 +211,25 @@ enum ExpressionParseErrorKind {
         name: String,
         found: Option<String>,
     },
+    ExpectedCommaOrArrayCloseBracket {
+        found: Option<String>,
+    },
+    ExpectedStructLiteralField {
+        found: Option<String>,
+    },
+    ExpectedStructFieldColon {
+        name: String,
+        found: Option<String>,
+    },
+    ExpectedCommaOrStructCloseBrace {
+        found: Option<String>,
+    },
+    ExpectedFieldName {
+        found: Option<String>,
+    },
+    ExpectedIndexCloseBracket {
+        found: Option<String>,
+    },
     ExpectedDivertTarget {
         found: Option<String>,
     },
@@ -243,6 +271,36 @@ impl ExpressionParseError {
                     "expected `,` or `)` in call to `{name}`{}",
                     found_clause(found)
                 )
+            }
+            ExpressionParseErrorKind::ExpectedCommaOrArrayCloseBracket { found } => {
+                format!(
+                    "expected `,` or `]` in array literal{}",
+                    found_clause(found)
+                )
+            }
+            ExpressionParseErrorKind::ExpectedStructLiteralField { found } => {
+                format!(
+                    "expected field name in struct literal{}",
+                    found_clause(found)
+                )
+            }
+            ExpressionParseErrorKind::ExpectedStructFieldColon { name, found } => {
+                format!(
+                    "expected `:` after struct literal field `{name}`{}",
+                    found_clause(found)
+                )
+            }
+            ExpressionParseErrorKind::ExpectedCommaOrStructCloseBrace { found } => {
+                format!(
+                    "expected `,` or `}}` in struct literal{}",
+                    found_clause(found)
+                )
+            }
+            ExpressionParseErrorKind::ExpectedFieldName { found } => {
+                format!("expected field name after `.`{}", found_clause(found))
+            }
+            ExpressionParseErrorKind::ExpectedIndexCloseBracket { found } => {
+                format!("expected `]` to close index access{}", found_clause(found))
             }
             ExpressionParseErrorKind::ExpectedDivertTarget { found } => {
                 format!("expected divert target after `->`{}", found_clause(found))
@@ -331,6 +389,55 @@ fn tokenize_expression_at(source: &str, base_span: &SourceSpan) -> Vec<Expressio
                 ));
                 index += ch.len_utf8();
             }
+            '[' => {
+                tokens.push(token_at(
+                    source,
+                    index,
+                    ExpressionTokenKind::OpenBracket,
+                    base_span,
+                ));
+                index += ch.len_utf8();
+            }
+            ']' => {
+                tokens.push(token_at(
+                    source,
+                    index,
+                    ExpressionTokenKind::CloseBracket,
+                    base_span,
+                ));
+                index += ch.len_utf8();
+            }
+            '{' => {
+                tokens.push(token_at(
+                    source,
+                    index,
+                    ExpressionTokenKind::OpenBrace,
+                    base_span,
+                ));
+                index += ch.len_utf8();
+            }
+            '}' => {
+                tokens.push(token_at(
+                    source,
+                    index,
+                    ExpressionTokenKind::CloseBrace,
+                    base_span,
+                ));
+                index += ch.len_utf8();
+            }
+            ':' => {
+                tokens.push(token_at(
+                    source,
+                    index,
+                    ExpressionTokenKind::Colon,
+                    base_span,
+                ));
+                index += ch.len_utf8();
+            }
+            '.' => {
+                tokens.push(token_at(source, index, ExpressionTokenKind::Dot, base_span));
+                index += ch.len_utf8();
+            }
             ',' => {
                 tokens.push(token_at(
                     source,
@@ -352,12 +459,9 @@ fn tokenize_expression_at(source: &str, base_span: &SourceSpan) -> Vec<Expressio
             }
             _ if is_token_word_start(ch) => {
                 let (word, next_index) = read_token_word(source, index);
-                tokens.push(token_at(
-                    source,
-                    index,
-                    classify_word_token(word),
-                    base_span,
-                ));
+                let (kind, next_index) =
+                    classify_word_token_with_decimal_suffix(source, index, word, next_index);
+                tokens.push(token_at(source, index, kind, base_span));
                 index = next_index;
             }
             _ => {
@@ -466,7 +570,7 @@ fn read_token_word(source: &str, start: usize) -> (&str, usize) {
     let mut end = start;
 
     for (relative_index, ch) in source[start..].char_indices() {
-        if is_identifier_continue(ch) || ch == '.' {
+        if is_identifier_continue(ch) {
             end = start + relative_index + ch.len_utf8();
         } else {
             break;
@@ -474,6 +578,43 @@ fn read_token_word(source: &str, start: usize) -> (&str, usize) {
     }
 
     (&source[start..end], end)
+}
+
+fn classify_word_token_with_decimal_suffix(
+    source: &str,
+    start: usize,
+    word: &str,
+    word_end: usize,
+) -> (ExpressionTokenKind, usize) {
+    let kind = classify_word_token(word);
+    if !matches!(kind, ExpressionTokenKind::IntLiteral(_)) {
+        return (kind, word_end);
+    }
+
+    let Some(fraction_start) = source[word_end..]
+        .strip_prefix('.')
+        .map(|_| word_end + '.'.len_utf8())
+    else {
+        return (kind, word_end);
+    };
+
+    let mut fraction_end = fraction_start;
+    for (relative_index, ch) in source[fraction_start..].char_indices() {
+        if ch.is_ascii_digit() {
+            fraction_end = fraction_start + relative_index + ch.len_utf8();
+        } else {
+            break;
+        }
+    }
+
+    if fraction_end == fraction_start {
+        return (kind, word_end);
+    }
+
+    (
+        ExpressionTokenKind::FloatLiteral(source[start..fraction_end].to_string()),
+        fraction_end,
+    )
 }
 
 fn classify_word_token(word: &str) -> ExpressionTokenKind {
@@ -535,6 +676,7 @@ impl<'a> TokenExpressionParser<'a> {
         minimum_precedence: u8,
     ) -> Result<Expression, ExpressionParseError> {
         let mut left = self.parse_prefix()?;
+        left = self.parse_postfix(left)?;
 
         while let Some((operator, precedence, operator_text)) = self.current_binary_operator() {
             if precedence < minimum_precedence {
@@ -549,6 +691,7 @@ impl<'a> TokenExpressionParser<'a> {
                 left: Box::new(left),
                 right: Box::new(right),
             };
+            left = self.parse_postfix(left)?;
         }
 
         Ok(left)
@@ -615,6 +758,8 @@ impl<'a> TokenExpressionParser<'a> {
                 )?;
                 Ok(expression)
             }
+            ExpressionTokenKind::OpenBracket => self.parse_array_literal(),
+            ExpressionTokenKind::OpenBrace => self.parse_struct_literal(),
             other => Err(ExpressionParseError::new(
                 ExpressionParseErrorKind::ExpectedExpression {
                     found: Some(describe_token_kind(&other)),
@@ -622,6 +767,60 @@ impl<'a> TokenExpressionParser<'a> {
                 token.span.clone(),
             )),
         }
+    }
+
+    fn parse_postfix(
+        &mut self,
+        mut expression: Expression,
+    ) -> Result<Expression, ExpressionParseError> {
+        loop {
+            if self.match_kind(|kind| matches!(kind, ExpressionTokenKind::Dot)) {
+                let Some(token) = self.advance() else {
+                    return Err(
+                        self.error_at_eof(ExpressionParseErrorKind::ExpectedFieldName {
+                            found: None,
+                        }),
+                    );
+                };
+                let kind = token.kind.clone();
+                let ExpressionTokenKind::Identifier(field) = kind else {
+                    return Err(ExpressionParseError::new(
+                        ExpressionParseErrorKind::ExpectedFieldName {
+                            found: Some(describe_token_kind(&kind)),
+                        },
+                        token.span.clone(),
+                    ));
+                };
+                if !is_identifier(&field) {
+                    return Err(ExpressionParseError::new(
+                        ExpressionParseErrorKind::ExpectedFieldName { found: Some(field) },
+                        token.span.clone(),
+                    ));
+                }
+                expression = Expression::FieldAccess {
+                    base: Box::new(expression),
+                    field,
+                };
+                continue;
+            }
+
+            if self.match_kind(|kind| matches!(kind, ExpressionTokenKind::OpenBracket)) {
+                let index = self.parse_expression(0)?;
+                self.expect_kind(
+                    |kind| matches!(kind, ExpressionTokenKind::CloseBracket),
+                    |found| ExpressionParseErrorKind::ExpectedIndexCloseBracket { found },
+                )?;
+                expression = Expression::IndexAccess {
+                    base: Box::new(expression),
+                    index: Box::new(index),
+                };
+                continue;
+            }
+
+            break;
+        }
+
+        Ok(expression)
     }
 
     fn parse_identifier_or_call(
@@ -686,6 +885,78 @@ impl<'a> TokenExpressionParser<'a> {
         })
     }
 
+    fn parse_array_literal(&mut self) -> Result<Expression, ExpressionParseError> {
+        let mut elements = Vec::new();
+        if self.match_kind(|kind| matches!(kind, ExpressionTokenKind::CloseBracket)) {
+            return Ok(Expression::ArrayLiteral(elements));
+        }
+
+        loop {
+            elements.push(self.parse_expression(0)?);
+            if self.match_kind(|kind| matches!(kind, ExpressionTokenKind::Comma)) {
+                continue;
+            }
+            self.expect_kind(
+                |kind| matches!(kind, ExpressionTokenKind::CloseBracket),
+                |found| ExpressionParseErrorKind::ExpectedCommaOrArrayCloseBracket { found },
+            )?;
+            break;
+        }
+
+        Ok(Expression::ArrayLiteral(elements))
+    }
+
+    fn parse_struct_literal(&mut self) -> Result<Expression, ExpressionParseError> {
+        let mut fields = Vec::new();
+        if self.match_kind(|kind| matches!(kind, ExpressionTokenKind::CloseBrace)) {
+            return Ok(Expression::StructLiteral(fields));
+        }
+
+        loop {
+            let Some(token) = self.advance() else {
+                return Err(self.error_at_eof(
+                    ExpressionParseErrorKind::ExpectedStructLiteralField { found: None },
+                ));
+            };
+            let kind = token.kind.clone();
+            let ExpressionTokenKind::Identifier(name) = kind else {
+                return Err(ExpressionParseError::new(
+                    ExpressionParseErrorKind::ExpectedStructLiteralField {
+                        found: Some(describe_token_kind(&kind)),
+                    },
+                    token.span.clone(),
+                ));
+            };
+            if !is_identifier(&name) {
+                return Err(ExpressionParseError::new(
+                    ExpressionParseErrorKind::ExpectedStructLiteralField { found: Some(name) },
+                    token.span.clone(),
+                ));
+            }
+
+            self.expect_kind(
+                |kind| matches!(kind, ExpressionTokenKind::Colon),
+                |found| ExpressionParseErrorKind::ExpectedStructFieldColon {
+                    name: name.clone(),
+                    found,
+                },
+            )?;
+            let expression = self.parse_expression(0)?;
+            fields.push(StructLiteralField::new(name, expression));
+
+            if self.match_kind(|kind| matches!(kind, ExpressionTokenKind::Comma)) {
+                continue;
+            }
+            self.expect_kind(
+                |kind| matches!(kind, ExpressionTokenKind::CloseBrace),
+                |found| ExpressionParseErrorKind::ExpectedCommaOrStructCloseBrace { found },
+            )?;
+            break;
+        }
+
+        Ok(Expression::StructLiteral(fields))
+    }
+
     fn parse_divert_target(&mut self) -> Result<Expression, ExpressionParseError> {
         let Some(token) = self.advance() else {
             return Err(
@@ -701,6 +972,30 @@ impl<'a> TokenExpressionParser<'a> {
                 token.span.clone(),
             ));
         };
+        let mut target = target;
+        while self.match_kind(|kind| matches!(kind, ExpressionTokenKind::Dot)) {
+            let Some(token) = self.advance() else {
+                return Err(self
+                    .error_at_eof(ExpressionParseErrorKind::ExpectedDivertTarget { found: None }));
+            };
+            let kind = token.kind.clone();
+            let ExpressionTokenKind::Identifier(part) = kind else {
+                return Err(ExpressionParseError::new(
+                    ExpressionParseErrorKind::ExpectedDivertTarget {
+                        found: Some(describe_token_kind(&kind)),
+                    },
+                    token.span.clone(),
+                ));
+            };
+            if !is_identifier(&part) {
+                return Err(ExpressionParseError::new(
+                    ExpressionParseErrorKind::ExpectedDivertTarget { found: Some(part) },
+                    token.span.clone(),
+                ));
+            }
+            target.push('.');
+            target.push_str(&part);
+        }
         Ok(Expression::DivertTarget(
             crate::parsed::DivertTarget::from_source(&target).to_snapshot_string(),
         ))
@@ -808,6 +1103,12 @@ fn describe_token_kind(kind: &ExpressionTokenKind) -> String {
         ExpressionTokenKind::StringLiteral(_) => "string literal".to_string(),
         ExpressionTokenKind::OpenParen => "(".to_string(),
         ExpressionTokenKind::CloseParen => ")".to_string(),
+        ExpressionTokenKind::OpenBracket => "[".to_string(),
+        ExpressionTokenKind::CloseBracket => "]".to_string(),
+        ExpressionTokenKind::OpenBrace => "{".to_string(),
+        ExpressionTokenKind::CloseBrace => "}".to_string(),
+        ExpressionTokenKind::Colon => ":".to_string(),
+        ExpressionTokenKind::Dot => ".".to_string(),
         ExpressionTokenKind::Comma => ",".to_string(),
         ExpressionTokenKind::Arrow => "->".to_string(),
     }
@@ -883,6 +1184,11 @@ mod tests {
         output
     }
 
+    fn expression(source: &str) -> Expression {
+        parse_initial_expression(source)
+            .unwrap_or_else(|| panic!("expected expression for {source:?}"))
+    }
+
     fn token_parser_error(source: &str) -> (String, usize) {
         let error = parse_token_expression(source)
             .expect_err("expected token parser to report a structured expression error");
@@ -928,8 +1234,48 @@ mod tests {
             ("3.5", "Number(3.5)"),
             (r#""hello""#, r#"String("hello")"#),
             ("foo(1, bar(2, 3), \"x,y\")", "FunctionCall(foo, args=3)"),
+            ("[]", "ArrayLiteral()"),
+            (
+                "[1, true, \"x\"]",
+                r#"ArrayLiteral(Number(1), Number(true), String("x"))"#,
+            ),
+            (
+                "[[], [1, 2], [foo(3 + 4)]]",
+                "ArrayLiteral(ArrayLiteral(), ArrayLiteral(Number(1), Number(2)), ArrayLiteral(FunctionCall(foo, args=1)))",
+            ),
+            (
+                "[player, companion]",
+                "ArrayLiteral(VariableReference(player), VariableReference(companion))",
+            ),
+            ("{}", "StructLiteral()"),
+            (
+                "{ hp: 10, name: \"Ada\" }",
+                r#"StructLiteral(hp=Number(10), name=String("Ada"))"#,
+            ),
+            (
+                "{ stats: { hp: 10 }, inventory: [] }",
+                "StructLiteral(stats=StructLiteral(hp=Number(10)), inventory=ArrayLiteral())",
+            ),
             ("-> knot.stitch", "DivertTarget(-> knot.stitch)"),
+            ("state.hp", "VariableReference(state.hp)"),
+            ("state.stats.hp", "VariableReference(state.stats.hp)"),
             ("knot.stitch.label", "VariableReference(knot.stitch.label)"),
+            (
+                "items[0]",
+                "IndexAccess(VariableReference(items), Number(0))",
+            ),
+            (
+                "items[i]",
+                "IndexAccess(VariableReference(items), VariableReference(i))",
+            ),
+            (
+                "party[0].hp",
+                "FieldAccess(IndexAccess(VariableReference(party), Number(0)), hp)",
+            ),
+            (
+                "matrix[0][i]",
+                "IndexAccess(IndexAccess(VariableReference(matrix), Number(0)), VariableReference(i))",
+            ),
             (
                 "a and b or c",
                 "Binary(or, Binary(and, VariableReference(a), VariableReference(b)), VariableReference(c))",
@@ -963,32 +1309,63 @@ mod tests {
 
     #[test]
     fn tokenizer_covers_expression_token_categories() {
-        let tokens = tokenize_expression(r#"foo(1, 2.5, "a,b", -> knot, list ? item)"#);
+        let tokens = tokenize_expression(r#"foo([1, 2.5], "a,b", -> knot, list ? item)"#);
 
         assert_eq!(
             tokens,
             vec![
                 token(ExpressionTokenKind::Identifier("foo".to_string()), 0, 1),
                 token(ExpressionTokenKind::OpenParen, 3, 4),
-                token(ExpressionTokenKind::IntLiteral("1".to_string()), 4, 5),
-                token(ExpressionTokenKind::Comma, 5, 6),
-                token(ExpressionTokenKind::FloatLiteral("2.5".to_string()), 7, 8),
-                token(ExpressionTokenKind::Comma, 10, 11),
+                token(ExpressionTokenKind::OpenBracket, 4, 5),
+                token(ExpressionTokenKind::IntLiteral("1".to_string()), 5, 6),
+                token(ExpressionTokenKind::Comma, 6, 7),
+                token(ExpressionTokenKind::FloatLiteral("2.5".to_string()), 8, 9),
+                token(ExpressionTokenKind::CloseBracket, 11, 12),
+                token(ExpressionTokenKind::Comma, 12, 13),
                 token(
                     ExpressionTokenKind::StringLiteral("a,b".to_string()),
-                    12,
-                    13
+                    14,
+                    15
                 ),
-                token(ExpressionTokenKind::Comma, 17, 18),
-                token(ExpressionTokenKind::Arrow, 19, 20),
-                token(ExpressionTokenKind::Identifier("knot".to_string()), 22, 23),
-                token(ExpressionTokenKind::Comma, 26, 27),
-                token(ExpressionTokenKind::Identifier("list".to_string()), 28, 29),
-                token(ExpressionTokenKind::Operator("?".to_string()), 33, 34),
-                token(ExpressionTokenKind::Identifier("item".to_string()), 35, 36),
-                token(ExpressionTokenKind::CloseParen, 39, 40),
+                token(ExpressionTokenKind::Comma, 19, 20),
+                token(ExpressionTokenKind::Arrow, 21, 22),
+                token(ExpressionTokenKind::Identifier("knot".to_string()), 24, 25),
+                token(ExpressionTokenKind::Comma, 28, 29),
+                token(ExpressionTokenKind::Identifier("list".to_string()), 30, 31),
+                token(ExpressionTokenKind::Operator("?".to_string()), 35, 36),
+                token(ExpressionTokenKind::Identifier("item".to_string()), 37, 38),
+                token(ExpressionTokenKind::CloseParen, 41, 42),
             ]
         );
+    }
+
+    #[test]
+    fn tokenizer_covers_struct_literal_tokens() {
+        let tokens = tokenize_expression("{hp: 1}");
+
+        assert_eq!(
+            tokens,
+            vec![
+                token(ExpressionTokenKind::OpenBrace, 0, 1),
+                token(ExpressionTokenKind::Identifier("hp".to_string()), 1, 2),
+                token(ExpressionTokenKind::Colon, 3, 4),
+                token(ExpressionTokenKind::IntLiteral("1".to_string()), 5, 6),
+                token(ExpressionTokenKind::CloseBrace, 6, 7),
+            ]
+        );
+    }
+
+    #[test]
+    fn parses_field_access_nodes() {
+        let Expression::FieldAccess { base, field } = expression("state.hp") else {
+            panic!("expected field access");
+        };
+        assert_eq!(field, "hp");
+        assert!(matches!(*base, Expression::VariableReference(ref name) if name == "state"));
+
+        let nested = expression("state.stats.hp");
+        assert_eq!(nested.dotted_path().as_deref(), Some("state.stats.hp"));
+        assert!(matches!(nested, Expression::FieldAccess { .. }));
     }
 
     #[test]
@@ -1017,13 +1394,15 @@ mod tests {
     }
 
     #[test]
-    fn tokenizer_covers_symbol_operators_and_paths() {
+    fn tokenizer_covers_symbol_operators_and_field_access_separators() {
         let tokens = tokenize_expression("a.b >= c && x != y || z <= 3");
 
         assert_eq!(
             tokens,
             vec![
-                token(ExpressionTokenKind::Identifier("a.b".to_string()), 0, 1),
+                token(ExpressionTokenKind::Identifier("a".to_string()), 0, 1),
+                token(ExpressionTokenKind::Dot, 1, 2),
+                token(ExpressionTokenKind::Identifier("b".to_string()), 2, 3),
                 token(ExpressionTokenKind::Operator(">=".to_string()), 4, 5),
                 token(ExpressionTokenKind::Identifier("c".to_string()), 7, 8),
                 token(ExpressionTokenKind::Operator("&&".to_string()), 9, 10),
@@ -1101,8 +1480,48 @@ mod tests {
             ("3.5", "Number(3.5)"),
             (r#""hello""#, r#"String("hello")"#),
             ("foo(1, bar(2, 3), \"x,y\")", "FunctionCall(foo, args=3)"),
+            ("[]", "ArrayLiteral()"),
+            (
+                "[1, true, \"x\"]",
+                r#"ArrayLiteral(Number(1), Number(true), String("x"))"#,
+            ),
+            (
+                "[[], [1, 2], [foo(3 + 4)]]",
+                "ArrayLiteral(ArrayLiteral(), ArrayLiteral(Number(1), Number(2)), ArrayLiteral(FunctionCall(foo, args=1)))",
+            ),
+            (
+                "[player, companion]",
+                "ArrayLiteral(VariableReference(player), VariableReference(companion))",
+            ),
+            ("{}", "StructLiteral()"),
+            (
+                "{ hp: 10, name: \"Ada\" }",
+                r#"StructLiteral(hp=Number(10), name=String("Ada"))"#,
+            ),
+            (
+                "{ stats: { hp: 10 }, inventory: [] }",
+                "StructLiteral(stats=StructLiteral(hp=Number(10)), inventory=ArrayLiteral())",
+            ),
             ("-> knot.stitch", "DivertTarget(-> knot.stitch)"),
+            ("state.hp", "VariableReference(state.hp)"),
+            ("state.stats.hp", "VariableReference(state.stats.hp)"),
             ("knot.stitch.label", "VariableReference(knot.stitch.label)"),
+            (
+                "items[0]",
+                "IndexAccess(VariableReference(items), Number(0))",
+            ),
+            (
+                "items[i]",
+                "IndexAccess(VariableReference(items), VariableReference(i))",
+            ),
+            (
+                "party[0].hp",
+                "FieldAccess(IndexAccess(VariableReference(party), Number(0)), hp)",
+            ),
+            (
+                "matrix[0][i]",
+                "IndexAccess(IndexAccess(VariableReference(matrix), Number(0)), VariableReference(i))",
+            ),
             (
                 "a and b or c",
                 "Binary(or, Binary(and, VariableReference(a), VariableReference(b)), VariableReference(c))",
@@ -1156,6 +1575,31 @@ mod tests {
                 "foo(1 2)",
                 "expected `,` or `)` in call to `foo`, found `2`",
                 7,
+            ),
+            (
+                "[1 2]",
+                "expected `,` or `]` in array literal, found `2`",
+                4,
+            ),
+            (
+                "{hp 1}",
+                "expected `:` after struct literal field `hp`, found `1`",
+                5,
+            ),
+            (
+                "{hp: 1 mp: 2}",
+                "expected `,` or `}` in struct literal, found `mp`",
+                8,
+            ),
+            (
+                "state.",
+                "expected field name after `.` before end of input",
+                7,
+            ),
+            (
+                "items[0",
+                "expected `]` to close index access before end of input",
+                8,
             ),
             ("1 $ 2", "unexpected token `$` after expression", 3),
         ];

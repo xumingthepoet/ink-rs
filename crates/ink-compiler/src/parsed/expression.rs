@@ -22,6 +22,29 @@ impl PartialEq for FloatLiteral {
 impl Eq for FloatLiteral {}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StructLiteralField {
+    name: String,
+    expression: Expression,
+}
+
+impl StructLiteralField {
+    pub fn new(name: impl Into<String>, expression: Expression) -> Self {
+        Self {
+            name: name.into(),
+            expression,
+        }
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn expression(&self) -> &Expression {
+        &self.expression
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expression {
     String(String),
     StringContent(ContentList),
@@ -33,6 +56,16 @@ pub enum Expression {
     FunctionCall {
         name: String,
         args: Vec<Expression>,
+    },
+    ArrayLiteral(Vec<Expression>),
+    StructLiteral(Vec<StructLiteralField>),
+    FieldAccess {
+        base: Box<Expression>,
+        field: String,
+    },
+    IndexAccess {
+        base: Box<Expression>,
+        index: Box<Expression>,
     },
     Binary {
         operator: BinaryOperator,
@@ -119,6 +152,48 @@ impl Expression {
                 out.push_str(&args.len().to_string());
                 out.push(')');
             }
+            Expression::ArrayLiteral(elements) => {
+                out.push_str("ArrayLiteral(");
+                for (index, element) in elements.iter().enumerate() {
+                    if index > 0 {
+                        out.push_str(", ");
+                    }
+                    element.write_parse_snapshot(out, 0);
+                }
+                out.push(')');
+            }
+            Expression::StructLiteral(fields) => {
+                out.push_str("StructLiteral(");
+                for (index, field) in fields.iter().enumerate() {
+                    if index > 0 {
+                        out.push_str(", ");
+                    }
+                    out.push_str(field.name());
+                    out.push('=');
+                    field.expression().write_parse_snapshot(out, 0);
+                }
+                out.push(')');
+            }
+            Expression::FieldAccess { base, field } => {
+                if let Some(path) = self.dotted_path() {
+                    out.push_str("VariableReference(");
+                    out.push_str(&path);
+                    out.push(')');
+                } else {
+                    out.push_str("FieldAccess(");
+                    base.write_parse_snapshot(out, 0);
+                    out.push_str(", ");
+                    out.push_str(field);
+                    out.push(')');
+                }
+            }
+            Expression::IndexAccess { base, index } => {
+                out.push_str("IndexAccess(");
+                base.write_parse_snapshot(out, 0);
+                out.push_str(", ");
+                index.write_parse_snapshot(out, 0);
+                out.push(')');
+            }
             Expression::Binary {
                 operator,
                 left,
@@ -162,6 +237,19 @@ impl Expression {
             _ => Some(Self::MultipleCondition(expressions)),
         }
     }
+
+    pub fn dotted_path(&self) -> Option<String> {
+        match self {
+            Expression::VariableReference(name) => Some(name.clone()),
+            Expression::FieldAccess { base, field } => {
+                let mut path = base.dotted_path()?;
+                path.push('.');
+                path.push_str(field);
+                Some(path)
+            }
+            _ => None,
+        }
+    }
 }
 
 fn content_list_display(content: &ContentList) -> String {
@@ -192,6 +280,7 @@ fn object_display(object: &Object) -> String {
         Object::Choice(_) => "Choice".to_string(),
         Object::Gather(_) => "Gather".to_string(),
         Object::Sequence(_) => "Sequence".to_string(),
+        Object::StructDeclaration(declaration) => declaration.name().to_string(),
         Object::TunnelOnwards(_) => "TunnelOnwards".to_string(),
         Object::ConstantDeclaration(declaration) => declaration.name().to_string(),
         Object::VariableAssignment(assignment) => assignment.name().to_string(),
@@ -216,6 +305,38 @@ fn expression_display(expression: &Expression) -> String {
                 .collect::<Vec<_>>()
                 .join(", ");
             format!("{name}({args})")
+        }
+        Expression::ArrayLiteral(elements) => {
+            let elements = elements
+                .iter()
+                .map(expression_display)
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!("[{elements}]")
+        }
+        Expression::StructLiteral(fields) => {
+            let fields = fields
+                .iter()
+                .map(|field| {
+                    format!(
+                        "{}: {}",
+                        field.name(),
+                        expression_display(field.expression())
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!("{{{fields}}}")
+        }
+        Expression::FieldAccess { base, field } => {
+            format!("{}.{}", expression_display(base), field)
+        }
+        Expression::IndexAccess { base, index } => {
+            format!(
+                "{}[{}]",
+                expression_display(base),
+                expression_display(index)
+            )
         }
         Expression::Binary {
             operator,

@@ -38,8 +38,12 @@ fn collect_variable_targets_in_content_list(content: &ContentList, names: &mut H
 fn collect_variable_targets_in_object(object: &Object, names: &mut HashSet<String>) {
     match object {
         Object::VariableAssignment(assignment) => {
-            names.insert(assignment.name().to_string());
-            collect_variable_targets_in_expression(assignment.expression(), names);
+            if let Some(name) = assignment.target().variable_name() {
+                names.insert(name.to_string());
+            }
+            if let Some(expression) = assignment.expression() {
+                collect_variable_targets_in_expression(expression, names);
+            }
         }
         Object::Choice(choice) => {
             if let Some(condition) = choice.condition() {
@@ -88,6 +92,7 @@ fn collect_variable_targets_in_object(object: &Object, names: &mut HashSet<Strin
         | Object::ExternalDeclaration(_)
         | Object::Gather(_)
         | Object::Glue(_)
+        | Object::StructDeclaration(_)
         | Object::Tag(_)
         | Object::Text(_)
         | Object::TunnelOnwards(_) => {}
@@ -103,6 +108,21 @@ fn collect_variable_targets_in_expression(expression: &Expression, names: &mut H
             for arg in args {
                 collect_variable_targets_in_expression(arg, names);
             }
+        }
+        Expression::ArrayLiteral(elements) => {
+            for element in elements {
+                collect_variable_targets_in_expression(element, names);
+            }
+        }
+        Expression::StructLiteral(fields) => {
+            for field in fields {
+                collect_variable_targets_in_expression(field.expression(), names);
+            }
+        }
+        Expression::FieldAccess { base, .. } => collect_variable_targets_in_expression(base, names),
+        Expression::IndexAccess { base, index } => {
+            collect_variable_targets_in_expression(base, names);
+            collect_variable_targets_in_expression(index, names);
         }
         Expression::Binary { left, right, .. } => {
             collect_variable_targets_in_expression(left, names);

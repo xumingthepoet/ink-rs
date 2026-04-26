@@ -1,8 +1,16 @@
+mod array_literals;
+mod assignments;
 mod constants;
 mod context;
+mod expression_types;
+mod field_access;
 mod flow;
+mod index_access;
+mod initializers;
 mod names;
 mod span;
+mod struct_literals;
+mod structs;
 mod target_symbols;
 mod targets;
 #[cfg(test)]
@@ -13,9 +21,16 @@ mod warnings;
 
 use crate::{compiler::StageOutput, diagnostic::Diagnostic, parsed::Story};
 
+use array_literals::array_literal_diagnostics;
+use assignments::variable_assignment_diagnostics;
 use constants::constant_redefinition_diagnostics;
+use field_access::field_access_diagnostics;
 use flow::flow_diagnostics;
+use index_access::index_access_diagnostics;
+use initializers::variable_initializer_diagnostics;
 use names::naming_diagnostics;
+use struct_literals::struct_literal_diagnostics;
+use structs::struct_type_diagnostics;
 use targets::call_target_diagnostics;
 use warnings::author_warning_diagnostics;
 
@@ -42,6 +57,7 @@ fn run_analysis_passes(story: &Story) -> Vec<Diagnostic> {
     // not depend on symbol or variable indexes.
     diagnostics.extend(constant_redefinition_diagnostics(story));
     diagnostics.extend(author_warning_diagnostics(story));
+    diagnostics.extend(struct_type_diagnostics(story));
 
     // Naming must run before target checks so name collisions are reported
     // independently from downstream target/variable resolution.
@@ -57,6 +73,13 @@ fn run_analysis_passes(story: &Story) -> Vec<Diagnostic> {
     // more local structural problems.
     diagnostics.extend(call_target_diagnostics(story));
 
+    diagnostics.extend(variable_initializer_diagnostics(story));
+    diagnostics.extend(variable_assignment_diagnostics(story));
+    diagnostics.extend(struct_literal_diagnostics(story));
+    diagnostics.extend(array_literal_diagnostics(story));
+    diagnostics.extend(field_access_diagnostics(story));
+    diagnostics.extend(index_access_diagnostics(story));
+
     diagnostics
 }
 
@@ -64,11 +87,19 @@ fn run_analysis_passes(story: &Story) -> Vec<Diagnostic> {
 mod tests {
     const ANALYSIS_SOURCES: &[(&str, &str)] = &[
         ("mod.rs", include_str!("mod.rs")),
+        ("array_literals.rs", include_str!("array_literals.rs")),
+        ("assignments.rs", include_str!("assignments.rs")),
         ("constants.rs", include_str!("constants.rs")),
         ("context.rs", include_str!("context.rs")),
+        ("expression_types.rs", include_str!("expression_types.rs")),
+        ("field_access.rs", include_str!("field_access.rs")),
         ("flow.rs", include_str!("flow.rs")),
+        ("index_access.rs", include_str!("index_access.rs")),
+        ("initializers.rs", include_str!("initializers.rs")),
         ("names.rs", include_str!("names.rs")),
         ("span.rs", include_str!("span.rs")),
+        ("struct_literals.rs", include_str!("struct_literals.rs")),
+        ("structs.rs", include_str!("structs.rs")),
         ("target_symbols.rs", include_str!("target_symbols.rs")),
         ("targets.rs", include_str!("targets.rs")),
         ("test_support.rs", include_str!("test_support.rs")),

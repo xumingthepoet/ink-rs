@@ -1,7 +1,7 @@
 A {f():B} 
 X
 
-=== function f() ===
+=== function f() -> bool ===
 {true: 
     ~ return false
 }

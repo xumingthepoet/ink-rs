@@ -1,10 +1,11 @@
 use crate::source::SourceSpan;
 
-use super::{push_indent, Expression};
+use super::{push_indent, AssignmentTarget, Expression};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IncDec {
     name: String,
+    target: AssignmentTarget,
     expression: Expression,
     is_increment: bool,
     span: SourceSpan,
@@ -17,8 +18,25 @@ impl IncDec {
         is_increment: bool,
         span: SourceSpan,
     ) -> Self {
+        let name = name.into();
+        Self::with_target(
+            AssignmentTarget::variable(name),
+            expression,
+            is_increment,
+            span,
+        )
+    }
+
+    pub fn with_target(
+        target: AssignmentTarget,
+        expression: Expression,
+        is_increment: bool,
+        span: SourceSpan,
+    ) -> Self {
+        let name = target.display_name();
         Self {
-            name: name.into(),
+            name,
+            target,
             expression,
             is_increment,
             span,
@@ -27,6 +45,10 @@ impl IncDec {
 
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    pub fn target(&self) -> &AssignmentTarget {
+        &self.target
     }
 
     pub fn expression(&self) -> &Expression {

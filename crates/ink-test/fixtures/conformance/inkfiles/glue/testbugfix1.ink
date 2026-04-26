@@ -2,7 +2,7 @@ A
 {f():X}
 C
 
-=== function f()
+=== function f() -> bool
 { true: 
     ~ return false
 }

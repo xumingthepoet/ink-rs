@@ -2,6 +2,6 @@
   The value is {x}.
   -> END
   
-  === function herp(a, b) ===
-  VAR x = 0.0
+  === function herp(a: int, b: int) -> void ===
+  VAR x: int = 0
   ~x = a * b

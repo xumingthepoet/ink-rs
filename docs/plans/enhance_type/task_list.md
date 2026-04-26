@@ -1,4 +1,4 @@
-Progress: 0/64 steps complete
+Progress: 64/64 steps complete
 
 # Typed Value Implementation Task List
 
@@ -40,6 +40,116 @@ Implementation method:
 - Write a short implementation note in this step summarizing the exact files
   that must change.
 
+Implementation note:
+
+- Current parsed model:
+  - `crates/ink-compiler/src/parsed/variable_assignment.rs` stores only
+    `name`, required `expression`, `is_global`, `is_temporary`, and `span`.
+    Typed declarations and omitted initializers must extend this model.
+  - `crates/ink-compiler/src/parsed/flow.rs` stores `FlowArgument` as
+    name/ref/divert-target metadata and `Flow` as `is_function` only. Typed
+    parameters and function return types must be added here.
+  - `crates/ink-compiler/src/parsed/external_declaration.rs` stores only
+    external argument names. Typed external arg and return signatures must be
+    added here.
+  - `crates/ink-compiler/src/parsed/expression.rs` currently supports strings,
+    primitive numeric/bool literals, divert targets, variable refs, function
+    calls, binary/unary expressions, and multiple conditions. Array literals,
+    struct literals, field access, and index access must be added here.
+  - `crates/ink-compiler/src/parsed/mod.rs` and
+    `crates/ink-compiler/src/parsed/visit.rs` must be updated whenever new
+    parsed nodes or expression variants are added.
+- Current syntax pipeline:
+  - `crates/ink-compiler/src/syntax/variable.rs` parses untyped `VAR name =
+    expr`, `~ temp name = expr`, simple reassignment, and variable-only
+    inc/dec. It must parse explicit types, omitted typed initializers, and
+    complex lvalue assignments.
+  - `crates/ink-compiler/src/syntax/knot.rs` parses untyped function/knot
+    arguments and no return type. It must parse typed parameters and `->`
+    return types.
+  - `crates/ink-compiler/src/syntax/declaration.rs` parses `EXTERNAL name(args)`
+    without types. It must parse typed external signatures.
+  - `crates/ink-compiler/src/syntax/expression.rs` tokenizes only identifiers,
+    literals, calls, operators, parentheses, commas, and divert arrows. It must
+    add reusable type parsing plus array/object literal and access syntax.
+  - `crates/ink-compiler/src/syntax/parser.rs` must route new top-level
+    `STRUCT` declarations and keep parse diagnostics/rule order coherent.
+  - `crates/ink-compiler/src/syntax/logic.rs` must continue wrapping
+    function-call-containing return/assignment expressions after new expression
+    variants are added.
+- Current analysis pipeline:
+  - `crates/ink-compiler/src/analysis/mod.rs` only runs constants, warnings,
+    naming, flow, and target diagnostics. Typed symbol and expression analysis
+    must be inserted here before lowering.
+  - `crates/ink-compiler/src/analysis/context.rs`,
+    `crates/ink-compiler/src/analysis/variables.rs`, and
+    `crates/ink-compiler/src/analysis/targets.rs` currently index names and
+    scopes without types. They must carry declared types, function signatures,
+    external signatures, and expression type results.
+  - `crates/ink-compiler/src/analysis/flow.rs` currently checks structural
+    function restrictions and return placement, not return types or condition
+    types. It must participate in typed return and condition diagnostics.
+  - `crates/ink-compiler/src/analysis/names.rs`,
+    `crates/ink-compiler/src/analysis/span.rs`,
+    `crates/ink-compiler/src/analysis/test_support.rs`, and
+    `crates/ink-compiler/src/diagnostic.rs` must be updated for struct names,
+    new spans, tests, and typed diagnostics as needed.
+- Current lowering/emission pipeline:
+  - `crates/ink-compiler/src/lower.rs` lowers global declarations and
+    assignments directly from `VariableAssignment.expression()` into
+    `ink_story_json_format::Object`. It must use typed default initializers and
+    complex lvalue operations.
+  - `crates/ink-compiler/src/lower/expression.rs` lowers only current
+    expression variants and primitive literals. It must lower arrays, objects,
+    field/index access, typed builtins, and typed external/function calls.
+  - `crates/ink-compiler/src/lower/flow.rs` lowers untyped parameters as temp
+    variable assignments. It must preserve typed parameter metadata through
+    analysis while keeping story JSON dynamic.
+  - `crates/ink-compiler/src/lower/indexes.rs` currently collects variable
+    declarations and external/Ink call arity signatures. It must collect typed
+    signatures and declarations for lowering support after analysis owns type
+    checking.
+  - `crates/ink-compiler/src/lower/conditional.rs`,
+    `crates/ink-compiler/src/lower/weave.rs`, and
+    `crates/ink-compiler/src/lower/sequence.rs` must be adjusted when new
+    expression/lvalue forms appear inside conditions, choices, sequences, and
+    content lists.
+  - `crates/ink-compiler/src/emit.rs` already delegates JSON writing to
+    `ink-story-json-format`; it only needs changes if format serialization
+    APIs change.
+- Current format/runtime value pipeline:
+  - `crates/ink-story-json-format/src/model.rs` and
+    `crates/ink-story-json-format/src/json.rs` currently model primitive
+    runtime values plus containers, diverts, variable commands, native
+    functions, and void. They must add dynamic array/object value variants and
+    roundtrip JSON support without static type metadata.
+  - `crates/ink-runtime/src/value_type.rs` and
+    `crates/ink-runtime/src/value.rs` currently store bool/int/float/string,
+    divert targets, and variable pointers. They must add array and object
+    storage with clone/value-copy behavior.
+  - `crates/ink-runtime/src/json/json_read.rs` converts
+    `ink-story-json-format` objects into runtime objects and save values. It
+    must map dynamic arrays/objects into runtime values.
+  - `crates/ink-runtime/src/json/json_write.rs` writes runtime values through
+    `ink-story-json-format`. It must serialize dynamic arrays/objects for story
+    JSON/save JSON.
+  - `crates/ink-runtime/src/variables_state.rs`,
+    `crates/ink-runtime/src/story_state.rs`, and
+    `crates/ink-runtime/src/state_patch.rs` currently save/load/copy primitive
+    variable state. They must preserve array/object values and compare them
+    structurally for default-value elision and equality.
+  - `crates/ink-runtime/src/native_function_call.rs` currently performs legacy
+    runtime coercion and primitive native operations. It must add typed array
+    builtins, recursive equality, and string concatenation behavior required by
+    the new typed language.
+  - `crates/ink-runtime/src/story/control_logic.rs` is the execution point for
+    variable assignment/reference, native calls, eval stack operations, and
+    should receive new field/index read/write operations.
+- Test and documentation files that must change across later steps include
+  `crates/ink-test` fixtures/snapshots, compiler/runtime crate unit tests,
+  `docs/WritingWithInk-updates.md`, `docs/WritingWithInk-latest.md`, and any
+  JSON format docs added for dynamic arrays/objects.
+
 Acceptance method:
 
 - No production behavior changes.
@@ -54,11 +164,11 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Inventory written in this step
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Inventory written in this step
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: 7c4b9a1
 
 ### Step 02: Add Typed-Value Test Matrix Document
 
@@ -68,6 +178,102 @@ Implementation method:
   and negative fixture categories for typed values.
 - Include primitives, structs, arrays, functions, externals, equality, runtime
   errors, and tail recursion.
+
+Typed-value test matrix:
+
+- Primitive typed variables:
+  - Positive: typed global `VAR` declarations for `int`, `float`, `bool`, and
+    `string`; typed `temp` declarations in root and flow scopes; omitted
+    initializers using default values; valid later reassignment with the exact
+    declared type.
+  - Negative: missing type annotations after migration, initializer type
+    mismatch, reassignment type mismatch, `int` to `float` assignment, `float`
+    to `int` assignment, assigning `bool`/`string` to numeric variables, and
+    `void` variables.
+- Primitive expressions and conditions:
+  - Positive: valid numeric arithmetic with matching numeric types, bool
+    operators on bool values, string concatenation with `string + string`, and
+    bool conditions in choices, conditionals, sequences, and conditional
+    diverts.
+  - Negative: implicit numeric widening, mixed primitive arithmetic, ordered
+    string comparison, non-bool conditions, `string + int`, `int + string`, and
+    use of `void` expression results where a value is required.
+- Struct declarations and struct values:
+  - Positive: top-level `STRUCT` declarations, primitive fields, nested struct
+    fields, array fields, full object literals, partial object literals with
+    defaulted missing fields, field reads, field writes, nested field access,
+    and value-copy assignment between struct variables.
+  - Negative: duplicate struct names, duplicate field names, unknown field
+    types, unknown literal fields, duplicate literal fields, wrong field value
+    types, field access on non-struct values, unknown field reads/writes, and
+    assigning the wrong value type to a field.
+- Arrays:
+  - Positive: empty arrays with expected type, primitive arrays, struct arrays,
+    nested arrays such as `int[][]`, index reads, index writes, nested
+    field/index chains like `party[0].hp`, and value-copy assignment between
+    array variables.
+  - Negative: empty array without expected type, mixed element types,
+    non-`int` index expressions, indexing non-array values, assigning wrong
+    element types, indexed assignment to non-lvalues, and out-of-bounds read or
+    write runtime errors.
+- Typed functions:
+  - Positive: typed parameters for primitives, arrays, structs, and nested
+    arrays; declared primitive/composite return types; `void` functions with
+    bare `return`; valid function calls in expressions and logic lines; valid
+    by-reference behavior where still supported.
+  - Negative: missing parameter types, `void` parameters, missing return type
+    after migration, wrong argument count, wrong argument type, value return in
+    `void` functions, bare return in non-`void` functions, and wrong return
+    expression type.
+- Typed externals:
+  - Positive: `EXTERNAL` signatures with typed primitive/composite arguments
+    and typed return values; valid calls; return values used in typed
+    expressions; existing host binding behavior for primitive values.
+  - Negative: missing argument types, missing return type, wrong call arity,
+    wrong call argument type, and use of unsupported host-return shapes if the
+    runtime API cannot provide them yet.
+- Builtins:
+  - Positive: `LEN(T[]) -> int` for empty arrays, primitive arrays, struct
+    arrays, and nested arrays; `ARRAY_REMOVE(T[], int) -> void` removing from
+    beginning, middle, and end.
+  - Negative: `LEN` on non-arrays, wrong `LEN` arity, `ARRAY_REMOVE` on
+    non-arrays, non-`int` removal index, wrong `ARRAY_REMOVE` arity,
+    non-lvalue array targets if required by implementation, and out-of-bounds
+    remove runtime errors.
+- Equality and inequality:
+  - Positive: primitive equality with identical types, array equality with
+    equal lengths and recursive element equality, struct equality with all
+    fields equal, nested array/struct equality, and inequality as logical
+    negation.
+  - Negative: equality across unrelated types, equality between `int` and
+    `float`, ordered comparisons for arrays/structs/strings, arrays with
+    unequal lengths, objects with missing or unequal fields, and nested
+    mismatches.
+- Runtime JSON and save JSON:
+  - Positive: `ink-story-json-format` roundtrips primitive values, arrays,
+    nested arrays, objects, nested object/array combinations, and dynamic
+    values inside containers; runtime story loading converts those values;
+    save/load preserves global array/object values and evaluation stack values
+    where reachable.
+  - Negative: malformed array/object JSON, unsupported object tokens that look
+    like compiled story commands, non-value JSON where a runtime value is
+    expected, and save-state reload failures for invalid dynamic value shapes.
+- Tail recursion:
+  - Positive: direct self tail return `return f(...)` updates parameters and
+    jumps without adding another function callstack layer; deep self-recursive
+    stress case; argument evaluation order; existing non-recursive and normal
+    recursive functions remain correct.
+  - Negative: mutual recursion, non-tail self calls such as `return 1 + f(...)`,
+    recursive calls inside larger expressions, calls not in actual return-tail
+    position, and tests that would pass merely by increasing runtime stack
+    limits.
+- Migration and compatibility:
+  - Positive: migrated primitive `VAR`, `temp`, function, and `EXTERNAL`
+    fixtures preserve story output and JSON behavior except for intentional
+    typed syntax changes; docs examples compile or mirror language tests.
+  - Negative: untyped declarations after migration, skipped/ignored legacy
+    fixtures, hidden compatibility branches, and diagnostics that collapse into
+    ambiguous parse failures instead of explicit missing-type messages.
 
 Acceptance method:
 
@@ -82,11 +288,11 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Test matrix added
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Test matrix added
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: cc06fc8
 
 ## Phase 1: Type Model Foundations
 
@@ -113,12 +319,12 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Type enum/model added
-- [ ] Type display/snapshot helpers tested
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Type enum/model added
+- [x] Type display/snapshot helpers tested
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: 738bfd9
 
 ### Step 04: Add Default Value Model In Compiler
 
@@ -141,13 +347,13 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Default value helper added
-- [ ] Primitive defaults tested
-- [ ] Array default tested
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Default value helper added
+- [x] Primitive defaults tested
+- [x] Array default tested
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: 6547db5
 
 ### Step 05: Add Runtime Format Value Variants For Arrays And Objects
 
@@ -172,14 +378,14 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Format value variants added
-- [ ] JSON reader added
-- [ ] JSON writer added
-- [ ] Nested roundtrip tests added
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Format value variants added
+- [x] JSON reader added
+- [x] JSON writer added
+- [x] Nested roundtrip tests added
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: 2d86f3a
 
 ### Step 06: Add Runtime Value Storage For Arrays And Objects
 
@@ -203,13 +409,13 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Runtime array value storage added
-- [ ] Runtime object value storage added
-- [ ] Clone/value-copy test added
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Runtime array value storage added
+- [x] Runtime object value storage added
+- [x] Clone/value-copy test added
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: 1a25523
 
 ### Step 07: Wire Format Arrays And Objects Into Runtime JSON Reader
 
@@ -233,12 +439,12 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Runtime JSON reader handles arrays
-- [ ] Runtime JSON reader handles objects
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Runtime JSON reader handles arrays
+- [x] Runtime JSON reader handles objects
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: 10d9242
 
 ### Step 08: Wire Runtime Arrays And Objects Into JSON Writer And Save State
 
@@ -261,13 +467,13 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Runtime JSON writer handles arrays
-- [ ] Save state serializes arrays/objects
-- [ ] Save state reloads arrays/objects
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Runtime JSON writer handles arrays
+- [x] Save state serializes arrays/objects
+- [x] Save state reloads arrays/objects
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: 6669781
 
 ## Phase 2: Type Syntax Parsing
 
@@ -293,13 +499,13 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Type parser added
-- [ ] Nested array type tests added
-- [ ] Invalid type syntax diagnostics tested
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Type parser added
+- [x] Nested array type tests added
+- [x] Invalid type syntax diagnostics tested
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: c1f5ae3
 
 ### Step 10: Parse Typed Global `VAR`
 
@@ -324,13 +530,13 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Parsed variable declaration stores type
-- [ ] Typed global parser tests added
-- [ ] Existing fixtures still pass
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Parsed variable declaration stores type
+- [x] Typed global parser tests added
+- [x] Existing fixtures still pass
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: a230391
 
 ### Step 11: Parse Typed `temp`
 
@@ -353,13 +559,13 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Typed temp parser added
-- [ ] Omitted initializer parser test added
-- [ ] `void` variable rejection tested
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Typed temp parser added
+- [x] Omitted initializer parser test added
+- [x] `void` variable rejection tested
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: 38f4509
 
 ### Step 12: Parse `STRUCT` Declarations
 
@@ -384,14 +590,14 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Struct parsed model added
-- [ ] Struct parser added
-- [ ] Field syntax tests added
-- [ ] Parse snapshot support added
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Struct parsed model added
+- [x] Struct parser added
+- [x] Field syntax tests added
+- [x] Parse snapshot support added
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: 450e449
 
 ### Step 13: Parse Array Literals
 
@@ -413,14 +619,14 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Array literal expression node added
-- [ ] Empty array parser test added
-- [ ] Nested array parser test added
-- [ ] Choice syntax regression test added
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Array literal expression node added
+- [x] Empty array parser test added
+- [x] Nested array parser test added
+- [x] Choice syntax regression test added
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: e40290b
 
 ### Step 14: Parse Struct Literals
 
@@ -444,13 +650,13 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Struct literal expression node added
-- [ ] Expression-position parsing tested
-- [ ] Braced content regression tests added
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Struct literal expression node added
+- [x] Expression-position parsing tested
+- [x] Braced content regression tests added
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: b9de2e8
 
 ### Step 15: Parse Field Access Expressions
 
@@ -475,13 +681,13 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Field access expression node added
-- [ ] Parser tests added
-- [ ] Divert path regression tests pass
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Field access expression node added
+- [x] Parser tests added
+- [x] Divert path regression tests pass
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: e09904d
 
 ### Step 16: Parse Index Access Expressions
 
@@ -504,13 +710,13 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Index access expression node added
-- [ ] Chained access tests added
-- [ ] Choice bracket regression test added
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Index access expression node added
+- [x] Chained access tests added
+- [x] Choice bracket regression test added
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: 8d00f17
 
 ### Step 17: Parse Field And Index Assignment Targets
 
@@ -534,14 +740,14 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Assignment target model added
-- [ ] Field assignment parser test added
-- [ ] Index assignment parser test added
-- [ ] Simple assignment regression test added
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Assignment target model added
+- [x] Field assignment parser test added
+- [x] Index assignment parser test added
+- [x] Simple assignment regression test added
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: 2b11969
 
 ### Step 18: Parse Compound Assignment For Fields And Indexes
 
@@ -566,14 +772,14 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Compound lvalue parser support added
-- [ ] Field compound assignment test added
-- [ ] Index compound assignment test added
-- [ ] Existing inc/dec tests pass
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Compound lvalue parser support added
+- [x] Field compound assignment test added
+- [x] Index compound assignment test added
+- [x] Existing inc/dec tests pass
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: 247cbd0
 
 ### Step 19: Parse Typed Function Signatures
 
@@ -597,14 +803,14 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Function signature parser updated
-- [ ] Parsed flow stores typed signature
-- [ ] Positive signature tests added
-- [ ] Negative signature tests added
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Function signature parser updated
+- [x] Parsed flow stores typed signature
+- [x] Positive signature tests added
+- [x] Negative signature tests added
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: ee443bd
 
 ### Step 20: Parse Typed `EXTERNAL` Signatures
 
@@ -627,14 +833,14 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] External signature parser updated
-- [ ] Parsed external stores typed signature
-- [ ] Positive external tests added
-- [ ] Negative external tests added
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] External signature parser updated
+- [x] Parsed external stores typed signature
+- [x] Positive external tests added
+- [x] Negative external tests added
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: b87ed13
 
 ## Phase 3: Type Analysis
 
@@ -660,14 +866,14 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Struct symbol index added
-- [ ] Duplicate struct diagnostic tested
-- [ ] Duplicate field diagnostic tested
-- [ ] Unknown field type diagnostic tested
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Struct symbol index added
+- [x] Duplicate struct diagnostic tested
+- [x] Duplicate field diagnostic tested
+- [x] Unknown field type diagnostic tested
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: c1fc3bc
 
 ### Step 22: Build Typed Variable Scope Index
 
@@ -690,14 +896,14 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Variable type scope index added
-- [ ] Global type visibility tested
-- [ ] Temp type visibility tested
-- [ ] Function arg type visibility tested
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Variable type scope index added
+- [x] Global type visibility tested
+- [x] Temp type visibility tested
+- [x] Function arg type visibility tested
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: afd9c72
 
 ### Step 23: Add Expression Type Inference For Primitives
 
@@ -720,14 +926,14 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Primitive expression type inference added
-- [ ] No implicit conversion tests added
-- [ ] String concatenation test added
-- [ ] Boolean operator tests added
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Primitive expression type inference added
+- [x] No implicit conversion tests added
+- [x] String concatenation test added
+- [x] Boolean operator tests added
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: 82db26d
 
 ### Step 24: Type-Check Variable Initializers
 
@@ -750,13 +956,13 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Initializer type checks added
-- [ ] Omitted default handling tested
-- [ ] Invalid initializer diagnostics tested
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Initializer type checks added
+- [x] Omitted default handling tested
+- [x] Invalid initializer diagnostics tested
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: 673935c
 
 ### Step 25: Type-Check Simple Assignment
 
@@ -779,13 +985,13 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Simple assignment type checks added
-- [ ] Compound assignment type checks added
-- [ ] Invalid assignment diagnostics tested
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Simple assignment type checks added
+- [x] Compound assignment type checks added
+- [x] Invalid assignment diagnostics tested
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: c6ae76a
 
 ### Step 26: Type-Check Struct Literals
 
@@ -809,14 +1015,14 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Struct literal type checking added
-- [ ] Missing field defaults tested
-- [ ] Unknown/duplicate field diagnostics tested
-- [ ] Nested struct literal tested
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Struct literal type checking added
+- [x] Missing field defaults tested
+- [x] Unknown/duplicate field diagnostics tested
+- [x] Nested struct literal tested
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: e63adf5
 
 ### Step 27: Type-Check Array Literals
 
@@ -840,14 +1046,14 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Array literal type checking added
-- [ ] Empty expected-type test added
-- [ ] Mixed element diagnostic tested
-- [ ] Nested array test added
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Array literal type checking added
+- [x] Empty expected-type test added
+- [x] Mixed element diagnostic tested
+- [x] Nested array test added
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: 2554f18
 
 ### Step 28: Type-Check Field Access
 
@@ -871,14 +1077,14 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Field access type resolution added
-- [ ] Unknown field diagnostic tested
-- [ ] Non-struct access diagnostic tested
-- [ ] Dotted divert regression tested
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Field access type resolution added
+- [x] Unknown field diagnostic tested
+- [x] Non-struct access diagnostic tested
+- [x] Dotted divert regression tested
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: 36ef83d
 
 ### Step 29: Type-Check Index Access
 
@@ -904,14 +1110,14 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Index access type resolution added
-- [ ] Non-int index diagnostic tested
-- [ ] Non-array index diagnostic tested
-- [ ] Nested array indexing tested
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Index access type resolution added
+- [x] Non-int index diagnostic tested
+- [x] Non-array index diagnostic tested
+- [x] Nested array indexing tested
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: fb514a1
 
 ### Step 30: Type-Check Field And Index Assignment
 
@@ -935,14 +1141,14 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Complex lvalue type checking added
-- [ ] Field assignment diagnostics tested
-- [ ] Index assignment diagnostics tested
-- [ ] Nested assignment tested
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Complex lvalue type checking added
+- [x] Field assignment diagnostics tested
+- [x] Index assignment diagnostics tested
+- [x] Nested assignment tested
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: 34dac55
 
 ### Step 31: Type-Check Function Calls
 
@@ -965,14 +1171,14 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Function call type checking added
-- [ ] Wrong arg count diagnostic tested
-- [ ] Wrong arg type diagnostic tested
-- [ ] Composite type call tests added
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Function call type checking added
+- [x] Wrong arg count diagnostic tested
+- [x] Wrong arg type diagnostic tested
+- [x] Composite type call tests added
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: 7608795
 
 ### Step 32: Type-Check Function Returns
 
@@ -996,14 +1202,14 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Return type checking added
-- [ ] Bare return tests added
-- [ ] Wrong return diagnostics tested
-- [ ] Composite return tests added
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Return type checking added
+- [x] Bare return tests added
+- [x] Wrong return diagnostics tested
+- [x] Composite return tests added
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: edfe7c5
 
 ### Step 33: Type-Check Conditions
 
@@ -1027,13 +1233,13 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Condition type checks added
-- [ ] Non-bool condition diagnostics tested
-- [ ] Existing bool behavior tested
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Condition type checks added
+- [x] Non-bool condition diagnostics tested
+- [x] Existing bool behavior tested
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: 11af20b
 
 ### Step 34: Type-Check `LEN`
 
@@ -1056,13 +1262,13 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] `LEN` type signature added
-- [ ] Valid `LEN` tests added
-- [ ] Invalid `LEN` diagnostics tested
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] `LEN` type signature added
+- [x] Valid `LEN` tests added
+- [x] Invalid `LEN` diagnostics tested
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: 7ab65ef
 
 ### Step 35: Type-Check `ARRAY_REMOVE`
 
@@ -1086,13 +1292,13 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] `ARRAY_REMOVE` type signature added
-- [ ] Mutability/lvalue rule tested
-- [ ] Invalid arg diagnostics tested
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] `ARRAY_REMOVE` type signature added
+- [x] Mutability/lvalue rule tested
+- [x] Invalid arg diagnostics tested
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: 387c7b6
 
 ### Step 36: Type-Check Equality And Inequality
 
@@ -1116,14 +1322,14 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Equality type rules added
-- [ ] Inequality type rules added
-- [ ] Nested equality tests added
-- [ ] Ordered comparison rejection tested
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Equality type rules added
+- [x] Inequality type rules added
+- [x] Nested equality tests added
+- [x] Ordered comparison rejection tested
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: d5b7763
 
 ### Step 37: Type-Check `EXTERNAL` Calls
 
@@ -1146,13 +1352,13 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] External call type checking added
-- [ ] External return type inference added
-- [ ] Invalid external call diagnostics tested
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] External call type checking added
+- [x] External return type inference added
+- [x] Invalid external call diagnostics tested
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: 3fef442
 
 ## Phase 4: Lowering And Runtime Execution
 
@@ -1177,13 +1383,13 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Global defaults lowered
-- [ ] Temp defaults lowered
-- [ ] Struct defaults lowered
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Global defaults lowered
+- [x] Temp defaults lowered
+- [x] Struct defaults lowered
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: e9e1b4b
 
 ### Step 39: Lower Array Literals
 
@@ -1206,13 +1412,13 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Array literal lowering added
-- [ ] Nested array lowering tested
-- [ ] Array of struct lowering tested
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Array literal lowering added
+- [x] Nested array lowering tested
+- [x] Array of struct lowering tested
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: 262a72e
 
 ### Step 40: Lower Struct Literals
 
@@ -1235,13 +1441,13 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Struct literal lowering added
-- [ ] Missing field defaults emitted
-- [ ] Nested struct lowering tested
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Struct literal lowering added
+- [x] Missing field defaults emitted
+- [x] Nested struct lowering tested
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: 0ac3de9
 
 ### Step 41: Runtime Field Read
 
@@ -1265,13 +1471,13 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Runtime field read operation added
-- [ ] Compiler lowering added
-- [ ] Missing field runtime error tested
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Runtime field read operation added
+- [x] Compiler lowering added
+- [x] Missing field runtime error tested
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: 57ef1d0
 
 ### Step 42: Runtime Index Read
 
@@ -1295,14 +1501,14 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Runtime index read operation added
-- [ ] Compiler lowering added
-- [ ] Out-of-bounds runtime error tested
-- [ ] Zero-based behavior tested
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Runtime index read operation added
+- [x] Compiler lowering added
+- [x] Out-of-bounds runtime error tested
+- [x] Zero-based behavior tested
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: cd26e6d
 
 ### Step 43: Runtime Field Write
 
@@ -1327,14 +1533,14 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Runtime field write operation added
-- [ ] Compiler lowering added
-- [ ] Value-copy struct assignment tested
-- [ ] Unknown field behavior tested
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Runtime field write operation added
+- [x] Compiler lowering added
+- [x] Value-copy struct assignment tested
+- [x] Unknown field behavior tested
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: 51024fa
 
 ### Step 44: Runtime Index Write
 
@@ -1359,14 +1565,14 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Runtime index write operation added
-- [ ] Compiler lowering added
-- [ ] Value-copy array assignment tested
-- [ ] Out-of-bounds write tested
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Runtime index write operation added
+- [x] Compiler lowering added
+- [x] Value-copy array assignment tested
+- [x] Out-of-bounds write tested
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: 431f582
 
 ### Step 45: Lower Compound Field And Index Assignment
 
@@ -1390,13 +1596,13 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Compound field lowering added
-- [ ] Compound index lowering added
-- [ ] Single-evaluation behavior tested
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Compound field lowering added
+- [x] Compound index lowering added
+- [x] Single-evaluation behavior tested
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: 9cf6953
 
 ### Step 46: Runtime `LEN`
 
@@ -1419,14 +1625,14 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Runtime `LEN` added
-- [ ] Compiler lowering connected
-- [ ] Array length tests added
-- [ ] Non-array runtime guard tested if reachable
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Runtime `LEN` added
+- [x] Compiler lowering connected
+- [x] Array length tests added
+- [x] Non-array runtime guard tested if reachable
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: 5ffd2d0
 
 ### Step 47: Runtime `ARRAY_REMOVE`
 
@@ -1452,14 +1658,14 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Runtime `ARRAY_REMOVE` added
-- [ ] Compiler lowering connected
-- [ ] In-place mutation tested
-- [ ] Out-of-bounds runtime error tested
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Runtime `ARRAY_REMOVE` added
+- [x] Compiler lowering connected
+- [x] In-place mutation tested
+- [x] Out-of-bounds runtime error tested
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: 83b1ad8
 
 ### Step 48: Runtime Struct And Array Equality
 
@@ -1483,14 +1689,14 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Runtime recursive equality added
-- [ ] Runtime inequality added
-- [ ] Nested equality tests added
-- [ ] Primitive regression tests pass
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Runtime recursive equality added
+- [x] Runtime inequality added
+- [x] Nested equality tests added
+- [x] Primitive regression tests pass
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: 43ab0b5
 
 ### Step 49: Runtime String Concatenation
 
@@ -1513,13 +1719,13 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] String concatenation runtime behavior verified
-- [ ] Invalid mixed concat diagnostics tested
-- [ ] Numeric addition regression tested
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] String concatenation runtime behavior verified
+- [x] Invalid mixed concat diagnostics tested
+- [x] Numeric addition regression tested
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: 005e69c
 
 ### Step 50: Lower Typed `EXTERNAL` Calls
 
@@ -1545,13 +1751,13 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Typed external lowering verified
-- [ ] External return value tests added
-- [ ] Existing external tests pass
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Typed external lowering verified
+- [x] External return value tests added
+- [x] Existing external tests pass
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: 9427bc0
 
 ## Phase 5: Tail Recursion
 
@@ -1577,13 +1783,13 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Tail-call detection added
-- [ ] Positive detection test added
-- [ ] Non-tail negative tests added
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Tail-call detection added
+- [x] Positive detection test added
+- [x] Non-tail negative tests added
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: 592c5f7
 
 ### Step 52: Lower Tail Recursion To Stack-Neutral Jump
 
@@ -1608,14 +1814,14 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Stack-neutral lowering added
-- [ ] Argument evaluation order tested
-- [ ] Deep tail recursion test added
-- [ ] Non-tail recursion regression tested
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Stack-neutral lowering added
+- [x] Argument evaluation order tested
+- [x] Deep tail recursion test added
+- [x] Non-tail recursion regression tested
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: ce37938
 
 ### Step 53: Prove Tail Recursion Does Not Grow Function Callstack
 
@@ -1638,12 +1844,12 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Stack-depth or stress test added
-- [ ] Test demonstrates stack-neutral behavior
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Stack-depth or stress test added
+- [x] Test demonstrates stack-neutral behavior
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: 298986d
 
 ## Phase 6: Fixture Migration And Compatibility Cleanup
 
@@ -1669,13 +1875,13 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Primitive global fixtures migrated
-- [ ] Parse snapshots updated
-- [ ] JSON fixtures updated
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Primitive global fixtures migrated
+- [x] Parse snapshots updated
+- [x] JSON fixtures updated
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: cda184c
 
 ### Step 55: Migrate Primitive `temp` Fixtures
 
@@ -1697,13 +1903,13 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Primitive temp fixtures migrated
-- [ ] Parse snapshots updated
-- [ ] JSON fixtures updated
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Primitive temp fixtures migrated
+- [x] Parse snapshots updated
+- [x] JSON fixtures updated
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: d1bc14b
 
 ### Step 56: Migrate Function Signature Fixtures
 
@@ -1725,14 +1931,14 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Function fixtures migrated
-- [ ] External references updated
-- [ ] Parse snapshots updated
-- [ ] JSON fixtures updated
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Function fixtures migrated
+- [x] External references updated
+- [x] Parse snapshots updated
+- [x] JSON fixtures updated
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: fa06b32
 
 ### Step 57: Migrate `EXTERNAL` Fixtures
 
@@ -1755,12 +1961,12 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] External fixtures migrated
-- [ ] Host binding tests updated if needed
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] External fixtures migrated
+- [x] Host binding tests updated if needed
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: 7dceb3e
 
 ### Step 58: Remove Transitional Untyped Declaration Support
 
@@ -1784,16 +1990,16 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Untyped global support removed
-- [ ] Untyped temp support removed
-- [ ] Untyped function signature support removed
-- [ ] Untyped external signature support removed
-- [ ] Missing-type diagnostics tested
-- [ ] Fixture search clean
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Untyped global support removed
+- [x] Untyped temp support removed
+- [x] Untyped function signature support removed
+- [x] Untyped external signature support removed
+- [x] Missing-type diagnostics tested
+- [x] Fixture search clean
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: 1ac9ba8
 
 ### Step 59: Remove Transitional Analysis/Lowering Paths
 
@@ -1815,14 +2021,14 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Transitional parser paths removed
-- [ ] Transitional analysis paths removed
-- [ ] Transitional lowering paths removed
-- [ ] Dead code search clean
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Transitional parser paths removed
+- [x] Transitional analysis paths removed
+- [x] Transitional lowering paths removed
+- [x] Dead code search clean
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: f340b6d
 
 ## Phase 7: Documentation And Final Validation
 
@@ -1846,12 +2052,12 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Updates doc entry added
-- [ ] Origin doc untouched
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Updates doc entry added
+- [x] Origin doc untouched
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: 4ca1de0
 
 ### Step 61: Update WritingWithInk Latest
 
@@ -1874,12 +2080,12 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Latest doc updated
-- [ ] Examples covered by tests
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Latest doc updated
+- [x] Examples covered by tests
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: 57a512d
 
 ### Step 62: Update JSON Runtime Format Documentation
 
@@ -1901,12 +2107,12 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] JSON format docs updated
-- [ ] Examples match tests
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] JSON format docs updated
+- [x] Examples match tests
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: c3845da
 
 ### Step 63: Add End-To-End Typed Language Fixtures
 
@@ -1930,17 +2136,17 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Primitive typed fixture added
-- [ ] Struct typed fixture added
-- [ ] Array typed fixture added
-- [ ] Nested typed fixture added
-- [ ] Typed function fixture added
-- [ ] Typed external fixture added
-- [ ] TCO fixture added
-- [ ] Focused validation passed
-- [ ] `make gate` passed
-- [ ] Committed immediately
-- Commit:
+- [x] Primitive typed fixture added
+- [x] Struct typed fixture added
+- [x] Array typed fixture added
+- [x] Nested typed fixture added
+- [x] Typed function fixture added
+- [x] Typed external fixture added
+- [x] TCO fixture added
+- [x] Focused validation passed
+- [x] `make gate` passed
+- [x] Committed immediately
+- Commit: a18ee23
 
 ### Step 64: Final Cleanup And Release Gate
 
@@ -1967,10 +2173,10 @@ Forbidden boundaries:
 
 Checklist:
 
-- [ ] Stale typed-value TODOs reviewed
-- [ ] Untyped fixture search clean
-- [ ] Unsupported builtin search clean
-- [ ] Full workspace tests passed
-- [ ] `make gate` passed
-- [ ] Final cleanup committed if needed
-- Commit:
+- [x] Stale typed-value TODOs reviewed
+- [x] Untyped fixture search clean
+- [x] Unsupported builtin search clean
+- [x] Full workspace tests passed
+- [x] `make gate` passed
+- [x] Final cleanup committed if needed
+- Commit: N/A (no cleanup changes)

@@ -339,32 +339,7 @@ impl VariablesState {
     }
 
     fn val_equal(&self, val: &Value, default_val: &Value) -> bool {
-        match &val.value {
-            ValueType::Bool(val) => match default_val.value {
-                ValueType::Bool(default_val) => *val == default_val,
-                _ => false,
-            },
-            ValueType::Int(val) => match default_val.value {
-                ValueType::Int(default_val) => *val == default_val,
-                _ => false,
-            },
-            ValueType::Float(val) => match default_val.value {
-                ValueType::Float(default_val) => *val == default_val,
-                _ => false,
-            },
-            ValueType::String(val) => match &default_val.value {
-                ValueType::String(default_val) => val.string.eq(&default_val.string),
-                _ => false,
-            },
-            ValueType::DivertTarget(val) => match &default_val.value {
-                ValueType::DivertTarget(default_val) => *val == *default_val,
-                _ => false,
-            },
-            ValueType::VariablePointer(val) => match &default_val.value {
-                ValueType::VariablePointer(default_val) => *val == *default_val,
-                _ => false,
-            },
-        }
+        value_type_equal(&val.value, &default_val.value)
     }
 
     pub(crate) fn load_json(
@@ -390,5 +365,38 @@ impl VariablesState {
         }
 
         Ok(())
+    }
+}
+
+fn value_type_equal(val: &ValueType, default_val: &ValueType) -> bool {
+    match (val, default_val) {
+        (ValueType::Bool(val), ValueType::Bool(default_val)) => *val == *default_val,
+        (ValueType::Int(val), ValueType::Int(default_val)) => *val == *default_val,
+        (ValueType::Float(val), ValueType::Float(default_val)) => *val == *default_val,
+        (ValueType::String(val), ValueType::String(default_val)) => {
+            val.string == default_val.string
+        }
+        (ValueType::DivertTarget(val), ValueType::DivertTarget(default_val)) => {
+            *val == *default_val
+        }
+        (ValueType::VariablePointer(val), ValueType::VariablePointer(default_val)) => {
+            *val == *default_val
+        }
+        (ValueType::Array(val), ValueType::Array(default_val)) => {
+            val.len() == default_val.len()
+                && val
+                    .iter()
+                    .zip(default_val.iter())
+                    .all(|(val, default_val)| value_type_equal(val, default_val))
+        }
+        (ValueType::Object(val), ValueType::Object(default_val)) => {
+            val.len() == default_val.len()
+                && val.iter().all(|(name, val)| {
+                    default_val
+                        .get(name)
+                        .is_some_and(|default_val| value_type_equal(val, default_val))
+                })
+        }
+        _ => false,
     }
 }

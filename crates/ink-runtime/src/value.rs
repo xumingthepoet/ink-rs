@@ -13,6 +13,8 @@ const CAST_FLOAT: u8 = 2;
 const CAST_STRING: u8 = 3;
 const CAST_DIVERT_TARGET: u8 = 4;
 const CAST_VARIABLE_POINTER: u8 = 5;
+const CAST_ARRAY: u8 = 6;
+const CAST_OBJECT: u8 = 7;
 
 pub struct Value {
     obj: Object,
@@ -27,13 +29,38 @@ impl RTObject for Value {
 
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self.value {
-            ValueType::Bool(v) => write!(f, "{}", v),
-            ValueType::Int(v) => write!(f, "{}", v),
-            ValueType::Float(v) => write!(f, "{}", v),
-            ValueType::String(v) => write!(f, "{}", v.string),
-            ValueType::DivertTarget(p) => write!(f, "DivertTargetValue({})", p),
-            ValueType::VariablePointer(v) => write!(f, "VariablePointerValue({})", v.variable_name),
+        fmt_value_type(&self.value, f)
+    }
+}
+
+fn fmt_value_type(value: &ValueType, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match value {
+        ValueType::Bool(v) => write!(f, "{}", v),
+        ValueType::Int(v) => write!(f, "{}", v),
+        ValueType::Float(v) => write!(f, "{}", v),
+        ValueType::String(v) => write!(f, "{}", v.string),
+        ValueType::DivertTarget(p) => write!(f, "DivertTargetValue({})", p),
+        ValueType::VariablePointer(v) => write!(f, "VariablePointerValue({})", v.variable_name),
+        ValueType::Array(values) => {
+            write!(f, "[")?;
+            for (index, value) in values.iter().enumerate() {
+                if index > 0 {
+                    write!(f, ", ")?;
+                }
+                fmt_value_type(value, f)?;
+            }
+            write!(f, "]")
+        }
+        ValueType::Object(fields) => {
+            write!(f, "{{")?;
+            for (index, (name, value)) in fields.iter().enumerate() {
+                if index > 0 {
+                    write!(f, ", ")?;
+                }
+                write!(f, "{}: ", name)?;
+                fmt_value_type(value, f)?;
+            }
+            write!(f, "}}")
         }
     }
 }
@@ -155,6 +182,12 @@ impl Value {
             ValueType::VariablePointer(_) => Err(StoryError::InvalidStoryState(
                 "Shouldn't be checking the truthiness of a variable pointer".to_owned(),
             )),
+            ValueType::Array(_) => Err(StoryError::InvalidStoryState(
+                "Shouldn't be checking the truthiness of an array".to_owned(),
+            )),
+            ValueType::Object(_) => Err(StoryError::InvalidStoryState(
+                "Shouldn't be checking the truthiness of an object".to_owned(),
+            )),
         }
     }
 
@@ -247,6 +280,18 @@ impl Value {
                 CAST_VARIABLE_POINTER => Ok(None),
                 _ => Err(StoryError::InvalidStoryState(
                     "Cast not allowed for variable pointer".to_owned(),
+                )),
+            },
+            ValueType::Array(_) => match cast_dest_type {
+                CAST_ARRAY => Ok(None),
+                _ => Err(StoryError::InvalidStoryState(
+                    "Cast not allowed for array".to_owned(),
+                )),
+            },
+            ValueType::Object(_) => match cast_dest_type {
+                CAST_OBJECT => Ok(None),
+                _ => Err(StoryError::InvalidStoryState(
+                    "Cast not allowed for object".to_owned(),
                 )),
             },
         }

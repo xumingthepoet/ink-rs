@@ -3,6 +3,6 @@ A line.
     Another line.
 }
 
-== function f ==
+== function f() -> bool ==
 {false:nothing}
 ~ return true

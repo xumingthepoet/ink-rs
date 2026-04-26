@@ -13,9 +13,11 @@ mod inc_dec;
 mod return_node;
 mod sequence;
 mod story;
+mod struct_declaration;
 mod tag;
 mod text;
 mod tunnel_onwards;
+mod type_name;
 mod variable_assignment;
 pub(crate) mod visit;
 mod weave;
@@ -26,7 +28,7 @@ pub use conditional::{Conditional, ConditionalBranch};
 pub use constant_declaration::ConstantDeclaration;
 pub use content_list::ContentList;
 pub use divert::{Divert, DivertTarget};
-pub use expression::{BinaryOperator, Expression, FloatLiteral, UnaryOperator};
+pub use expression::{BinaryOperator, Expression, FloatLiteral, StructLiteralField, UnaryOperator};
 pub use external_declaration::ExternalDeclaration;
 pub use flow::{Flow, FlowArgument, FlowLevel};
 pub use gather::Gather;
@@ -35,10 +37,12 @@ pub use inc_dec::IncDec;
 pub use return_node::Return;
 pub use sequence::{Sequence, SequenceType};
 pub use story::Story;
+pub use struct_declaration::{StructDeclaration, StructField};
 pub use tag::Tag;
 pub use text::Text;
 pub use tunnel_onwards::TunnelOnwards;
-pub use variable_assignment::VariableAssignment;
+pub use type_name::{DefaultValue, PrimitiveType, TypeName};
+pub use variable_assignment::{AssignmentTarget, VariableAssignment};
 pub use weave::Weave;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -58,6 +62,7 @@ pub enum Object {
     Tag(Tag),
     Sequence(Sequence),
     Return(Return),
+    StructDeclaration(StructDeclaration),
     TunnelOnwards(TunnelOnwards),
     VariableAssignment(VariableAssignment),
     ExternalDeclaration(ExternalDeclaration),
@@ -100,6 +105,7 @@ impl Object {
             Object::Glue(glue) => glue.write_parse_snapshot(out, indent),
             Object::IncDec(inc_dec) => inc_dec.write_parse_snapshot(out, indent),
             Object::Return(ret) => ret.write_parse_snapshot(out, indent),
+            Object::StructDeclaration(declaration) => declaration.write_parse_snapshot(out, indent),
             Object::Choice(choice) => choice.write_parse_snapshot(out, indent),
             Object::Divert(divert) => divert.write_parse_snapshot(out, indent),
             Object::Gather(gather) => gather.write_parse_snapshot(out, indent),

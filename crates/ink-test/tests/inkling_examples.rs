@@ -314,7 +314,7 @@ You find a lamp on a hook.
 fn inkling_sequences_conditionals_and_variable_assignments_update_text() {
     let mut story = compile_story(
         r#"
-VAR count = 0
+VAR count: int = 0
 
 -> loop
 
@@ -342,8 +342,8 @@ Status {fresh|warming|steady}. {count == 0: First pass.|Count is {count}.}
 fn inkling_math_expressions_in_content_use_current_variables() {
     let mut story = compile_story(
         r#"
-VAR a = 3
-VAR b = 5
+VAR a: int = 3
+VAR b: int = 5
 
 Before: {a} + {b} = {a + b}.
 ~ a = 7
@@ -1222,16 +1222,18 @@ Strings can be added, too: <>
 fn inkling_variables_can_be_used_in_mathematical_operations() {
     let mut story = compile_story(
         r#"
-VAR a = 3
-VAR b = 5
-VAR c = 13
-VAR f = 3.0
+VAR a: int = 3
+VAR b: int = 5
+VAR c: int = 13
+VAR f: float = 3.0
+VAR cf: float = 13.0
+VAR bf: float = 5.0
 
 Integer calculation does each step as integers, which may not be what you want.
 ({a} - {c}) / {a} + {b} = {(a - c) / a + b} which should be 1.66666...!
 
 Float calculation works better:
-({f} - {c}) / {f} + {b} = {(f - c) / f + b}!
+({f} - {cf}) / {f} + {bf} = {(f - cf) / f + bf}!
 "#,
     );
 
@@ -1246,8 +1248,8 @@ Float calculation works better:
 fn inkling_variable_expressions_always_use_updated_variables() {
     let mut story = compile_story(
         r#"
-VAR a = 3
-VAR b = 5
+VAR a: int = 3
+VAR b: int = 5
 
 -> root
 
@@ -1273,8 +1275,8 @@ VAR b = 5
 fn inkling_conditions_may_use_expressions_on_left_or_right_hand_side() {
     let mut story = compile_story(
         r#"
-VAR a = 3
-VAR b = 5.0
+VAR a: int = 3
+VAR b: int = 5
 
 {(a + 2) * 3 >= b * 3: True | False}
 {(a + 2) * 3 <= b * 3: True | False}
@@ -1291,9 +1293,9 @@ VAR b = 5.0
 fn inkling_global_variables_are_parsed_when_story_is_read() {
     let mut story = compile_story(
         r#"
-VAR value = 3.6
-VAR unit = "Röntgen"
-VAR is_hazardous = false
+VAR value: float = 3.6
+VAR unit: string = "Röntgen"
+VAR is_hazardous: bool = false
 
 The latest measurement is {value} {unit}.
 "#,
@@ -1313,9 +1315,9 @@ The latest measurement is {value} {unit}.
 fn inkling_global_variables_can_be_changed_from_the_caller() {
     let mut story = compile_story(
         r#"
-VAR value = 3.6
-VAR unit = "Röntgen"
-VAR is_hazardous = false
+VAR value: float = 3.6
+VAR unit: string = "Röntgen"
+VAR is_hazardous: bool = false
 
 The latest measurement is {value} {unit}.
 "#,
@@ -1334,9 +1336,9 @@ The latest measurement is {value} {unit}.
 fn inkling_variables_can_be_used_in_conditions() {
     let mut story = compile_story(
         r#"
-VAR value = 3.6
-VAR threshold = 10
-VAR unit = "Röntgen"
+VAR value: float = 3.6
+VAR threshold: float = 10.0
+VAR unit: string = "Röntgen"
 
 -> root
 
@@ -1364,9 +1366,9 @@ The latest measurement is {value} {unit}. {value < threshold: Not terrible, not 
 fn inkling_variables_can_change_and_influence_story_flow_conditions() {
     let mut story = compile_story(
         r#"
-VAR value = 3.6
-VAR unit = "Röntgen"
-VAR is_hazardous = false
+VAR value: float = 3.6
+VAR unit: string = "Röntgen"
+VAR is_hazardous: bool = false
 
 -> root
 
@@ -1532,7 +1534,7 @@ fn inkling_address_validation_reports_condition_address_errors() {
 fn inkling_addresses_in_choices_are_validated_without_raw_parse_nodes() {
     let errors = compile_error_messages(
         r#"
-VAR variable = 0
+VAR variable: int = 0
 
 *   This {variable} must not fail [] Nor this {variable}
 *   Diverts should be the same -> knot

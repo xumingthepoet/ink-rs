@@ -44,6 +44,16 @@ pub(super) fn expression_contains_function_call(expr: &Expression) -> bool {
         Expression::StringContent(content) => {
             content.objects().iter().any(object_contains_function_call)
         }
+        Expression::ArrayLiteral(elements) => {
+            elements.iter().any(expression_contains_function_call)
+        }
+        Expression::StructLiteral(fields) => fields
+            .iter()
+            .any(|field| expression_contains_function_call(field.expression())),
+        Expression::FieldAccess { base, .. } => expression_contains_function_call(base),
+        Expression::IndexAccess { base, index } => {
+            expression_contains_function_call(base) || expression_contains_function_call(index)
+        }
         Expression::Binary { left, right, .. } => {
             expression_contains_function_call(left) || expression_contains_function_call(right)
         }
@@ -96,9 +106,9 @@ fn object_contains_function_call(object: &Object) -> bool {
             .elements()
             .iter()
             .any(|content| content.objects().iter().any(object_contains_function_call)),
-        Object::VariableAssignment(assignment) => {
-            expression_contains_function_call(assignment.expression())
-        }
+        Object::VariableAssignment(assignment) => assignment
+            .expression()
+            .is_some_and(expression_contains_function_call),
         Object::IncDec(inc_dec) => expression_contains_function_call(inc_dec.expression()),
         Object::Return(ret) => ret
             .returned_expression()
@@ -112,6 +122,7 @@ fn object_contains_function_call(object: &Object) -> bool {
         | Object::TunnelOnwards(_)
         | Object::Gather(_)
         | Object::ExternalDeclaration(_)
+        | Object::StructDeclaration(_)
         | Object::Tag(_) => false,
     }
 }

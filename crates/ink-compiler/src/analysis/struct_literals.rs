@@ -1,0 +1,406 @@
+use std::collections::BTreeSet;
+
+use crate::{
+    diagnostic::Diagnostic,
+    parsed::{
+        visit::{walk_story, ParsedVisitor, VisitContext},
+        Expression, Object, Story, StructLiteralField, TypeName, VariableAssignment,
+    },
+    source::SourceSpan,
+};
+
+use super::{
+    context::{StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
+    expression_types::infer_expression_type,
+    structs::build_struct_type_index,
+    target_symbols::build_target_symbol_index,
+    variables::build_variable_scope_index,
+};
+
+pub(super) fn struct_literal_diagnostics(story: &Story) -> Vec<Diagnostic> {
+    let struct_types = build_struct_type_index(story);
+    let variable_scopes = build_variable_scope_index(story);
+    let target_symbols = build_target_symbol_index(story);
+    let mut checker = StructLiteralChecker::new(&struct_types, &variable_scopes, &target_symbols);
+    walk_story(story, &mut checker);
+    checker.diagnostics
+}
+
+struct StructLiteralChecker<'a> {
+    struct_types: &'a StructTypeIndex,
+    variable_scopes: &'a VariableScopeIndex,
+    target_symbols: &'a TargetSymbolIndex,
+    diagnostics: Vec<Diagnostic>,
+}
+
+impl<'a> StructLiteralChecker<'a> {
+    fn new(
+        struct_types: &'a StructTypeIndex,
+        variable_scopes: &'a VariableScopeIndex,
+        target_symbols: &'a TargetSymbolIndex,
+    ) -> Self {
+        Self {
+            struct_types,
+            variable_scopes,
+            target_symbols,
+            diagnostics: Vec::new(),
+        }
+    }
+
+    fn check_assignment(&mut self, assignment: &VariableAssignment, context: &VisitContext) {
+        let Some(expression) = assignment.expression() else {
+            return;
+        };
+
+        let expected_type = if assignment.is_global() || assignment.is_temporary() {
+            assignment.declared_type().cloned()
+        } else {
+            assignment
+                .target()
+                .variable_name()
+                .and_then(|name| self.visible_declared_type(name, context))
+        };
+
+        let Some(expected_type) = expected_type else {
+            return;
+        };
+
+        self.check_expression_against_type(
+            expression,
+            &expected_type,
+            assignment.name(),
+            assignment.span(),
+            context,
+        );
+    }
+
+    fn visible_declared_type(&self, name: &str, context: &VisitContext) -> Option<TypeName> {
+        self.variable_scopes
+            .visible_variable_declared_type(name, context.current_flow_path.as_deref())
+            .and_then(|declared_type| declared_type.cloned())
+    }
+
+    fn check_expression_against_type(
+        &mut self,
+        expression: &Expression,
+        expected_type: &TypeName,
+        context_name: &str,
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) {
+        match (expected_type, expression) {
+            (TypeName::Struct(struct_name), Expression::StructLiteral(fields)) => {
+                self.check_struct_literal(struct_name, fields, span, context);
+            }
+            (TypeName::Struct(_), _) => {
+                self.check_non_literal_expression(
+                    expression,
+                    expected_type,
+                    context_name,
+                    span,
+                    context,
+                );
+            }
+            (TypeName::Primitive(_), _) => {
+                self.check_non_literal_expression(
+                    expression,
+                    expected_type,
+                    context_name,
+                    span,
+                    context,
+                );
+            }
+            (TypeName::Array(_), _) => {
+                if let Ok(actual_type) = infer_expression_type(
+                    expression,
+                    self.variable_scopes,
+                    self.struct_types,
+                    self.target_symbols,
+                    context.current_flow_path.as_deref(),
+                ) {
+                    if &actual_type != expected_type {
+                        self.diagnostics.push(type_mismatch_diagnostic(
+                            context_name,
+                            expected_type,
+                            &actual_type,
+                            span,
+                        ));
+                    }
+                }
+            }
+            (TypeName::Void, _) => {}
+        }
+    }
+
+    fn check_non_literal_expression(
+        &mut self,
+        expression: &Expression,
+        expected_type: &TypeName,
+        context_name: &str,
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) {
+        match infer_expression_type(
+            expression,
+            self.variable_scopes,
+            self.struct_types,
+            self.target_symbols,
+            context.current_flow_path.as_deref(),
+        ) {
+            Ok(actual_type) if &actual_type != expected_type => {
+                self.diagnostics.push(type_mismatch_diagnostic(
+                    context_name,
+                    expected_type,
+                    &actual_type,
+                    span,
+                ));
+            }
+            Ok(_) => {}
+            Err(error) if expected_type.primitive_type().is_some() => {
+                self.diagnostics.push(Diagnostic::error(
+                    span.clone(),
+                    format!(
+                        "Cannot type-check value for '{}': {}",
+                        context_name,
+                        error.message()
+                    ),
+                ));
+            }
+            Err(_) => {}
+        }
+    }
+
+    fn check_struct_literal(
+        &mut self,
+        struct_name: &str,
+        fields: &[StructLiteralField],
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) {
+        let Some(symbol) = self.struct_types.get(struct_name) else {
+            self.diagnostics.push(Diagnostic::error(
+                span.clone(),
+                format!("Unknown struct type '{struct_name}' for struct literal"),
+            ));
+            return;
+        };
+
+        let mut provided_fields = BTreeSet::new();
+        for field in fields {
+            if !provided_fields.insert(field.name().to_string()) {
+                self.diagnostics.push(Diagnostic::error(
+                    span.clone(),
+                    format!(
+                        "Duplicate field '{}' in struct literal for '{}'",
+                        field.name(),
+                        struct_name
+                    ),
+                ));
+                continue;
+            }
+
+            let Some(field_type) = symbol.fields().get(field.name()) else {
+                self.diagnostics.push(Diagnostic::error(
+                    span.clone(),
+                    format!(
+                        "Unknown field '{}' in struct literal for '{}'",
+                        field.name(),
+                        struct_name
+                    ),
+                ));
+                continue;
+            };
+
+            let field_context_name = format!("{struct_name}.{}", field.name());
+            self.check_expression_against_type(
+                field.expression(),
+                field_type,
+                &field_context_name,
+                span,
+                context,
+            );
+        }
+
+        for (field_name, field_type) in symbol.fields() {
+            if provided_fields.contains(field_name) {
+                continue;
+            }
+            if field_type.default_value().is_none() {
+                self.diagnostics.push(Diagnostic::error(
+                    span.clone(),
+                    format!(
+                        "Missing field '{}' in struct literal for '{}' cannot be default-initialized",
+                        field_name, struct_name
+                    ),
+                ));
+            }
+        }
+    }
+}
+
+impl ParsedVisitor for StructLiteralChecker<'_> {
+    fn visit_object(&mut self, object: &Object, context: &VisitContext) {
+        if let Object::VariableAssignment(assignment) = object {
+            self.check_assignment(assignment, context);
+        }
+    }
+}
+
+fn type_mismatch_diagnostic(
+    context_name: &str,
+    expected_type: &TypeName,
+    actual_type: &TypeName,
+    span: &SourceSpan,
+) -> Diagnostic {
+    Diagnostic::error(
+        span.clone(),
+        format!(
+            "Value for '{}' has type {} but expected {}",
+            context_name,
+            actual_type.display_name(),
+            expected_type.display_name()
+        ),
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{analysis::test_support::assert_single_diagnostic, diagnostic::DiagnosticSeverity};
+
+    use super::{super::test_support::parse_story, *};
+
+    #[test]
+    fn accepts_full_struct_literal_initializers() {
+        let story = parse_story(
+            "STRUCT Player {\n\
+             hp: int\n\
+             name: string\n\
+             }\n\
+             VAR player: Player = { hp: 10, name: \"Ada\" }\n\
+             -> DONE",
+        );
+
+        assert_eq!(struct_literal_diagnostics(&story), []);
+    }
+
+    #[test]
+    fn accepts_partial_struct_literal_with_defaulted_array_field() {
+        let story = parse_story(
+            "STRUCT Player {\n\
+             hp: int\n\
+             inventory: int[]\n\
+             }\n\
+             VAR player: Player = { hp: 10 }\n\
+             -> DONE",
+        );
+
+        assert_eq!(struct_literal_diagnostics(&story), []);
+    }
+
+    #[test]
+    fn reports_unknown_struct_literal_field() {
+        let story = parse_story(
+            "STRUCT Player {\n\
+             hp: int\n\
+             }\n\
+             VAR player: Player = { hp: 10, mp: 5 }\n\
+             -> DONE",
+        );
+
+        let diagnostics = struct_literal_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Unknown field 'mp' in struct literal for 'Player'",
+        );
+    }
+
+    #[test]
+    fn reports_duplicate_struct_literal_field() {
+        let story = parse_story(
+            "STRUCT Player {\n\
+             hp: int\n\
+             }\n\
+             VAR player: Player = { hp: 10, hp: 11 }\n\
+             -> DONE",
+        );
+
+        let diagnostics = struct_literal_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Duplicate field 'hp' in struct literal for 'Player'",
+        );
+    }
+
+    #[test]
+    fn reports_wrong_struct_literal_field_type() {
+        let story = parse_story(
+            "STRUCT Player {\n\
+             hp: int\n\
+             }\n\
+             VAR player: Player = { hp: \"full\" }\n\
+             -> DONE",
+        );
+
+        let diagnostics = struct_literal_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Value for 'Player.hp' has type string but expected int",
+        );
+    }
+
+    #[test]
+    fn checks_nested_struct_literals() {
+        let story = parse_story(
+            "STRUCT Stats {\n\
+             hp: int\n\
+             }\n\
+             STRUCT Player {\n\
+             stats: Stats\n\
+             name: string\n\
+             }\n\
+             VAR player: Player = { stats: { hp: 10 }, name: \"Ada\" }\n\
+             -> DONE",
+        );
+
+        assert_eq!(struct_literal_diagnostics(&story), []);
+    }
+
+    #[test]
+    fn checks_reassignment_struct_literals_against_variable_type() {
+        let story = parse_story(
+            "STRUCT Player {\n\
+             hp: int\n\
+             }\n\
+             VAR player: Player = {}\n\
+             ~ player = { hp: \"full\" }\n\
+             -> DONE",
+        );
+
+        let diagnostics = struct_literal_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Value for 'Player.hp' has type string but expected int",
+        );
+    }
+
+    #[test]
+    fn does_not_infer_struct_type_from_field_names() {
+        let story = parse_story(
+            "STRUCT Player {\n\
+             hp: int\n\
+             }\n\
+             { { hp: \"dynamic\" } }\n\
+             -> DONE",
+        );
+
+        assert_eq!(struct_literal_diagnostics(&story), []);
+    }
+}

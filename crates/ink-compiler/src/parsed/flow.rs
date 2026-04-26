@@ -1,6 +1,6 @@
 use crate::source::SourceSpan;
 
-use super::{push_indent, Object, Weave};
+use super::{push_indent, Object, TypeName, Weave};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FlowLevel {
@@ -11,6 +11,7 @@ pub enum FlowLevel {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FlowArgument {
     name: String,
+    declared_type: Option<TypeName>,
     is_by_reference: bool,
     is_divert_target: bool,
     span: SourceSpan,
@@ -23,18 +24,21 @@ pub struct Flow {
     weave: Weave,
     child_flows: Vec<Flow>,
     arguments: Vec<FlowArgument>,
+    return_type: TypeName,
     is_function: bool,
 }
 
 impl FlowArgument {
     pub fn new(
         name: impl Into<String>,
+        declared_type: Option<TypeName>,
         is_by_reference: bool,
         is_divert_target: bool,
         span: SourceSpan,
     ) -> Self {
         Self {
             name: name.into(),
+            declared_type,
             is_by_reference,
             is_divert_target,
             span,
@@ -43,6 +47,10 @@ impl FlowArgument {
 
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    pub fn declared_type(&self) -> Option<&TypeName> {
+        self.declared_type.as_ref()
     }
 
     pub fn is_by_reference(&self) -> bool {
@@ -65,6 +73,7 @@ impl Flow {
         content: Vec<Object>,
         child_flows: Vec<Flow>,
         arguments: Vec<FlowArgument>,
+        return_type: TypeName,
         is_function: bool,
     ) -> Self {
         Self {
@@ -73,6 +82,7 @@ impl Flow {
             weave: Weave::new(content, 0),
             child_flows,
             arguments,
+            return_type,
             is_function,
         }
     }
@@ -95,6 +105,18 @@ impl Flow {
 
     pub fn arguments(&self) -> &[FlowArgument] {
         &self.arguments
+    }
+
+    pub fn return_type(&self) -> &TypeName {
+        &self.return_type
+    }
+
+    pub fn has_typed_signature(&self) -> bool {
+        self.is_function
+            || self
+                .arguments
+                .iter()
+                .any(|argument| argument.declared_type().is_some())
     }
 
     pub fn is_function(&self) -> bool {

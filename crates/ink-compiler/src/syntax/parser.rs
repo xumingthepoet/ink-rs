@@ -12,7 +12,7 @@ use super::weave::group_weave_content;
 use super::{
     author_warning_statement, choice_statement, declaration, divert_statement, gather,
     is_choice_continuation_boundary, knot, leading_whitespace_count, logic, parse_choice_from_line,
-    text_statement, variable,
+    structure, text_statement, variable,
 };
 
 type StatementRuleFn = for<'source> fn(&mut RuleParser<'source>) -> Option<Vec<Object>>;
@@ -121,6 +121,13 @@ impl Parser {
                 continue;
             }
 
+            if line.text.trim_start().starts_with("STRUCT ") {
+                if let Some(parsed) = self.parse_struct_declaration(&lines, &mut index) {
+                    objects.push(Object::StructDeclaration(parsed));
+                    continue;
+                }
+            }
+
             if knot::is_knot_declaration_line(&line.text) {
                 if let Some(flow) = self.parse_flow(&lines, &mut index) {
                     flows.push(flow);
@@ -227,6 +234,8 @@ impl Parser {
             Some("constant declaration")
         } else if trimmed.starts_with("EXTERNAL ") {
             Some("external declaration")
+        } else if trimmed.starts_with("STRUCT ") {
+            Some("struct declaration")
         } else if knot::is_knot_declaration_line(trimmed) {
             Some("knot declaration")
         } else if trimmed.starts_with('*') || trimmed.starts_with('+') {
@@ -305,6 +314,7 @@ impl Parser {
             group_weave_content(content),
             child_flows,
             declaration.arguments,
+            declaration.return_type,
             declaration.is_function,
         ))
     }
@@ -360,7 +370,75 @@ impl Parser {
             group_weave_content(content),
             Vec::new(),
             declaration.arguments,
+            declaration.return_type,
             declaration.is_function,
+        ))
+    }
+
+    fn parse_struct_declaration(
+        &mut self,
+        lines: &[SourceLine],
+        index: &mut usize,
+    ) -> Option<crate::parsed::StructDeclaration> {
+        let line = &lines[*index];
+        let mut line_parser = RuleParser::new(line);
+        let header = line_parser.parse_rule(structure::parse_struct_header);
+        let had_error = line_parser.had_error();
+        self.diagnostics.extend(line_parser.finish());
+
+        let Some(mut header) = header else {
+            return None;
+        };
+
+        *index += 1;
+        if had_error {
+            return Some(crate::parsed::StructDeclaration::new(
+                header.name,
+                header.fields,
+                line.span.clone(),
+            ));
+        }
+
+        while !header.closed && *index < lines.len() {
+            let next_line = &lines[*index];
+            let trimmed = next_line.text.trim();
+
+            if trimmed.is_empty() {
+                *index += 1;
+                continue;
+            }
+
+            if trimmed == "}" {
+                header.closed = true;
+                *index += 1;
+                break;
+            }
+
+            let mut field_parser = RuleParser::new(next_line);
+            let field = field_parser.parse_rule(structure::parse_struct_field);
+            let had_error = field_parser.had_error();
+            self.diagnostics.extend(field_parser.finish());
+            if let Some(field) = field {
+                header.fields.push(field);
+            }
+            *index += 1;
+
+            if had_error {
+                continue;
+            }
+        }
+
+        if !header.closed {
+            self.diagnostics.push(Diagnostic::error(
+                line.span.clone(),
+                "Expected closing '}' for struct declaration",
+            ));
+        }
+
+        Some(crate::parsed::StructDeclaration::new(
+            header.name,
+            header.fields,
+            line.span.clone(),
         ))
     }
 
@@ -501,6 +579,67 @@ mod tests {
                 "text",
             ]
         );
+    }
+
+    #[test]
+    fn parses_struct_declaration_and_snapshot() {
+        let output = parse(SourceInput::new(
+            "STRUCT Player {\n\
+             hp: int\n\
+             name: string\n\
+             inventory: Item[]\n\
+             }",
+        ));
+
+        assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
+        let story = output.artifact.expect("story should parse");
+        let Object::StructDeclaration(declaration) = &story.root_weave().content()[0] else {
+            panic!("expected struct declaration");
+        };
+        assert_eq!(declaration.name(), "Player");
+        assert_eq!(declaration.fields().len(), 3);
+        assert_eq!(declaration.fields()[0].name(), "hp");
+        assert_eq!(declaration.fields()[0].type_name().snapshot_name(), "int");
+        assert_eq!(
+            declaration.fields()[2].type_name().snapshot_name(),
+            "Item[]"
+        );
+        assert_eq!(
+            story.to_parse_snapshot(),
+            "Story\n  Weave(baseIndent=0)\n    StructDeclaration(name=\"Player\")\n      Field(name=\"hp\", type=int)\n      Field(name=\"name\", type=string)\n      Field(name=\"inventory\", type=Item[])\n    Gather(name=null, depth=1)\n    Divert(target=\"-> DONE\", empty=false, tunnel=false, thread=false)"
+        );
+    }
+
+    #[test]
+    fn parses_single_line_struct_declaration() {
+        let output = parse(SourceInput::new("STRUCT Point { x: int }"));
+
+        assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
+        let story = output.artifact.expect("story should parse");
+        let Object::StructDeclaration(declaration) = &story.root_weave().content()[0] else {
+            panic!("expected struct declaration");
+        };
+        assert_eq!(declaration.name(), "Point");
+        assert_eq!(declaration.fields().len(), 1);
+        assert_eq!(declaration.fields()[0].name(), "x");
+    }
+
+    #[test]
+    fn rejects_struct_comma_and_semicolon_field_separators() {
+        let cases = [
+            "STRUCT Player {\n  hp: int, name: string\n}",
+            "STRUCT Player {\n  hp: int;\n}",
+        ];
+
+        for source in cases {
+            let output = parse(SourceInput::new(source));
+
+            assert_eq!(output.diagnostics.len(), 1, "{:#?}", output.diagnostics);
+            assert_eq!(
+                output.diagnostics[0].message,
+                "Struct fields must be declared one per line without comma or semicolon separators"
+            );
+        }
     }
 
     #[test]

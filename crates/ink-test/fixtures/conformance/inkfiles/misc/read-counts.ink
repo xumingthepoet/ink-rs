@@ -1,12 +1,10 @@
-VAR x = ->knot
+Count start: {READ_COUNT (-> knot)} {READ_COUNT (-> knot)} {knot}
 
-Count start: {READ_COUNT (x)} {READ_COUNT (-> knot)} {knot}
+-> knot (1) ->
+-> knot (2) ->
+-> knot (3) ->
 
--> x (1) ->
--> x (2) ->
--> x (3) ->
-
-Count end: {READ_COUNT (x)} {READ_COUNT (-> knot)} {knot}
+Count end: {READ_COUNT (-> knot)} {READ_COUNT (-> knot)} {knot}
 -> END
 
 

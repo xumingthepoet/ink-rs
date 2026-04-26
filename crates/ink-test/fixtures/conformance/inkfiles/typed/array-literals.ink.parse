@@ -1,0 +1,23 @@
+Story
+  Weave(baseIndent=0)
+    StructDeclaration(name="Player")
+      Field(name="hp", type=int)
+      Field(name="name", type=string)
+    VariableAssignment(name="numbers", global=true, temp=false, type=int[])
+      ArrayLiteral(Number(1), Number(2), Number(3))
+    VariableAssignment(name="matrix", global=true, temp=false, type=int[][])
+      ArrayLiteral(ArrayLiteral(Number(1), Number(2)), ArrayLiteral())
+    VariableAssignment(name="party", global=true, temp=false, type=Player[])
+      ArrayLiteral(StructLiteral(hp=Number(10), name=String("Ada")))
+    ContentList
+      VariableReference(numbers)
+    Text("|")
+    ContentList
+      VariableReference(matrix)
+    Text("|")
+    ContentList
+      VariableReference(party)
+    Text("\n")
+    Divert(target="-> DONE", empty=false, tunnel=false, thread=false)
+    Gather(name=null, depth=1)
+    Divert(target="-> DONE", empty=false, tunnel=false, thread=false)

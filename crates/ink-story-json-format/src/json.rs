@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use serde_json::{Map, Number, Value as JsonValue};
 
 use crate::{Container, FormatError, NamedContainer, Object, Program};
@@ -145,7 +147,7 @@ pub(crate) fn object_from_value(value: &JsonValue) -> Result<Object, FormatError
             }
         }
         JsonValue::String(value) => string_object_from_token(value),
-        JsonValue::Array(_) => Ok(Object::Container(container_from_value(value, None)?)),
+        JsonValue::Array(_) => array_object_from_value(value),
         JsonValue::Object(obj) => object_from_map(obj),
     }
 }
@@ -202,8 +204,34 @@ pub(crate) fn object_to_value(object: &Object) -> JsonValue {
         Object::Float(value) => JsonValue::Number(
             Number::from_f64(*value).expect("compiled story float values must be finite"),
         ),
+        Object::ValueArray(values) => {
+            JsonValue::Array(values.iter().map(object_to_value).collect())
+        }
+        Object::ValueObject(fields) => {
+            let mut obj = Map::new();
+            for (key, value) in fields {
+                obj.insert(key.clone(), object_to_value(value));
+            }
+            JsonValue::Object(obj)
+        }
         Object::Void => JsonValue::String("void".to_string()),
         Object::NativeFunction(name) => JsonValue::String(name.clone()),
+    }
+}
+
+fn array_object_from_value(value: &JsonValue) -> Result<Object, FormatError> {
+    match container_from_value(value, None) {
+        Ok(container) => Ok(Object::Container(container)),
+        Err(container_error) => match value {
+            JsonValue::Array(values) => {
+                let values = values
+                    .iter()
+                    .map(object_from_value)
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(Object::ValueArray(values))
+            }
+            _ => Err(container_error),
+        },
     }
 }
 
@@ -288,10 +316,15 @@ fn object_from_map(obj: &Map<String, JsonValue>) -> Result<Object, FormatError> 
         return Ok(assignment);
     }
 
-    Err(FormatError::new(format!(
-        "unrecognized compiled story object: {}",
-        JsonValue::Object(obj.clone())
-    )))
+    value_object_from_map(obj)
+}
+
+fn value_object_from_map(obj: &Map<String, JsonValue>) -> Result<Object, FormatError> {
+    let mut fields = BTreeMap::new();
+    for (key, value) in obj {
+        fields.insert(key.clone(), object_from_value(value)?);
+    }
+    Ok(Object::ValueObject(fields))
 }
 
 fn divert_from_map(obj: &Map<String, JsonValue>) -> Result<Option<Object>, FormatError> {
@@ -424,6 +457,8 @@ fn json_value_to_usize(value: &JsonValue, key: &str) -> Result<usize, FormatErro
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
     use serde_json::json;
 
     use super::*;
@@ -469,5 +504,79 @@ mod tests {
         let program = program_from_value(input.clone()).expect("format should parse");
 
         assert_eq!(program_to_value(&program), input);
+    }
+
+    #[test]
+    fn roundtrips_dynamic_array_values() {
+        let object = Object::ValueArray(vec![
+            Object::Int(1),
+            Object::Float(2.5),
+            Object::Bool(true),
+            Object::String("text".to_string()),
+            Object::ValueArray(vec![Object::Int(3)]),
+        ]);
+
+        let value = object.to_json_value();
+
+        assert_eq!(value, json!([1, 2.5, true, "^text", [3]]));
+        assert_eq!(Object::from_json_value(value).unwrap(), object);
+    }
+
+    #[test]
+    fn roundtrips_dynamic_object_values() {
+        let mut fields = BTreeMap::new();
+        fields.insert("hp".to_string(), Object::Int(10));
+        fields.insert("name".to_string(), Object::String("Ada".to_string()));
+        fields.insert(
+            "flags".to_string(),
+            Object::ValueArray(vec![Object::Bool(true), Object::Bool(false)]),
+        );
+
+        let object = Object::ValueObject(fields);
+        let value = object.to_json_value();
+
+        assert_eq!(
+            value,
+            json!({
+                "flags": [true, false],
+                "hp": 10,
+                "name": "^Ada"
+            })
+        );
+        assert_eq!(Object::from_json_value(value).unwrap(), object);
+    }
+
+    #[test]
+    fn parses_json_arrays_without_container_terminators_as_values() {
+        let parsed = Object::from_json_value(json!([1, 2, 3])).unwrap();
+
+        assert_eq!(
+            parsed,
+            Object::ValueArray(vec![Object::Int(1), Object::Int(2), Object::Int(3)])
+        );
+    }
+
+    #[test]
+    fn still_parses_json_arrays_with_container_terminators_as_containers() {
+        let parsed = Object::from_json_value(json!(["done", null])).unwrap();
+
+        assert_eq!(
+            parsed,
+            Object::Container(Container::unnamed(vec![Object::ControlCommand(
+                ControlCommand::Done
+            )]))
+        );
+    }
+
+    #[test]
+    fn parses_arrays_of_objects_as_dynamic_values() {
+        let parsed = Object::from_json_value(json!([{ "hp": 10 }])).unwrap();
+
+        let mut fields = BTreeMap::new();
+        fields.insert("hp".to_string(), Object::Int(10));
+        assert_eq!(
+            parsed,
+            Object::ValueArray(vec![Object::ValueObject(fields)])
+        );
     }
 }

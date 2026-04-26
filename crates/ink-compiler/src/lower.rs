@@ -8,6 +8,7 @@ mod indexes;
 mod labels;
 mod path;
 mod sequence;
+mod value;
 mod weave;
 
 use ink_story_json_format::{
@@ -17,16 +18,20 @@ use ink_story_json_format::{
 use crate::{
     analysis::CheckedStory,
     compiler::StageOutput,
-    parsed::{Choice, Divert, DivertTarget, Expression, Object},
+    parsed::{AssignmentTarget, Choice, Divert, DivertTarget, Expression, Object},
 };
 
 use conditional::lower_conditional_into;
 use context::ChoicePathMode;
-use expression::{lower_expression_into, lower_logic_line_into, lower_output_expression_into};
+use expression::{
+    lower_expression_into, lower_function_arg_into, lower_logic_line_into,
+    lower_output_expression_into,
+};
 use flow::{lower_flow, lower_root_weave};
-use indexes::{ExternalSignatures, LoweringIndexes, RuntimeLenEstimator};
+use indexes::{ExternalSignatures, LoweringIndexes, RuntimeLenEstimator, StructDefinitions};
 use path::{compact_path_strings_in_container, LabelIndex};
 use sequence::lower_sequence;
+use value::{lower_value_literal, runtime_default_for_type};
 use weave::{choice_container_prefix, lower_choice_weave, lower_content_list_into_context};
 
 pub(crate) fn lower(story: &CheckedStory, count_all_visits: bool) -> StageOutput<RuntimeProgram> {
@@ -108,19 +113,20 @@ fn lower_global_declarations(indexes: &LoweringIndexes<'_>) -> Option<Container>
     let choice_labels = LabelIndex::new();
     let mut content = vec![RuntimeObject::ControlCommand(ControlCommand::EvalStart)];
     for declaration in declarations {
-        lower_expression_into(
+        if lower_assignment_initializer_into(
             &mut content,
-            declaration.expression(),
+            declaration,
             &choice_labels,
             &indexes.global_labels,
             &indexes.external_signatures,
             &indexes.constants,
             &ChoicePathMode::Root,
-            false,
-        );
-        content.push(RuntimeObject::GlobalVariableAssignment(
-            declaration.name().to_string(),
-        ));
+            &indexes.struct_definitions,
+        ) {
+            content.push(RuntimeObject::GlobalVariableAssignment(
+                declaration.name().to_string(),
+            ));
+        }
     }
     content.push(RuntimeObject::ControlCommand(ControlCommand::EvalEnd));
     content.push(RuntimeObject::ControlCommand(ControlCommand::End));
@@ -133,7 +139,11 @@ fn lower_global_declarations(indexes: &LoweringIndexes<'_>) -> Option<Container>
     })
 }
 
-fn estimated_choice_content_len(choice: &Choice, constants: &HashMap<String, Expression>) -> usize {
+fn estimated_choice_content_len(
+    choice: &Choice,
+    constants: &HashMap<String, Expression>,
+    struct_definitions: &StructDefinitions,
+) -> usize {
     let mut content = Vec::new();
     if choice.has_start_content() {
         content.extend(choice_container_prefix(&ChoicePathMode::Root, "c-0", 0, 2));
@@ -147,6 +157,7 @@ fn estimated_choice_content_len(choice: &Choice, constants: &HashMap<String, Exp
         &HashSet::new(),
         &HashMap::new(),
         constants,
+        struct_definitions,
     );
     content.len()
 }
@@ -154,6 +165,7 @@ fn estimated_choice_content_len(choice: &Choice, constants: &HashMap<String, Exp
 fn estimated_runtime_len_for_label_collection(
     object: &Object,
     constants: &HashMap<String, Expression>,
+    struct_definitions: &StructDefinitions,
 ) -> usize {
     if matches!(object, Object::Weave(_)) {
         return 1;
@@ -169,6 +181,7 @@ fn estimated_runtime_len_for_label_collection(
         &HashSet::new(),
         &HashMap::new(),
         constants,
+        struct_definitions,
         false,
     );
     content.len()
@@ -183,6 +196,7 @@ fn lower_object_into_with_context(
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
+    struct_definitions: &StructDefinitions,
 ) {
     lower_object_into_with_context_count(
         content,
@@ -193,6 +207,7 @@ fn lower_object_into_with_context(
         global_variables,
         external_signatures,
         constants,
+        struct_definitions,
         false,
     );
 }
@@ -206,6 +221,7 @@ fn lower_object_into_with_context_count(
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
+    struct_definitions: &StructDefinitions,
     count_all_visits: bool,
 ) {
     match object {
@@ -221,6 +237,7 @@ fn lower_object_into_with_context_count(
                 global_variables,
                 external_signatures,
                 constants,
+                struct_definitions,
             );
         }
         Object::Expression(expression) => lower_output_expression_into(
@@ -230,6 +247,7 @@ fn lower_object_into_with_context_count(
             global_labels,
             external_signatures,
             constants,
+            struct_definitions,
             path_mode,
         ),
         Object::Conditional(conditional) => lower_conditional_into(
@@ -240,6 +258,7 @@ fn lower_object_into_with_context_count(
             global_variables,
             external_signatures,
             constants,
+            struct_definitions,
             path_mode,
         ),
         Object::LogicLine(expression) => {
@@ -250,6 +269,7 @@ fn lower_object_into_with_context_count(
                 global_labels,
                 external_signatures,
                 constants,
+                struct_definitions,
                 path_mode,
             );
         }
@@ -263,6 +283,7 @@ fn lower_object_into_with_context_count(
             global_variables,
             external_signatures,
             constants,
+            struct_definitions,
         ),
         Object::TunnelOnwards(tunnel_onwards) => {
             lower_tunnel_onwards_into(
@@ -274,11 +295,13 @@ fn lower_object_into_with_context_count(
                 global_variables,
                 external_signatures,
                 constants,
+                struct_definitions,
             );
         }
         Object::Choice(_) => {}
         Object::ConstantDeclaration(_) => {}
         Object::Gather(_) => {} // Handled in lower_choice_weave
+        Object::StructDeclaration(_) => {}
         Object::VariableAssignment(assignment) => {
             lower_variable_assignment_into(
                 content,
@@ -288,6 +311,7 @@ fn lower_object_into_with_context_count(
                 global_labels,
                 external_signatures,
                 constants,
+                struct_definitions,
             );
         }
         Object::IncDec(inc_dec) => {
@@ -299,9 +323,22 @@ fn lower_object_into_with_context_count(
                 global_labels,
                 external_signatures,
                 constants,
+                struct_definitions,
             );
         }
         Object::Return(ret) => {
+            if lower_tail_recursive_return_into(
+                content,
+                ret,
+                path_mode,
+                choice_labels,
+                global_labels,
+                external_signatures,
+                constants,
+                struct_definitions,
+            ) {
+                return;
+            }
             content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
             if let Some(expr) = ret.returned_expression() {
                 lower_expression_into(
@@ -311,6 +348,7 @@ fn lower_object_into_with_context_count(
                     global_labels,
                     external_signatures,
                     constants,
+                    struct_definitions,
                     path_mode,
                     false,
                 );
@@ -330,6 +368,7 @@ fn lower_object_into_with_context_count(
             global_variables,
             external_signatures,
             constants,
+            struct_definitions,
             path_mode,
             &path_mode.sequence_container_path(content.len()),
         ))),
@@ -342,11 +381,418 @@ fn lower_object_into_with_context_count(
                 global_variables,
                 external_signatures,
                 constants,
+                struct_definitions,
                 count_all_visits,
             )));
         }
         Object::ExternalDeclaration(_) => {}
     }
+}
+
+fn lower_assignment_initializer_into(
+    content: &mut Vec<RuntimeObject>,
+    assignment: &crate::parsed::VariableAssignment,
+    choice_labels: &LabelIndex,
+    global_labels: &LabelIndex,
+    external_signatures: &ExternalSignatures,
+    constants: &HashMap<String, Expression>,
+    path_mode: &ChoicePathMode,
+    struct_definitions: &StructDefinitions,
+) -> bool {
+    if let Some(expression) = assignment.expression() {
+        if let Expression::ArrayLiteral(_) | Expression::StructLiteral(_) = expression {
+            if let Some(value) =
+                lower_value_literal(expression, assignment.declared_type(), struct_definitions)
+            {
+                content.push(value);
+                return true;
+            }
+        }
+
+        lower_expression_into(
+            content,
+            expression,
+            choice_labels,
+            global_labels,
+            external_signatures,
+            constants,
+            struct_definitions,
+            path_mode,
+            false,
+        );
+        return true;
+    }
+
+    assignment
+        .declared_type()
+        .and_then(|declared_type| runtime_default_for_type(declared_type, struct_definitions))
+        .map(|default_value| content.push(default_value))
+        .is_some()
+}
+
+enum AssignmentPathComponent<'a> {
+    Field(&'a str),
+    Index(&'a Expression),
+    CachedIndex(String),
+}
+
+#[derive(Clone, Copy)]
+enum AssignmentUpdateValue<'a> {
+    Expression(&'a Expression),
+    Compound {
+        expression: &'a Expression,
+        operator: &'static str,
+    },
+    ArrayRemove {
+        index: &'a Expression,
+    },
+}
+
+fn collect_assignment_path<'a>(
+    target: &'a AssignmentTarget,
+    components: &mut Vec<AssignmentPathComponent<'a>>,
+) -> Option<&'a str> {
+    match target {
+        AssignmentTarget::Variable(name) => Some(name),
+        AssignmentTarget::FieldAccess { base, field } => {
+            let root = collect_assignment_path(base, components)?;
+            components.push(AssignmentPathComponent::Field(field));
+            Some(root)
+        }
+        AssignmentTarget::IndexAccess { base, index } => {
+            let root = collect_assignment_path(base, components)?;
+            components.push(AssignmentPathComponent::Index(index));
+            Some(root)
+        }
+    }
+}
+
+fn lower_assignment_path_component_key_into(
+    content: &mut Vec<RuntimeObject>,
+    component: &AssignmentPathComponent<'_>,
+    choice_labels: &LabelIndex,
+    global_labels: &LabelIndex,
+    external_signatures: &ExternalSignatures,
+    constants: &HashMap<String, Expression>,
+    path_mode: &ChoicePathMode,
+    struct_definitions: &StructDefinitions,
+) {
+    match component {
+        AssignmentPathComponent::Field(field) => {
+            content.push(RuntimeObject::String((*field).to_string()));
+        }
+        AssignmentPathComponent::CachedIndex(name) => {
+            content.push(RuntimeObject::VariableReference(name.clone()));
+        }
+        AssignmentPathComponent::Index(index) => lower_expression_into(
+            content,
+            index,
+            choice_labels,
+            global_labels,
+            external_signatures,
+            constants,
+            struct_definitions,
+            path_mode,
+            false,
+        ),
+    }
+}
+
+fn lower_assignment_path_read_into(
+    content: &mut Vec<RuntimeObject>,
+    root_name: &str,
+    components: &[AssignmentPathComponent<'_>],
+    choice_labels: &LabelIndex,
+    global_labels: &LabelIndex,
+    external_signatures: &ExternalSignatures,
+    constants: &HashMap<String, Expression>,
+    path_mode: &ChoicePathMode,
+    struct_definitions: &StructDefinitions,
+) {
+    content.push(RuntimeObject::VariableReference(root_name.to_string()));
+    for component in components {
+        lower_assignment_path_component_key_into(
+            content,
+            component,
+            choice_labels,
+            global_labels,
+            external_signatures,
+            constants,
+            path_mode,
+            struct_definitions,
+        );
+        let read_operation = match component {
+            AssignmentPathComponent::Field(_) => "FIELD",
+            AssignmentPathComponent::Index(_) | AssignmentPathComponent::CachedIndex(_) => "INDEX",
+        };
+        content.push(RuntimeObject::NativeFunction(read_operation.to_string()));
+    }
+}
+
+fn lower_assignment_update_value_into(
+    content: &mut Vec<RuntimeObject>,
+    root_name: &str,
+    components: &[AssignmentPathComponent<'_>],
+    value: AssignmentUpdateValue<'_>,
+    choice_labels: &LabelIndex,
+    global_labels: &LabelIndex,
+    external_signatures: &ExternalSignatures,
+    constants: &HashMap<String, Expression>,
+    path_mode: &ChoicePathMode,
+    struct_definitions: &StructDefinitions,
+) {
+    match value {
+        AssignmentUpdateValue::Expression(expression) => lower_expression_into(
+            content,
+            expression,
+            choice_labels,
+            global_labels,
+            external_signatures,
+            constants,
+            struct_definitions,
+            path_mode,
+            false,
+        ),
+        AssignmentUpdateValue::Compound {
+            expression,
+            operator,
+        } => {
+            lower_assignment_path_read_into(
+                content,
+                root_name,
+                components,
+                choice_labels,
+                global_labels,
+                external_signatures,
+                constants,
+                path_mode,
+                struct_definitions,
+            );
+            lower_expression_into(
+                content,
+                expression,
+                choice_labels,
+                global_labels,
+                external_signatures,
+                constants,
+                struct_definitions,
+                path_mode,
+                false,
+            );
+            content.push(RuntimeObject::NativeFunction(operator.to_string()));
+        }
+        AssignmentUpdateValue::ArrayRemove { index } => {
+            lower_assignment_path_read_into(
+                content,
+                root_name,
+                components,
+                choice_labels,
+                global_labels,
+                external_signatures,
+                constants,
+                path_mode,
+                struct_definitions,
+            );
+            lower_expression_into(
+                content,
+                index,
+                choice_labels,
+                global_labels,
+                external_signatures,
+                constants,
+                struct_definitions,
+                path_mode,
+                false,
+            );
+            content.push(RuntimeObject::NativeFunction("ARRAY_REMOVE".to_string()));
+        }
+    }
+}
+
+fn lower_assignment_path_update_value_into(
+    content: &mut Vec<RuntimeObject>,
+    root_name: &str,
+    components: &[AssignmentPathComponent<'_>],
+    component_index: usize,
+    value: AssignmentUpdateValue<'_>,
+    choice_labels: &LabelIndex,
+    global_labels: &LabelIndex,
+    external_signatures: &ExternalSignatures,
+    constants: &HashMap<String, Expression>,
+    path_mode: &ChoicePathMode,
+    struct_definitions: &StructDefinitions,
+) {
+    lower_assignment_path_read_into(
+        content,
+        root_name,
+        &components[..component_index],
+        choice_labels,
+        global_labels,
+        external_signatures,
+        constants,
+        path_mode,
+        struct_definitions,
+    );
+    lower_assignment_path_component_key_into(
+        content,
+        &components[component_index],
+        choice_labels,
+        global_labels,
+        external_signatures,
+        constants,
+        path_mode,
+        struct_definitions,
+    );
+
+    if component_index + 1 == components.len() {
+        lower_assignment_update_value_into(
+            content,
+            root_name,
+            components,
+            value,
+            choice_labels,
+            global_labels,
+            external_signatures,
+            constants,
+            path_mode,
+            struct_definitions,
+        );
+    } else {
+        lower_assignment_path_update_value_into(
+            content,
+            root_name,
+            components,
+            component_index + 1,
+            value,
+            choice_labels,
+            global_labels,
+            external_signatures,
+            constants,
+            path_mode,
+            struct_definitions,
+        );
+    }
+
+    let write_operation = match &components[component_index] {
+        AssignmentPathComponent::Field(_) => "SET_FIELD",
+        AssignmentPathComponent::Index(_) | AssignmentPathComponent::CachedIndex(_) => "SET_INDEX",
+    };
+    content.push(RuntimeObject::NativeFunction(write_operation.to_string()));
+}
+
+fn lower_cached_assignment_indexes_into<'a>(
+    content: &mut Vec<RuntimeObject>,
+    components: &[AssignmentPathComponent<'a>],
+    choice_labels: &LabelIndex,
+    global_labels: &LabelIndex,
+    external_signatures: &ExternalSignatures,
+    constants: &HashMap<String, Expression>,
+    path_mode: &ChoicePathMode,
+    struct_definitions: &StructDefinitions,
+) -> Vec<AssignmentPathComponent<'a>> {
+    let mut cached_components = Vec::with_capacity(components.len());
+    let mut next_index = 0;
+    for component in components {
+        match component {
+            AssignmentPathComponent::Field(field) => {
+                cached_components.push(AssignmentPathComponent::Field(field));
+            }
+            AssignmentPathComponent::CachedIndex(name) => {
+                cached_components.push(AssignmentPathComponent::CachedIndex(name.clone()));
+            }
+            AssignmentPathComponent::Index(index) => {
+                let temp_name = format!("$lvalue{next_index}");
+                next_index += 1;
+                lower_expression_into(
+                    content,
+                    index,
+                    choice_labels,
+                    global_labels,
+                    external_signatures,
+                    constants,
+                    struct_definitions,
+                    path_mode,
+                    false,
+                );
+                content.push(RuntimeObject::VariableAssignment(temp_name.clone()));
+                cached_components.push(AssignmentPathComponent::CachedIndex(temp_name));
+            }
+        }
+    }
+    cached_components
+}
+
+fn push_reassignment_for_name(
+    content: &mut Vec<RuntimeObject>,
+    name: &str,
+    path_mode: &ChoicePathMode,
+) {
+    if path_mode.is_local_variable(name) {
+        content.push(RuntimeObject::TempVariableReassignment(name.to_string()));
+    } else {
+        content.push(RuntimeObject::VariableReassignment(name.to_string()));
+    }
+}
+
+fn lower_tail_recursive_return_into(
+    content: &mut Vec<RuntimeObject>,
+    ret: &crate::parsed::Return,
+    path_mode: &ChoicePathMode,
+    choice_labels: &LabelIndex,
+    global_labels: &LabelIndex,
+    external_signatures: &ExternalSignatures,
+    constants: &HashMap<String, Expression>,
+    struct_definitions: &StructDefinitions,
+) -> bool {
+    let Some(flow_name) = path_mode.current_flow_name() else {
+        return false;
+    };
+    let Some(tail_args) = ret.direct_self_tail_call_args(flow_name) else {
+        return false;
+    };
+    let Some(indexes::CallSignature::Ink {
+        args: expected_args,
+    }) = external_signatures.get(flow_name)
+    else {
+        return false;
+    };
+    if expected_args.len() != tail_args.len() {
+        return false;
+    }
+    let Some(body_start_target) = path_mode.current_flow_body_start_target(expected_args.len())
+    else {
+        return false;
+    };
+
+    content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
+    let mut visiting_constants = HashSet::new();
+    for (index, arg) in tail_args.iter().enumerate() {
+        lower_function_arg_into(
+            content,
+            arg,
+            expected_args.get(index),
+            choice_labels,
+            global_labels,
+            external_signatures,
+            constants,
+            struct_definitions,
+            path_mode,
+            false,
+            &mut visiting_constants,
+        );
+    }
+    for argument in expected_args.iter().rev() {
+        content.push(RuntimeObject::VariableAssignment(
+            argument.name().to_string(),
+        ));
+    }
+    content.push(RuntimeObject::ControlCommand(ControlCommand::EvalEnd));
+    content.push(RuntimeObject::Divert {
+        target: body_start_target,
+        variable: false,
+    });
+
+    true
 }
 
 fn lower_variable_assignment_into(
@@ -357,36 +803,65 @@ fn lower_variable_assignment_into(
     global_labels: &LabelIndex,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
+    struct_definitions: &StructDefinitions,
 ) {
     if assignment.is_global() {
         return;
     }
 
-    content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
-    lower_expression_into(
-        content,
-        assignment.expression(),
+    let Some(name) = assignment.target().variable_name() else {
+        let Some(expression) = assignment.expression() else {
+            return;
+        };
+        let mut components = Vec::new();
+        let Some(root_name) = collect_assignment_path(assignment.target(), &mut components) else {
+            return;
+        };
+        if components.is_empty() {
+            return;
+        }
+
+        content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
+        lower_assignment_path_update_value_into(
+            content,
+            root_name,
+            &components,
+            0,
+            AssignmentUpdateValue::Expression(expression),
+            choice_labels,
+            global_labels,
+            external_signatures,
+            constants,
+            path_mode,
+            struct_definitions,
+        );
+        content.push(RuntimeObject::ControlCommand(ControlCommand::EvalEnd));
+        push_reassignment_for_name(content, root_name, path_mode);
+        return;
+    };
+
+    let mut initializer = Vec::new();
+    if !lower_assignment_initializer_into(
+        &mut initializer,
+        assignment,
         choice_labels,
         global_labels,
         external_signatures,
         constants,
         path_mode,
-        false,
-    );
+        struct_definitions,
+    ) {
+        return;
+    }
+
+    content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
+    content.extend(initializer);
     content.push(RuntimeObject::ControlCommand(ControlCommand::EvalEnd));
 
     if assignment.is_temporary() {
-        content.push(RuntimeObject::VariableAssignment(
-            assignment.name().to_string(),
-        ));
-    } else if path_mode.is_local_variable(assignment.name()) {
-        content.push(RuntimeObject::TempVariableReassignment(
-            assignment.name().to_string(),
-        ));
+        content.push(RuntimeObject::VariableAssignment(name.to_string()));
     } else {
-        content.push(RuntimeObject::VariableReassignment(
-            assignment.name().to_string(),
-        ));
+        push_reassignment_for_name(content, name, path_mode);
     }
 }
 
@@ -398,9 +873,51 @@ fn lower_inc_dec_into(
     global_labels: &LabelIndex,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
+    struct_definitions: &StructDefinitions,
 ) {
+    let Some(name) = inc_dec.target().variable_name() else {
+        let mut components = Vec::new();
+        let Some(root_name) = collect_assignment_path(inc_dec.target(), &mut components) else {
+            return;
+        };
+        if components.is_empty() {
+            return;
+        }
+        let operator = if inc_dec.is_increment() { "+" } else { "-" };
+
+        content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
+        let cached_components = lower_cached_assignment_indexes_into(
+            content,
+            &components,
+            choice_labels,
+            global_labels,
+            external_signatures,
+            constants,
+            path_mode,
+            struct_definitions,
+        );
+        lower_assignment_path_update_value_into(
+            content,
+            root_name,
+            &cached_components,
+            0,
+            AssignmentUpdateValue::Compound {
+                expression: inc_dec.expression(),
+                operator,
+            },
+            choice_labels,
+            global_labels,
+            external_signatures,
+            constants,
+            path_mode,
+            struct_definitions,
+        );
+        content.push(RuntimeObject::ControlCommand(ControlCommand::EvalEnd));
+        push_reassignment_for_name(content, root_name, path_mode);
+        return;
+    };
     content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
-    content.push(RuntimeObject::VariableReference(inc_dec.name().to_string()));
+    content.push(RuntimeObject::VariableReference(name.to_string()));
     lower_expression_into(
         content,
         inc_dec.expression(),
@@ -408,20 +925,17 @@ fn lower_inc_dec_into(
         global_labels,
         external_signatures,
         constants,
+        struct_definitions,
         path_mode,
         false,
     );
     content.push(RuntimeObject::NativeFunction(
         if inc_dec.is_increment() { "+" } else { "-" }.to_string(),
     ));
-    if path_mode.is_local_variable(inc_dec.name()) {
-        content.push(RuntimeObject::TempVariableReassignment(
-            inc_dec.name().to_string(),
-        ));
+    if path_mode.is_local_variable(name) {
+        content.push(RuntimeObject::TempVariableReassignment(name.to_string()));
     } else {
-        content.push(RuntimeObject::VariableReassignment(
-            inc_dec.name().to_string(),
-        ));
+        content.push(RuntimeObject::VariableReassignment(name.to_string()));
     }
     content.push(RuntimeObject::ControlCommand(ControlCommand::EvalEnd));
 }
@@ -435,6 +949,7 @@ fn push_divert_with_context(
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
+    struct_definitions: &StructDefinitions,
 ) {
     if !divert.arguments().is_empty() {
         content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
@@ -446,6 +961,7 @@ fn push_divert_with_context(
                 global_labels,
                 external_signatures,
                 constants,
+                struct_definitions,
                 path_mode,
                 false,
             );
@@ -506,6 +1022,7 @@ fn lower_tunnel_onwards_into(
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
+    struct_definitions: &StructDefinitions,
 ) {
     content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
     for argument in tunnel_onwards.arguments() {
@@ -516,6 +1033,7 @@ fn lower_tunnel_onwards_into(
             global_labels,
             external_signatures,
             constants,
+            struct_definitions,
             path_mode,
             false,
         );

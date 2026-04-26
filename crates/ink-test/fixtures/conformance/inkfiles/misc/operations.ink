@@ -1,4 +1,4 @@
-VAR x = 3
+VAR x: int = 3
 
 neg:{-x}
 mod:{x%2}

@@ -16,11 +16,11 @@ Story
     Divert(target="-> DONE", empty=false, tunnel=false, thread=false)
   Flow(level=Knot, name="derp", function=true)
     Weave(baseIndent=0)
-      VariableAssignment(name="x", global=true, temp=false)
+      VariableAssignment(name="x", global=true, temp=false, type=int)
         Number(0)
       VariableAssignment(name="x", global=false, temp=false)
         Binary(+, VariableReference(a), VariableReference(b))
-      VariableAssignment(name="y", global=true, temp=false)
+      VariableAssignment(name="y", global=true, temp=false, type=int)
         Number(3)
       ContentList
         Conditional

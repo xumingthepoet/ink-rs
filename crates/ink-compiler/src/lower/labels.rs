@@ -2,13 +2,14 @@ use std::collections::HashMap;
 
 use crate::parsed::{Expression, Flow, Object, Story, Weave};
 
-use super::indexes::RuntimeLenEstimator;
+use super::indexes::{RuntimeLenEstimator, StructDefinitions};
 use super::path::{child_path, LabelIndex, RuntimePath};
 use super::weave::weave_has_weave_points;
 
 pub(super) fn build_label_index(
     story: &Story,
     constants: &HashMap<String, Expression>,
+    struct_definitions: &StructDefinitions,
     estimator: &RuntimeLenEstimator,
 ) -> LabelIndex {
     let mut labels = LabelIndex::new();
@@ -17,11 +18,19 @@ pub(super) fn build_label_index(
         "0",
         None,
         constants,
+        struct_definitions,
         estimator,
         &mut labels,
     );
     for flow in story.flows() {
-        collect_flow_labels(flow, None, constants, estimator, &mut labels);
+        collect_flow_labels(
+            flow,
+            None,
+            constants,
+            struct_definitions,
+            estimator,
+            &mut labels,
+        );
     }
     labels
 }
@@ -30,6 +39,7 @@ fn collect_flow_labels(
     flow: &Flow,
     parent_flow_name: Option<&str>,
     constants: &HashMap<String, Expression>,
+    struct_definitions: &StructDefinitions,
     estimator: &RuntimeLenEstimator,
     labels: &mut LabelIndex,
 ) {
@@ -50,11 +60,19 @@ fn collect_flow_labels(
         &weave_container_path,
         Some(&flow_path),
         constants,
+        struct_definitions,
         estimator,
         labels,
     );
     for child in flow.child_flows() {
-        collect_flow_labels(child, Some(&flow_path), constants, estimator, labels);
+        collect_flow_labels(
+            child,
+            Some(&flow_path),
+            constants,
+            struct_definitions,
+            estimator,
+            labels,
+        );
     }
 }
 
@@ -63,6 +81,7 @@ fn collect_weave_labels(
     container_path: &str,
     flow_alias_prefix: Option<&str>,
     constants: &HashMap<String, Expression>,
+    struct_definitions: &StructDefinitions,
     estimator: &RuntimeLenEstimator,
     labels: &mut LabelIndex,
 ) {
@@ -86,7 +105,7 @@ fn collect_weave_labels(
                 let choice_path = format!("{current_container_path}.c-{choice_count}");
                 previous_choice_content = Some((
                     choice_path,
-                    (estimator.choice_content_len)(choice, constants),
+                    (estimator.choice_content_len)(choice, constants, struct_definitions),
                 ));
                 choice_count += 1;
                 last_section_had_choice = true;
@@ -122,6 +141,7 @@ fn collect_weave_labels(
                         &nested_container_path,
                         flow_alias_prefix,
                         constants,
+                        struct_definitions,
                         estimator,
                         labels,
                     );
@@ -132,6 +152,7 @@ fn collect_weave_labels(
                         &current_container_path,
                         flow_alias_prefix,
                         constants,
+                        struct_definitions,
                         estimator,
                         labels,
                     );
@@ -139,7 +160,7 @@ fn collect_weave_labels(
             }
             _ => {
                 if let Some((_, next_index)) = previous_choice_content.as_mut() {
-                    *next_index += (estimator.object_len)(object, constants);
+                    *next_index += (estimator.object_len)(object, constants, struct_definitions);
                 }
             }
         }

@@ -21,6 +21,7 @@ pub use ink_story_json_format::{
     NamedContainer as RuntimeNamedContainer, Object as RuntimeObject, Program as RuntimeProgram,
 };
 pub use parsed::{
-    Choice, ContentList, Divert, DivertTarget, Object, Story as ParsedStory, Text, Weave,
+    Choice, ContentList, DefaultValue, Divert, DivertTarget, Object, PrimitiveType,
+    Story as ParsedStory, Text, TypeName, Weave,
 };
 pub use source::{eliminate_comments, FileHandler, SourceInput, SourceSpan};

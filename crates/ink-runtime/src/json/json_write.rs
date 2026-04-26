@@ -1,26 +1,17 @@
-use std::{collections::HashMap, rc::Rc};
+use std::{
+    collections::{BTreeMap, HashMap},
+    rc::Rc,
+};
 
 use ink_story_json_format as format;
 use serde_json::{json, Map};
 
 use crate::{
-    choice::Choice,
-    choice_point::ChoicePoint,
-    container::Container,
-    control_command::ControlCommand,
-    divert::Divert,
-    glue::Glue,
-    native_function_call::NativeFunctionCall,
-    object::RTObject,
-    path::Path,
-    push_pop::PushPopType,
-    story_error::StoryError,
-    tag::Tag,
-    value::Value,
-    value_type::{StringValue, VariablePointerValue},
-    variable_assigment::VariableAssignment,
-    variable_reference::VariableReference,
-    void::Void,
+    choice::Choice, choice_point::ChoicePoint, container::Container,
+    control_command::ControlCommand, divert::Divert, glue::Glue,
+    native_function_call::NativeFunctionCall, object::RTObject, push_pop::PushPopType,
+    story_error::StoryError, tag::Tag, value::Value, value_type::ValueType,
+    variable_assigment::VariableAssignment, variable_reference::VariableReference, void::Void,
 };
 
 pub fn write_dictionary_values(
@@ -80,36 +71,11 @@ pub fn write_rtobject(o: Rc<dyn RTObject>) -> Result<serde_json::Value, StoryErr
     }
 
     if let Some(v) = Value::get_bool_value(o.as_ref()) {
-        return Ok(format::Object::Bool(v).to_json_value());
+        return Ok(value_type_to_format_object(&ValueType::Bool(v))?.to_json_value());
     }
 
-    if let Some(v) = Value::get_value::<i32>(o.as_ref()) {
-        return Ok(format::Object::Int(v).to_json_value());
-    }
-
-    if let Some(v) = Value::get_value::<f32>(o.as_ref()) {
-        return Ok(format::Object::Float(v as f64).to_json_value());
-    }
-
-    if let Some(v) = Value::get_value::<&StringValue>(o.as_ref()) {
-        let text = if v.is_newline {
-            "\n".to_string()
-        } else {
-            v.string.clone()
-        };
-        return Ok(format::Object::String(text).to_json_value());
-    }
-
-    if let Some(v) = Value::get_value::<&Path>(o.as_ref()) {
-        return Ok(format::Object::DivertTarget(v.get_components_string()).to_json_value());
-    }
-
-    if let Some(v) = Value::get_value::<&VariablePointerValue>(o.as_ref()) {
-        return Ok(format::Object::VariablePointer {
-            name: v.variable_name.clone(),
-            context_index: v.context_index,
-        }
-        .to_json_value());
+    if let Some(v) = o.as_any().downcast_ref::<Value>() {
+        return Ok(value_type_to_format_object(&v.value)?.to_json_value());
     }
 
     if o.as_any().is::<Glue>() {
@@ -180,6 +146,39 @@ pub fn write_rtobject(o: Rc<dyn RTObject>) -> Result<serde_json::Value, StoryErr
         "Failed to write runtime object to JSON: {}",
         o
     )))
+}
+
+fn value_type_to_format_object(value: &ValueType) -> Result<format::Object, StoryError> {
+    match value {
+        ValueType::Bool(value) => Ok(format::Object::Bool(*value)),
+        ValueType::Int(value) => Ok(format::Object::Int(*value)),
+        ValueType::Float(value) => Ok(format::Object::Float(*value as f64)),
+        ValueType::String(value) => {
+            let text = if value.is_newline {
+                "\n".to_string()
+            } else {
+                value.string.clone()
+            };
+            Ok(format::Object::String(text))
+        }
+        ValueType::DivertTarget(value) => {
+            Ok(format::Object::DivertTarget(value.get_components_string()))
+        }
+        ValueType::VariablePointer(value) => Ok(format::Object::VariablePointer {
+            name: value.variable_name.clone(),
+            context_index: value.context_index,
+        }),
+        ValueType::Array(values) => values
+            .iter()
+            .map(value_type_to_format_object)
+            .collect::<Result<Vec<_>, _>>()
+            .map(format::Object::ValueArray),
+        ValueType::Object(fields) => fields
+            .iter()
+            .map(|(name, value)| Ok((name.clone(), value_type_to_format_object(value)?)))
+            .collect::<Result<BTreeMap<_, _>, _>>()
+            .map(format::Object::ValueObject),
+    }
 }
 
 pub fn write_rt_container(

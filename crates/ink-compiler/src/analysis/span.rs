@@ -20,6 +20,7 @@ pub(super) fn object_span(object: &Object) -> SourceSpan {
         Object::Gather(gather) => gather.span().clone(),
         Object::IncDec(inc_dec) => inc_dec.span().clone(),
         Object::Return(ret) => ret.span().clone(),
+        Object::StructDeclaration(declaration) => declaration.span().clone(),
         Object::Text(text) => text.span().clone(),
         Object::TunnelOnwards(tunnel_onwards) => tunnel_onwards.span().clone(),
         Object::VariableAssignment(assignment) => assignment.span().clone(),

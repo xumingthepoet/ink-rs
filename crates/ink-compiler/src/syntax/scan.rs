@@ -9,6 +9,7 @@ pub(super) struct ScanOptions {
     pub(super) track_strings: bool,
     pub(super) track_parentheses: bool,
     pub(super) track_braces: bool,
+    pub(super) track_brackets: bool,
     pub(super) escape_outside_strings: bool,
 }
 
@@ -18,6 +19,7 @@ impl ScanOptions {
             track_strings: true,
             track_parentheses: true,
             track_braces: true,
+            track_brackets: true,
             escape_outside_strings: false,
         }
     }
@@ -26,7 +28,8 @@ impl ScanOptions {
         Self {
             track_strings: true,
             track_parentheses: true,
-            track_braces: false,
+            track_braces: true,
+            track_brackets: true,
             escape_outside_strings: false,
         }
     }
@@ -36,6 +39,7 @@ impl ScanOptions {
             track_strings: true,
             track_parentheses: true,
             track_braces: true,
+            track_brackets: true,
             escape_outside_strings: true,
         }
     }
@@ -45,6 +49,7 @@ impl ScanOptions {
             track_strings: false,
             track_parentheses: false,
             track_braces: false,
+            track_brackets: false,
             escape_outside_strings: true,
         }
     }
@@ -62,6 +67,7 @@ struct ScanState {
     escaped: bool,
     paren_depth: usize,
     brace_depth: usize,
+    bracket_depth: usize,
 }
 
 impl ScanState {
@@ -82,12 +88,16 @@ impl ScanState {
             '}' if !self.in_string && options.track_braces => {
                 self.brace_depth = self.brace_depth.saturating_sub(1);
             }
+            '[' if !self.in_string && options.track_brackets => self.bracket_depth += 1,
+            ']' if !self.in_string && options.track_brackets => {
+                self.bracket_depth = self.bracket_depth.saturating_sub(1);
+            }
             _ => {}
         }
     }
 
     fn is_top_level(&self) -> bool {
-        !self.in_string && self.paren_depth == 0 && self.brace_depth == 0
+        !self.in_string && self.paren_depth == 0 && self.brace_depth == 0 && self.bracket_depth == 0
     }
 
     fn can_match_top_level(&self) -> bool {
@@ -270,7 +280,7 @@ mod tests {
     }
 
     #[test]
-    fn expression_options_ignore_braces_but_track_strings_and_parentheses() {
+    fn expression_options_track_strings_parentheses_and_braces() {
         assert_eq!(
             find_top_level_char_with_options(
                 r#""+" + call(1 + 2)"#,
@@ -278,6 +288,35 @@ mod tests {
                 ScanOptions::expression()
             ),
             Some(4)
+        );
+
+        let parts = split_top_level_with_options(
+            "first, {second: 2, third: 3}, call({fourth: 4, fifth: 5})",
+            ',',
+            ScanOptions::expression(),
+        );
+
+        assert_eq!(
+            parts,
+            vec![
+                "first",
+                "{second: 2, third: 3}",
+                "call({fourth: 4, fifth: 5})"
+            ]
+        );
+    }
+
+    #[test]
+    fn expression_options_track_array_brackets() {
+        let parts = split_top_level_with_options(
+            "first, [second, third], call([fourth, fifth])",
+            ',',
+            ScanOptions::expression(),
+        );
+
+        assert_eq!(
+            parts,
+            vec!["first", "[second, third]", "call([fourth, fifth])"]
         );
     }
 

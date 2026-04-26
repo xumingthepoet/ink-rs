@@ -1,5 +1,5 @@
 
-        VAR x = 0
+        VAR x: int = 0
         {
             - x == 0:
               This is text 1.

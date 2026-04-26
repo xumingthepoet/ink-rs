@@ -1,0 +1,222 @@
+use crate::{
+    diagnostic::Diagnostic,
+    parsed::{
+        visit::{walk_story, ParsedVisitor, VisitContext},
+        DefaultValue, Object, Story, TypeName, VariableAssignment,
+    },
+};
+
+use super::{
+    context::{StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
+    expression_types::infer_expression_type,
+    structs::build_struct_type_index,
+    target_symbols::build_target_symbol_index,
+    variables::build_variable_scope_index,
+};
+
+pub(super) fn variable_initializer_diagnostics(story: &Story) -> Vec<Diagnostic> {
+    let struct_types = build_struct_type_index(story);
+    let variable_scopes = build_variable_scope_index(story);
+    let target_symbols = build_target_symbol_index(story);
+    let mut checker =
+        VariableInitializerChecker::new(&variable_scopes, &struct_types, &target_symbols);
+    walk_story(story, &mut checker);
+    checker.diagnostics
+}
+
+struct VariableInitializerChecker<'a> {
+    variable_scopes: &'a VariableScopeIndex,
+    struct_types: &'a StructTypeIndex,
+    target_symbols: &'a TargetSymbolIndex,
+    diagnostics: Vec<Diagnostic>,
+}
+
+impl<'a> VariableInitializerChecker<'a> {
+    fn new(
+        variable_scopes: &'a VariableScopeIndex,
+        struct_types: &'a StructTypeIndex,
+        target_symbols: &'a TargetSymbolIndex,
+    ) -> Self {
+        Self {
+            variable_scopes,
+            struct_types,
+            target_symbols,
+            diagnostics: Vec::new(),
+        }
+    }
+
+    fn check_assignment(&mut self, assignment: &VariableAssignment, context: &VisitContext) {
+        if !assignment.is_global() && !assignment.is_temporary() {
+            return;
+        }
+
+        let Some(declared_type) = assignment.declared_type() else {
+            return;
+        };
+
+        let Some(expression) = assignment.expression() else {
+            if default_initializer_metadata(assignment).is_none() {
+                self.diagnostics.push(Diagnostic::error(
+                    assignment.span().clone(),
+                    format!(
+                        "Variable '{}' of type {} cannot be default-initialized",
+                        assignment.name(),
+                        declared_type.display_name()
+                    ),
+                ));
+            }
+            return;
+        };
+
+        match infer_expression_type(
+            expression,
+            self.variable_scopes,
+            self.struct_types,
+            self.target_symbols,
+            context.current_flow_path.as_deref(),
+        ) {
+            Ok(actual_type) if &actual_type != declared_type => {
+                self.diagnostics.push(type_mismatch_diagnostic(
+                    assignment,
+                    declared_type,
+                    &actual_type,
+                ));
+            }
+            Ok(_) => {}
+            Err(error) if declared_type.primitive_type().is_some() => {
+                self.diagnostics.push(Diagnostic::error(
+                    assignment.span().clone(),
+                    format!(
+                        "Cannot type-check initializer for variable '{}': {}",
+                        assignment.name(),
+                        error.message()
+                    ),
+                ));
+            }
+            Err(_) => {}
+        }
+    }
+}
+
+impl ParsedVisitor for VariableInitializerChecker<'_> {
+    fn visit_object(&mut self, object: &Object, context: &VisitContext) {
+        if let Object::VariableAssignment(assignment) = object {
+            self.check_assignment(assignment, context);
+        }
+    }
+}
+
+fn type_mismatch_diagnostic(
+    assignment: &VariableAssignment,
+    expected_type: &TypeName,
+    actual_type: &TypeName,
+) -> Diagnostic {
+    Diagnostic::error(
+        assignment.span().clone(),
+        format!(
+            "Initializer for variable '{}' has type {} but declared type is {}",
+            assignment.name(),
+            actual_type.display_name(),
+            expected_type.display_name()
+        ),
+    )
+}
+
+fn default_initializer_metadata(assignment: &VariableAssignment) -> Option<DefaultValue> {
+    if assignment.expression().is_some() {
+        return None;
+    }
+    assignment.declared_type()?.default_value()
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        analysis::test_support::assert_single_diagnostic,
+        diagnostic::DiagnosticSeverity,
+        parsed::{Object, TypeName},
+    };
+
+    use super::{super::test_support::parse_story, *};
+
+    #[test]
+    fn accepts_valid_primitive_initializers() {
+        let story = parse_story(
+            "VAR score: int = 10\n\
+             VAR ratio: float = 1.5\n\
+             VAR ready: bool = true\n\
+             VAR label: string = \"start\"\n\
+             == knot ==\n\
+             ~ temp next: int = score + 1\n\
+             -> DONE",
+        );
+
+        assert_eq!(variable_initializer_diagnostics(&story), []);
+    }
+
+    #[test]
+    fn reports_invalid_primitive_initializer_type() {
+        let story = parse_story("VAR score: int = \"high\"\n-> DONE");
+
+        let diagnostics = variable_initializer_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Initializer for variable 'score' has type string but declared type is int",
+        );
+    }
+
+    #[test]
+    fn rejects_implicit_numeric_conversion_in_initializers() {
+        let story = parse_story("VAR ratio: float = 1\n-> DONE");
+
+        let diagnostics = variable_initializer_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Initializer for variable 'ratio' has type int but declared type is float",
+        );
+    }
+
+    #[test]
+    fn rejects_operator_errors_in_primitive_initializers() {
+        let story = parse_story("VAR valid: bool = 1 && true\n-> DONE");
+
+        let diagnostics = variable_initializer_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Cannot type-check initializer for variable 'valid': Operator '&&' is not defined for types int and bool",
+        );
+    }
+
+    #[test]
+    fn records_default_metadata_for_omitted_typed_temp_initializers() {
+        let story = parse_story(
+            "== knot ==\n\
+             ~ temp hp: int\n\
+             -> DONE",
+        );
+        let assignment = story.flows()[0]
+            .weave()
+            .content()
+            .iter()
+            .find_map(|object| match object {
+                Object::VariableAssignment(assignment) if assignment.name() == "hp" => {
+                    Some(assignment)
+                }
+                _ => None,
+            })
+            .expect("typed temp should parse as a variable assignment");
+
+        assert_eq!(variable_initializer_diagnostics(&story), []);
+        assert_eq!(
+            default_initializer_metadata(assignment),
+            Some(DefaultValue::Int(0))
+        );
+        assert_eq!(assignment.declared_type(), Some(&TypeName::int()));
+    }
+}

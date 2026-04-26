@@ -2,10 +2,10 @@
    The values are {x} and {y}.
    -> END
    
-   === function derp(a, b, c) ===
-   VAR x = 0
+   === function derp(a: int, b: int, c: int) -> void ===
+   VAR x: int = 0
    ~ x = a + b
-   VAR y = 3
+   VAR y: int = 3
    { x == 5:
       ~ x = 6
    }

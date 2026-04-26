@@ -1,6 +1,6 @@
 Story
   Weave(baseIndent=0)
-    VariableAssignment(name="x", global=true, temp=false)
+    VariableAssignment(name="x", global=true, temp=false, type=float)
       Number(0)
     ContentList
       VariableAssignment(name="x", global=false, temp=false)

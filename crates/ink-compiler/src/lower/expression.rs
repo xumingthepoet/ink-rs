@@ -2,12 +2,17 @@ use std::collections::{HashMap, HashSet};
 
 use ink_story_json_format::{ControlCommand, Object as RuntimeObject};
 
-use crate::parsed::{BinaryOperator, Expression, FlowArgument};
+use crate::parsed::{AssignmentTarget, BinaryOperator, Expression, FlowArgument};
 
 use super::context::ChoicePathMode;
-use super::indexes::{CallSignature, ExternalSignatures};
+use super::indexes::{CallSignature, ExternalSignatures, StructDefinitions};
 use super::path::LabelIndex;
+use super::value::lower_value_literal;
 use super::weave::lower_content_list_into_context;
+use super::{
+    collect_assignment_path, lower_assignment_path_update_value_into,
+    lower_cached_assignment_indexes_into, push_reassignment_for_name, AssignmentUpdateValue,
+};
 
 pub(super) fn lower_output_expression_into(
     content: &mut Vec<RuntimeObject>,
@@ -16,6 +21,7 @@ pub(super) fn lower_output_expression_into(
     global_labels: &LabelIndex,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
+    struct_definitions: &StructDefinitions,
     path_mode: &ChoicePathMode,
 ) {
     content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
@@ -26,6 +32,7 @@ pub(super) fn lower_output_expression_into(
         global_labels,
         external_signatures,
         constants,
+        struct_definitions,
         path_mode,
         false,
     );
@@ -40,6 +47,7 @@ pub(super) fn lower_logic_line_into(
     global_labels: &LabelIndex,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
+    struct_definitions: &StructDefinitions,
     path_mode: &ChoicePathMode,
 ) {
     content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
@@ -50,6 +58,7 @@ pub(super) fn lower_logic_line_into(
         global_labels,
         external_signatures,
         constants,
+        struct_definitions,
         path_mode,
         false,
     );
@@ -65,6 +74,7 @@ pub(super) fn lower_expression_into(
     global_labels: &LabelIndex,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
+    struct_definitions: &StructDefinitions,
     path_mode: &ChoicePathMode,
     has_start_content: bool,
 ) {
@@ -76,6 +86,7 @@ pub(super) fn lower_expression_into(
         global_labels,
         external_signatures,
         constants,
+        struct_definitions,
         path_mode,
         has_start_content,
         &mut visiting_constants,
@@ -89,6 +100,7 @@ fn lower_expression_into_with_constants(
     global_labels: &LabelIndex,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
+    struct_definitions: &StructDefinitions,
     path_mode: &ChoicePathMode,
     has_start_content: bool,
     visiting_constants: &mut HashSet<String>,
@@ -110,6 +122,7 @@ fn lower_expression_into_with_constants(
                 &HashSet::new(),
                 external_signatures,
                 constants,
+                struct_definitions,
             );
             content.push(RuntimeObject::ControlCommand(ControlCommand::EndString));
         }
@@ -139,6 +152,7 @@ fn lower_expression_into_with_constants(
                         global_labels,
                         external_signatures,
                         constants,
+                        struct_definitions,
                         path_mode,
                         has_start_content,
                         visiting_constants,
@@ -148,18 +162,14 @@ fn lower_expression_into_with_constants(
                 }
             }
 
-            if let Some(choice_target) = choice_labels.get(name) {
-                let _ = has_start_content;
-                content.push(RuntimeObject::ReadCount(choice_target.to_string()));
-            } else if let Some(label_target) = path_mode.scoped_label_target(name, global_labels) {
-                content.push(RuntimeObject::ReadCount(
-                    path_mode.resolve_label_target(label_target),
-                ));
-            } else if path_mode.is_flow_sibling_stitch(name) {
-                content.push(RuntimeObject::ReadCount(
-                    path_mode.resolve_single_stitch_target(name),
-                ));
-            } else {
+            if !lower_dotted_reference_path_into(
+                content,
+                name,
+                choice_labels,
+                global_labels,
+                path_mode,
+                has_start_content,
+            ) {
                 content.push(RuntimeObject::VariableReference(name.clone()));
             }
         }
@@ -172,10 +182,72 @@ fn lower_expression_into_with_constants(
                 global_labels,
                 external_signatures,
                 constants,
+                struct_definitions,
                 path_mode,
                 has_start_content,
                 visiting_constants,
             );
+        }
+        Expression::ArrayLiteral(_) | Expression::StructLiteral(_) => {
+            if let Some(value) = lower_value_literal(expression, None, struct_definitions) {
+                content.push(value);
+            }
+        }
+        Expression::FieldAccess { base, field } => {
+            if let Some(path) = expression.dotted_path() {
+                if lower_dotted_reference_path_into(
+                    content,
+                    &path,
+                    choice_labels,
+                    global_labels,
+                    path_mode,
+                    has_start_content,
+                ) {
+                    return;
+                }
+            }
+
+            lower_expression_into_with_constants(
+                content,
+                base,
+                choice_labels,
+                global_labels,
+                external_signatures,
+                constants,
+                struct_definitions,
+                path_mode,
+                has_start_content,
+                visiting_constants,
+            );
+            content.push(RuntimeObject::String(field.clone()));
+            content.push(RuntimeObject::NativeFunction("FIELD".to_string()));
+        }
+        Expression::IndexAccess { base, index } => {
+            lower_expression_into_with_constants(
+                content,
+                base,
+                choice_labels,
+                global_labels,
+                external_signatures,
+                constants,
+                struct_definitions,
+                path_mode,
+                has_start_content,
+                visiting_constants,
+            );
+            lower_expression_into_with_constants(
+                content,
+                index,
+                choice_labels,
+                global_labels,
+                external_signatures,
+                constants,
+                struct_definitions,
+                path_mode,
+                has_start_content,
+                visiting_constants,
+            );
+            content.push(RuntimeObject::NativeFunction("INDEX".to_string()));
         }
         Expression::Binary {
             operator,
@@ -189,6 +261,7 @@ fn lower_expression_into_with_constants(
                 global_labels,
                 external_signatures,
                 constants,
+                struct_definitions,
                 path_mode,
                 has_start_content,
                 visiting_constants,
@@ -200,6 +273,7 @@ fn lower_expression_into_with_constants(
                 global_labels,
                 external_signatures,
                 constants,
+                struct_definitions,
                 path_mode,
                 has_start_content,
                 visiting_constants,
@@ -219,6 +293,7 @@ fn lower_expression_into_with_constants(
                 global_labels,
                 external_signatures,
                 constants,
+                struct_definitions,
                 path_mode,
                 has_start_content,
                 visiting_constants,
@@ -236,6 +311,7 @@ fn lower_expression_into_with_constants(
                     global_labels,
                     external_signatures,
                     constants,
+                    struct_definitions,
                     path_mode,
                     has_start_content,
                     visiting_constants,
@@ -248,6 +324,33 @@ fn lower_expression_into_with_constants(
     }
 }
 
+fn lower_dotted_reference_path_into(
+    content: &mut Vec<RuntimeObject>,
+    name: &str,
+    choice_labels: &LabelIndex,
+    global_labels: &LabelIndex,
+    path_mode: &ChoicePathMode,
+    has_start_content: bool,
+) -> bool {
+    if let Some(choice_target) = choice_labels.get(name) {
+        let _ = has_start_content;
+        content.push(RuntimeObject::ReadCount(choice_target.to_string()));
+        true
+    } else if let Some(label_target) = path_mode.scoped_label_target(name, global_labels) {
+        content.push(RuntimeObject::ReadCount(
+            path_mode.resolve_label_target(label_target),
+        ));
+        true
+    } else if path_mode.is_flow_sibling_stitch(name) {
+        content.push(RuntimeObject::ReadCount(
+            path_mode.resolve_single_stitch_target(name),
+        ));
+        true
+    } else {
+        false
+    }
+}
+
 fn lower_function_call_into(
     content: &mut Vec<RuntimeObject>,
     name: &str,
@@ -256,11 +359,25 @@ fn lower_function_call_into(
     global_labels: &LabelIndex,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
+    struct_definitions: &StructDefinitions,
     path_mode: &ChoicePathMode,
     has_start_content: bool,
     visiting_constants: &mut HashSet<String>,
 ) {
     match name {
+        "ARRAY_REMOVE" => {
+            lower_array_remove_call_into(
+                content,
+                args,
+                choice_labels,
+                global_labels,
+                external_signatures,
+                constants,
+                struct_definitions,
+                path_mode,
+                visiting_constants,
+            );
+        }
         "CHOICE_COUNT" => content.push(RuntimeObject::ControlCommand(ControlCommand::ChoiceCount)),
         "TURNS" => content.push(RuntimeObject::ControlCommand(ControlCommand::Turns)),
         "TURNS_SINCE" => {
@@ -273,6 +390,7 @@ fn lower_function_call_into(
                     global_labels,
                     external_signatures,
                     constants,
+                    struct_definitions,
                     path_mode,
                     has_start_content,
                     visiting_constants,
@@ -290,6 +408,7 @@ fn lower_function_call_into(
                     global_labels,
                     external_signatures,
                     constants,
+                    struct_definitions,
                     path_mode,
                     has_start_content,
                     visiting_constants,
@@ -307,6 +426,7 @@ fn lower_function_call_into(
                     global_labels,
                     external_signatures,
                     constants,
+                    struct_definitions,
                     path_mode,
                     has_start_content,
                     visiting_constants,
@@ -324,6 +444,7 @@ fn lower_function_call_into(
                     global_labels,
                     external_signatures,
                     constants,
+                    struct_definitions,
                     path_mode,
                     has_start_content,
                     visiting_constants,
@@ -341,6 +462,7 @@ fn lower_function_call_into(
                     global_labels,
                     external_signatures,
                     constants,
+                    struct_definitions,
                     path_mode,
                     has_start_content,
                     visiting_constants,
@@ -362,6 +484,7 @@ fn lower_function_call_into(
                     global_labels,
                     external_signatures,
                     constants,
+                    struct_definitions,
                     path_mode,
                     has_start_content,
                     visiting_constants,
@@ -390,6 +513,7 @@ fn lower_function_call_into(
                     global_labels,
                     external_signatures,
                     constants,
+                    struct_definitions,
                     path_mode,
                     has_start_content,
                     visiting_constants,
@@ -409,6 +533,7 @@ fn lower_function_call_into(
                     global_labels,
                     external_signatures,
                     constants,
+                    struct_definitions,
                     path_mode,
                     has_start_content,
                     visiting_constants,
@@ -421,7 +546,80 @@ fn lower_function_call_into(
     }
 }
 
-fn lower_function_arg_into(
+fn lower_array_remove_call_into(
+    content: &mut Vec<RuntimeObject>,
+    args: &[Expression],
+    choice_labels: &LabelIndex,
+    global_labels: &LabelIndex,
+    external_signatures: &ExternalSignatures,
+    constants: &HashMap<String, Expression>,
+    struct_definitions: &StructDefinitions,
+    path_mode: &ChoicePathMode,
+    visiting_constants: &mut HashSet<String>,
+) {
+    let (Some(target_expression), Some(index_expression)) = (args.first(), args.get(1)) else {
+        content.push(RuntimeObject::Void);
+        return;
+    };
+    let Some(target) = AssignmentTarget::from_expression(target_expression.clone()) else {
+        content.push(RuntimeObject::Void);
+        return;
+    };
+
+    let mut components = Vec::new();
+    let Some(root_name) = collect_assignment_path(&target, &mut components) else {
+        content.push(RuntimeObject::Void);
+        return;
+    };
+    let cached_components = lower_cached_assignment_indexes_into(
+        content,
+        &components,
+        choice_labels,
+        global_labels,
+        external_signatures,
+        constants,
+        path_mode,
+        struct_definitions,
+    );
+
+    if cached_components.is_empty() {
+        content.push(RuntimeObject::VariableReference(root_name.to_string()));
+        lower_expression_into_with_constants(
+            content,
+            index_expression,
+            choice_labels,
+            global_labels,
+            external_signatures,
+            constants,
+            struct_definitions,
+            path_mode,
+            false,
+            visiting_constants,
+        );
+        content.push(RuntimeObject::NativeFunction("ARRAY_REMOVE".to_string()));
+    } else {
+        lower_assignment_path_update_value_into(
+            content,
+            root_name,
+            &cached_components,
+            0,
+            AssignmentUpdateValue::ArrayRemove {
+                index: index_expression,
+            },
+            choice_labels,
+            global_labels,
+            external_signatures,
+            constants,
+            path_mode,
+            struct_definitions,
+        );
+    }
+
+    push_reassignment_for_name(content, root_name, path_mode);
+    content.push(RuntimeObject::Void);
+}
+
+pub(super) fn lower_function_arg_into(
     content: &mut Vec<RuntimeObject>,
     arg: &Expression,
     expected_arg: Option<&FlowArgument>,
@@ -429,6 +627,7 @@ fn lower_function_arg_into(
     global_labels: &LabelIndex,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
+    struct_definitions: &StructDefinitions,
     path_mode: &ChoicePathMode,
     has_start_content: bool,
     visiting_constants: &mut HashSet<String>,
@@ -443,6 +642,15 @@ fn lower_function_arg_into(
         }
     }
 
+    if let Expression::ArrayLiteral(_) | Expression::StructLiteral(_) = arg {
+        if let Some(expected_type) = expected_arg.and_then(FlowArgument::declared_type) {
+            if let Some(value) = lower_value_literal(arg, Some(expected_type), struct_definitions) {
+                content.push(value);
+                return;
+            }
+        }
+    }
+
     lower_expression_into_with_constants(
         content,
         arg,
@@ -450,6 +658,7 @@ fn lower_function_arg_into(
         global_labels,
         external_signatures,
         constants,
+        struct_definitions,
         path_mode,
         has_start_content,
         visiting_constants,
@@ -463,6 +672,6 @@ fn operator_runtime_name(operator: BinaryOperator) -> &'static str {
 fn is_builtin_function(name: &str) -> bool {
     matches!(
         name,
-        "MIN" | "MAX" | "POW" | "FLOOR" | "CEILING" | "INT" | "FLOAT"
+        "MIN" | "MAX" | "POW" | "FLOOR" | "CEILING" | "INT" | "FLOAT" | "LEN"
     )
 }

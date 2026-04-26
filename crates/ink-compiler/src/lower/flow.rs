@@ -5,7 +5,7 @@ use ink_story_json_format::{Container, Object as RuntimeObject};
 use crate::parsed::{ContentList, Expression, Flow, Object, Weave};
 
 use super::context::ChoicePathMode;
-use super::indexes::{CountedFlowPaths, ExternalSignatures, LoweringIndexes};
+use super::indexes::{CountedFlowPaths, ExternalSignatures, LoweringIndexes, StructDefinitions};
 use super::path::LabelIndex;
 use super::weave::{
     lower_choice_weave, lower_linear_weave, lower_linear_weave_into_context, weave_has_choice,
@@ -26,6 +26,7 @@ pub(super) fn lower_root_weave(
             &indexes.global_variables,
             &indexes.external_signatures,
             &indexes.constants,
+            &indexes.struct_definitions,
             count_all_visits,
         )
     } else {
@@ -35,6 +36,7 @@ pub(super) fn lower_root_weave(
             &indexes.global_variables,
             &indexes.external_signatures,
             &indexes.constants,
+            &indexes.struct_definitions,
         );
         content.push(RuntimeObject::Container(done_container(
             "g-0",
@@ -67,6 +69,7 @@ pub(super) fn lower_flow(
         &indexes.global_variables,
         &indexes.external_signatures,
         &indexes.constants,
+        &indexes.struct_definitions,
         &indexes.counted_flow_paths,
         count_all_visits,
     )
@@ -80,6 +83,7 @@ fn lower_flow_with_context(
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
+    struct_definitions: &StructDefinitions,
     counted_flow_paths: &CountedFlowPaths,
     count_all_visits: bool,
 ) -> Container {
@@ -111,6 +115,7 @@ fn lower_flow_with_context(
             global_variables,
             external_signatures,
             constants,
+            struct_definitions,
             count_all_visits,
         )));
     } else if !flow.weave().content().is_empty() {
@@ -130,6 +135,7 @@ fn lower_flow_with_context(
             global_variables,
             external_signatures,
             constants,
+            struct_definitions,
             &path_mode,
         );
     }
@@ -161,6 +167,7 @@ fn lower_flow_with_context(
                     global_variables,
                     external_signatures,
                     constants,
+                    struct_definitions,
                     counted_flow_paths,
                     count_all_visits,
                 ))

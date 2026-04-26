@@ -1,10 +1,10 @@
 Story
   Weave(baseIndent=0)
-    VariableAssignment(name="x", global=true, temp=false)
+    VariableAssignment(name="x", global=true, temp=false, type=int)
       Number(1)
-    VariableAssignment(name="y", global=true, temp=false)
+    VariableAssignment(name="y", global=true, temp=false, type=int)
       Number(2)
-    VariableAssignment(name="z", global=true, temp=false)
+    VariableAssignment(name="z", global=true, temp=false, type=int)
       Number(0)
     Text("How much do you give?")
     Text("\n")

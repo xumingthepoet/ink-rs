@@ -1,6 +1,6 @@
-VAR x = 1
-        VAR y = 2
-        VAR z = 0
+VAR x: int = 1
+        VAR y: int = 2
+        VAR z: int = 0
         How much do you give?
         * [$1] -> give(x)
         * [$2] -> give(y)

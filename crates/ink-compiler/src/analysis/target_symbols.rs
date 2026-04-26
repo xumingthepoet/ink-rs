@@ -1,9 +1,9 @@
 use crate::parsed::{
     visit::{walk_story, ParsedVisitor, VisitContext},
-    Flow, Object, Story,
+    ExternalDeclaration, Flow, Object, Story,
 };
 
-use super::context::{FlowSymbol, TargetSymbolIndex};
+use super::context::{FlowSymbol, ParameterSymbol, TargetSymbolIndex};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 enum TargetSymbolCollectionPhase {
@@ -28,11 +28,21 @@ pub(super) fn build_target_symbol_index(story: &Story) -> TargetSymbolIndex {
             let Some(flow_path) = &context.current_flow_path else {
                 return;
             };
-            let symbol = FlowSymbol {
-                is_function: flow.is_function(),
-            };
+            let parameters = flow
+                .arguments()
+                .iter()
+                .map(ParameterSymbol::from_flow_argument)
+                .collect();
+            let symbol = FlowSymbol::new(
+                flow.is_function(),
+                parameters,
+                flow.return_type().clone(),
+                flow.has_typed_signature(),
+            );
 
-            self.symbols.entry(flow_path.clone()).or_insert(symbol);
+            self.symbols
+                .entry(flow_path.clone())
+                .or_insert_with(|| symbol.clone());
             if context.parent_flow_path.is_none() {
                 self.symbols
                     .entry(flow.name().to_string())
@@ -41,30 +51,33 @@ pub(super) fn build_target_symbol_index(story: &Story) -> TargetSymbolIndex {
         }
 
         fn visit_object(&mut self, object: &Object, context: &VisitContext) {
-            if self.phase != TargetSymbolCollectionPhase::Labels {
-                return;
-            }
-
-            match object {
-                Object::Choice(choice) => {
-                    if let Some(identifier) = choice.identifier() {
-                        insert_label_symbol(
-                            &mut self.symbols,
-                            identifier,
-                            context.current_flow_path.as_deref(),
-                        );
+            match self.phase {
+                TargetSymbolCollectionPhase::Flows => {
+                    if let Object::ExternalDeclaration(external) = object {
+                        insert_external_symbol(&mut self.symbols, external);
                     }
                 }
-                Object::Gather(gather) => {
-                    if let Some(identifier) = gather.identifier() {
-                        insert_label_symbol(
-                            &mut self.symbols,
-                            identifier,
-                            context.current_flow_path.as_deref(),
-                        );
+                TargetSymbolCollectionPhase::Labels => match object {
+                    Object::Choice(choice) => {
+                        if let Some(identifier) = choice.identifier() {
+                            insert_label_symbol(
+                                &mut self.symbols,
+                                identifier,
+                                context.current_flow_path.as_deref(),
+                            );
+                        }
                     }
-                }
-                _ => {}
+                    Object::Gather(gather) => {
+                        if let Some(identifier) = gather.identifier() {
+                            insert_label_symbol(
+                                &mut self.symbols,
+                                identifier,
+                                context.current_flow_path.as_deref(),
+                            );
+                        }
+                    }
+                    _ => {}
+                },
             }
         }
     }
@@ -76,9 +89,25 @@ pub(super) fn build_target_symbol_index(story: &Story) -> TargetSymbolIndex {
     visitor.symbols
 }
 
+fn insert_external_symbol(symbols: &mut TargetSymbolIndex, external: &ExternalDeclaration) {
+    let parameters = external
+        .argument_names()
+        .iter()
+        .zip(external.argument_types())
+        .map(|(name, declared_type)| {
+            ParameterSymbol::new(name.clone(), Some(declared_type.clone()))
+        })
+        .collect();
+    let symbol = FlowSymbol::new(true, parameters, external.return_type().clone(), true);
+
+    symbols.entry(external.name().to_string()).or_insert(symbol);
+}
+
 fn insert_label_symbol(symbols: &mut TargetSymbolIndex, identifier: &str, flow_path: Option<&str>) {
-    let symbol = FlowSymbol { is_function: false };
-    symbols.entry(identifier.to_string()).or_insert(symbol);
+    let symbol = FlowSymbol::label();
+    symbols
+        .entry(identifier.to_string())
+        .or_insert_with(|| symbol.clone());
     if let Some(flow_path) = flow_path {
         symbols
             .entry(format!("{flow_path}.{identifier}"))

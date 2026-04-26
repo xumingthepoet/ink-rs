@@ -1,6 +1,6 @@
 Story
   Weave(baseIndent=0)
-    VariableAssignment(name="v", global=true, temp=false)
+    VariableAssignment(name="v", global=true, temp=false, type=string)
       String("")
     VariableAssignment(name="v", global=false, temp=false)
       String("a")

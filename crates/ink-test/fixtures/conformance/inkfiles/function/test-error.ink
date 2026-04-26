@@ -1,4 +1,4 @@
-VAR roll = 0
+VAR roll: int = 0
  
  { roll == 0:
     ~ roll = 2

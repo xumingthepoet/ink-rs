@@ -1,9 +1,9 @@
 
-         VAR knows = false
-         VAR x = 2
-         VAR y = 3
-         VAR c = 4
-         VAR str = ""
+         VAR knows: bool = false
+         VAR x: int = 2
+         VAR y: int = 3
+         VAR c: int = 4
+         VAR str: string = ""
          ~ knows = true
          ~ x = (x * x) - (y * y) + c
          ~ y = 2 * x * y

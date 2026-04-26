@@ -91,6 +91,8 @@ fixture!(
 fixture!(variable_varstringinc, "inkfiles/variable/varstringinc.ink");
 fixture!(tags_tags_dynamic_content, "inkfiles/tags/tagsDynamicContent.ink");
 fixture!(variable_varcalc, "inkfiles/variable/varcalc.ink");
+fixture!(typed_array_literals, "inkfiles/typed/array-literals.ink");
+fixture!(typed_struct_literals, "inkfiles/typed/struct-literals.ink");
 fixture!(function_rnd_func, "inkfiles/function/rnd-func.ink");
 fixture_count_all_visits!(misc_operations, "inkfiles/misc/operations.ink");
 fixture!(conditional_ifelse, "inkfiles/conditional/ifelse.ink");

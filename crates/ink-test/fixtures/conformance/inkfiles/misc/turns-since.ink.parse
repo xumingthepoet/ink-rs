@@ -6,10 +6,10 @@ Story
   Flow(level=Knot, name="start", function=false)
     Weave(baseIndent=0)
       ContentList
-        FunctionCall(beats, args=1)
+        FunctionCall(TURNS_SINCE, args=1)
       Text("\n")
       ContentList
-        FunctionCall(beats, args=1)
+        FunctionCall(TURNS_SINCE, args=1)
       Text("\n")
       Choice(name=null, once=true, invisible=false, depth=1, inline=true)
         ContentList
@@ -21,12 +21,6 @@ Story
     Flow(level=Stitch, name="next", function=false)
       Weave(baseIndent=0)
         ContentList
-          FunctionCall(beats, args=1)
-        Text("\n")
-        Divert(target="-> END", empty=false, tunnel=false, thread=false)
-  Flow(level=Knot, name="beats", function=true)
-    Weave(baseIndent=0)
-      ContentList
-        Return
           FunctionCall(TURNS_SINCE, args=1)
         Text("\n")
+        Divert(target="-> END", empty=false, tunnel=false, thread=false)

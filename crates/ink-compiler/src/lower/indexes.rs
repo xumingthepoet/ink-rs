@@ -17,18 +17,21 @@ pub(super) struct LoweringIndexes<'a> {
     pub(super) global_variables: HashSet<String>,
     pub(super) variable_declarations: Vec<&'a VariableAssignment>,
     pub(super) external_signatures: ExternalSignatures,
+    pub(super) struct_definitions: StructDefinitions,
     pub(super) counted_flow_paths: CountedFlowPaths,
 }
 
 pub(super) struct RuntimeLenEstimator {
-    pub(super) choice_content_len: fn(&Choice, &HashMap<String, Expression>) -> usize,
-    pub(super) object_len: fn(&Object, &HashMap<String, Expression>) -> usize,
+    pub(super) choice_content_len:
+        fn(&Choice, &HashMap<String, Expression>, &StructDefinitions) -> usize,
+    pub(super) object_len: fn(&Object, &HashMap<String, Expression>, &StructDefinitions) -> usize,
 }
 
 impl<'a> LoweringIndexes<'a> {
     pub(super) fn build(story: &'a Story, estimator: RuntimeLenEstimator) -> Self {
         let constants = build_constant_values(story);
-        let global_labels = build_label_index(story, &constants, &estimator);
+        let struct_definitions = build_struct_definitions(story);
+        let global_labels = build_label_index(story, &constants, &struct_definitions, &estimator);
         let variable_declarations = collect_story_variable_declarations(story);
         let global_variables = build_global_variable_names(&variable_declarations);
         let external_signatures = build_external_signatures(story);
@@ -40,6 +43,7 @@ impl<'a> LoweringIndexes<'a> {
             global_variables,
             variable_declarations,
             external_signatures,
+            struct_definitions,
             counted_flow_paths,
         }
     }
@@ -52,6 +56,7 @@ pub(super) struct CountedFlowPaths {
 }
 
 pub(super) type ExternalSignatures = HashMap<String, CallSignature>;
+pub(super) type StructDefinitions = HashMap<String, Vec<(String, crate::parsed::TypeName)>>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum CallSignature {
@@ -122,6 +127,75 @@ fn build_global_variable_names(declarations: &[&VariableAssignment]) -> HashSet<
             _ => None,
         })
         .collect()
+}
+
+fn build_struct_definitions(story: &Story) -> StructDefinitions {
+    let mut definitions = HashMap::new();
+    collect_struct_definitions_in_objects(story.root_weave().content(), &mut definitions);
+    for flow in story.flows() {
+        collect_struct_definitions_in_flow(flow, &mut definitions);
+    }
+    definitions
+}
+
+fn collect_struct_definitions_in_flow(flow: &Flow, definitions: &mut StructDefinitions) {
+    collect_struct_definitions_in_objects(flow.weave().content(), definitions);
+    for child in flow.child_flows() {
+        collect_struct_definitions_in_flow(child, definitions);
+    }
+}
+
+fn collect_struct_definitions_in_objects(objects: &[Object], definitions: &mut StructDefinitions) {
+    for object in objects {
+        collect_struct_definitions_in_object(object, definitions);
+    }
+}
+
+fn collect_struct_definitions_in_content_list(
+    content_list: &ContentList,
+    definitions: &mut StructDefinitions,
+) {
+    collect_struct_definitions_in_objects(content_list.objects(), definitions);
+}
+
+fn collect_struct_definitions_in_object(object: &Object, definitions: &mut StructDefinitions) {
+    match object {
+        Object::StructDeclaration(declaration) => {
+            definitions
+                .entry(declaration.name().to_string())
+                .or_insert_with(|| {
+                    declaration
+                        .fields()
+                        .iter()
+                        .map(|field| (field.name().to_string(), field.type_name().clone()))
+                        .collect()
+                });
+        }
+        Object::ContentList(content_list) => {
+            collect_struct_definitions_in_content_list(content_list, definitions);
+        }
+        Object::Conditional(conditional) => {
+            for branch in conditional.branches() {
+                collect_struct_definitions_in_objects(branch.content().content(), definitions);
+            }
+        }
+        Object::Choice(choice) => {
+            if let Some(content) = choice.start_content() {
+                collect_struct_definitions_in_content_list(content, definitions);
+            }
+            if let Some(content) = choice.choice_only_content() {
+                collect_struct_definitions_in_content_list(content, definitions);
+            }
+            collect_struct_definitions_in_content_list(choice.inner_content(), definitions);
+        }
+        Object::Sequence(sequence) => {
+            for element in sequence.elements() {
+                collect_struct_definitions_in_content_list(element, definitions);
+            }
+        }
+        Object::Weave(weave) => collect_struct_definitions_in_objects(weave.content(), definitions),
+        _ => {}
+    }
 }
 
 fn collect_story_variable_declarations(story: &Story) -> Vec<&VariableAssignment> {
@@ -215,6 +289,7 @@ fn collect_constant_values_in_object(object: &Object, constants: &mut HashMap<St
         | Object::IncDec(_)
         | Object::Return(_)
         | Object::ExternalDeclaration(_)
+        | Object::StructDeclaration(_)
         | Object::Tag(_) => {}
     }
 }
@@ -513,18 +588,29 @@ fn collect_counted_paths_in_object(
                 );
             }
         }
-        Object::VariableAssignment(assignment) => match assignment.expression() {
-            Expression::DivertTarget(target) if assignment.is_global() => {
-                insert_counted_divert_target(target, global_labels, path_mode, paths, true, true);
+        Object::VariableAssignment(assignment) => {
+            if let Some(expression) = assignment.expression() {
+                match expression {
+                    Expression::DivertTarget(target) if assignment.is_global() => {
+                        insert_counted_divert_target(
+                            target,
+                            global_labels,
+                            path_mode,
+                            paths,
+                            true,
+                            true,
+                        );
+                    }
+                    expression => collect_counted_paths_in_expression(
+                        expression,
+                        global_labels,
+                        constants,
+                        path_mode,
+                        paths,
+                    ),
+                }
             }
-            expression => collect_counted_paths_in_expression(
-                expression,
-                global_labels,
-                constants,
-                path_mode,
-                paths,
-            ),
-        },
+        }
         Object::Return(ret) => {
             if let Some(expr) = ret.returned_expression() {
                 collect_counted_paths_in_expression(
@@ -547,6 +633,7 @@ fn collect_counted_paths_in_object(
         | Object::Gather(_)
         | Object::TunnelOnwards(_)
         | Object::ExternalDeclaration(_)
+        | Object::StructDeclaration(_)
         | Object::Tag(_) => {}
     }
 }
@@ -619,6 +706,43 @@ fn collect_counted_paths_in_expression(
                     ),
                 }
             }
+        }
+        Expression::ArrayLiteral(elements) => {
+            for element in elements {
+                collect_counted_paths_in_expression(
+                    element,
+                    global_labels,
+                    constants,
+                    path_mode,
+                    paths,
+                );
+            }
+        }
+        Expression::StructLiteral(fields) => {
+            for field in fields {
+                collect_counted_paths_in_expression(
+                    field.expression(),
+                    global_labels,
+                    constants,
+                    path_mode,
+                    paths,
+                );
+            }
+        }
+        Expression::FieldAccess { .. } => {
+            if let Some(path) = expression.dotted_path() {
+                if let Some(target) = path_mode.scoped_label_target(&path, global_labels) {
+                    paths.visits.insert(target.to_string());
+                } else if path_mode.is_flow_sibling_stitch(&path) {
+                    paths
+                        .visits
+                        .insert(path_mode.resolve_single_stitch_target(&path));
+                }
+            }
+        }
+        Expression::IndexAccess { base, index } => {
+            collect_counted_paths_in_expression(base, global_labels, constants, path_mode, paths);
+            collect_counted_paths_in_expression(index, global_labels, constants, path_mode, paths);
         }
         Expression::MultipleCondition(args) => {
             for arg in args {

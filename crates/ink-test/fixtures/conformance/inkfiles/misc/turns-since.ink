@@ -1,12 +1,10 @@
 -> start
 
 === start ===
-    {beats(-> start)}
-    {beats(-> start)}
+    {TURNS_SINCE(-> start)}
+    {TURNS_SINCE(-> start)}
     *   [Choice]  -> next
 = next
-    {beats(-> start)}
+    {TURNS_SINCE(-> start)}
     -> END
 
-=== function beats(x) ===
-    ~ return TURNS_SINCE(x)

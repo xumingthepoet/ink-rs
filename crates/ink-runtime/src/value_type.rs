@@ -1,9 +1,11 @@
 //! A combination of an Ink value with its type.
+use std::collections::BTreeMap;
+
 use crate::{path::Path, story_error::StoryError};
 
 /// An Ink value, tagged with its type.
 #[repr(u8)]
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum ValueType {
     Bool(bool),
     Int(i32),
@@ -14,6 +16,10 @@ pub enum ValueType {
     DivertTarget(Path),
     /// Reference to an Ink variable.
     VariablePointer(VariablePointerValue),
+    /// Dynamic Ink array value.
+    Array(Vec<ValueType>),
+    /// Dynamic Ink object/struct value.
+    Object(BTreeMap<String, ValueType>),
 }
 
 impl From<bool> for ValueType {
@@ -55,6 +61,18 @@ impl From<Path> for ValueType {
 impl From<VariablePointerValue> for ValueType {
     fn from(value: VariablePointerValue) -> Self {
         ValueType::VariablePointer(value)
+    }
+}
+
+impl From<Vec<ValueType>> for ValueType {
+    fn from(value: Vec<ValueType>) -> Self {
+        ValueType::Array(value)
+    }
+}
+
+impl From<BTreeMap<String, ValueType>> for ValueType {
+    fn from(value: BTreeMap<String, ValueType>) -> Self {
+        ValueType::Object(value)
     }
 }
 
@@ -176,7 +194,7 @@ impl ValueType {
 }
 
 /// Ink runtime representation of a string.
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct StringValue {
     /// The internal string value.
     pub string: String,
@@ -200,4 +218,50 @@ pub struct VariablePointerValue {
     // 0  = in global scope
     // 1+ = callstack element index + 1 (so that the first doesn't conflict with special global scope)
     pub(crate) context_index: i32,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn array_values_clone_and_compare_by_contents() {
+        let original = ValueType::Array(vec![
+            ValueType::Int(1),
+            ValueType::Array(vec![ValueType::Bool(true), ValueType::new("nested")]),
+        ]);
+
+        let cloned = original.clone();
+
+        assert!(original == cloned);
+
+        let ValueType::Array(mut edited) = cloned else {
+            panic!("expected array value");
+        };
+        edited.push(ValueType::Int(2));
+
+        assert!(original != ValueType::Array(edited));
+    }
+
+    #[test]
+    fn object_values_clone_and_compare_by_contents() {
+        let mut original_fields = BTreeMap::new();
+        original_fields.insert("count".to_string(), ValueType::Int(3));
+        original_fields.insert(
+            "items".to_string(),
+            ValueType::Array(vec![ValueType::new("a"), ValueType::new("b")]),
+        );
+        let original = ValueType::Object(original_fields);
+
+        let cloned = original.clone();
+
+        assert!(original == cloned);
+
+        let ValueType::Object(mut edited_fields) = cloned else {
+            panic!("expected object value");
+        };
+        edited_fields.insert("count".to_string(), ValueType::Int(4));
+
+        assert!(original != ValueType::Object(edited_fields));
+    }
 }

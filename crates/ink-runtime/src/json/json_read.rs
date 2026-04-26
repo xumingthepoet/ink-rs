@@ -1,4 +1,7 @@
-use std::{collections::HashMap, rc::Rc};
+use std::{
+    collections::{BTreeMap, HashMap},
+    rc::Rc,
+};
 
 use ink_story_json_format as format;
 use serde_json::Map;
@@ -8,7 +11,8 @@ use crate::{
     control_command::ControlCommand, divert::Divert, glue::Glue,
     native_function_call::NativeFunctionCall, object::RTObject, path::Path, push_pop::PushPopType,
     story::INK_VERSION_CURRENT, story_error::StoryError, tag::Tag, value::Value,
-    variable_assigment::VariableAssignment, variable_reference::VariableReference, void::Void,
+    value_type::ValueType, variable_assigment::VariableAssignment,
+    variable_reference::VariableReference, void::Void,
 };
 
 pub fn load_from_string(s: &str) -> Result<Rc<Container>, StoryError> {
@@ -139,7 +143,40 @@ fn format_object_to_runtime(object: &format::Object) -> Result<Rc<dyn RTObject>,
                     StoryError::BadJson(format!("Unsupported control command token: {token}"))
                 })
         }
+        format::Object::ValueArray(_) | format::Object::ValueObject(_) => Ok(Rc::new(
+            Value::new_value_type(format_object_to_runtime_value(object)?),
+        )),
         format::Object::Void => Ok(Rc::new(Void::new())),
+    }
+}
+
+fn format_object_to_runtime_value(object: &format::Object) -> Result<ValueType, StoryError> {
+    match object {
+        format::Object::String(value) => Ok(ValueType::new(value.as_str())),
+        format::Object::Bool(value) => Ok(ValueType::Bool(*value)),
+        format::Object::Int(value) => Ok(ValueType::Int(*value)),
+        format::Object::Float(value) => Ok(ValueType::Float(*value as f32)),
+        format::Object::DivertTarget(target) => Ok(ValueType::DivertTarget(
+            Path::new_with_components_string(Some(target)),
+        )),
+        format::Object::VariablePointer {
+            name,
+            context_index,
+        } => Ok(Value::new_variable_pointer(name, *context_index).value),
+        format::Object::ValueArray(values) => values
+            .iter()
+            .map(format_object_to_runtime_value)
+            .collect::<Result<Vec<_>, _>>()
+            .map(ValueType::Array),
+        format::Object::ValueObject(fields) => fields
+            .iter()
+            .map(|(name, value)| Ok((name.clone(), format_object_to_runtime_value(value)?)))
+            .collect::<Result<BTreeMap<_, _>, _>>()
+            .map(ValueType::Object),
+        _ => Err(StoryError::BadJson(format!(
+            "Unsupported value object in dynamic value: {:?}",
+            object
+        ))),
     }
 }
 
@@ -198,7 +235,9 @@ pub fn jtoken_to_runtime_object(
     name: Option<String>,
 ) -> Result<Rc<dyn RTObject>, StoryError> {
     if let serde_json::Value::Array(value) = token {
-        return jarray_to_container(value, name);
+        if name.is_some() {
+            return jarray_to_container(value, name);
+        }
     }
 
     if let serde_json::Value::Object(obj) = token {
@@ -316,6 +355,7 @@ pub(crate) fn jobject_to_int_hashmap(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
     #[test]
     fn loads_current_story_json_version() {
@@ -336,5 +376,56 @@ mod tests {
         assert!(error
             .to_string()
             .contains("Story JSON format version mismatch"));
+    }
+
+    #[test]
+    fn loads_dynamic_array_values_from_story_json() {
+        let json = r#"{
+            "inkVersion": 1,
+            "root": [
+                [1, true, {"hp": 10}, ["^nested"]],
+                "done",
+                null
+            ]
+        }"#;
+
+        let root = load_from_string(json).expect("story JSON should load");
+        let value = root.content[0]
+            .as_any()
+            .downcast_ref::<Value>()
+            .expect("first root object should be a value");
+
+        let ValueType::Array(values) = &value.value else {
+            panic!("expected array value");
+        };
+        assert!(matches!(values[0], ValueType::Int(1)));
+        assert!(matches!(values[1], ValueType::Bool(true)));
+        assert!(matches!(values[2], ValueType::Object(_)));
+        assert!(matches!(values[3], ValueType::Array(_)));
+    }
+
+    #[test]
+    fn loads_dynamic_object_values_from_runtime_tokens() {
+        let runtime_object = jtoken_to_runtime_object(
+            &json!({
+                "name": "^Ada",
+                "stats": {
+                    "hp": 10,
+                    "flags": [true, false]
+                }
+            }),
+            None,
+        )
+        .expect("object token should load");
+        let value = runtime_object
+            .as_any()
+            .downcast_ref::<Value>()
+            .expect("runtime object should be a value");
+
+        let ValueType::Object(fields) = &value.value else {
+            panic!("expected object value");
+        };
+        assert!(matches!(fields.get("name"), Some(ValueType::String(_))));
+        assert!(matches!(fields.get("stats"), Some(ValueType::Object(_))));
     }
 }

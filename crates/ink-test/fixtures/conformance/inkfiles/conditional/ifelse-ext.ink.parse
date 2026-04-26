@@ -1,8 +1,8 @@
 Story
   Weave(baseIndent=0)
-    VariableAssignment(name="x", global=true, temp=false)
+    VariableAssignment(name="x", global=true, temp=false, type=int)
       Number(-2)
-    VariableAssignment(name="y", global=true, temp=false)
+    VariableAssignment(name="y", global=true, temp=false, type=int)
       Number(3)
     ContentList
       Conditional

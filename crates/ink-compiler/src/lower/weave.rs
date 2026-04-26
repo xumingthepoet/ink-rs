@@ -6,7 +6,9 @@ use crate::parsed::{Choice, ContentList, Expression, Object, Weave};
 
 use super::context::ChoicePathMode;
 use super::expression::lower_expression_into;
-use super::indexes::{collect_counted_paths_in_weave, CountedFlowPaths, ExternalSignatures};
+use super::indexes::{
+    collect_counted_paths_in_weave, CountedFlowPaths, ExternalSignatures, StructDefinitions,
+};
 use super::path::{child_path, LabelIndex};
 use super::{
     done_container, ends_with_end_or_done, lower_object_into_with_context,
@@ -87,6 +89,7 @@ pub(super) fn lower_linear_weave(
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
+    struct_definitions: &StructDefinitions,
 ) -> Vec<RuntimeObject> {
     lower_linear_weave_with_context(
         weave,
@@ -94,6 +97,7 @@ pub(super) fn lower_linear_weave(
         global_variables,
         external_signatures,
         constants,
+        struct_definitions,
         &ChoicePathMode::Root,
     )
 }
@@ -104,6 +108,7 @@ fn lower_linear_weave_with_context(
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
+    struct_definitions: &StructDefinitions,
     path_mode: &ChoicePathMode,
 ) -> Vec<RuntimeObject> {
     let mut content = Vec::new();
@@ -114,6 +119,7 @@ fn lower_linear_weave_with_context(
         global_variables,
         external_signatures,
         constants,
+        struct_definitions,
         path_mode,
     );
     content
@@ -126,6 +132,7 @@ pub(super) fn lower_linear_weave_into_context(
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
+    struct_definitions: &StructDefinitions,
     path_mode: &ChoicePathMode,
 ) {
     let choice_labels = LabelIndex::new();
@@ -139,6 +146,7 @@ pub(super) fn lower_linear_weave_into_context(
             global_variables,
             external_signatures,
             constants,
+            struct_definitions,
         );
     }
 }
@@ -150,6 +158,7 @@ pub(super) fn lower_choice_weave(
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
+    struct_definitions: &StructDefinitions,
     count_all_visits: bool,
 ) -> Container {
     lower_choice_weave_with_initial_content(
@@ -159,6 +168,7 @@ pub(super) fn lower_choice_weave(
         global_variables,
         external_signatures,
         constants,
+        struct_definitions,
         count_all_visits,
         Vec::new(),
     )
@@ -171,6 +181,7 @@ pub(super) fn lower_choice_weave_with_initial_content(
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
+    struct_definitions: &StructDefinitions,
     count_all_visits: bool,
     initial_content: Vec<RuntimeObject>,
 ) -> Container {
@@ -213,6 +224,7 @@ pub(super) fn lower_choice_weave_with_initial_content(
             | Object::IncDec(_)
             | Object::VariableAssignment(_)
             | Object::ExternalDeclaration(_)
+            | Object::StructDeclaration(_)
             | Object::Return(_)
             | Object::Weave(_) => {
                 last_section_had_choice = lower_weave_section(
@@ -227,6 +239,7 @@ pub(super) fn lower_choice_weave_with_initial_content(
                     global_variables,
                     external_signatures,
                     constants,
+                    struct_definitions,
                     gather_count,
                     &current_path_mode,
                     &path_mode,
@@ -274,6 +287,7 @@ pub(super) fn lower_choice_weave_with_initial_content(
                     global_variables,
                     external_signatures,
                     constants,
+                    struct_definitions,
                     gather_count,
                     &gather_path_mode,
                     &path_mode,
@@ -346,6 +360,7 @@ pub(super) fn lower_choice_weave_with_initial_content(
                     global_variables,
                     external_signatures,
                     constants,
+                    struct_definitions,
                     gather_count,
                     &current_path_mode,
                     &path_mode,
@@ -401,6 +416,7 @@ fn lower_weave_section(
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
+    struct_definitions: &StructDefinitions,
     gather_count: usize,
     path_mode: &ChoicePathMode,
     weave_path_mode: &ChoicePathMode,
@@ -427,6 +443,7 @@ fn lower_weave_section(
             | Object::IncDec(_)
             | Object::VariableAssignment(_)
             | Object::ExternalDeclaration(_)
+            | Object::StructDeclaration(_)
             | Object::Return(_)
             | Object::Weave(_) => {
                 lower_object_into_with_context_count(
@@ -438,6 +455,7 @@ fn lower_weave_section(
                     global_variables,
                     external_signatures,
                     constants,
+                    struct_definitions,
                     count_all_visits,
                 );
                 *index += 1;
@@ -456,6 +474,7 @@ fn lower_weave_section(
                     global_variables,
                     external_signatures,
                     constants,
+                    struct_definitions,
                     gather_count,
                     path_mode,
                     weave_path_mode,
@@ -531,6 +550,7 @@ fn lower_choice_in_section(
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
+    struct_definitions: &StructDefinitions,
     gather_count: usize,
     path_mode: &ChoicePathMode,
     weave_path_mode: &ChoicePathMode,
@@ -561,6 +581,7 @@ fn lower_choice_in_section(
         global_variables,
         external_signatures,
         constants,
+        struct_definitions,
     ) {
         ChoiceOuter::Inline(objects) => content.extend(objects),
         ChoiceOuter::Nested(container) => content.push(RuntimeObject::Container(container)),
@@ -590,6 +611,7 @@ fn lower_choice_in_section(
         global_variables,
         external_signatures,
         constants,
+        struct_definitions,
     );
     let mut has_nested_weave_content = false;
 
@@ -610,6 +632,7 @@ fn lower_choice_in_section(
             global_variables,
             external_signatures,
             constants,
+            struct_definitions,
             count_all_visits,
         );
         *index += 1;
@@ -713,6 +736,7 @@ fn choice_outer(
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
+    struct_definitions: &StructDefinitions,
 ) -> ChoiceOuter {
     let mut outer_content = Vec::new();
     let has_eval_content = choice.has_start_content()
@@ -749,6 +773,7 @@ fn choice_outer(
             global_variables,
             external_signatures,
             constants,
+            struct_definitions,
         );
         outer_content.push(RuntimeObject::ControlCommand(ControlCommand::EndString));
     }
@@ -761,6 +786,7 @@ fn choice_outer(
             global_labels,
             external_signatures,
             constants,
+            struct_definitions,
             path_mode,
             choice.has_start_content(),
         );
@@ -790,6 +816,7 @@ fn choice_outer(
                 global_variables,
                 external_signatures,
                 constants,
+                struct_definitions,
             )
         })
         .unwrap_or_default();
@@ -836,6 +863,7 @@ fn lower_content_list_with_context(
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
+    struct_definitions: &StructDefinitions,
 ) -> Vec<RuntimeObject> {
     let mut content = Vec::new();
     lower_content_list_into_context(
@@ -847,6 +875,7 @@ fn lower_content_list_with_context(
         global_variables,
         external_signatures,
         constants,
+        struct_definitions,
     );
     content
 }
@@ -860,6 +889,7 @@ pub(super) fn lower_content_list_into_context(
     global_variables: &HashSet<String>,
     external_signatures: &ExternalSignatures,
     constants: &HashMap<String, Expression>,
+    struct_definitions: &StructDefinitions,
 ) {
     for object in content_list.objects() {
         lower_object_into_with_context(
@@ -871,6 +901,7 @@ pub(super) fn lower_content_list_into_context(
             global_variables,
             external_signatures,
             constants,
+            struct_definitions,
         );
     }
 }

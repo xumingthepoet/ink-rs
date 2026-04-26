@@ -1,4 +1,4 @@
-VAR name = "Name"
+VAR name: string = "Name"
 // Should add tag 'tag Name' to choice at runtime
 + [Choice #tag {name}]
 + [Choice2 #tag 1 {name} 2 3 4]

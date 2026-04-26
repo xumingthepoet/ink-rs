@@ -3,7 +3,7 @@
 // This is a test
 // X is set
 
-VAR x = ""
+VAR x: string = ""
 
 This is a test
 SET_X:

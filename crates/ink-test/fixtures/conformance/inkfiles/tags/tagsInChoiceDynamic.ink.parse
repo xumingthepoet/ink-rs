@@ -1,6 +1,6 @@
 Story
   Weave(baseIndent=0)
-    VariableAssignment(name="name", global=true, temp=false)
+    VariableAssignment(name="name", global=true, temp=false, type=string)
       String("Name")
     Choice(name=null, once=false, invisible=false, depth=1, inline=true)
       ContentList

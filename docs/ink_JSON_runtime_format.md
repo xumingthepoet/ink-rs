@@ -56,16 +56,28 @@ Values may also be used in logic/calculations, for example with the `int` and `f
 Supported types:
 
 * **string**: Represented with a leading `^` to differentiate from other string-based objects. e.g. `"^Hello world"` is used in JSON to represent the text `Hello world`, and `"^^ up there ^"` would be the text `^ up there ^`. No `^` is needed for a newline, so it's just `"\n"`.
-* **int** and **float**: these are represented using their standard JSON counterparts. e.g. `5`, `5.6`.
+* **int**, **float**, and **bool**: these are represented using their standard JSON counterparts. e.g. `5`, `5.6`, `true`.
+* **dynamic array value**: represented as a JSON array that is not a Container. A JSON array is parsed as a Container only when it has the Container terminator shape described above, such as a final `null` element or a final object containing Container metadata. Otherwise it is a value array. For example, `[1, 2.5, true, "^text", [3]]` is an array value containing an integer, float, boolean, string, and nested array.
+* **dynamic object/struct value**: represented as a JSON object whose fields are runtime values. For example:
+
+    ```json
+    {
+        "flags": [true, false],
+        "hp": 10,
+        "name": "^Ada"
+    }
+    ```
+
+    This represents an object value with `flags`, `hp`, and `name` fields. Static Ink source type names and field declarations are not serialized in story JSON or save JSON in this phase; only the runtime values are serialized.
 * **divert target**: represents a variable divert target, for example as used in the following ink:
 
-        VAR x = -> somewhere
+        -> somewhere
 
     Represented in runtime JSON as an object of the form: `{"^->": "path.to.target"}`
 
 * **variable pointer**: used for references to variables, for example when declaring a function with the following ink:
 
-        == function myFunction(ref x) ==
+        == function myFunction(ref x: int) -> void ==
 
     Represented in runtime JSON as an object of the form: `{"^var": "varname", "ci": 0}`. Where `ci` is "context index", with the following possible values:
 
@@ -101,9 +113,11 @@ Control commands are special instructions to the text engine to perform various 
 
 ## Native functions
 
-These are mathematical and logical functions that pop 1 or 2 arguments from the evaluation stack, evaluate the result, and push the result back onto the evaluation stack. The following operators are supported:
+These are mathematical, logical, and dynamic-value functions that pop arguments from the evaluation stack, evaluate the result, and push the result back onto the evaluation stack. The following operators are supported:
 
-`"+"`, `"-"`, `"/"`, `"*"`, `"%"` (mod), `"_"` (unary negate), `"=="`, `">"`, `"<"`, `">="`, `"<="`, `"!="`, `"!"` (unary 'not'), `"&&"`, `"||"`, `"MIN"`, `"MAX"`
+`"+"`, `"-"`, `"/"`, `"*"`, `"%"` (mod), `"_"` (unary negate), `"=="`, `">"`, `"<"`, `">="`, `"<="`, `"!="`, `"!"` (unary 'not'), `"&&"`, `"||"`, `"MIN"`, `"MAX"`, `"FIELD"`, `"INDEX"`, `"SET_FIELD"`, `"SET_INDEX"`, `"LEN"`, `"ARRAY_REMOVE"`
+
+`"FIELD"` and `"INDEX"` read object fields and array elements. `"SET_FIELD"` and `"SET_INDEX"` return updated object or array values; assignment instructions store the updated value back into the target variable. `"LEN"` returns an array length as an integer. `"ARRAY_REMOVE"` returns a copy of the array with the requested zero-based item removed; assignment lowering stores that updated array back into the source lvalue.
 
 Booleans are supported only in the C-style - i.e. as integers where non-zero is treated as "true" and zero as "false". The true result of a boolean operation is pushed to the evaluation stack as `1`.
 

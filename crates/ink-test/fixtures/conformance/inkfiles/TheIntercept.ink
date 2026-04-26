@@ -1,49 +1,49 @@
 // Character variables. We track just two, using a +/- scale
-VAR forceful = 0
-VAR evasive = 0
+VAR forceful: int = 0
+VAR evasive: int = 0
 
 
 // Inventory Items
-VAR teacup = false
-VAR gotcomponent = false
+VAR teacup: bool = false
+VAR gotcomponent: bool = false
 
 
 // Story states: these can be done using read counts of knots; or functions that collect up more complex logic; or variables
-VAR drugged = false
-VAR hooper_mentioned = false
+VAR drugged: bool = false
+VAR hooper_mentioned: bool = false
 
-VAR losttemper = false
-VAR admitblackmail = false
+VAR losttemper: bool = false
+VAR admitblackmail: bool = false
 
 // what kind of clue did we pass to Hooper?
 CONST NONE = 0
 CONST STRAIGHT = 1
 CONST CHESS = 2
 CONST CROSSWORD = 3
-VAR hooperClueType = NONE
+VAR hooperClueType: int = NONE
 
-VAR hooperConfessed = false
+VAR hooperConfessed: bool = false
 
 CONST SHOE = 1
 CONST BUCKET = 2
-VAR smashingWindowItem = NONE
+VAR smashingWindowItem: int = NONE
 
-VAR notraitor = false
-VAR revealedhooperasculprit = false
-VAR smashedglass = false
-VAR muddyshoes = false
+VAR notraitor: bool = false
+VAR revealedhooperasculprit: bool = false
+VAR smashedglass: bool = false
+VAR muddyshoes: bool = false
 
-VAR framedhooper = false
+VAR framedhooper: bool = false
 
 // What did you do with the component?
-VAR putcomponentintent = false
-VAR throwncomponentaway = false
-VAR piecereturned = false
-VAR longgrasshooperframe = false
+VAR putcomponentintent: bool = false
+VAR throwncomponentaway: bool = false
+VAR piecereturned: bool = false
+VAR longgrasshooperframe: bool = false
 
 
 // DEBUG mode adds a few shortcuts - remember to set to false in release!
-VAR DEBUG = false
+VAR DEBUG: bool = false
 {DEBUG:
 	IN DEBUG MODE!
 	*	[Beginning...]	-> start
@@ -59,10 +59,10 @@ VAR DEBUG = false
 --------------------------------------------------------------------------------*/
 
 
- === function lower(ref x)
+ === function lower(ref x: int) -> void
  	~ x = x - 1
 
- === function raise(ref x)
+ === function raise(ref x: int) -> void
  	~ x = x + 1
 
 /*--------------------------------------------------------------------------------
@@ -544,7 +544,7 @@ VAR DEBUG = false
 	//  So blackmail?
 	"This young man was blackmailing you over your affair?"
 
-	~ temp harris_thinks_youre_drugged = drugged
+	~ temp harris_thinks_youre_drugged: bool = drugged
 
 	 { drugged:
 	 	~ drugged = false
@@ -1059,7 +1059,7 @@ VAR DEBUG = false
 		 * [Say nothing] -> my_lips_are_sealed
 
 = find_something_to_smash_window
-	Let me see. There's the bunk, { not smashingWindowItem == BUCKET :a bucket,} nothing else. I have my jacket but nothing in the pockets — no handkerchief, for instance.
+		Let me see. There's the bunk, { smashingWindowItem != BUCKET :a bucket,} nothing else. I have my jacket but nothing in the pockets — no handkerchief, for instance.
 	- (opts)
 	*   [The bunk] 	
 		The bunk has a solid metal frame, a blanket, a pillow, nothing more.
@@ -1077,7 +1077,7 @@ VAR DEBUG = false
 
 	* [The jacket] 
 			I slip off my jacket and hold it with one hand over the glass. -> smash_the_window
-	* { not smashingWindowItem == BUCKET  }   [The bucket] 
+		* { smashingWindowItem != BUCKET  }   [The bucket] 
 	 		The bucket? Hardly. The bucket might do some good if I wanted to sweep up the glass afterwards, but it won't help me smash the glass quietly.
 		 	-> opts
 
@@ -1121,7 +1121,7 @@ VAR DEBUG = false
 			* * [Don't go] 
 				 	It's no good. That's only half a solution. I couldn't be happy with that.
 					* * * 	[Back to the barracks] 			-> return_to_room_after_excursion
-					* * * 	{ gotcomponent   && not go_to_hoopers_dorm  }  [To Hooper's dorm] -> go_to_hoopers_dorm
+						* * * 	{ gotcomponent   && READ_COUNT(-> go_to_hoopers_dorm) == 0  }  [To Hooper's dorm] -> go_to_hoopers_dorm
 
 
 /*--------------------------------------------------------------------------------

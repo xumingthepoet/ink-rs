@@ -1,4 +1,4 @@
-VAR x = 2 
+VAR x: int = 2
 # author: Joe
 # title: My Great Story
 This is the content

@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use serde_json::Value as JsonValue;
 
 use crate::{json, FormatError, INK_VERSION_CURRENT};
@@ -128,6 +130,8 @@ pub enum Object {
     Bool(bool),
     Int(i32),
     Float(f64),
+    ValueArray(Vec<Object>),
+    ValueObject(BTreeMap<String, Object>),
     Void,
     NativeFunction(String),
 }

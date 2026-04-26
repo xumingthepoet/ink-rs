@@ -114,4 +114,20 @@ mod tests {
         });
         assert!(has_sequence);
     }
+
+    #[test]
+    fn parses_multiline_sequence_after_struct_literal_expression_support() {
+        let output = parse(SourceInput::new("{ shuffle:\n- one\n- two\n}"));
+
+        assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
+        let story = output.artifact.expect("expected story");
+        let has_sequence = story.root_weave().content().iter().any(|object| {
+            matches!(
+                object,
+                Object::ContentList(content)
+                    if matches!(content.objects().first(), Some(Object::Sequence(_)))
+            )
+        });
+        assert!(has_sequence);
+    }
 }

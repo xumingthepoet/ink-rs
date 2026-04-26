@@ -27,3 +27,18 @@ stories, and assert diagnostics.
 - New behavior: ink-rs reports `DiagnosticCode::RemovedFeature`.
 - Reason: the current language direction favors variables, functions, or host
   data over carrying the legacy list declaration feature.
+
+### `typed/*.ink`
+
+- Intent: keep the Rust-first typed value language covered by small end-to-end
+  source fixtures.
+- Old behavior: upstream Ink accepted dynamically typed `VAR`, `temp`,
+  function, and external declarations and did not have source-level `STRUCT` or
+  `T[]` array declarations.
+- New behavior: ink-rs requires explicit typed value declarations, supports
+  structs, arrays, nested arrays, arrays of structs, typed functions, typed
+  externals, recursive equality, `LEN`, `ARRAY_REMOVE`, and direct self tail
+  recursion lowering.
+- Reason: these fixtures protect the supported typed language surface as user
+  examples and regression coverage, separately from legacy C# conformance
+  fixtures.

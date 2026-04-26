@@ -3,7 +3,7 @@ Story
     Text("A")
     Text("\n")
     ContentList
-      VariableAssignment(name="someTemp", global=false, temp=true)
+      VariableAssignment(name="someTemp", global=false, temp=true, type=string)
         FunctionCall(string, args=0)
       Text("\n")
     Text("B")

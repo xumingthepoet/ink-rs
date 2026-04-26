@@ -56,6 +56,32 @@ The full change history lives in `WritingWithInk-updates.md`. The upstream C#
 documentation snapshot lives in `WritingWithInk-origin.md` and should not be
 edited for ink-rs language changes.
 
+### Typed values are required for new value declarations
+
+- status: supported
+- upstream behavior: upstream Ink infers variable, temporary variable,
+  function, and external value shapes dynamically from runtime values.
+- ink-rs behavior: `VAR` and `temp` declarations require `name: Type`, function
+  parameters require `name: Type`, functions require `-> ReturnType`, and
+  `EXTERNAL` declarations require typed arguments and returns. Supported source
+  types are `int`, `float`, `bool`, `string`, user `STRUCT` types, arrays
+  written as `T[]`, nested arrays, and `void` return types for functions and
+  externals that do not return values.
+- ink-rs behavior: structs are declared with `STRUCT Name { field: Type }`,
+  object literals use `{ field: value }`, arrays use `[a, b]`, field access uses
+  `value.field`, and index access uses `array[index]`. Array and struct values
+  are copied by value and compare recursively with `==` and `!=`.
+- ink-rs behavior: `LEN(array)` returns `int`, `ARRAY_REMOVE(array, index)`
+  mutates an array and returns `void`, and direct self tail recursion in
+  `return current_function(...)` is lowered without growing the Ink function
+  callstack for that recursive step.
+- migration guidance: add explicit types to all `VAR`, `temp`, function, and
+  `EXTERNAL` declarations. Use direct diverts instead of storing divert targets
+  in variables; divert-target values are still accepted in the existing flow
+  APIs such as `TURNS_SINCE(-> knot)` and tunnel parameters.
+- tests: typed value behavior is covered by `crates/ink-test/tests/language.rs`
+  and the compiler, runtime, and JSON format unit tests.
+
 ### LIST declarations are removed
 
 - status: removed
@@ -832,23 +858,7 @@ A value of 0 means "was seen as part of the current chunk". A value of -1 means 
 	*	{TURNS_SINCE(-> sleeping.intro) > 10} You are feeling tired... -> sleeping
 	* 	{TURNS_SINCE(-> laugh) == 0}  You try to stop laughing.
 
-Note that the parameter passed to `TURNS_SINCE` is a "divert target", not simply the knot address itself (because the knot address is a number - the read count - not a location in the story...)
-
-TODO: (requirement of passing `-c` to the compiler)
-
-#### Sneak preview: using TURNS_SINCE in a function
-
-The `TURNS_SINCE(->x) == 0` test is so useful it's often worth wrapping it up as an ink function.
-
-	=== function came_from(-> x)
-		~ return TURNS_SINCE(x) == 0
-
-The section on [functions](#5-functions) outlines the syntax here a bit more clearly but the above allows you to say things like:
-
-	* {came_from(->  nice_welcome)} 'I'm happy to be here!'
-	* {came_from(->  nasty_welcome)} 'Let's keep this quick.'
-
-... and have the game react to content the player saw *just now*.
+Note that the parameter passed to `TURNS_SINCE` is a "divert target", not simply the knot address itself (because the knot address is a number - the read count - not a location in the story...). In ink-rs, divert-target values are accepted directly by builtins such as `TURNS_SINCE(-> nice_welcome)`, but they are not a typed source value that can be stored in `VAR` declarations or exposed through typed function signatures.
 
 ### SEED_RANDOM()
 
@@ -1262,7 +1272,7 @@ Note the level 2 gather point directly below the first option: there's nothing t
 
 So far we've made conditional text, and conditional choices, using tests based on what content the player has seen so far.
 
-**ink** also supports variables, both temporary and global, storing numerical and content data, or even story flow commands. It is fully-featured in terms of logic, and contains a few additional structures to help keep the often complex logic of a branching story better organised.
+**ink** also supports variables, both temporary and global, storing typed values such as numbers, booleans, strings, structs, and arrays. It is fully-featured in terms of logic, and contains a few additional structures to help keep the often complex logic of a branching story better organised.
 
 
 ## 1) Global Variables
@@ -1273,12 +1283,39 @@ This kind of variable is called "global" because it can be accessed from anywher
 
 ### Defining Global Variables
 
-Global variables can be defined anywhere, via a `VAR` statement. They should be given an initial value, which defines what type of variable they are - integer, floating point (decimal), content, or a story address.
+Global variables can be defined anywhere, via a `VAR` statement. In ink-rs, every `VAR` declaration must include an explicit type using `name: Type`. A declaration may include an initializer, or omit it to use the type's default value.
 
-	VAR knowledge_of_the_cure = false
-	VAR players_name = "Emilia"
-	VAR number_of_infected_people = 521
-	VAR current_epilogue = -> they_all_die_of_the_plague
+	VAR knowledge_of_the_cure: bool = false
+	VAR players_name: string = "Emilia"
+	VAR number_of_infected_people: int = 521
+	VAR infection_ratio: float = 0.25
+	VAR discovered_clues: string[] = ["ticket", "cipher"]
+	VAR unopened_doors: int[]
+
+The primitive source types are `int`, `float`, `bool`, and `string`. Array types are written as `T[]`, so `string[]` means an array of strings and `int[][]` means an array of integer arrays. Empty array literals are valid when the expected type is known, such as in `VAR unopened_doors: int[] = []`.
+
+### Structs and object values
+
+Story-specific value shapes can be declared with `STRUCT`. Struct fields also require explicit types.
+
+	STRUCT Stats {
+		hp: int
+		ready: bool
+	}
+
+	STRUCT Player {
+		name: string
+		stats: Stats
+	}
+
+	VAR current_player: Player = { name: "Ada", stats: { hp: 10, ready: true } }
+	VAR party: Player[] = [{ name: "Ada", stats: { hp: 10, ready: true } }, { name: "Bea", stats: { hp: 8, ready: false } }]
+
+Struct literals can omit fields; missing fields are filled from the field type's default value. Fields and array items can be read or assigned with normal logic lines:
+
+	{current_player.stats.hp}
+	~ current_player.stats.hp += 1
+	~ party[1].stats.hp += 1
 
 ### Using Global Variables
 
@@ -1289,16 +1326,14 @@ We can test global variables to control options, and provide conditional text, i
 		*	{ not knows_about_wager } 'But, Monsieur, why are we travelling?'[] I asked.
 		* 	{ knows_about_wager} I contemplated our strange adventure[]. Would it be possible?
 
-#### Advanced: storing diverts as variables
+#### Advanced: direct diverts instead of divert variables
 
-A "divert" statement is actually a type of value in itself, and can be stored, altered, and diverted to.
-
-	VAR 	current_epilogue = -> everybody_dies
+ink-rs does not expose divert targets as a typed `VAR` value in this phase. Use direct diverts, conditional branches, or host-side state when the destination needs to vary.
 
 	=== continue_or_quit ===
 	Give up now, or keep trying to save your Kingdom?
 	*  [Keep trying!] 	-> more_hopeless_introspection
-	*  [Give up] 		-> current_epilogue
+	*  [Give up] 		-> everybody_dies
 
 
 #### Advanced: Global variables are externally visible
@@ -1313,8 +1348,8 @@ The **ink** layer is often be a good place to store gameplay-variables; there's 
 
 The value of a variable can be printed as content using an inline syntax similar to sequences, and conditional text:
 
-	VAR friendly_name_of_player = "Jackie"
-	VAR age = 23
+	VAR friendly_name_of_player: string = "Jackie"
+	VAR age: int = 23
 
 	My name is Jean Passepartout, but my friends call me {friendly_name_of_player}. I'm {age} years old.
 
@@ -1324,7 +1359,7 @@ This can be useful in debugging. For more complex printing based on logic and va
 
 It might be noticed that above we refered to variables as being able to contain "content", rather than "strings". That was deliberate, because a string defined in ink can contain ink - although it will always evaluate to a string. (Yikes!)
 
-	VAR a_colour = ""
+	VAR a_colour: string = ""
 
 	~ a_colour = "{~red|blue|green|yellow}"
 
@@ -1340,7 +1375,7 @@ Note that once a piece of content like this is evaluated, its value is "sticky".
 
 This is also why
 
-	VAR a_colour = "{~red|blue|green|yellow}"
+	VAR a_colour: string = "{~red|blue|green|yellow}"
 
 is explicitly disallowed; it would be evaluated on the construction of the story, which probably isn't what you want.
 
@@ -1380,21 +1415,21 @@ If more complex operations are required, one can write functions (using recursio
 
 Ink can generate random integers if required using the RANDOM function. RANDOM is authored to be like a dice (yes, pendants, we said *a dice*), so the min and max values are both inclusive.
 
-	~ temp dice_roll = RANDOM(1, 6)
+	~ temp dice_roll: int = RANDOM(1, 6)
 
-	~ temp lazy_grading_for_test_paper = RANDOM(30, 75)
+	~ temp lazy_grading_for_test_paper: int = RANDOM(30, 75)
 
-	~ temp number_of_heads_the_serpent_has = RANDOM(3, 8)
+	~ temp number_of_heads_the_serpent_has: int = RANDOM(3, 8)
 
 The random number generator can be seeded for testing purposes, see the section of Game Queries and Functions section above.
 
-#### Advanced: numerical types are implicit
+#### Advanced: numeric results follow operand types
 
-Results of operations - in particular, for division - are typed based on the type of the input. So integer division returns integer, but floating point division returns floating point results.
+Results of operations - in particular, for division - are typed based on the type of the input. So integer division returns integer, but floating point division returns floating point results. Declarations still need explicit types.
 
-	~ x = 2 / 3
-	~ y = 7 / 3
-	~ z = 1.2 / 0.5
+	~ temp x: int = 2 / 3
+	~ temp y: int = 7 / 3
+	~ temp z: float = 1.2 / 0.5
 
 assigns `x` to be 0, `y` to be 2 and `z` to be 2.4.
 
@@ -1420,6 +1455,33 @@ The following all return true:
 	{ "Yes, please." == "Yes, please." }
 	{ "No, thank you." != "Yes, please." }
 	{ "Yes, please" ? "ease" }
+
+Strings of type `string` can also be concatenated with `+`.
+
+	VAR greeting: string = "Hello"
+	VAR name: string = "Ada"
+	{greeting + ", " + name + "!"}
+
+### Array builtins
+
+`LEN(array)` returns the current length of an array as an `int`.
+
+	VAR clues: string[] = ["ticket", "cipher", "key"]
+
+	{LEN(clues)} clues remain.
+
+`ARRAY_REMOVE(array, index)` removes the item at a zero-based index and returns `void`. It can be used in a logic line, or inline when you want the mutation to happen while printing no value.
+
+	~ ARRAY_REMOVE(clues, 1)
+	{clues[0]} and {clues[1]} remain.
+
+Arrays and structs compare by value, so equality checks recurse through nested arrays and fields.
+
+	VAR first_scores: int[] = [1, 2]
+	VAR second_scores: int[] = [1, 2]
+	{ first_scores == second_scores:
+		The scores match.
+	}
 
 
 ## 3) Conditional blocks (if/else)
@@ -1585,7 +1647,7 @@ There are two other versions of shuffle:
 Sometimes, a global variable is unwieldy. **ink** provides temporary variables for quick calculations of things.
 
 	=== near_north_pole ===
-		~ temp number_of_warm_things = 0
+		~ temp number_of_warm_things: int = 0
 		{ blanket:
 			~ number_of_warm_things++
 		}
@@ -1647,7 +1709,7 @@ Temporary variables are safe to use in recursion (unlike globals), so the follow
 
 #### Advanced: sending divert targets as parameters
 
-Knot/stitch addresses are a type of value, indicated by a `->` character, and can be stored and passed around. The following is therefore legal, and often useful:
+Knot/stitch addresses can be passed to knot and stitch parameters as divert targets, indicated by a `->` character. The following is therefore legal, and often useful:
 
 	=== sleeping_in_hut ===
 		You lie down and close your eyes.
@@ -1683,39 +1745,39 @@ A function:
 - cannot use diverts or offer choices
 - can call other functions
 - can include printed content
-- can return a value of any type
+- can return a value of any declared type
 - can recurse safely
 
 (Some of these may seem quite limiting, but for more story-oriented call-stack-style features, see the section on [Tunnels](#1-tunnels).)
 
-Return values are provided via the `~ return` statement.
+Function parameters must be declared with explicit types, and every function must declare a return type. Return values are provided via the `~ return` statement. Use `-> void` when a function performs an effect and does not return a value.
 
 ### Defining and calling functions
 
 To define a function, simply declare a knot to be one:
 
-	=== function say_yes_to_everything ===
+	=== function say_yes_to_everything() -> bool ===
 		~ return true
 
-	=== function lerp(a, b, k) ===
+	=== function lerp(a: float, b: float, k: float) -> float ===
 		~ return ((b - a) * k) + a
 
 Functions are called by name, and with brackets, even if they have no parameters:
 
-	~ x = lerp(2, 8, 0.3)
+	~ temp x: float = lerp(2.0, 8.0, 0.3)
 
 	*	{say_yes_to_everything()} 'Yes.'
 
 As in any other language, a function, once done, returns the flow to wherever it was called from - and despite not being allowed to divert the flow, functions can still call other functions.
 
-	=== function say_no_to_nothing ===
+	=== function say_no_to_nothing() -> bool ===
 		~ return say_yes_to_everything()
 
 ### Functions don't have to return anything
 
 A function does not need to have a return value, and can simply do something that is worth packaging up:
 
-	=== function harm(x) ===
+	=== function harm(x: int) -> void ===
 		{ stamina < x:
 			~ stamina = 0
 		- else:
@@ -1732,7 +1794,7 @@ Content is, by default, 'glued in', so the following:
 
 	Monsieur Fogg was looking {describe_health(health)}.
 
-	=== function describe_health(x) ===
+	=== function describe_health(x: int) -> string ===
 	{
 	- x == 100:
 		~ return "spritely"
@@ -1752,14 +1814,14 @@ produces:
 
 For instance, you might include:
 
-	=== function max(a,b) ===
+	=== function max(a: int, b: int) -> int ===
 		{ a < b:
 			~ return b
 		- else:
 			~ return a
 		}
 
-	=== function exp(x, e) ===
+	=== function exp(x: int, e: int) -> int ===
 		// returns x to the power e where e is an integer
 		{ e <= 0:
 			~ return 1
@@ -1780,7 +1842,7 @@ produces:
 
 The following example is long, but appears in pretty much every inkle game to date. (Recall that a hyphenated line inside multiline curly braces indicates either "a condition to test" or, if the curly brace began with a variable, "a value to compare against".)
 
-    === function print_num(x) ===
+    === function print_num(x: int) -> void ===
     {
         - x >= 1000:
             {print_num(x / 1000)} thousand { x mod 1000 > 0:{print_num(x mod 1000)}}
@@ -1832,7 +1894,7 @@ The following example is long, but appears in pretty much every inkle game to da
 
 which enables us to write things like:
 
-	~ price = 15
+	~ temp price: int = 15
 
 	I pulled out {print_num(price)} coins from my pocket and slowly counted them.
 	"Oh, never mind," the trader replied. "I'll take half." And she took {print_num(price / 2)}, and pushed the rest back over to me.
@@ -1845,7 +1907,7 @@ Function parameters can also be passed 'by reference', meaning that the function
 
 For instance, most **inkle** stories include the following:
 
-	=== function alter(ref x, k) ===
+	=== function alter(ref x: int, k: int) -> void ===
 		~ x = x + k
 
 Lines such as:
@@ -1882,7 +1944,7 @@ Sometimes, it's convenient to define constants to be strings, so you can print t
 	CONST POIROT = "Poirot"
 	CONST JAPP = "Japp"
 
-	VAR current_chief_suspect = HASTINGS
+	VAR current_chief_suspect: string = HASTINGS
 
 	=== review_evidence ===
 		{ found_japps_bloodied_glove:
@@ -1903,8 +1965,8 @@ And sometimes the numbers are useful in other ways:
 
 	CONST HELD_BY_AGENT = -1
 
-	VAR secret_agent_location = LOBBY
-	VAR suitcase_location = HALLWAY
+	VAR secret_agent_location: int = LOBBY
+	VAR suitcase_location: int = HALLWAY
 
 	=== report_progress ===
 	{
@@ -1921,7 +1983,20 @@ Constants are simply a way to allow you to give story states easy-to-understand 
 
 ## 7) Advanced: Game-side logic
 
-There are two core ways to provide game hooks in the **ink** engine. External function declarations in ink allow you to directly call C# functions in the game, and variable observers are callbacks that are fired in the game when ink variables are modified. Both of these are described in [Running your ink](RunningYourInk.md).
+There are two core ways to provide game hooks in the **ink** engine. External function declarations in ink allow you to directly call host functions in the game, and variable observers are callbacks that are fired in the game when ink variables are modified. Both of these are described in [Running your ink](RunningYourInk.md).
+
+In ink-rs, every `EXTERNAL` declaration needs a typed signature:
+
+	STRUCT Player {
+		hp: int
+	}
+
+	EXTERNAL next_score(value: int) -> int
+	EXTERNAL make_scores() -> int[]
+	EXTERNAL make_player() -> Player
+	EXTERNAL log_event(message: string) -> void
+
+External calls are type-checked like Ink function calls. Host return values must match the declared runtime shape: primitive values for primitive returns, arrays for `T[]`, and objects with matching fields for struct returns.
 
 # Part 4: Advanced Flow Control
 
@@ -2137,9 +2212,9 @@ But for games with lots of independent moving parts, threads quickly become esse
 	CONST HALLWAY = 1
 	CONST OFFICE = 2
 
-	VAR player_location = HALLWAY
-	VAR generals_location = HALLWAY
-	VAR doctors_location = OFFICE
+	VAR player_location: int = HALLWAY
+	VAR generals_location: int = HALLWAY
+	VAR doctors_location: int = OFFICE
 
 	== run_player_location
 		{

@@ -1,6 +1,6 @@
 Story
   Weave(baseIndent=0)
-    VariableAssignment(name="x", global=true, temp=false)
+    VariableAssignment(name="x", global=true, temp=false, type=int)
       Number(0)
     Divert(target="-> one", empty=false, tunnel=false, thread=false)
     Gather(name=null, depth=1)

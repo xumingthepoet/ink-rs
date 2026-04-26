@@ -11,7 +11,9 @@ mod rule;
 mod scan;
 mod sequence;
 mod state;
+mod structure;
 mod text;
+mod type_name;
 mod variable;
 mod weave;
 
@@ -220,10 +222,13 @@ mod tests {
         let Object::Choice(choice) = &story.root_weave().content()[0] else {
             panic!("expected choice");
         };
-        let Some(crate::parsed::Expression::VariableReference(name)) = choice.condition() else {
-            panic!("expected variable reference condition");
+        let Some(condition) = choice.condition() else {
+            panic!("expected choice condition");
         };
-        assert_eq!(name, "knot.stitch.label");
+        assert_eq!(
+            condition.dotted_path().as_deref(),
+            Some("knot.stitch.label")
+        );
     }
 
     #[test]
@@ -240,6 +245,33 @@ mod tests {
     }
 
     #[test]
+    fn parses_inline_choice_brackets_after_array_literal_support() {
+        let output = parse(SourceInput::new("* Start [choice text] inner"));
+        assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
+        let story = output.artifact.unwrap();
+
+        let Object::Choice(choice) = &story.root_weave().content()[0] else {
+            panic!("expected choice");
+        };
+        assert!(choice.has_weave_style_inline_brackets());
+        assert!(choice.has_choice_only_content());
+        assert_eq!(choice.choice_only_content().unwrap().objects().len(), 1);
+    }
+
+    #[test]
+    fn parses_inline_choice_brackets_after_index_access_support() {
+        let output = parse(SourceInput::new("* Open [the indexed door] now"));
+        assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
+        let story = output.artifact.unwrap();
+
+        let Object::Choice(choice) = &story.root_weave().content()[0] else {
+            panic!("expected choice");
+        };
+        assert!(choice.has_weave_style_inline_brackets());
+        assert!(choice.has_choice_only_content());
+    }
+
+    #[test]
     fn parses_inline_divert_in_text() {
         let output = parse(SourceInput::new("A line. -> END"));
         assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
@@ -247,6 +279,27 @@ mod tests {
 
         assert_eq!(story.root_weave().content().len(), 3);
         assert!(matches!(story.root_weave().content()[1], Object::Divert(_)));
+    }
+
+    #[test]
+    fn parses_field_access_in_output_expression() {
+        let output = parse(SourceInput::new("HP: {state.hp}."));
+        assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
+        let story = output.artifact.unwrap();
+
+        let has_field_access = story.root_weave().content().iter().any(|object| {
+            matches!(
+                object,
+                Object::ContentList(content)
+                    if content.objects().iter().any(|object| {
+                        matches!(
+                            object,
+                            Object::Expression(crate::parsed::Expression::FieldAccess { .. })
+                        )
+                    })
+            )
+        });
+        assert!(has_field_access);
     }
 
     #[test]
@@ -320,7 +373,7 @@ mod tests {
 
     #[test]
     fn parses_return_without_expression() {
-        let output = parse(SourceInput::new("=== function f() ===\n~ return"));
+        let output = parse(SourceInput::new("=== function f() -> void ===\n~ return"));
         assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
         let story = output.artifact.unwrap();
 

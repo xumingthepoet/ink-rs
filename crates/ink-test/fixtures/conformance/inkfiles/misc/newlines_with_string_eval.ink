@@ -1,9 +1,9 @@
 A
-~temp someTemp = string()
+~temp someTemp: string = string()
 B
 A
 {string()}
 B
-=== function string()
+=== function string() -> string
     ~ return "{3}"
 }
