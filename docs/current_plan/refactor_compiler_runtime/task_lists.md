@@ -1,4 +1,4 @@
-Progress: 6/24
+Progress: 7/24
 
 # Task List: Compiler And Runtime Refactor
 
@@ -359,7 +359,7 @@ Validation status:
 
 Commit: d1ccb1f306aff48c80db1b7faf5ac7fbddbe5a85
 
-### [ ] Task 07: Make Compiled Story Objects Use Typed Native Functions
+### [x] Task 07: Make Compiled Story Objects Use Typed Native Functions
 
 Goal:
 
@@ -401,9 +401,14 @@ Validation:
 - `cargo fmt --all --check`
 - `make gate`
 
-Validation status: pending.
+Validation status:
 
-Commit: pending.
+- `cargo test -p ink-story-json-format` passed.
+- `cargo test -p ink-runtime json` passed.
+- `cargo fmt --all --check` passed.
+- `make gate` passed.
+
+Commit: e23fe54819f3a0154284f294ad85e5059154de47
 
 ### [ ] Task 08: Update Compiler Lowering To Emit Typed Native Functions
 
