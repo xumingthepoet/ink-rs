@@ -1,5 +1,7 @@
 use std::{fmt, rc::Rc};
 
+use ink_story_json_format::NativeFunction;
+
 use crate::{
     object::{Object, RTObject},
     story_error::StoryError,
@@ -48,37 +50,6 @@ pub enum Op {
     ArrayRemove,
 }
 
-const ADD_NAME: &str = "+";
-const SUBTRACT_NAME: &str = "-";
-const DIVIDE_NAME: &str = "/";
-const MULTIPLY_NAME: &str = "*";
-const MOD_NAME: &str = "%";
-const NEGATE_NAME: &str = "_";
-const EQUAL_NAME: &str = "==";
-const GREATER_NAME: &str = ">";
-const LESS_NAME: &str = "<";
-const GREATER_THAN_OR_EQUALS_NAME: &str = ">=";
-const LESS_THAN_OR_EQUALS_NAME: &str = "<=";
-const NOT_EQUALS_NAME: &str = "!=";
-const NOT_NAME: &str = "!";
-const AND_NAME: &str = "&&";
-const OR_NAME: &str = "||";
-const MIN_NAME: &str = "MIN";
-const MAX_NAME: &str = "MAX";
-const POW_NAME: &str = "POW";
-const FLOOR_NAME: &str = "FLOOR";
-const CEILING_NAME: &str = "CEILING";
-const INT_NAME: &str = "INT";
-const FLOAT_NAME: &str = "FLOAT";
-const HAS_NAME: &str = "?";
-const HASNT_NAME: &str = "!?";
-const FIELD_READ_NAME: &str = "FIELD";
-const INDEX_READ_NAME: &str = "INDEX";
-const FIELD_WRITE_NAME: &str = "SET_FIELD";
-const INDEX_WRITE_NAME: &str = "SET_INDEX";
-const LEN_NAME: &str = "LEN";
-const ARRAY_REMOVE_NAME: &str = "ARRAY_REMOVE";
-
 pub struct NativeFunctionCall {
     obj: Object,
     pub op: Op,
@@ -92,74 +63,85 @@ impl NativeFunctionCall {
         }
     }
 
-    pub fn new_from_name(name: &str) -> Option<Self> {
-        match name {
-            ADD_NAME => Some(Self::new(Op::Add)),
-            SUBTRACT_NAME => Some(Self::new(Op::Subtract)),
-            DIVIDE_NAME => Some(Self::new(Op::Divide)),
-            MULTIPLY_NAME => Some(Self::new(Op::Multiply)),
-            MOD_NAME => Some(Self::new(Op::Mod)),
-            NEGATE_NAME => Some(Self::new(Op::Negate)),
-            EQUAL_NAME => Some(Self::new(Op::Equal)),
-            GREATER_NAME => Some(Self::new(Op::Greater)),
-            LESS_NAME => Some(Self::new(Op::Less)),
-            GREATER_THAN_OR_EQUALS_NAME => Some(Self::new(Op::GreaterThanOrEquals)),
-            LESS_THAN_OR_EQUALS_NAME => Some(Self::new(Op::LessThanOrEquals)),
-            NOT_EQUALS_NAME => Some(Self::new(Op::NotEquals)),
-            NOT_NAME => Some(Self::new(Op::Not)),
-            AND_NAME => Some(Self::new(Op::And)),
-            OR_NAME => Some(Self::new(Op::Or)),
-            MIN_NAME => Some(Self::new(Op::Min)),
-            MAX_NAME => Some(Self::new(Op::Max)),
-            POW_NAME => Some(Self::new(Op::Pow)),
-            FLOOR_NAME => Some(Self::new(Op::Floor)),
-            CEILING_NAME => Some(Self::new(Op::Ceiling)),
-            INT_NAME => Some(Self::new(Op::Int)),
-            FLOAT_NAME => Some(Self::new(Op::Float)),
-            HAS_NAME => Some(Self::new(Op::Has)),
-            HASNT_NAME => Some(Self::new(Op::Hasnt)),
-            FIELD_READ_NAME => Some(Self::new(Op::FieldRead)),
-            INDEX_READ_NAME => Some(Self::new(Op::IndexRead)),
-            FIELD_WRITE_NAME => Some(Self::new(Op::FieldWrite)),
-            INDEX_WRITE_NAME => Some(Self::new(Op::IndexWrite)),
-            LEN_NAME => Some(Self::new(Op::Len)),
-            ARRAY_REMOVE_NAME => Some(Self::new(Op::ArrayRemove)),
-            _ => None,
-        }
+    pub fn new_from_format(function: NativeFunction) -> Self {
+        Self::new(Self::op_from_format(function))
     }
 
     pub fn get_name(op: Op) -> String {
+        Self::format_function_for_op(op).token().to_owned()
+    }
+
+    pub fn format_function(&self) -> NativeFunction {
+        Self::format_function_for_op(self.op)
+    }
+
+    fn op_from_format(function: NativeFunction) -> Op {
+        match function {
+            NativeFunction::Add => Op::Add,
+            NativeFunction::Subtract => Op::Subtract,
+            NativeFunction::Divide => Op::Divide,
+            NativeFunction::Multiply => Op::Multiply,
+            NativeFunction::Mod => Op::Mod,
+            NativeFunction::Negate => Op::Negate,
+            NativeFunction::Equal => Op::Equal,
+            NativeFunction::Greater => Op::Greater,
+            NativeFunction::Less => Op::Less,
+            NativeFunction::GreaterThanOrEquals => Op::GreaterThanOrEquals,
+            NativeFunction::LessThanOrEquals => Op::LessThanOrEquals,
+            NativeFunction::NotEquals => Op::NotEquals,
+            NativeFunction::Not => Op::Not,
+            NativeFunction::And => Op::And,
+            NativeFunction::Or => Op::Or,
+            NativeFunction::Min => Op::Min,
+            NativeFunction::Max => Op::Max,
+            NativeFunction::Pow => Op::Pow,
+            NativeFunction::Floor => Op::Floor,
+            NativeFunction::Ceiling => Op::Ceiling,
+            NativeFunction::Int => Op::Int,
+            NativeFunction::Float => Op::Float,
+            NativeFunction::Has => Op::Has,
+            NativeFunction::Hasnt => Op::Hasnt,
+            NativeFunction::FieldRead => Op::FieldRead,
+            NativeFunction::IndexRead => Op::IndexRead,
+            NativeFunction::FieldWrite => Op::FieldWrite,
+            NativeFunction::IndexWrite => Op::IndexWrite,
+            NativeFunction::Len => Op::Len,
+            NativeFunction::ArrayRemove => Op::ArrayRemove,
+        }
+    }
+
+    fn format_function_for_op(op: Op) -> NativeFunction {
         match op {
-            Op::Add => ADD_NAME.to_owned(),
-            Op::Subtract => SUBTRACT_NAME.to_owned(),
-            Op::Divide => DIVIDE_NAME.to_owned(),
-            Op::Multiply => MULTIPLY_NAME.to_owned(),
-            Op::Mod => MOD_NAME.to_owned(),
-            Op::Negate => NEGATE_NAME.to_owned(),
-            Op::Equal => EQUAL_NAME.to_owned(),
-            Op::Greater => GREATER_NAME.to_owned(),
-            Op::Less => LESS_NAME.to_owned(),
-            Op::GreaterThanOrEquals => GREATER_THAN_OR_EQUALS_NAME.to_owned(),
-            Op::LessThanOrEquals => LESS_THAN_OR_EQUALS_NAME.to_owned(),
-            Op::NotEquals => NOT_EQUALS_NAME.to_owned(),
-            Op::Not => NOT_NAME.to_owned(),
-            Op::And => AND_NAME.to_owned(),
-            Op::Or => OR_NAME.to_owned(),
-            Op::Min => MIN_NAME.to_owned(),
-            Op::Max => MAX_NAME.to_owned(),
-            Op::Pow => POW_NAME.to_owned(),
-            Op::Floor => FLOOR_NAME.to_owned(),
-            Op::Ceiling => CEILING_NAME.to_owned(),
-            Op::Int => INT_NAME.to_owned(),
-            Op::Float => FLOAT_NAME.to_owned(),
-            Op::Has => HAS_NAME.to_owned(),
-            Op::Hasnt => HASNT_NAME.to_owned(),
-            Op::FieldRead => FIELD_READ_NAME.to_owned(),
-            Op::IndexRead => INDEX_READ_NAME.to_owned(),
-            Op::FieldWrite => FIELD_WRITE_NAME.to_owned(),
-            Op::IndexWrite => INDEX_WRITE_NAME.to_owned(),
-            Op::Len => LEN_NAME.to_owned(),
-            Op::ArrayRemove => ARRAY_REMOVE_NAME.to_owned(),
+            Op::Add => NativeFunction::Add,
+            Op::Subtract => NativeFunction::Subtract,
+            Op::Divide => NativeFunction::Divide,
+            Op::Multiply => NativeFunction::Multiply,
+            Op::Mod => NativeFunction::Mod,
+            Op::Negate => NativeFunction::Negate,
+            Op::Equal => NativeFunction::Equal,
+            Op::Greater => NativeFunction::Greater,
+            Op::Less => NativeFunction::Less,
+            Op::GreaterThanOrEquals => NativeFunction::GreaterThanOrEquals,
+            Op::LessThanOrEquals => NativeFunction::LessThanOrEquals,
+            Op::NotEquals => NativeFunction::NotEquals,
+            Op::Not => NativeFunction::Not,
+            Op::And => NativeFunction::And,
+            Op::Or => NativeFunction::Or,
+            Op::Min => NativeFunction::Min,
+            Op::Max => NativeFunction::Max,
+            Op::Pow => NativeFunction::Pow,
+            Op::Floor => NativeFunction::Floor,
+            Op::Ceiling => NativeFunction::Ceiling,
+            Op::Int => NativeFunction::Int,
+            Op::Float => NativeFunction::Float,
+            Op::Has => NativeFunction::Has,
+            Op::Hasnt => NativeFunction::Hasnt,
+            Op::FieldRead => NativeFunction::FieldRead,
+            Op::IndexRead => NativeFunction::IndexRead,
+            Op::FieldWrite => NativeFunction::FieldWrite,
+            Op::IndexWrite => NativeFunction::IndexWrite,
+            Op::Len => NativeFunction::Len,
+            Op::ArrayRemove => NativeFunction::ArrayRemove,
         }
     }
 
@@ -1135,6 +1117,8 @@ impl fmt::Display for NativeFunctionCall {
 mod tests {
     use std::{collections::BTreeMap, rc::Rc};
 
+    use ink_story_json_format::NativeFunction;
+
     use crate::{object::RTObject, value::Value, value_type::ValueType};
 
     use super::{NativeFunctionCall, Op};
@@ -1161,6 +1145,50 @@ mod tests {
 
     fn string_value(value: &str) -> Rc<dyn RTObject> {
         Rc::new(Value::new::<&str>(value))
+    }
+
+    #[test]
+    fn maps_format_native_functions_to_runtime_ops_and_back() {
+        let cases = [
+            (NativeFunction::Add, Op::Add),
+            (NativeFunction::Subtract, Op::Subtract),
+            (NativeFunction::Divide, Op::Divide),
+            (NativeFunction::Multiply, Op::Multiply),
+            (NativeFunction::Mod, Op::Mod),
+            (NativeFunction::Negate, Op::Negate),
+            (NativeFunction::Equal, Op::Equal),
+            (NativeFunction::Greater, Op::Greater),
+            (NativeFunction::Less, Op::Less),
+            (NativeFunction::GreaterThanOrEquals, Op::GreaterThanOrEquals),
+            (NativeFunction::LessThanOrEquals, Op::LessThanOrEquals),
+            (NativeFunction::NotEquals, Op::NotEquals),
+            (NativeFunction::Not, Op::Not),
+            (NativeFunction::And, Op::And),
+            (NativeFunction::Or, Op::Or),
+            (NativeFunction::Min, Op::Min),
+            (NativeFunction::Max, Op::Max),
+            (NativeFunction::Pow, Op::Pow),
+            (NativeFunction::Floor, Op::Floor),
+            (NativeFunction::Ceiling, Op::Ceiling),
+            (NativeFunction::Int, Op::Int),
+            (NativeFunction::Float, Op::Float),
+            (NativeFunction::Has, Op::Has),
+            (NativeFunction::Hasnt, Op::Hasnt),
+            (NativeFunction::FieldRead, Op::FieldRead),
+            (NativeFunction::IndexRead, Op::IndexRead),
+            (NativeFunction::FieldWrite, Op::FieldWrite),
+            (NativeFunction::IndexWrite, Op::IndexWrite),
+            (NativeFunction::Len, Op::Len),
+            (NativeFunction::ArrayRemove, Op::ArrayRemove),
+        ];
+
+        assert_eq!(cases.len(), NativeFunction::ALL.len());
+        for (function, op) in cases {
+            let runtime_function = NativeFunctionCall::new_from_format(function);
+            assert_eq!(runtime_function.op, op);
+            assert_eq!(runtime_function.format_function(), function);
+            assert_eq!(NativeFunctionCall::get_name(op), function.token());
+        }
     }
 
     fn object_value_type(fields: Vec<(&str, ValueType)>) -> ValueType {

@@ -77,12 +77,7 @@ fn format_object_to_runtime(object: &format::Object) -> Result<Rc<dyn RTObject>,
                 })
         }
         format::Object::NativeFunction(function) => {
-            let token = function.token();
-            NativeFunctionCall::new_from_name(token)
-                .map(|function| Rc::new(function) as Rc<dyn RTObject>)
-                .ok_or_else(|| {
-                    StoryError::BadJson(format!("Unsupported native function token: {token}"))
-                })
+            Ok(Rc::new(NativeFunctionCall::new_from_format(*function)))
         }
         format::Object::Divert { target, variable } => {
             Ok(Rc::new(format_divert_to_runtime(format::Object::Divert {
@@ -346,6 +341,7 @@ pub(crate) fn jobject_to_hashmap_values(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::native_function_call::{NativeFunctionCall, Op};
     use serde_json::json;
 
     #[test]
@@ -367,6 +363,33 @@ mod tests {
         assert!(error
             .to_string()
             .contains("Story JSON format version mismatch"));
+    }
+
+    #[test]
+    fn loads_native_function_tokens_as_runtime_calls() {
+        let json = r#"{"inkVersion":1,"root":["LEN","done",null]}"#;
+
+        let root = load_from_string(json).expect("story JSON should load");
+        let function = root.content[0]
+            .as_any()
+            .downcast_ref::<NativeFunctionCall>()
+            .expect("first root object should be a native function");
+
+        assert_eq!(function.op, Op::Len);
+    }
+
+    #[test]
+    fn rejects_unknown_native_function_tokens_from_story_json() {
+        let json = r#"{"inkVersion":1,"root":["UNKNOWN_NATIVE",null]}"#;
+
+        let error = match load_from_string(json) {
+            Ok(_) => panic!("expected unsupported native token"),
+            Err(error) => error,
+        };
+
+        assert!(error
+            .to_string()
+            .contains("unsupported native function token: UNKNOWN_NATIVE"));
     }
 
     #[test]

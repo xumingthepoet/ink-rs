@@ -100,11 +100,7 @@ pub fn write_rtobject(o: Rc<dyn RTObject>) -> Result<serde_json::Value, StoryErr
     }
 
     if let Some(f) = o.as_any().downcast_ref::<NativeFunctionCall>() {
-        let token = NativeFunctionCall::get_name(f.op);
-        let function = format::NativeFunction::from_token(&token).ok_or_else(|| {
-            StoryError::BadJson(format!("Unsupported native function token: {token}"))
-        })?;
-        return Ok(format::Object::NativeFunction(function).to_json_value());
+        return Ok(format::Object::NativeFunction(f.format_function()).to_json_value());
     }
 
     if let Ok(var_ref) = o.clone().into_any().downcast::<VariableReference>() {
@@ -257,4 +253,21 @@ fn write_choice_tags(choice: &Choice) -> serde_json::Value {
     }
 
     serde_json::Value::Array(tags)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::native_function_call::{NativeFunctionCall, Op};
+
+    #[test]
+    fn writes_native_function_calls_through_format_native_functions() {
+        let object: Rc<dyn RTObject> = Rc::new(NativeFunctionCall::new(Op::Len));
+
+        assert_eq!(write_rtobject(object.clone()).unwrap(), json!("LEN"));
+        assert_eq!(
+            runtime_object_to_format_object(object).unwrap(),
+            format::Object::NativeFunction(format::NativeFunction::Len)
+        );
+    }
 }
