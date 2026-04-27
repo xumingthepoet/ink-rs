@@ -1,4 +1,4 @@
-Progress: 12/24
+Progress: 13/24
 
 # Task List: Compiler And Runtime Refactor
 
@@ -687,7 +687,7 @@ Commit:
 - Implementation: fe81e292ddd8dc8f8ff601e0f33d536c87f0d4c7
 - Review fix: 8b735051beb5a1d7aa27bcffc9218e6f4e66a503
 
-### [ ] Task 13: Extract Entry Point And Mixed Root Diagnostics
+### [x] Task 13: Extract Entry Point And Mixed Root Diagnostics
 
 Goal:
 
@@ -728,9 +728,19 @@ Validation:
 - `cargo fmt --all --check`
 - `make gate`
 
-Validation status: pending.
+Validation status:
 
-Commit: pending.
+- `cargo test -p ink-compiler analysis::modules` passed before implementation
+  commit.
+- `cargo test -p ink-test --test language module` passed before implementation
+  commit.
+- `cargo fmt --all --check` passed before implementation commit.
+- `make gate` passed before implementation commit.
+
+Review status: passed after reviewing the implementation commit and rerunning
+validation.
+
+Commit: 5e75bb61cadf156a5a7027a50bd534db7953d28e
 
 ### [ ] Task 14: Share Module Analysis Indexes Across Diagnostics And CheckedStory
 
