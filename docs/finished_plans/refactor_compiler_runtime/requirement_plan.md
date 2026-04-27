@@ -1,7 +1,7 @@
 # Compiler And Runtime Refactor Requirement Plan
 
-Status: active preparation plan created on 2026-04-27 from current repository
-inspection after module support landed.
+Status: completed on 2026-04-27 after full validation. Created on 2026-04-27
+from current repository inspection after module support landed.
 
 Keep detailed implementation sequencing in `task_lists.md`.
 
@@ -131,4 +131,3 @@ Focused checks should prefer:
 - `cargo test -p ink-test --test language module`
 - `cargo test -p ink-runtime json`
 - `cargo test -p ink-runtime native_function_call`
-

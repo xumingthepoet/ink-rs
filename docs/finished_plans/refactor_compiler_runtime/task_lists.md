@@ -1268,7 +1268,7 @@ validation.
 
 Commit: f52ef639c145f924ea3aa41500c0461dab7fdd7b
 
-### [ ] Task 24: Final Compatibility Validation And Plan Closeout
+### [>] Task 24: Final Compatibility Validation And Plan Closeout
 
 Goal:
 
@@ -1309,6 +1309,13 @@ Validation:
 - `cargo test -p ink-test --features csharp-tests --test csharp_tests`
 - `make gate`
 
-Validation status: pending.
+Validation status:
+
+- `cargo fmt --all --check` passed before closeout commit.
+- `cargo check --workspace` passed before closeout commit.
+- `cargo test --workspace` passed before closeout commit.
+- `cargo test -p ink-test --features csharp-tests --test csharp_tests`
+  passed before closeout commit.
+- `make gate` passed before closeout commit.
 
 Commit: pending.
