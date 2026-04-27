@@ -2,6 +2,9 @@ use std::{fmt, rc::Rc};
 
 use ink_story_json_format::NativeFunction;
 
+mod metadata;
+pub use metadata::Op;
+
 use crate::{
     object::{Object, RTObject},
     story_error::StoryError,
@@ -9,46 +12,6 @@ use crate::{
     value_type::ValueType,
     void::Void,
 };
-
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub enum Op {
-    Add,
-    Subtract,
-    Divide,
-    Multiply,
-    Mod,
-    Negate,
-
-    Equal,
-    Greater,
-    Less,
-    GreaterThanOrEquals,
-    LessThanOrEquals,
-    NotEquals,
-    Not,
-
-    And,
-    Or,
-
-    Min,
-    Max,
-
-    Pow,
-    Floor,
-    Ceiling,
-    Int,
-    Float,
-
-    Has,
-    Hasnt,
-
-    FieldRead,
-    IndexRead,
-    FieldWrite,
-    IndexWrite,
-    Len,
-    ArrayRemove,
-}
 
 pub struct NativeFunctionCall {
     obj: Object,
@@ -64,120 +27,24 @@ impl NativeFunctionCall {
     }
 
     pub fn new_from_format(function: NativeFunction) -> Self {
-        Self::new(Self::op_from_format(function))
+        Self::new_from_name(function.token())
+            .expect("format native function token should map to a runtime operation")
+    }
+
+    pub fn new_from_name(name: &str) -> Option<Self> {
+        NativeFunction::from_token(name).map(|function| Self::new(Op::from_format(function)))
     }
 
     pub fn get_name(op: Op) -> String {
-        Self::format_function_for_op(op).token().to_owned()
+        op.token().to_owned()
     }
 
     pub fn format_function(&self) -> NativeFunction {
-        Self::format_function_for_op(self.op)
-    }
-
-    fn op_from_format(function: NativeFunction) -> Op {
-        match function {
-            NativeFunction::Add => Op::Add,
-            NativeFunction::Subtract => Op::Subtract,
-            NativeFunction::Divide => Op::Divide,
-            NativeFunction::Multiply => Op::Multiply,
-            NativeFunction::Mod => Op::Mod,
-            NativeFunction::Negate => Op::Negate,
-            NativeFunction::Equal => Op::Equal,
-            NativeFunction::Greater => Op::Greater,
-            NativeFunction::Less => Op::Less,
-            NativeFunction::GreaterThanOrEquals => Op::GreaterThanOrEquals,
-            NativeFunction::LessThanOrEquals => Op::LessThanOrEquals,
-            NativeFunction::NotEquals => Op::NotEquals,
-            NativeFunction::Not => Op::Not,
-            NativeFunction::And => Op::And,
-            NativeFunction::Or => Op::Or,
-            NativeFunction::Min => Op::Min,
-            NativeFunction::Max => Op::Max,
-            NativeFunction::Pow => Op::Pow,
-            NativeFunction::Floor => Op::Floor,
-            NativeFunction::Ceiling => Op::Ceiling,
-            NativeFunction::Int => Op::Int,
-            NativeFunction::Float => Op::Float,
-            NativeFunction::Has => Op::Has,
-            NativeFunction::Hasnt => Op::Hasnt,
-            NativeFunction::FieldRead => Op::FieldRead,
-            NativeFunction::IndexRead => Op::IndexRead,
-            NativeFunction::FieldWrite => Op::FieldWrite,
-            NativeFunction::IndexWrite => Op::IndexWrite,
-            NativeFunction::Len => Op::Len,
-            NativeFunction::ArrayRemove => Op::ArrayRemove,
-        }
-    }
-
-    fn format_function_for_op(op: Op) -> NativeFunction {
-        match op {
-            Op::Add => NativeFunction::Add,
-            Op::Subtract => NativeFunction::Subtract,
-            Op::Divide => NativeFunction::Divide,
-            Op::Multiply => NativeFunction::Multiply,
-            Op::Mod => NativeFunction::Mod,
-            Op::Negate => NativeFunction::Negate,
-            Op::Equal => NativeFunction::Equal,
-            Op::Greater => NativeFunction::Greater,
-            Op::Less => NativeFunction::Less,
-            Op::GreaterThanOrEquals => NativeFunction::GreaterThanOrEquals,
-            Op::LessThanOrEquals => NativeFunction::LessThanOrEquals,
-            Op::NotEquals => NativeFunction::NotEquals,
-            Op::Not => NativeFunction::Not,
-            Op::And => NativeFunction::And,
-            Op::Or => NativeFunction::Or,
-            Op::Min => NativeFunction::Min,
-            Op::Max => NativeFunction::Max,
-            Op::Pow => NativeFunction::Pow,
-            Op::Floor => NativeFunction::Floor,
-            Op::Ceiling => NativeFunction::Ceiling,
-            Op::Int => NativeFunction::Int,
-            Op::Float => NativeFunction::Float,
-            Op::Has => NativeFunction::Has,
-            Op::Hasnt => NativeFunction::Hasnt,
-            Op::FieldRead => NativeFunction::FieldRead,
-            Op::IndexRead => NativeFunction::IndexRead,
-            Op::FieldWrite => NativeFunction::FieldWrite,
-            Op::IndexWrite => NativeFunction::IndexWrite,
-            Op::Len => NativeFunction::Len,
-            Op::ArrayRemove => NativeFunction::ArrayRemove,
-        }
+        self.op.format_function()
     }
 
     pub fn get_number_of_parameters(&self) -> usize {
-        match self.op {
-            Op::Add => 2,
-            Op::Subtract => 2,
-            Op::Divide => 2,
-            Op::Multiply => 2,
-            Op::Mod => 2,
-            Op::Negate => 1,
-            Op::Equal => 2,
-            Op::Greater => 2,
-            Op::Less => 2,
-            Op::GreaterThanOrEquals => 2,
-            Op::LessThanOrEquals => 2,
-            Op::NotEquals => 2,
-            Op::Not => 1,
-            Op::And => 2,
-            Op::Or => 2,
-            Op::Min => 2,
-            Op::Max => 2,
-            Op::Pow => 2,
-            Op::Floor => 1,
-            Op::Ceiling => 1,
-            Op::Int => 1,
-            Op::Float => 1,
-            Op::Has => 2,
-            Op::Hasnt => 2,
-            Op::FieldRead => 2,
-            Op::IndexRead => 2,
-            Op::FieldWrite => 3,
-            Op::IndexWrite => 3,
-            Op::Len => 1,
-            Op::ArrayRemove => 2,
-        }
+        self.op.arity()
     }
 
     pub(crate) fn call(
@@ -1188,6 +1055,14 @@ mod tests {
             assert_eq!(runtime_function.op, op);
             assert_eq!(runtime_function.format_function(), function);
             assert_eq!(NativeFunctionCall::get_name(op), function.token());
+            assert_eq!(
+                NativeFunctionCall::new_from_name(function.token()).map(|call| call.op),
+                Some(op)
+            );
+            assert_eq!(
+                runtime_function.get_number_of_parameters(),
+                function.arity()
+            );
         }
     }
 
