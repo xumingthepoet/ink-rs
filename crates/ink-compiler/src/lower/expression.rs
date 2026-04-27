@@ -84,10 +84,8 @@ fn lower_expression_into_with_constants(
         }
         Expression::StringContent(string_content) => {
             content.push(RuntimeObject::ControlCommand(ControlCommand::BeginString));
-            lower_content_list_into_context(
-                content,
-                string_content,
-                path_mode,
+            let context = LoweringContext::new(
+                path_mode.clone(),
                 choice_labels,
                 global_labels,
                 global_variables,
@@ -95,6 +93,7 @@ fn lower_expression_into_with_constants(
                 constants,
                 struct_definitions,
             );
+            lower_content_list_into_context(content, string_content, &context);
             content.push(RuntimeObject::ControlCommand(ControlCommand::EndString));
         }
         Expression::NumberInt(value) => content.push(RuntimeObject::Int(*value)),

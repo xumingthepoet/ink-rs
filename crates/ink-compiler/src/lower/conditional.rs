@@ -1,40 +1,22 @@
-use std::collections::HashSet;
-
 use ink_story_json_format::{Container, ControlCommand, Object as RuntimeObject};
 
 use crate::parsed::Conditional;
 
-use super::context::{ChoicePathMode, LoweringContext};
+use super::context::LoweringContext;
 use super::expression::lower_expression_into;
-use super::indexes::{ConstantValues, ExternalSignatures, StructDefinitions};
 use super::lower_object_into_with_context;
-use super::path::LabelIndex;
 use super::weave::{lower_choice_weave_with_initial_content, weave_has_choice};
 use super::{named_container, named_content};
 
 pub(super) fn lower_conditional_into(
     content: &mut Vec<RuntimeObject>,
     conditional: &Conditional,
-    choice_labels: &LabelIndex,
-    global_labels: &LabelIndex,
-    global_variables: &HashSet<String>,
-    external_signatures: &ExternalSignatures,
-    constants: &ConstantValues,
-    struct_definitions: &StructDefinitions,
-    path_mode: &ChoicePathMode,
+    context: &LoweringContext<'_>,
 ) {
-    let lowering_context = LoweringContext::new(
-        path_mode.clone(),
-        choice_labels,
-        global_labels,
-        global_variables,
-        external_signatures,
-        constants,
-        struct_definitions,
-    );
+    let path_mode = context.path_mode();
     if let Some(condition) = conditional.initial_condition() {
         content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
-        lower_expression_into(content, condition, &lowering_context, false);
+        lower_expression_into(content, condition, context, false);
         content.push(RuntimeObject::ControlCommand(ControlCommand::EvalEnd));
     }
 
@@ -68,7 +50,7 @@ pub(super) fn lower_conditional_into(
                 branch_content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
             }
             if let Some(condition) = branch.own_condition() {
-                lower_expression_into(&mut branch_content, condition, &lowering_context, false);
+                lower_expression_into(&mut branch_content, condition, context, false);
             }
             if switch_like {
                 branch_content.push(RuntimeObject::NativeFunction("==".to_string()));
@@ -106,12 +88,7 @@ pub(super) fn lower_conditional_into(
             };
             let lowered_branch = lower_choice_weave_with_initial_content(
                 branch.content(),
-                branch_path_mode,
-                global_labels,
-                global_variables,
-                external_signatures,
-                constants,
-                struct_definitions,
+                &context.with_path_mode(branch_path_mode.clone()),
                 false,
                 initial_content,
             );
@@ -144,13 +121,7 @@ pub(super) fn lower_conditional_into(
                 lower_object_into_with_context(
                     &mut content_container,
                     object,
-                    &branch_path_mode,
-                    choice_labels,
-                    global_labels,
-                    global_variables,
-                    external_signatures,
-                    constants,
-                    struct_definitions,
+                    &context.with_path_mode(branch_path_mode.clone()),
                 );
             }
             content_container.push(RuntimeObject::Divert {

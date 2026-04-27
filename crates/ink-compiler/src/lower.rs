@@ -33,9 +33,7 @@ use divert::{
 };
 use expression::{lower_expression_into, lower_logic_line_into, lower_output_expression_into};
 use flow::{lower_flow, lower_module_flow, lower_root_weave};
-use indexes::{
-    ConstantValues, ExternalSignatures, LoweringIndexes, RuntimeLenEstimator, StructDefinitions,
-};
+use indexes::{ConstantValues, LoweringIndexes, RuntimeLenEstimator, StructDefinitions};
 use path::{compact_path_strings_in_container, LabelIndex};
 use sequence::lower_sequence;
 use weave::{lower_choice_weave, lower_content_list_into_context};
@@ -247,17 +245,19 @@ fn estimated_choice_content_len(
     global_variables: &HashSet<String>,
 ) -> usize {
     let mut content = Vec::new();
-    lower_content_list_into_context(
-        &mut content,
-        choice.inner_content(),
-        &ChoicePathMode::Root,
-        &LabelIndex::new(),
-        &LabelIndex::new(),
+    let choice_labels = LabelIndex::new();
+    let global_labels = LabelIndex::new();
+    let external_signatures = HashMap::new();
+    let context = LoweringContext::new(
+        ChoicePathMode::Root,
+        &choice_labels,
+        &global_labels,
         global_variables,
-        &HashMap::new(),
+        &external_signatures,
         constants,
         struct_definitions,
     );
+    lower_content_list_into_context(&mut content, choice.inner_content(), &context);
     content.len()
 }
 
@@ -272,122 +272,72 @@ fn estimated_runtime_len_for_label_collection(
     }
 
     let mut content = Vec::new();
-    lower_object_into_with_context_count(
-        &mut content,
-        object,
-        &ChoicePathMode::Root,
-        &LabelIndex::new(),
-        &LabelIndex::new(),
+    let choice_labels = LabelIndex::new();
+    let global_labels = LabelIndex::new();
+    let external_signatures = HashMap::new();
+    let context = LoweringContext::new(
+        ChoicePathMode::Root,
+        &choice_labels,
+        &global_labels,
         global_variables,
-        &HashMap::new(),
+        &external_signatures,
         constants,
         struct_definitions,
-        false,
     );
+    lower_object_into_with_context_count(&mut content, object, &context, false);
     content.len()
 }
 
 fn lower_object_into_with_context(
     content: &mut Vec<RuntimeObject>,
     object: &Object,
-    path_mode: &ChoicePathMode,
-    choice_labels: &LabelIndex,
-    global_labels: &LabelIndex,
-    global_variables: &HashSet<String>,
-    external_signatures: &ExternalSignatures,
-    constants: &ConstantValues,
-    struct_definitions: &StructDefinitions,
+    context: &LoweringContext<'_>,
 ) {
-    lower_object_into_with_context_count(
-        content,
-        object,
-        path_mode,
-        choice_labels,
-        global_labels,
-        global_variables,
-        external_signatures,
-        constants,
-        struct_definitions,
-        false,
-    );
+    lower_object_into_with_context_count(content, object, context, false);
 }
 
 fn lower_object_into_with_context_count(
     content: &mut Vec<RuntimeObject>,
     object: &Object,
-    path_mode: &ChoicePathMode,
-    choice_labels: &LabelIndex,
-    global_labels: &LabelIndex,
-    global_variables: &HashSet<String>,
-    external_signatures: &ExternalSignatures,
-    constants: &ConstantValues,
-    struct_definitions: &StructDefinitions,
+    context: &LoweringContext<'_>,
     count_all_visits: bool,
 ) {
-    let lowering_context = LoweringContext::new(
-        path_mode.clone(),
-        choice_labels,
-        global_labels,
-        global_variables,
-        external_signatures,
-        constants,
-        struct_definitions,
-    );
+    let path_mode = context.path_mode();
     match object {
         Object::Text(text) => content.push(RuntimeObject::String(text.text().to_string())),
         Object::AuthorWarning(_) => {}
         Object::ContentList(content_list) => {
-            lower_content_list_into_context(
-                content,
-                content_list,
-                path_mode,
-                choice_labels,
-                global_labels,
-                global_variables,
-                external_signatures,
-                constants,
-                struct_definitions,
-            );
+            lower_content_list_into_context(content, content_list, context);
         }
         Object::Expression(expression) => {
-            lower_output_expression_into(content, expression, &lowering_context)
+            lower_output_expression_into(content, expression, context)
         }
-        Object::Conditional(conditional) => lower_conditional_into(
-            content,
-            conditional,
-            choice_labels,
-            global_labels,
-            global_variables,
-            external_signatures,
-            constants,
-            struct_definitions,
-            path_mode,
-        ),
+        Object::Conditional(conditional) => lower_conditional_into(content, conditional, context),
         Object::LogicLine(expression) => {
-            lower_logic_line_into(content, expression, &lowering_context);
+            lower_logic_line_into(content, expression, context);
         }
         Object::Glue(_) => content.push(RuntimeObject::Glue),
-        Object::Divert(divert) => push_divert_with_context(content, divert, &lowering_context),
+        Object::Divert(divert) => push_divert_with_context(content, divert, context),
         Object::TunnelOnwards(tunnel_onwards) => {
-            lower_tunnel_onwards_into(content, tunnel_onwards, &lowering_context);
+            lower_tunnel_onwards_into(content, tunnel_onwards, context);
         }
         Object::Choice(_) => {}
         Object::ConstantDeclaration(_) => {}
         Object::Gather(_) => {} // Handled in lower_choice_weave
         Object::StructDeclaration(_) => {}
         Object::VariableAssignment(assignment) => {
-            lower_variable_assignment_into(content, assignment, &lowering_context);
+            lower_variable_assignment_into(content, assignment, context);
         }
         Object::IncDec(inc_dec) => {
-            lower_inc_dec_into(content, inc_dec, &lowering_context);
+            lower_inc_dec_into(content, inc_dec, context);
         }
         Object::Return(ret) => {
-            if lower_tail_recursive_return_into(content, ret, &lowering_context) {
+            if lower_tail_recursive_return_into(content, ret, context) {
                 return;
             }
             content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
             if let Some(expr) = ret.returned_expression() {
-                lower_expression_into(content, expr, &lowering_context, false);
+                lower_expression_into(content, expr, context, false);
             } else {
                 content.push(RuntimeObject::Void);
             }
@@ -399,25 +349,14 @@ fn lower_object_into_with_context_count(
         }),
         Object::Sequence(sequence) => content.push(RuntimeObject::Container(lower_sequence(
             sequence,
-            choice_labels,
-            global_labels,
-            global_variables,
-            external_signatures,
-            constants,
-            struct_definitions,
-            path_mode,
+            context,
             &path_mode.sequence_container_path(content.len()),
         ))),
         Object::Weave(weave) => {
-            let nested_path_mode = path_mode.for_nested_weave(content.len());
+            let nested_context = context.with_path_mode(path_mode.for_nested_weave(content.len()));
             content.push(RuntimeObject::Container(lower_choice_weave(
                 weave,
-                nested_path_mode,
-                global_labels,
-                global_variables,
-                external_signatures,
-                constants,
-                struct_definitions,
+                &nested_context,
                 count_all_visits,
             )));
         }
@@ -929,6 +868,61 @@ mod tests {
         ));
     }
 
+    #[test]
+    fn structured_weave_context_preserves_choice_sequence_and_conditional_json() {
+        let source = concat!(
+            "=== module game ===\n",
+            "VAR ready: bool = true\n",
+            "== main ==\n",
+            "{ ready:\n",
+            "    Ready.\n",
+            "- else:\n",
+            "    Not ready.\n",
+            "}\n",
+            "{ cycle:\n",
+            "- one\n",
+            "- two\n",
+            "}\n",
+            "* [Take]\n",
+            "    Took.\n",
+            "    { cycle:\n",
+            "    - inner one\n",
+            "    - inner two\n",
+            "    }\n",
+            "- (after)\n",
+            "After.\n",
+            "-> END\n",
+        );
+        let compiled = Compiler::default().compile(SourceInput::new(source));
+
+        assert!(
+            compiled.artifact.is_some(),
+            "module story should compile: {:#?}",
+            compiled.diagnostics
+        );
+        let json = compiled
+            .artifact
+            .expect("compiled story")
+            .program
+            .to_json_value();
+
+        assert!(json_contains_sequence(
+            &json,
+            &[json!("ev"), json!({"VAR?": "game::ready"}), json!("/ev")]
+        ));
+        assert!(json_contains_value(
+            &json,
+            &json!({"->": ".^.b", "c": true})
+        ));
+        assert!(json_contains_sequence(
+            &json,
+            &[json!("visit"), json!(2), json!("%")]
+        ));
+        assert!(json_contains_object_key(&json, "c-0"), "{json:#}");
+        assert!(json_contains_object_key(&json, "after"), "{json:#}");
+        assert!(json_contains_object_key(&json, "s0"), "{json:#}");
+    }
+
     fn container_json_has_named_content(container: &Value, name: &str) -> bool {
         container
             .as_array()
@@ -950,6 +944,35 @@ mod tests {
             Value::Object(object) => object
                 .values()
                 .any(|item| json_contains_sequence(item, expected)),
+            _ => false,
+        }
+    }
+
+    fn json_contains_value(value: &Value, expected: &Value) -> bool {
+        if value == expected {
+            return true;
+        }
+
+        match value {
+            Value::Array(items) => items.iter().any(|item| json_contains_value(item, expected)),
+            Value::Object(object) => object
+                .values()
+                .any(|item| json_contains_value(item, expected)),
+            _ => false,
+        }
+    }
+
+    fn json_contains_object_key(value: &Value, expected_key: &str) -> bool {
+        match value {
+            Value::Array(items) => items
+                .iter()
+                .any(|item| json_contains_object_key(item, expected_key)),
+            Value::Object(object) => {
+                object.contains_key(expected_key)
+                    || object
+                        .values()
+                        .any(|item| json_contains_object_key(item, expected_key))
+            }
             _ => false,
         }
     }

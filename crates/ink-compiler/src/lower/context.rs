@@ -61,6 +61,34 @@ impl<'a> LoweringContext<'a> {
     pub(super) fn struct_definitions(&self) -> &StructDefinitions {
         self.struct_definitions
     }
+
+    pub(super) fn with_path_mode(&self, path_mode: ChoicePathMode) -> Self {
+        Self {
+            path_mode,
+            choice_labels: self.choice_labels,
+            global_labels: self.global_labels,
+            global_variables: self.global_variables,
+            external_signatures: self.external_signatures,
+            constants: self.constants,
+            struct_definitions: self.struct_definitions,
+        }
+    }
+
+    pub(super) fn scoped<'b>(
+        &'b self,
+        path_mode: ChoicePathMode,
+        choice_labels: &'b LabelIndex,
+    ) -> LoweringContext<'b> {
+        LoweringContext {
+            path_mode,
+            choice_labels,
+            global_labels: self.global_labels,
+            global_variables: self.global_variables,
+            external_signatures: self.external_signatures,
+            constants: self.constants,
+            struct_definitions: self.struct_definitions,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

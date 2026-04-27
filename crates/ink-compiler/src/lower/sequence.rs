@@ -1,13 +1,10 @@
-use std::collections::HashSet;
-
 use ink_story_json_format::{Container, ControlCommand, Object as RuntimeObject};
 
 use crate::parsed::{Sequence, SequenceType, Weave};
 
-use super::context::ChoicePathMode;
-use super::indexes::{ConstantValues, ExternalSignatures, StructDefinitions};
+use super::context::LoweringContext;
 use super::named_container;
-use super::path::{compact_relative_path, LabelIndex};
+use super::path::compact_relative_path;
 use super::weave::{
     content_list_has_choice, lower_choice_weave_with_initial_content,
     lower_content_list_into_context,
@@ -15,13 +12,7 @@ use super::weave::{
 
 pub(super) fn lower_sequence(
     sequence: &Sequence,
-    choice_labels: &LabelIndex,
-    global_labels: &LabelIndex,
-    global_variables: &HashSet<String>,
-    external_signatures: &ExternalSignatures,
-    constants: &ConstantValues,
-    struct_definitions: &StructDefinitions,
-    path_mode: &ChoicePathMode,
+    context: &LoweringContext<'_>,
     sequence_container_path: &str,
 ) -> Container {
     let mut content = vec![
@@ -98,8 +89,10 @@ pub(super) fn lower_sequence(
         .enumerate()
         .map(|(index, element)| {
             let branch_name = format!("s{index}");
-            let branch_path_mode =
-                path_mode.for_sequence_branch(sequence_container_path, &branch_name);
+            let branch_path_mode = context
+                .path_mode()
+                .for_sequence_branch(sequence_container_path, &branch_name);
+            let branch_context = context.with_path_mode(branch_path_mode);
             let mut branch_content = vec![RuntimeObject::ControlCommand(ControlCommand::Pop)];
             let mut branch_named_content = Vec::new();
             if let Some(element) = element {
@@ -107,29 +100,14 @@ pub(super) fn lower_sequence(
                     let element_weave = Weave::new(element.objects().to_vec(), 0);
                     let lowered_branch = lower_choice_weave_with_initial_content(
                         &element_weave,
-                        branch_path_mode.clone(),
-                        global_labels,
-                        global_variables,
-                        external_signatures,
-                        constants,
-                        struct_definitions,
+                        &branch_context,
                         false,
                         branch_content,
                     );
                     branch_content = lowered_branch.content;
                     branch_named_content = lowered_branch.named_content;
                 } else {
-                    lower_content_list_into_context(
-                        &mut branch_content,
-                        element,
-                        &branch_path_mode,
-                        choice_labels,
-                        global_labels,
-                        global_variables,
-                        external_signatures,
-                        constants,
-                        struct_definitions,
-                    );
+                    lower_content_list_into_context(&mut branch_content, element, &branch_context);
                 }
             }
             let relative_return_target = format!(".^.^.{post_sequence_index}");

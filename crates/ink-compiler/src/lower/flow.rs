@@ -4,7 +4,7 @@ use ink_story_json_format::{Container, Object as RuntimeObject};
 
 use crate::parsed::{ContentList, Flow, Object, Weave};
 
-use super::context::ChoicePathMode;
+use super::context::{ChoicePathMode, LoweringContext};
 use super::indexes::{
     ConstantValues, CountedFlowPaths, ExternalSignatures, LoweringIndexes, StructDefinitions,
 };
@@ -21,25 +21,29 @@ pub(super) fn lower_root_weave(
     count_all_visits: bool,
 ) -> Container {
     if weave_has_weave_points(weave) {
-        lower_choice_weave(
-            weave,
+        let choice_labels = LabelIndex::new();
+        let context = LoweringContext::new(
             ChoicePathMode::Root,
-            &indexes.global_labels,
-            &indexes.global_variables,
-            &indexes.external_signatures,
-            &indexes.constants,
-            &indexes.struct_definitions,
-            count_all_visits,
-        )
-    } else {
-        let mut content = lower_linear_weave(
-            weave,
+            &choice_labels,
             &indexes.global_labels,
             &indexes.global_variables,
             &indexes.external_signatures,
             &indexes.constants,
             &indexes.struct_definitions,
         );
+        lower_choice_weave(weave, &context, count_all_visits)
+    } else {
+        let choice_labels = LabelIndex::new();
+        let context = LoweringContext::new(
+            ChoicePathMode::Root,
+            &choice_labels,
+            &indexes.global_labels,
+            &indexes.global_variables,
+            &indexes.external_signatures,
+            &indexes.constants,
+            &indexes.struct_definitions,
+        );
+        let mut content = lower_linear_weave(weave, &context);
         content.push(RuntimeObject::Container(done_container(
             "g-0",
             count_all_visits,
@@ -142,14 +146,19 @@ fn lower_flow_with_context(
             self_target_relative: false,
             fallback_gather_target: None,
         };
-        content.push(RuntimeObject::Container(lower_choice_weave(
-            flow.weave(),
+        let choice_labels = LabelIndex::new();
+        let context = LoweringContext::new(
             path_mode,
+            &choice_labels,
             global_labels,
             global_variables,
             external_signatures,
             constants,
             struct_definitions,
+        );
+        content.push(RuntimeObject::Container(lower_choice_weave(
+            flow.weave(),
+            &context,
             count_all_visits,
         )));
     } else if !flow.weave().content().is_empty() {
@@ -163,16 +172,17 @@ fn lower_flow_with_context(
             self_target_relative: false,
             fallback_gather_target: None,
         };
-        lower_linear_weave_into_context(
-            &mut content,
-            flow.weave(),
+        let choice_labels = LabelIndex::new();
+        let context = LoweringContext::new(
+            path_mode,
+            &choice_labels,
             global_labels,
             global_variables,
             external_signatures,
             constants,
             struct_definitions,
-            &path_mode,
         );
+        lower_linear_weave_into_context(&mut content, flow.weave(), &context);
     }
 
     if !flow.child_flows().is_empty() {

@@ -1,15 +1,10 @@
-use std::collections::HashSet;
-
 use ink_story_json_format::{Container, ControlCommand, NamedContainer, Object as RuntimeObject};
 
 use crate::parsed::{Choice, ContentList, Object, Weave};
 
 use super::context::{ChoicePathMode, LoweringContext};
 use super::expression::lower_expression_into;
-use super::indexes::{
-    collect_counted_paths_in_weave, ConstantValues, CountedFlowPaths, ExternalSignatures,
-    StructDefinitions,
-};
+use super::indexes::{collect_counted_paths_in_weave, CountedFlowPaths};
 use super::path::{child_path, LabelIndex};
 use super::{
     done_container, ends_with_end_or_done, lower_object_into_with_context,
@@ -86,103 +81,36 @@ pub(super) fn content_list_has_choice(content_list: &ContentList) -> bool {
 
 pub(super) fn lower_linear_weave(
     weave: &Weave,
-    global_labels: &LabelIndex,
-    global_variables: &HashSet<String>,
-    external_signatures: &ExternalSignatures,
-    constants: &ConstantValues,
-    struct_definitions: &StructDefinitions,
-) -> Vec<RuntimeObject> {
-    lower_linear_weave_with_context(
-        weave,
-        global_labels,
-        global_variables,
-        external_signatures,
-        constants,
-        struct_definitions,
-        &ChoicePathMode::Root,
-    )
-}
-
-fn lower_linear_weave_with_context(
-    weave: &Weave,
-    global_labels: &LabelIndex,
-    global_variables: &HashSet<String>,
-    external_signatures: &ExternalSignatures,
-    constants: &ConstantValues,
-    struct_definitions: &StructDefinitions,
-    path_mode: &ChoicePathMode,
+    context: &LoweringContext<'_>,
 ) -> Vec<RuntimeObject> {
     let mut content = Vec::new();
-    lower_linear_weave_into_context(
-        &mut content,
-        weave,
-        global_labels,
-        global_variables,
-        external_signatures,
-        constants,
-        struct_definitions,
-        path_mode,
-    );
+    lower_linear_weave_into_context(&mut content, weave, context);
     content
 }
 
 pub(super) fn lower_linear_weave_into_context(
     content: &mut Vec<RuntimeObject>,
     weave: &Weave,
-    global_labels: &LabelIndex,
-    global_variables: &HashSet<String>,
-    external_signatures: &ExternalSignatures,
-    constants: &ConstantValues,
-    struct_definitions: &StructDefinitions,
-    path_mode: &ChoicePathMode,
+    context: &LoweringContext<'_>,
 ) {
     let choice_labels = LabelIndex::new();
+    let context = context.scoped(context.path_mode().clone(), &choice_labels);
     for object in weave.content() {
-        lower_object_into_with_context(
-            content,
-            object,
-            path_mode,
-            &choice_labels,
-            global_labels,
-            global_variables,
-            external_signatures,
-            constants,
-            struct_definitions,
-        );
+        lower_object_into_with_context(content, object, &context);
     }
 }
 
 pub(super) fn lower_choice_weave(
     weave: &Weave,
-    path_mode: ChoicePathMode,
-    global_labels: &LabelIndex,
-    global_variables: &HashSet<String>,
-    external_signatures: &ExternalSignatures,
-    constants: &ConstantValues,
-    struct_definitions: &StructDefinitions,
+    context: &LoweringContext<'_>,
     count_all_visits: bool,
 ) -> Container {
-    lower_choice_weave_with_initial_content(
-        weave,
-        path_mode,
-        global_labels,
-        global_variables,
-        external_signatures,
-        constants,
-        struct_definitions,
-        count_all_visits,
-        Vec::new(),
-    )
+    lower_choice_weave_with_initial_content(weave, context, count_all_visits, Vec::new())
 }
 
 pub(super) fn lower_choice_weave_with_initial_content(
     weave: &Weave,
-    path_mode: ChoicePathMode,
-    global_labels: &LabelIndex,
-    global_variables: &HashSet<String>,
-    external_signatures: &ExternalSignatures,
-    constants: &ConstantValues,
-    struct_definitions: &StructDefinitions,
+    context: &LoweringContext<'_>,
     count_all_visits: bool,
     initial_content: Vec<RuntimeObject>,
 ) -> Container {
@@ -194,15 +122,16 @@ pub(super) fn lower_choice_weave_with_initial_content(
     let mut needs_terminal_gather = false;
     let mut last_gather_location = None;
     let mut last_section_had_choice = false;
+    let path_mode = context.path_mode().clone();
     let mut current_path_mode = path_mode.clone();
     let objects = weave.content();
     let mut choice_labels = collect_local_weave_labels(objects, &path_mode);
     let mut counted_paths = CountedFlowPaths::default();
     collect_counted_paths_in_weave(
         weave,
-        global_labels,
-        constants,
-        global_variables,
+        context.global_labels(),
+        context.constants(),
+        context.global_variables(),
         &path_mode,
         &mut counted_paths,
     );
@@ -237,11 +166,7 @@ pub(super) fn lower_choice_weave_with_initial_content(
                     &mut choice_count,
                     &mut needs_terminal_gather,
                     &mut choice_labels,
-                    global_labels,
-                    global_variables,
-                    external_signatures,
-                    constants,
-                    struct_definitions,
+                    context,
                     gather_count,
                     &current_path_mode,
                     &path_mode,
@@ -285,11 +210,7 @@ pub(super) fn lower_choice_weave_with_initial_content(
                     &mut choice_count,
                     &mut needs_terminal_gather,
                     &mut choice_labels,
-                    global_labels,
-                    global_variables,
-                    external_signatures,
-                    constants,
-                    struct_definitions,
+                    context,
                     gather_count,
                     &gather_path_mode,
                     &path_mode,
@@ -358,11 +279,7 @@ pub(super) fn lower_choice_weave_with_initial_content(
                     &mut choice_count,
                     &mut needs_terminal_gather,
                     &mut choice_labels,
-                    global_labels,
-                    global_variables,
-                    external_signatures,
-                    constants,
-                    struct_definitions,
+                    context,
                     gather_count,
                     &current_path_mode,
                     &path_mode,
@@ -414,11 +331,7 @@ fn lower_weave_section(
     choice_count: &mut usize,
     needs_terminal_gather: &mut bool,
     choice_labels: &mut LabelIndex,
-    global_labels: &LabelIndex,
-    global_variables: &HashSet<String>,
-    external_signatures: &ExternalSignatures,
-    constants: &ConstantValues,
-    struct_definitions: &StructDefinitions,
+    context: &LoweringContext<'_>,
     gather_count: usize,
     path_mode: &ChoicePathMode,
     weave_path_mode: &ChoicePathMode,
@@ -448,16 +361,11 @@ fn lower_weave_section(
             | Object::StructDeclaration(_)
             | Object::Return(_)
             | Object::Weave(_) => {
+                let object_context = context.scoped(path_mode.clone(), choice_labels);
                 lower_object_into_with_context_count(
                     content,
                     &objects[*index],
-                    path_mode,
-                    choice_labels,
-                    global_labels,
-                    global_variables,
-                    external_signatures,
-                    constants,
-                    struct_definitions,
+                    &object_context,
                     count_all_visits,
                 );
                 *index += 1;
@@ -472,11 +380,7 @@ fn lower_weave_section(
                     choice_count,
                     needs_terminal_gather,
                     choice_labels,
-                    global_labels,
-                    global_variables,
-                    external_signatures,
-                    constants,
-                    struct_definitions,
+                    context,
                     gather_count,
                     path_mode,
                     weave_path_mode,
@@ -548,11 +452,7 @@ fn lower_choice_in_section(
     choice_count: &mut usize,
     needs_terminal_gather: &mut bool,
     choice_labels: &mut LabelIndex,
-    global_labels: &LabelIndex,
-    global_variables: &HashSet<String>,
-    external_signatures: &ExternalSignatures,
-    constants: &ConstantValues,
-    struct_definitions: &StructDefinitions,
+    context: &LoweringContext<'_>,
     gather_count: usize,
     path_mode: &ChoicePathMode,
     weave_path_mode: &ChoicePathMode,
@@ -579,11 +479,7 @@ fn lower_choice_in_section(
         content.len(),
         path_mode,
         choice_labels,
-        global_labels,
-        global_variables,
-        external_signatures,
-        constants,
-        struct_definitions,
+        context,
     ) {
         ChoiceOuter::Inline(objects) => content.extend(objects),
         ChoiceOuter::Nested(container) => content.push(RuntimeObject::Container(container)),
@@ -603,13 +499,7 @@ fn lower_choice_in_section(
     lower_content_list_into_context(
         &mut choice_content,
         choice.inner_content(),
-        &nested_choice_content_path_mode,
-        choice_labels,
-        global_labels,
-        global_variables,
-        external_signatures,
-        constants,
-        struct_definitions,
+        &context.scoped(nested_choice_content_path_mode.clone(), choice_labels),
     );
     let mut has_nested_weave_content = false;
 
@@ -621,16 +511,11 @@ fn lower_choice_in_section(
         if matches!(objects[*index], Object::Weave(_)) {
             has_nested_weave_content = true;
         }
+        let nested_context = context.scoped(nested_choice_content_path_mode.clone(), choice_labels);
         lower_object_into_with_context_count(
             &mut choice_content,
             &objects[*index],
-            &nested_choice_content_path_mode,
-            choice_labels,
-            global_labels,
-            global_variables,
-            external_signatures,
-            constants,
-            struct_definitions,
+            &nested_context,
             count_all_visits,
         );
         *index += 1;
@@ -728,11 +613,7 @@ fn choice_outer(
     choice_point_index: usize,
     path_mode: &ChoicePathMode,
     choice_labels: &LabelIndex,
-    global_labels: &LabelIndex,
-    global_variables: &HashSet<String>,
-    external_signatures: &ExternalSignatures,
-    constants: &ConstantValues,
-    struct_definitions: &StructDefinitions,
+    context: &LoweringContext<'_>,
 ) -> ChoiceOuter {
     let mut outer_content = Vec::new();
     let has_eval_content = choice.has_start_content() || choice.condition().is_some();
@@ -757,15 +638,7 @@ fn choice_outer(
     }
 
     if let Some(condition) = choice.condition() {
-        let context = LoweringContext::new(
-            path_mode.clone(),
-            choice_labels,
-            global_labels,
-            global_variables,
-            external_signatures,
-            constants,
-            struct_definitions,
-        );
+        let context = context.scoped(path_mode.clone(), choice_labels);
         lower_expression_into(
             &mut outer_content,
             condition,
@@ -790,16 +663,7 @@ fn choice_outer(
     let mut start_content = choice
         .start_content()
         .map(|cl| {
-            lower_content_list_with_context(
-                cl,
-                path_mode,
-                choice_labels,
-                global_labels,
-                global_variables,
-                external_signatures,
-                constants,
-                struct_definitions,
-            )
+            lower_content_list_with_context(cl, &context.scoped(path_mode.clone(), choice_labels))
         })
         .unwrap_or_default();
     start_content.push(RuntimeObject::Divert {
@@ -817,51 +681,19 @@ fn choice_outer(
 
 fn lower_content_list_with_context(
     content_list: &ContentList,
-    path_mode: &ChoicePathMode,
-    choice_labels: &LabelIndex,
-    global_labels: &LabelIndex,
-    global_variables: &HashSet<String>,
-    external_signatures: &ExternalSignatures,
-    constants: &ConstantValues,
-    struct_definitions: &StructDefinitions,
+    context: &LoweringContext<'_>,
 ) -> Vec<RuntimeObject> {
     let mut content = Vec::new();
-    lower_content_list_into_context(
-        &mut content,
-        content_list,
-        path_mode,
-        choice_labels,
-        global_labels,
-        global_variables,
-        external_signatures,
-        constants,
-        struct_definitions,
-    );
+    lower_content_list_into_context(&mut content, content_list, context);
     content
 }
 
 pub(super) fn lower_content_list_into_context(
     content: &mut Vec<RuntimeObject>,
     content_list: &ContentList,
-    path_mode: &ChoicePathMode,
-    choice_labels: &LabelIndex,
-    global_labels: &LabelIndex,
-    global_variables: &HashSet<String>,
-    external_signatures: &ExternalSignatures,
-    constants: &ConstantValues,
-    struct_definitions: &StructDefinitions,
+    context: &LoweringContext<'_>,
 ) {
     for object in content_list.objects() {
-        lower_object_into_with_context(
-            content,
-            object,
-            path_mode,
-            choice_labels,
-            global_labels,
-            global_variables,
-            external_signatures,
-            constants,
-            struct_definitions,
-        );
+        lower_object_into_with_context(content, object, context);
     }
 }
