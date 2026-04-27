@@ -1,4 +1,4 @@
-Progress: 8/24
+Progress: 9/24
 
 # Task List: Compiler And Runtime Refactor
 
@@ -464,7 +464,7 @@ Validation status:
 
 Commit: 6c45e10a9265675ee067f9e420749c917fb08010
 
-### [ ] Task 09: Update Runtime Loading And Writing For Typed Native Functions
+### [x] Task 09: Update Runtime Loading And Writing For Typed Native Functions
 
 Goal:
 
@@ -507,9 +507,15 @@ Validation:
 - `cargo fmt --all --check`
 - `make gate`
 
-Validation status: pending.
+Validation status:
 
-Commit: pending.
+- `cargo test -p ink-runtime json` passed.
+- `cargo test -p ink-runtime native_function_call` passed.
+- `cargo test -p ink-test --test conformance` passed.
+- `cargo fmt --all --check` passed.
+- `make gate` passed.
+
+Commit: be491d686043311dbd06bbce4b6776169742ec0b
 
 ## Milestone 3: Module Analysis Structure
 
