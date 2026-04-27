@@ -1,4 +1,4 @@
-Progress: 21/24
+Progress: 22/24
 
 # Task List: Compiler And Runtime Refactor
 
@@ -1160,7 +1160,7 @@ validation.
 
 Commit: 74db0d646f4e24c05391a4107e7cea0d75c4187f
 
-### [ ] Task 22: Centralize Runtime Native Value Parameter Helpers
+### [x] Task 22: Centralize Runtime Native Value Parameter Helpers
 
 Goal:
 
@@ -1199,9 +1199,17 @@ Validation:
 - `cargo fmt --all --check`
 - `make gate`
 
-Validation status: pending.
+Validation status:
 
-Commit: pending.
+- `cargo test -p ink-runtime native_function_call` passed before
+  implementation commit.
+- `cargo fmt --all --check` passed before implementation commit.
+- `make gate` passed before implementation commit.
+
+Review status: passed after reviewing the implementation commit and rerunning
+validation.
+
+Commit: 4b4c737e72d574975762b1bccd58a4b42dde6dd9
 
 ## Milestone 6: Mechanical Cleanup And Compatibility Checks
 
