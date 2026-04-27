@@ -100,9 +100,11 @@ pub fn write_rtobject(o: Rc<dyn RTObject>) -> Result<serde_json::Value, StoryErr
     }
 
     if let Some(f) = o.as_any().downcast_ref::<NativeFunctionCall>() {
-        return Ok(
-            format::Object::NativeFunction(NativeFunctionCall::get_name(f.op)).to_json_value(),
-        );
+        let token = NativeFunctionCall::get_name(f.op);
+        let function = format::NativeFunction::from_token(&token).ok_or_else(|| {
+            StoryError::BadJson(format!("Unsupported native function token: {token}"))
+        })?;
+        return Ok(format::Object::NativeFunction(function).to_json_value());
     }
 
     if let Ok(var_ref) = o.clone().into_any().downcast::<VariableReference>() {

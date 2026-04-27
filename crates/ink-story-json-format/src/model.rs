@@ -133,7 +133,7 @@ pub enum Object {
     ValueArray(Vec<Object>),
     ValueObject(BTreeMap<String, Object>),
     Void,
-    NativeFunction(String),
+    NativeFunction(NativeFunction),
 }
 
 impl Object {

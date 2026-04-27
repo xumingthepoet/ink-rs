@@ -4,6 +4,7 @@ use crate::parsed::{Sequence, SequenceType, Weave};
 
 use super::context::LoweringContext;
 use super::named_container;
+use super::native_function;
 use super::path::compact_relative_path;
 use super::weave::{
     content_list_has_choice, lower_choice_weave_with_initial_content,
@@ -29,10 +30,10 @@ pub(super) fn lower_sequence(
 
     if stopping || once {
         content.push(RuntimeObject::Int(branch_count.saturating_sub(1) as i32));
-        content.push(RuntimeObject::NativeFunction("MIN".to_string()));
+        content.push(native_function("MIN"));
     } else if cycle {
         content.push(RuntimeObject::Int(sequence.elements().len() as i32));
-        content.push(RuntimeObject::NativeFunction("%".to_string()));
+        content.push(native_function("%"));
     }
 
     if shuffle {
@@ -46,7 +47,7 @@ pub(super) fn lower_sequence(
             content.extend([
                 RuntimeObject::ControlCommand(ControlCommand::Duplicate),
                 RuntimeObject::Int(last_index as i32),
-                RuntimeObject::NativeFunction("==".to_string()),
+                native_function("=="),
                 RuntimeObject::ConditionalDivert {
                     target: format!(".^.{post_shuffle_noop_index}"),
                 },
@@ -70,7 +71,7 @@ pub(super) fn lower_sequence(
             RuntimeObject::ControlCommand(ControlCommand::EvalStart),
             RuntimeObject::ControlCommand(ControlCommand::Duplicate),
             RuntimeObject::Int(index as i32),
-            RuntimeObject::NativeFunction("==".to_string()),
+            native_function("=="),
             RuntimeObject::ControlCommand(ControlCommand::EvalEnd),
             RuntimeObject::ConditionalDivert {
                 target: format!(".^.s{index}"),

@@ -12,6 +12,7 @@ use super::context::{ChoicePathMode, LoweringContext};
 use super::indexes::{
     CallSignature, ConstantValue, ConstantValues, ExternalSignatures, StructDefinitions,
 };
+use super::native_function;
 use super::path::{
     module_scoped_source_path_to_runtime_path, source_path_to_runtime_path, LabelIndex,
 };
@@ -216,7 +217,7 @@ fn lower_expression_into_with_constants(
                 visiting_constants,
             );
             content.push(RuntimeObject::String(field.clone()));
-            content.push(RuntimeObject::NativeFunction("FIELD".to_string()));
+            content.push(native_function("FIELD"));
         }
         Expression::IndexAccess { base, index } => {
             lower_expression_into_with_constants(
@@ -245,7 +246,7 @@ fn lower_expression_into_with_constants(
                 has_start_content,
                 visiting_constants,
             );
-            content.push(RuntimeObject::NativeFunction("INDEX".to_string()));
+            content.push(native_function("INDEX"));
         }
         Expression::Binary {
             operator,
@@ -278,9 +279,7 @@ fn lower_expression_into_with_constants(
                 has_start_content,
                 visiting_constants,
             );
-            content.push(RuntimeObject::NativeFunction(
-                operator_runtime_name(*operator).to_string(),
-            ));
+            content.push(native_function(operator_runtime_name(*operator)));
         }
         Expression::Unary {
             operator,
@@ -299,9 +298,7 @@ fn lower_expression_into_with_constants(
                 has_start_content,
                 visiting_constants,
             );
-            content.push(RuntimeObject::NativeFunction(
-                operator.runtime_name().to_string(),
-            ));
+            content.push(native_function(operator.runtime_name()));
         }
         Expression::MultipleCondition(expressions) => {
             for (index, expression) in expressions.iter().enumerate() {
@@ -319,7 +316,7 @@ fn lower_expression_into_with_constants(
                     visiting_constants,
                 );
                 if index > 0 {
-                    content.push(RuntimeObject::NativeFunction("&&".to_string()));
+                    content.push(native_function("&&"));
                 }
             }
         }
@@ -451,7 +448,7 @@ fn lower_function_call_into(
                     visiting_constants,
                 );
             }
-            content.push(RuntimeObject::NativeFunction(name.to_string()));
+            content.push(native_function(name));
         }
         _ if matches!(
             external_signatures.get(resolved_name.as_str()),
@@ -593,7 +590,7 @@ fn lower_array_remove_call_into(
             false,
             visiting_constants,
         );
-        content.push(RuntimeObject::NativeFunction("ARRAY_REMOVE".to_string()));
+        content.push(native_function("ARRAY_REMOVE"));
     } else {
         lower_assignment_path_update_value_into(
             content,

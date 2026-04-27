@@ -76,11 +76,14 @@ fn format_object_to_runtime(object: &format::Object) -> Result<Rc<dyn RTObject>,
                     StoryError::BadJson(format!("Unsupported control command token: {token}"))
                 })
         }
-        format::Object::NativeFunction(function) => NativeFunctionCall::new_from_name(function)
-            .map(|function| Rc::new(function) as Rc<dyn RTObject>)
-            .ok_or_else(|| {
-                StoryError::BadJson(format!("Unsupported native function token: {function}"))
-            }),
+        format::Object::NativeFunction(function) => {
+            let token = function.token();
+            NativeFunctionCall::new_from_name(token)
+                .map(|function| Rc::new(function) as Rc<dyn RTObject>)
+                .ok_or_else(|| {
+                    StoryError::BadJson(format!("Unsupported native function token: {token}"))
+                })
+        }
         format::Object::Divert { target, variable } => {
             Ok(Rc::new(format_divert_to_runtime(format::Object::Divert {
                 target: target.clone(),

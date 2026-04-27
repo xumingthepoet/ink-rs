@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use serde_json::{Map, Number, Value as JsonValue};
 
-use crate::{Container, FormatError, NamedContainer, Object, Program};
+use crate::{Container, FormatError, NamedContainer, NativeFunction, Object, Program};
 
 pub(crate) fn program_from_str(input: &str) -> Result<Program, FormatError> {
     let value = serde_json::from_str(input)
@@ -220,7 +220,7 @@ pub(crate) fn object_to_value(object: &Object) -> JsonValue {
             JsonValue::Object(obj)
         }
         Object::Void => JsonValue::String("void".to_string()),
-        Object::NativeFunction(name) => JsonValue::String(name.clone()),
+        Object::NativeFunction(function) => JsonValue::String(function.token().to_string()),
     }
 }
 
@@ -269,7 +269,9 @@ fn string_object_from_token(token: &str) -> Result<Object, FormatError> {
         return Ok(Object::ControlCommand(command));
     }
 
-    Ok(Object::NativeFunction(token.to_string()))
+    NativeFunction::from_token(token)
+        .map(Object::NativeFunction)
+        .ok_or_else(|| FormatError::new(format!("unsupported native function token: {token}")))
 }
 
 fn object_from_map(obj: &Map<String, JsonValue>) -> Result<Object, FormatError> {
@@ -547,17 +549,27 @@ mod tests {
     }
 
     #[test]
-    fn native_function_metadata_keeps_string_backed_json_shape() {
-        let known = Object::from_json_value(json!("+")).unwrap();
-        assert_eq!(known, Object::NativeFunction("+".to_string()));
-        assert_eq!(known.to_json_value(), json!("+"));
+    fn native_function_tokens_roundtrip_as_typed_objects() {
+        for function in NativeFunction::ALL {
+            let token = function.token();
+            let value = json!(token);
 
-        let unknown = Object::from_json_value(json!("UNKNOWN_NATIVE")).unwrap();
+            assert_eq!(
+                Object::from_json_value(value.clone()).unwrap(),
+                Object::NativeFunction(function)
+            );
+            assert_eq!(Object::NativeFunction(function).to_json_value(), value);
+        }
+    }
+
+    #[test]
+    fn rejects_unknown_native_function_tokens() {
+        let error = Object::from_json_value(json!("UNKNOWN_NATIVE")).unwrap_err();
+
         assert_eq!(
-            unknown,
-            Object::NativeFunction("UNKNOWN_NATIVE".to_string())
+            error.message(),
+            "unsupported native function token: UNKNOWN_NATIVE"
         );
-        assert_eq!(unknown.to_json_value(), json!("UNKNOWN_NATIVE"));
     }
 
     #[test]

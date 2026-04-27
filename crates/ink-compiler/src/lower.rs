@@ -14,7 +14,8 @@ mod value;
 mod weave;
 
 use ink_story_json_format::{
-    Container, ControlCommand, NamedContainer, Object as RuntimeObject, Program as RuntimeProgram,
+    Container, ControlCommand, NamedContainer, NativeFunction, Object as RuntimeObject,
+    Program as RuntimeProgram,
 };
 
 use crate::{
@@ -37,6 +38,12 @@ use indexes::{ConstantValues, LoweringIndexes, RuntimeLenEstimator, StructDefini
 use path::{compact_path_strings_in_container, LabelIndex};
 use sequence::lower_sequence;
 use weave::{lower_choice_weave, lower_content_list_into_context};
+
+pub(super) fn native_function(token: &str) -> RuntimeObject {
+    RuntimeObject::NativeFunction(
+        NativeFunction::from_token(token).expect("compiler emitted unsupported native function"),
+    )
+}
 
 pub(crate) fn lower(story: &CheckedStory, count_all_visits: bool) -> StageOutput<RuntimeProgram> {
     let indexes = LoweringIndexes::build(
