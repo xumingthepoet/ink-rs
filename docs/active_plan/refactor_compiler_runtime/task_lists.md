@@ -1,4 +1,4 @@
-Progress: 17/24
+Progress: 18/24
 
 # Task List: Compiler And Runtime Refactor
 
@@ -946,7 +946,7 @@ validation.
 
 Commit: 4340dcc602e690d43896f732cb1702e47c2837d4
 
-### [ ] Task 18: Remove JSON Round Trips From Runtime Container Writing Where Practical
+### [x] Task 18: Remove JSON Round Trips From Runtime Container Writing Where Practical
 
 Goal:
 
@@ -984,9 +984,18 @@ Validation:
 - `cargo fmt --all --check`
 - `make gate`
 
-Validation status: pending.
+Validation status:
 
-Commit: pending.
+- `cargo test -p ink-runtime json` passed before implementation commit.
+- `cargo test -p ink-test --test conformance` passed before implementation
+  commit.
+- `cargo fmt --all --check` passed before implementation commit.
+- `make gate` passed before implementation commit.
+
+Review status: passed after reviewing the implementation commit and rerunning
+validation.
+
+Commit: e5418648b4c8f773e84e59a927c3c0155101a4e1
 
 ## Milestone 5: Runtime Native Function Organization
 
