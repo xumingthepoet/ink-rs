@@ -1,4 +1,4 @@
-Progress: 7/24
+Progress: 8/24
 
 # Task List: Compiler And Runtime Refactor
 
@@ -410,7 +410,7 @@ Validation status:
 
 Commit: e23fe54819f3a0154284f294ad85e5059154de47
 
-### [ ] Task 08: Update Compiler Lowering To Emit Typed Native Functions
+### [x] Task 08: Update Compiler Lowering To Emit Typed Native Functions
 
 Goal:
 
@@ -453,9 +453,16 @@ Validation:
 - `cargo fmt --all --check`
 - `make gate`
 
-Validation status: pending.
+Validation status:
 
-Commit: pending.
+- `cargo test -p ink-compiler lower::` passed.
+- `cargo test -p ink-test --test language expression` passed with no matching
+  tests; `make gate` covered the full language test.
+- `cargo test -p ink-test --test language module` passed.
+- `cargo fmt --all --check` passed.
+- `make gate` passed.
+
+Commit: 6c45e10a9265675ee067f9e420749c917fb08010
 
 ### [ ] Task 09: Update Runtime Loading And Writing For Typed Native Functions
 
