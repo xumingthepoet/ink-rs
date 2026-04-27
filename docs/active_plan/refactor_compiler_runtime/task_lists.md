@@ -1,4 +1,4 @@
-Progress: 16/24
+Progress: 17/24
 
 # Task List: Compiler And Runtime Refactor
 
@@ -895,7 +895,7 @@ validation.
 
 Commit: 043f959e52a3da26923cd909c1b1cae1279972b5
 
-### [ ] Task 17: Convert Runtime Value Dictionary Save-State Reading To Helpers
+### [x] Task 17: Convert Runtime Value Dictionary Save-State Reading To Helpers
 
 Goal:
 
@@ -934,9 +934,17 @@ Validation:
 - `cargo fmt --all --check`
 - `make gate`
 
-Validation status: pending.
+Validation status:
 
-Commit: pending.
+- `cargo test -p ink-runtime json` passed before implementation commit.
+- `cargo test -p ink-runtime story_state` passed before implementation commit.
+- `cargo fmt --all --check` passed before implementation commit.
+- `make gate` passed before implementation commit.
+
+Review status: passed after reviewing the implementation commit and rerunning
+validation.
+
+Commit: 4340dcc602e690d43896f732cb1702e47c2837d4
 
 ### [ ] Task 18: Remove JSON Round Trips From Runtime Container Writing Where Practical
 
