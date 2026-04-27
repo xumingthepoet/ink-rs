@@ -4,6 +4,10 @@ use ink_story_json_format::{ControlCommand, Object as RuntimeObject};
 
 use crate::parsed::{AssignmentTarget, BinaryOperator, Expression, FlowArgument};
 
+use super::assignment::{
+    collect_assignment_path, lower_assignment_path_update_value_into,
+    lower_cached_assignment_indexes_into, push_reassignment_for_name, AssignmentUpdateValue,
+};
 use super::context::{ChoicePathMode, LoweringContext};
 use super::indexes::{
     CallSignature, ConstantValue, ConstantValues, ExternalSignatures, StructDefinitions,
@@ -13,10 +17,6 @@ use super::path::{
 };
 use super::value::{lower_value_literal, resolve_divert_target_value};
 use super::weave::lower_content_list_into_context;
-use super::{
-    collect_assignment_path, lower_assignment_path_update_value_into,
-    lower_cached_assignment_indexes_into, push_reassignment_for_name, AssignmentUpdateValue,
-};
 
 pub(super) fn lower_output_expression_into(
     content: &mut Vec<RuntimeObject>,
@@ -567,17 +567,16 @@ fn lower_array_remove_call_into(
         content.push(RuntimeObject::Void);
         return;
     };
-    let cached_components = lower_cached_assignment_indexes_into(
-        content,
-        &components,
+    let context = LoweringContext::new(
+        path_mode.clone(),
         choice_labels,
         global_labels,
         global_variables,
         external_signatures,
         constants,
-        path_mode,
         struct_definitions,
     );
+    let cached_components = lower_cached_assignment_indexes_into(content, &components, &context);
     let resolved_root_name = resolve_runtime_variable_name(root_name, path_mode, global_variables);
 
     if cached_components.is_empty() {
@@ -605,13 +604,7 @@ fn lower_array_remove_call_into(
             AssignmentUpdateValue::ArrayRemove {
                 index: index_expression,
             },
-            choice_labels,
-            global_labels,
-            global_variables,
-            external_signatures,
-            constants,
-            path_mode,
-            struct_definitions,
+            &context,
         );
     }
 
