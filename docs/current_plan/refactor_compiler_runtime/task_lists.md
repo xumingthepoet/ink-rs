@@ -1,4 +1,4 @@
-Progress: 5/24
+Progress: 6/24
 
 # Task List: Compiler And Runtime Refactor
 
@@ -310,7 +310,7 @@ Commit: 500449c374dde6b1559349b4391994ec27397a07
 
 ## Milestone 2: Typed Native Function Tokens
 
-### [ ] Task 06: Add Format-Crate Native Function Metadata
+### [x] Task 06: Add Format-Crate Native Function Metadata
 
 Goal:
 
@@ -351,9 +351,13 @@ Validation:
 - `cargo fmt --all --check`
 - `make gate`
 
-Validation status: pending.
+Validation status:
 
-Commit: pending.
+- `cargo test -p ink-story-json-format` passed.
+- `cargo fmt --all --check` passed.
+- `make gate` passed.
+
+Commit: d1ccb1f306aff48c80db1b7faf5ac7fbddbe5a85
 
 ### [ ] Task 07: Make Compiled Story Objects Use Typed Native Functions
 
