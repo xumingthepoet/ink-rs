@@ -7,11 +7,22 @@ use ink_story_json_format as format;
 use serde_json::{json, Map};
 
 use crate::{
-    choice::Choice, choice_point::ChoicePoint, container::Container,
-    control_command::ControlCommand, divert::Divert, glue::Glue,
-    native_function_call::NativeFunctionCall, object::RTObject, push_pop::PushPopType,
-    story_error::StoryError, tag::Tag, value::Value, value_type::ValueType,
-    variable_assigment::VariableAssignment, variable_reference::VariableReference, void::Void,
+    choice::Choice,
+    choice_point::ChoicePoint,
+    container::Container,
+    control_command::{CommandType, ControlCommand},
+    divert::Divert,
+    glue::Glue,
+    native_function_call::NativeFunctionCall,
+    object::RTObject,
+    push_pop::PushPopType,
+    story_error::StoryError,
+    tag::Tag,
+    value::Value,
+    value_type::ValueType,
+    variable_assigment::VariableAssignment,
+    variable_reference::VariableReference,
+    void::Void,
 };
 
 pub fn write_dictionary_values(
@@ -27,107 +38,6 @@ pub fn write_dictionary_values(
 }
 
 pub fn write_rtobject(o: Rc<dyn RTObject>) -> Result<serde_json::Value, StoryError> {
-    if let Some(c) = o.as_any().downcast_ref::<Container>() {
-        return write_rt_container(c, false);
-    }
-
-    if let Ok(divert) = o.clone().into_any().downcast::<Divert>() {
-        let target_str = if divert.has_variable_target() {
-            divert.variable_divert_name.clone().unwrap()
-        } else {
-            divert.get_target_path_string().unwrap()
-        };
-
-        let object = if divert.is_external {
-            format::Object::ExternalFunction {
-                target: target_str,
-                args: divert.external_args,
-            }
-        } else if divert.pushes_to_stack && divert.stack_push_type == PushPopType::Function {
-            format::Object::FunctionDivert { target: target_str }
-        } else if divert.pushes_to_stack && divert.stack_push_type == PushPopType::Tunnel {
-            format::Object::TunnelDivert {
-                target: target_str,
-                variable: divert.has_variable_target(),
-            }
-        } else if divert.is_conditional {
-            format::Object::ConditionalDivert { target: target_str }
-        } else {
-            format::Object::Divert {
-                target: target_str,
-                variable: divert.has_variable_target(),
-            }
-        };
-
-        return Ok(object.to_json_value());
-    }
-
-    if let Ok(cp) = o.clone().into_any().downcast::<ChoicePoint>() {
-        return Ok(format::Object::ChoicePoint {
-            target: ChoicePoint::get_path_string_on_choice(&cp),
-            flags: cp.get_flags(),
-        }
-        .to_json_value());
-    }
-
-    if let Some(v) = Value::get_bool_value(o.as_ref()) {
-        return Ok(value_type_to_format_object(&ValueType::Bool(v))?.to_json_value());
-    }
-
-    if let Some(v) = o.as_any().downcast_ref::<Value>() {
-        return Ok(value_type_to_format_object(&v.value)?.to_json_value());
-    }
-
-    if o.as_any().is::<Glue>() {
-        return Ok(format::Object::Glue.to_json_value());
-    }
-
-    if let Some(cc) = o.as_any().downcast_ref::<ControlCommand>() {
-        let name = ControlCommand::get_name(cc.command_type);
-        let object = format::Object::from_json_value(serde_json::Value::String(name.clone()))
-            .map_err(|_| {
-                StoryError::BadJson(format!("Unsupported control command token: {name}"))
-            })?;
-        let object = match object {
-            format::Object::ControlCommand(_) | format::Object::Tag { .. } => object,
-            _ => {
-                return Err(StoryError::BadJson(format!(
-                    "Unsupported control command token: {name}"
-                )))
-            }
-        };
-        return Ok(object.to_json_value());
-    }
-
-    if let Some(f) = o.as_any().downcast_ref::<NativeFunctionCall>() {
-        return Ok(format::Object::NativeFunction(f.format_function()).to_json_value());
-    }
-
-    if let Ok(var_ref) = o.clone().into_any().downcast::<VariableReference>() {
-        if let Some(read_count_path) = var_ref.get_path_string_for_count() {
-            return Ok(format::Object::ReadCount(read_count_path).to_json_value());
-        } else {
-            return Ok(format::Object::VariableReference(var_ref.name.clone()).to_json_value());
-        }
-    }
-
-    if let Some(var_ass) = o.as_any().downcast_ref::<VariableAssignment>() {
-        let object = if var_ass.is_new_declaration && var_ass.is_global {
-            format::Object::GlobalVariableAssignment(var_ass.variable_name.clone())
-        } else if var_ass.is_new_declaration {
-            format::Object::VariableAssignment(var_ass.variable_name.clone())
-        } else if var_ass.is_global {
-            format::Object::VariableReassignment(var_ass.variable_name.clone())
-        } else {
-            format::Object::TempVariableReassignment(var_ass.variable_name.clone())
-        };
-        return Ok(object.to_json_value());
-    }
-
-    if o.as_any().is::<Void>() {
-        return Ok(format::Object::Void.to_json_value());
-    }
-
     if let Some(tag) = o.as_any().downcast_ref::<Tag>() {
         let mut jobj: Map<String, serde_json::Value> = Map::new();
 
@@ -140,10 +50,123 @@ pub fn write_rtobject(o: Rc<dyn RTObject>) -> Result<serde_json::Value, StoryErr
         return Ok(write_choice(choice));
     }
 
+    if let Some(c) = o.as_any().downcast_ref::<Container>() {
+        return write_rt_container(c, false);
+    }
+
+    Ok(runtime_object_to_format_object(o)?.to_json_value())
+}
+
+fn runtime_object_to_format_object(object: Rc<dyn RTObject>) -> Result<format::Object, StoryError> {
+    if let Some(c) = object.as_any().downcast_ref::<Container>() {
+        return runtime_container_to_format(c, c.name.clone()).map(format::Object::Container);
+    }
+
+    if let Ok(divert) = object.clone().into_any().downcast::<Divert>() {
+        return Ok(divert_to_format_object(&divert));
+    }
+
+    if let Ok(cp) = object.clone().into_any().downcast::<ChoicePoint>() {
+        return Ok(format::Object::ChoicePoint {
+            target: ChoicePoint::get_path_string_on_choice(&cp),
+            flags: cp.get_flags(),
+        });
+    }
+
+    if let Some(v) = Value::get_bool_value(object.as_ref()) {
+        return value_type_to_format_object(&ValueType::Bool(v));
+    }
+
+    if let Some(v) = object.as_any().downcast_ref::<Value>() {
+        return value_type_to_format_object(&v.value);
+    }
+
+    if object.as_any().is::<Glue>() {
+        return Ok(format::Object::Glue);
+    }
+
+    if let Some(cc) = object.as_any().downcast_ref::<ControlCommand>() {
+        return control_command_to_format_object(cc);
+    }
+
+    if let Some(f) = object.as_any().downcast_ref::<NativeFunctionCall>() {
+        return Ok(format::Object::NativeFunction(f.format_function()));
+    }
+
+    if let Ok(var_ref) = object.clone().into_any().downcast::<VariableReference>() {
+        if let Some(read_count_path) = var_ref.get_path_string_for_count() {
+            return Ok(format::Object::ReadCount(read_count_path));
+        } else {
+            return Ok(format::Object::VariableReference(var_ref.name.clone()));
+        }
+    }
+
+    if let Some(var_ass) = object.as_any().downcast_ref::<VariableAssignment>() {
+        return Ok(if var_ass.is_new_declaration && var_ass.is_global {
+            format::Object::GlobalVariableAssignment(var_ass.variable_name.clone())
+        } else if var_ass.is_new_declaration {
+            format::Object::VariableAssignment(var_ass.variable_name.clone())
+        } else if var_ass.is_global {
+            format::Object::VariableReassignment(var_ass.variable_name.clone())
+        } else {
+            format::Object::TempVariableReassignment(var_ass.variable_name.clone())
+        });
+    }
+
+    if object.as_any().is::<Void>() {
+        return Ok(format::Object::Void);
+    }
+
     Err(StoryError::BadJson(format!(
         "Failed to write runtime object to JSON: {}",
-        o
+        object
     )))
+}
+
+fn divert_to_format_object(divert: &Rc<Divert>) -> format::Object {
+    let target_str = if divert.has_variable_target() {
+        divert.variable_divert_name.clone().unwrap()
+    } else {
+        divert.get_target_path_string().unwrap()
+    };
+
+    if divert.is_external {
+        format::Object::ExternalFunction {
+            target: target_str,
+            args: divert.external_args,
+        }
+    } else if divert.pushes_to_stack && divert.stack_push_type == PushPopType::Function {
+        format::Object::FunctionDivert { target: target_str }
+    } else if divert.pushes_to_stack && divert.stack_push_type == PushPopType::Tunnel {
+        format::Object::TunnelDivert {
+            target: target_str,
+            variable: divert.has_variable_target(),
+        }
+    } else if divert.is_conditional {
+        format::Object::ConditionalDivert { target: target_str }
+    } else {
+        format::Object::Divert {
+            target: target_str,
+            variable: divert.has_variable_target(),
+        }
+    }
+}
+
+fn control_command_to_format_object(
+    command: &ControlCommand,
+) -> Result<format::Object, StoryError> {
+    match command.command_type {
+        CommandType::BeginTag => Ok(format::Object::Tag { is_start: true }),
+        CommandType::EndTag => Ok(format::Object::Tag { is_start: false }),
+        command_type => {
+            let name = ControlCommand::get_name(command_type);
+            format::ControlCommand::from_token(&name)
+                .map(format::Object::ControlCommand)
+                .ok_or_else(|| {
+                    StoryError::BadJson(format!("Unsupported control command token: {name}"))
+                })
+        }
+    }
 }
 
 fn value_type_to_format_object(value: &ValueType) -> Result<format::Object, StoryError> {
@@ -221,11 +244,6 @@ fn runtime_container_to_format(
     })
 }
 
-fn runtime_object_to_format_object(object: Rc<dyn RTObject>) -> Result<format::Object, StoryError> {
-    let value = write_rtobject(object)?;
-    format::Object::from_json_value(value).map_err(|error| StoryError::BadJson(error.to_string()))
-}
-
 pub fn write_choice(choice: &Choice) -> serde_json::Value {
     let mut jobj: Map<String, serde_json::Value> = Map::new();
 
@@ -258,7 +276,10 @@ fn write_choice_tags(choice: &Choice) -> serde_json::Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fmt;
+
     use crate::native_function_call::{NativeFunctionCall, Op};
+    use crate::object::Object;
 
     #[test]
     fn writes_native_function_calls_through_format_native_functions() {
@@ -269,5 +290,141 @@ mod tests {
             runtime_object_to_format_object(object).unwrap(),
             format::Object::NativeFunction(format::NativeFunction::Len)
         );
+    }
+
+    #[test]
+    fn converts_runtime_containers_to_format_objects_without_json_reparse() {
+        let named_child = Container::new(
+            Some("knot".to_string()),
+            0,
+            vec![Rc::new(Value::new::<&str>("Nested")) as Rc<dyn RTObject>],
+            HashMap::new(),
+        );
+        let mut named_content = HashMap::new();
+        named_content.insert("knot".to_string(), named_child);
+        let root = Container::new(
+            Some("root".to_string()),
+            1,
+            vec![
+                Rc::new(Value::new::<&str>("Line.")) as Rc<dyn RTObject>,
+                Rc::new(ControlCommand::new(CommandType::BeginTag)) as Rc<dyn RTObject>,
+                Rc::new(ControlCommand::new(CommandType::Done)) as Rc<dyn RTObject>,
+            ],
+            named_content,
+        );
+        let root_object: Rc<dyn RTObject> = root.clone();
+
+        let format_object = runtime_object_to_format_object(root_object.clone())
+            .expect("runtime container should convert to format object");
+
+        assert_eq!(
+            format_object.to_json_value(),
+            write_rtobject(root_object).expect("runtime object should write")
+        );
+        assert_eq!(
+            format_object.to_json_value(),
+            write_rt_container(root.as_ref(), false).expect("runtime container should write")
+        );
+        let format::Object::Container(format_container) = format_object else {
+            panic!("expected format container object");
+        };
+        assert_eq!(format_container.name.as_deref(), Some("root"));
+        assert_eq!(format_container.flags, Some(1));
+        assert_eq!(
+            format_container.content,
+            vec![
+                format::Object::String("Line.".to_string()),
+                format::Object::Tag { is_start: true },
+                format::Object::ControlCommand(format::ControlCommand::Done),
+            ]
+        );
+        assert_eq!(format_container.named_content.len(), 1);
+        assert_eq!(format_container.named_content[0].name, "knot");
+        assert_eq!(
+            format_container.named_content[0].container.content,
+            vec![format::Object::String("Nested".to_string())]
+        );
+    }
+
+    #[test]
+    fn value_dictionaries_write_and_read_save_state_values() {
+        let mut fields = BTreeMap::new();
+        fields.insert("hp".to_string(), ValueType::Int(10));
+        let mut values = HashMap::new();
+        values.insert("score".to_string(), Rc::new(Value::new::<i32>(7)));
+        values.insert(
+            "items".to_string(),
+            Rc::new(Value::new_value_type(ValueType::Array(vec![
+                ValueType::new("key"),
+                ValueType::Bool(true),
+            ]))),
+        );
+        values.insert(
+            "player".to_string(),
+            Rc::new(Value::new_value_type(ValueType::Object(fields))),
+        );
+
+        let written = write_dictionary_values(&values).expect("value dictionary should write");
+
+        assert_eq!(written["score"], json!(7));
+        assert_eq!(written["items"], json!(["^key", true]));
+        assert_eq!(written["player"], json!({ "hp": 10 }));
+        let read = crate::json::json_read::jobject_to_hashmap_values(
+            written.as_object().expect("dictionary should be an object"),
+        )
+        .expect("value dictionary should read");
+
+        assert!(matches!(
+            read.get("score").map(|value| &value.value),
+            Some(ValueType::Int(7))
+        ));
+        let Some(ValueType::Array(items)) = read.get("items").map(|value| &value.value) else {
+            panic!("expected items array");
+        };
+        assert!(matches!(
+            items.as_slice(),
+            [ValueType::String(_), ValueType::Bool(true)]
+        ));
+        let Some(ValueType::Object(player)) = read.get("player").map(|value| &value.value) else {
+            panic!("expected player object");
+        };
+        assert!(matches!(player.get("hp"), Some(ValueType::Int(10))));
+    }
+
+    #[test]
+    fn unsupported_runtime_objects_still_report_bad_json() {
+        let object: Rc<dyn RTObject> = Rc::new(UnsupportedObject::new());
+
+        let error = match write_rtobject(object) {
+            Ok(_) => panic!("expected unsupported runtime object to fail"),
+            Err(StoryError::BadJson(message)) => message,
+            Err(error) => panic!("expected BadJson, got {error:?}"),
+        };
+
+        assert!(error.contains("Failed to write runtime object to JSON: unsupported"));
+    }
+
+    struct UnsupportedObject {
+        object: Object,
+    }
+
+    impl UnsupportedObject {
+        fn new() -> Self {
+            Self {
+                object: Object::new(),
+            }
+        }
+    }
+
+    impl RTObject for UnsupportedObject {
+        fn get_object(&self) -> &Object {
+            &self.object
+        }
+    }
+
+    impl fmt::Display for UnsupportedObject {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "unsupported")
+        }
     }
 }
