@@ -87,7 +87,7 @@ Validation status:
 - `cargo fmt --all --check` passed.
 - `make gate` passed.
 
-Commit: pending.
+Commit: ab4791c9c3c39e07c2d1af8be69eec7546d5eaad
 
 ### [ ] Task 02: Migrate Expression Lowering To The Context
 
