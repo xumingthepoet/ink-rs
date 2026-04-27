@@ -126,13 +126,13 @@
           "name": "entity.name.type.struct.ink"
         },
         "3": {
-          "name": "punctuation.section.block.begin.ink"
+          "name": "keyword.control.heading.ink"
         }
       },
       "end": "\\}",
       "endCaptures": {
         "0": {
-          "name": "punctuation.section.block.end.ink"
+          "name": "keyword.control.heading.ink"
         }
       },
       "name": "meta.struct.declaration.ink",
@@ -161,16 +161,16 @@
       "match": "^\\s*(===)\\s*(module)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*(===)\\s*$",
       "captures": {
         "1": {
-          "name": "punctuation.definition.heading.module.begin.ink"
+          "name": "keyword.control.heading.ink"
         },
         "2": {
           "name": "storage.type.module.ink"
         },
         "3": {
-          "name": "entity.name.namespace.module.ink"
+          "name": "entity.name.function.module.ink"
         },
         "4": {
-          "name": "punctuation.definition.heading.module.end.ink"
+          "name": "keyword.control.heading.ink"
         }
       },
       "name": "meta.module.declaration.ink"
@@ -179,13 +179,13 @@
       "begin": "^\\s*(==)\\s*(?:(function)\\s+)?([A-Za-z_][A-Za-z0-9_]*)",
       "beginCaptures": {
         "1": {
-          "name": "punctuation.definition.heading.ink"
+          "name": "keyword.control.heading.ink"
         },
         "2": {
           "name": "storage.type.function.ink"
         },
         "3": {
-          "name": "entity.name.section.knot.ink"
+          "name": "entity.name.function.knot.ink"
         }
       },
       "end": "$",
@@ -199,7 +199,7 @@
         },
         {
           "match": "==",
-          "name": "punctuation.definition.heading.ink"
+          "name": "keyword.control.heading.ink"
         }
       ]
     },
@@ -207,13 +207,13 @@
       "begin": "^\\s*(=)\\s*(?:(function)\\s+)?([A-Za-z_][A-Za-z0-9_]*)",
       "beginCaptures": {
         "1": {
-          "name": "punctuation.definition.heading.ink"
+          "name": "keyword.control.heading.ink"
         },
         "2": {
           "name": "storage.type.function.ink"
         },
         "3": {
-          "name": "entity.name.section.stitch.ink"
+          "name": "entity.name.function.stitch.ink"
         }
       },
       "end": "$",
@@ -313,7 +313,7 @@
           "name": "storage.modifier.constant.ink"
         },
         "2": {
-          "name": "entity.name.constant.ink"
+          "name": "entity.name.variable.constant.ink"
         },
         "3": {
           "name": "punctuation.separator.type.ink"
@@ -335,13 +335,19 @@
       ]
     },
     "choice-line": {
-      "begin": "^\\s*((?:[+*]\\s*)+)(?:\\(\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*\\))?",
+      "begin": "^\\s*((?:[+*]\\s*)+)(?:(\\()\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*(\\)))?",
       "beginCaptures": {
         "1": {
-          "name": "keyword.operator.choice.bullet.ink"
+          "name": "keyword.control.heading.ink"
         },
         "2": {
+          "name": "keyword.control.heading.ink"
+        },
+        "3": {
           "name": "entity.name.label.choice.ink"
+        },
+        "4": {
+          "name": "keyword.control.heading.ink"
         }
       },
       "end": "$",
@@ -386,13 +392,19 @@
       ]
     },
     "gather-line": {
-      "match": "^\\s*((?:-\\s*)+)(?!>)(?:\\(\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*\\))?",
+      "match": "^\\s*((?:-\\s*)+)(?!>)(?:(\\()\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*(\\)))?",
       "captures": {
         "1": {
-          "name": "keyword.operator.gather.bullet.ink"
+          "name": "keyword.control.heading.ink"
         },
         "2": {
+          "name": "keyword.control.heading.ink"
+        },
+        "3": {
           "name": "entity.name.label.gather.ink"
+        },
+        "4": {
+          "name": "keyword.control.heading.ink"
         }
       },
       "name": "meta.gather.ink"
@@ -401,7 +413,7 @@
       "begin": "^\\s*(~)",
       "beginCaptures": {
         "1": {
-          "name": "keyword.operator.logic-line.ink"
+          "name": "keyword.control.heading.ink"
         }
       },
       "end": "$",
@@ -438,13 +450,13 @@
       "begin": "^\\s*(\\{)(?![^\\n{}]*\\})",
       "beginCaptures": {
         "1": {
-          "name": "punctuation.section.logic.begin.ink"
+          "name": "keyword.control.heading.ink"
         }
       },
       "end": "^\\s*(\\})",
       "endCaptures": {
         "1": {
-          "name": "punctuation.section.logic.end.ink"
+          "name": "keyword.control.heading.ink"
         }
       },
       "name": "meta.logic.block.ink",
@@ -456,7 +468,7 @@
           "match": "^\\s*(-)\\s*(else)?([^:]*)(:)",
           "captures": {
             "1": {
-              "name": "keyword.operator.conditional.branch.ink"
+              "name": "keyword.control.heading.ink"
             },
             "2": {
               "name": "keyword.control.conditional.else.ink"
@@ -526,10 +538,10 @@
       "name": "constant.language.glue.ink"
     },
     "divert": {
-      "match": "(->->|->t->|->|<-)\\s*((?:(DONE)|(END)|([A-Za-z_][A-Za-z0-9_]*))(?:\\s*(?:::|\\.)\\s*[A-Za-z_][A-Za-z0-9_]*)*(?:\\s*\\([^)]*\\))?)?",
+      "match": "(->->|->t->|->|<-)\\s*((?:(DONE)|(END)|([A-Za-z_][A-Za-z0-9_]*))(?:\\s*(?:::|\\.)\\s*[A-Za-z_][A-Za-z0-9_]*)*)?(?:\\s*(\\()([^)]*)(\\)))?",
       "captures": {
         "1": {
-          "name": "keyword.operator.divert.ink"
+          "name": "keyword.control.heading.ink"
         },
         "3": {
           "name": "constant.language.done.ink"
@@ -539,6 +551,15 @@
         },
         "5": {
           "name": "variable.other.divert-target.ink"
+        },
+        "6": {
+          "name": "keyword.control.heading.ink"
+        },
+        "7": {
+          "name": "meta.arguments.divert.ink"
+        },
+        "8": {
+          "name": "keyword.control.heading.ink"
         }
       },
       "name": "meta.divert.ink"
@@ -547,19 +568,25 @@
       "begin": "(->->|->t->|->|<-)\\s*(\\{)",
       "beginCaptures": {
         "1": {
-          "name": "keyword.operator.divert.ink"
+          "name": "keyword.control.heading.ink"
         },
         "2": {
-          "name": "punctuation.section.dynamic-divert.begin.ink"
+          "name": "keyword.control.heading.ink"
         }
       },
-      "end": "(\\})(?:\\s*(\\([^)]*\\)))?",
+      "end": "(\\})(?:\\s*(\\()([^)]*)(\\)))?",
       "endCaptures": {
         "1": {
-          "name": "punctuation.section.dynamic-divert.end.ink"
+          "name": "keyword.control.heading.ink"
         },
         "2": {
+          "name": "keyword.control.heading.ink"
+        },
+        "3": {
           "name": "meta.arguments.dynamic-divert.ink"
+        },
+        "4": {
+          "name": "keyword.control.heading.ink"
         }
       },
       "name": "meta.divert.dynamic.ink",
@@ -573,7 +600,7 @@
       "begin": "(\\{)\\s*([~&!$])?(?=[^}]*\\|)",
       "beginCaptures": {
         "1": {
-          "name": "punctuation.section.sequence.begin.ink"
+          "name": "keyword.control.heading.ink"
         },
         "2": {
           "name": "keyword.operator.sequence.mode.ink"
@@ -582,7 +609,7 @@
       "end": "\\}",
       "endCaptures": {
         "0": {
-          "name": "punctuation.section.sequence.end.ink"
+          "name": "keyword.control.heading.ink"
         }
       },
       "name": "meta.sequence.inline.ink",
@@ -600,13 +627,13 @@
       "begin": "(\\{)(?=[^{}|]*:)",
       "beginCaptures": {
         "1": {
-          "name": "punctuation.section.conditional.begin.ink"
+          "name": "keyword.control.heading.ink"
         }
       },
       "end": "\\}",
       "endCaptures": {
         "0": {
-          "name": "punctuation.section.conditional.end.ink"
+          "name": "keyword.control.heading.ink"
         }
       },
       "name": "meta.conditional.inline.ink",
@@ -631,13 +658,13 @@
       "begin": "\\{",
       "beginCaptures": {
         "0": {
-          "name": "punctuation.section.logic.begin.ink"
+          "name": "keyword.control.heading.ink"
         }
       },
       "end": "\\}",
       "endCaptures": {
         "0": {
-          "name": "punctuation.section.logic.end.ink"
+          "name": "keyword.control.heading.ink"
         }
       },
       "name": "meta.logic.inline.ink",
@@ -654,11 +681,11 @@
       "patterns": [
         {
           "match": "\\(",
-          "name": "punctuation.section.parameters.begin.ink"
+          "name": "keyword.control.heading.ink"
         },
         {
           "match": "\\)",
-          "name": "punctuation.section.parameters.end.ink"
+          "name": "keyword.control.heading.ink"
         },
         {
           "match": ",",
@@ -736,6 +763,9 @@
           "include": "#member-access"
         },
         {
+          "include": "#brackets"
+        },
+        {
           "include": "#operators"
         },
         {
@@ -781,6 +811,10 @@
     "builtins": {
       "match": "\\b(?:LEN|ARRAY_REMOVE|RANDOM|SEED_RANDOM|POW|FLOOR|CEILING|INT|FLOAT)\\b",
       "name": "support.function.builtin.ink"
+    },
+    "brackets": {
+      "match": "[(){}]",
+      "name": "keyword.control.heading.ink"
     },
     "field-key": {
       "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\b(?=\\s*:)",
