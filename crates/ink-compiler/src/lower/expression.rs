@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use ink_story_json_format::{ControlCommand, Object as RuntimeObject};
+use ink_story_json_format::{ControlCommand, NativeFunction, Object as RuntimeObject};
 
 use crate::parsed::{AssignmentTarget, BinaryOperator, Expression, FlowArgument};
 
@@ -12,7 +12,6 @@ use super::context::{ChoicePathMode, LoweringContext};
 use super::indexes::{
     CallSignature, ConstantValue, ConstantValues, ExternalSignatures, StructDefinitions,
 };
-use super::native_function;
 use super::path::{
     module_scoped_source_path_to_runtime_path, source_path_to_runtime_path, LabelIndex,
 };
@@ -217,7 +216,7 @@ fn lower_expression_into_with_constants(
                 visiting_constants,
             );
             content.push(RuntimeObject::String(field.clone()));
-            content.push(native_function("FIELD"));
+            content.push(RuntimeObject::NativeFunction(NativeFunction::FieldRead));
         }
         Expression::IndexAccess { base, index } => {
             lower_expression_into_with_constants(
@@ -246,7 +245,7 @@ fn lower_expression_into_with_constants(
                 has_start_content,
                 visiting_constants,
             );
-            content.push(native_function("INDEX"));
+            content.push(RuntimeObject::NativeFunction(NativeFunction::IndexRead));
         }
         Expression::Binary {
             operator,
@@ -279,7 +278,9 @@ fn lower_expression_into_with_constants(
                 has_start_content,
                 visiting_constants,
             );
-            content.push(native_function(operator_runtime_name(*operator)));
+            content.push(RuntimeObject::NativeFunction(
+                native_function_for_binary_operator(*operator),
+            ));
         }
         Expression::Unary {
             operator,
@@ -298,7 +299,9 @@ fn lower_expression_into_with_constants(
                 has_start_content,
                 visiting_constants,
             );
-            content.push(native_function(operator.runtime_name()));
+            content.push(RuntimeObject::NativeFunction(
+                native_function_for_unary_operator(*operator),
+            ));
         }
         Expression::MultipleCondition(expressions) => {
             for (index, expression) in expressions.iter().enumerate() {
@@ -316,7 +319,7 @@ fn lower_expression_into_with_constants(
                     visiting_constants,
                 );
                 if index > 0 {
-                    content.push(native_function("&&"));
+                    content.push(RuntimeObject::NativeFunction(NativeFunction::And));
                 }
             }
         }
@@ -378,6 +381,7 @@ fn lower_function_call_into(
     visiting_constants: &mut HashSet<String>,
 ) {
     let resolved_name = resolve_callable_name(name, external_signatures, path_mode);
+    let builtin_function = builtin_native_function(name);
     match name {
         "ARRAY_REMOVE" => {
             lower_array_remove_call_into(
@@ -431,7 +435,7 @@ fn lower_function_call_into(
             }
             content.push(RuntimeObject::ControlCommand(ControlCommand::SeedRandom));
         }
-        _ if is_builtin_function(name) => {
+        _ if builtin_function.is_some() => {
             for arg in args {
                 lower_function_arg_into_parts(
                     content,
@@ -448,7 +452,9 @@ fn lower_function_call_into(
                     visiting_constants,
                 );
             }
-            content.push(native_function(name));
+            content.push(RuntimeObject::NativeFunction(
+                builtin_function.expect("builtin function guard should provide a native function"),
+            ));
         }
         _ if matches!(
             external_signatures.get(resolved_name.as_str()),
@@ -590,7 +596,7 @@ fn lower_array_remove_call_into(
             false,
             visiting_constants,
         );
-        content.push(native_function("ARRAY_REMOVE"));
+        content.push(RuntimeObject::NativeFunction(NativeFunction::ArrayRemove));
     } else {
         lower_assignment_path_update_value_into(
             content,
@@ -694,15 +700,45 @@ fn lower_function_arg_into_parts(
     );
 }
 
-fn operator_runtime_name(operator: BinaryOperator) -> &'static str {
-    operator.runtime_name()
+fn native_function_for_binary_operator(operator: BinaryOperator) -> NativeFunction {
+    match operator {
+        BinaryOperator::And | BinaryOperator::AndSymbol => NativeFunction::And,
+        BinaryOperator::Or | BinaryOperator::OrSymbol => NativeFunction::Or,
+        BinaryOperator::Equals => NativeFunction::Equal,
+        BinaryOperator::NotEquals => NativeFunction::NotEquals,
+        BinaryOperator::GreaterThan => NativeFunction::Greater,
+        BinaryOperator::LessThan => NativeFunction::Less,
+        BinaryOperator::GreaterThanOrEquals => NativeFunction::GreaterThanOrEquals,
+        BinaryOperator::LessThanOrEquals => NativeFunction::LessThanOrEquals,
+        BinaryOperator::Has => NativeFunction::Has,
+        BinaryOperator::Hasnt => NativeFunction::Hasnt,
+        BinaryOperator::Add => NativeFunction::Add,
+        BinaryOperator::Subtract => NativeFunction::Subtract,
+        BinaryOperator::Multiply => NativeFunction::Multiply,
+        BinaryOperator::Divide => NativeFunction::Divide,
+        BinaryOperator::Modulo => NativeFunction::Mod,
+    }
 }
 
-fn is_builtin_function(name: &str) -> bool {
-    matches!(
-        name,
-        "MIN" | "MAX" | "POW" | "FLOOR" | "CEILING" | "INT" | "FLOAT" | "LEN"
-    )
+fn native_function_for_unary_operator(operator: crate::parsed::UnaryOperator) -> NativeFunction {
+    match operator {
+        crate::parsed::UnaryOperator::Negate => NativeFunction::Negate,
+        crate::parsed::UnaryOperator::Not => NativeFunction::Not,
+    }
+}
+
+fn builtin_native_function(name: &str) -> Option<NativeFunction> {
+    match name {
+        "MIN" => Some(NativeFunction::Min),
+        "MAX" => Some(NativeFunction::Max),
+        "POW" => Some(NativeFunction::Pow),
+        "FLOOR" => Some(NativeFunction::Floor),
+        "CEILING" => Some(NativeFunction::Ceiling),
+        "INT" => Some(NativeFunction::Int),
+        "FLOAT" => Some(NativeFunction::Float),
+        "LEN" => Some(NativeFunction::Len),
+        _ => None,
+    }
 }
 
 fn resolve_runtime_variable_name(

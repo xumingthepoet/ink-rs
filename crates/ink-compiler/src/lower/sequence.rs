@@ -1,10 +1,9 @@
-use ink_story_json_format::{Container, ControlCommand, Object as RuntimeObject};
+use ink_story_json_format::{Container, ControlCommand, NativeFunction, Object as RuntimeObject};
 
 use crate::parsed::{Sequence, SequenceType, Weave};
 
 use super::context::LoweringContext;
 use super::named_container;
-use super::native_function;
 use super::path::compact_relative_path;
 use super::weave::{
     content_list_has_choice, lower_choice_weave_with_initial_content,
@@ -30,10 +29,10 @@ pub(super) fn lower_sequence(
 
     if stopping || once {
         content.push(RuntimeObject::Int(branch_count.saturating_sub(1) as i32));
-        content.push(native_function("MIN"));
+        content.push(RuntimeObject::NativeFunction(NativeFunction::Min));
     } else if cycle {
         content.push(RuntimeObject::Int(sequence.elements().len() as i32));
-        content.push(native_function("%"));
+        content.push(RuntimeObject::NativeFunction(NativeFunction::Mod));
     }
 
     if shuffle {
@@ -47,7 +46,7 @@ pub(super) fn lower_sequence(
             content.extend([
                 RuntimeObject::ControlCommand(ControlCommand::Duplicate),
                 RuntimeObject::Int(last_index as i32),
-                native_function("=="),
+                RuntimeObject::NativeFunction(NativeFunction::Equal),
                 RuntimeObject::ConditionalDivert {
                     target: format!(".^.{post_shuffle_noop_index}"),
                 },
@@ -71,7 +70,7 @@ pub(super) fn lower_sequence(
             RuntimeObject::ControlCommand(ControlCommand::EvalStart),
             RuntimeObject::ControlCommand(ControlCommand::Duplicate),
             RuntimeObject::Int(index as i32),
-            native_function("=="),
+            RuntimeObject::NativeFunction(NativeFunction::Equal),
             RuntimeObject::ControlCommand(ControlCommand::EvalEnd),
             RuntimeObject::ConditionalDivert {
                 target: format!(".^.s{index}"),

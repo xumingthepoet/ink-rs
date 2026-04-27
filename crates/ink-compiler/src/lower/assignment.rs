@@ -1,10 +1,9 @@
-use ink_story_json_format::{ControlCommand, Object as RuntimeObject};
+use ink_story_json_format::{ControlCommand, NativeFunction, Object as RuntimeObject};
 
 use crate::parsed::{AssignmentTarget, Expression, IncDec, VariableAssignment};
 
 use super::context::{ChoicePathMode, LoweringContext};
 use super::expression::lower_expression_into;
-use super::native_function;
 use super::value::{lower_value_literal, runtime_default_for_type};
 
 pub(super) enum AssignmentPathComponent<'a> {
@@ -18,7 +17,7 @@ pub(super) enum AssignmentUpdateValue<'a> {
     Expression(&'a Expression),
     Compound {
         expression: &'a Expression,
-        operator: &'static str,
+        operator: NativeFunction,
     },
     ArrayRemove {
         index: &'a Expression,
@@ -120,10 +119,12 @@ fn lower_assignment_path_read_into(
     for component in components {
         lower_assignment_path_component_key_into(content, component, context);
         let read_operation = match component {
-            AssignmentPathComponent::Field(_) => "FIELD",
-            AssignmentPathComponent::Index(_) | AssignmentPathComponent::CachedIndex(_) => "INDEX",
+            AssignmentPathComponent::Field(_) => NativeFunction::FieldRead,
+            AssignmentPathComponent::Index(_) | AssignmentPathComponent::CachedIndex(_) => {
+                NativeFunction::IndexRead
+            }
         };
-        content.push(native_function(read_operation));
+        content.push(RuntimeObject::NativeFunction(read_operation));
     }
 }
 
@@ -144,12 +145,12 @@ fn lower_assignment_update_value_into(
         } => {
             lower_assignment_path_read_into(content, root_name, components, context);
             lower_expression_into(content, expression, context, false);
-            content.push(native_function(operator));
+            content.push(RuntimeObject::NativeFunction(operator));
         }
         AssignmentUpdateValue::ArrayRemove { index } => {
             lower_assignment_path_read_into(content, root_name, components, context);
             lower_expression_into(content, index, context, false);
-            content.push(native_function("ARRAY_REMOVE"));
+            content.push(RuntimeObject::NativeFunction(NativeFunction::ArrayRemove));
         }
     }
 }
@@ -179,10 +180,12 @@ pub(super) fn lower_assignment_path_update_value_into(
     }
 
     let write_operation = match &components[component_index] {
-        AssignmentPathComponent::Field(_) => "SET_FIELD",
-        AssignmentPathComponent::Index(_) | AssignmentPathComponent::CachedIndex(_) => "SET_INDEX",
+        AssignmentPathComponent::Field(_) => NativeFunction::FieldWrite,
+        AssignmentPathComponent::Index(_) | AssignmentPathComponent::CachedIndex(_) => {
+            NativeFunction::IndexWrite
+        }
     };
-    content.push(native_function(write_operation));
+    content.push(RuntimeObject::NativeFunction(write_operation));
 }
 
 pub(super) fn lower_cached_assignment_indexes_into<'a>(
@@ -311,7 +314,11 @@ pub(super) fn lower_inc_dec_into(
         if components.is_empty() {
             return;
         }
-        let operator = if inc_dec.is_increment() { "+" } else { "-" };
+        let operator = if inc_dec.is_increment() {
+            NativeFunction::Add
+        } else {
+            NativeFunction::Subtract
+        };
 
         content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
         let resolved_root_name = resolve_runtime_variable_name(
@@ -340,10 +347,10 @@ pub(super) fn lower_inc_dec_into(
         resolve_runtime_variable_name(name, context.path_mode(), context.global_variables());
     content.push(RuntimeObject::VariableReference(resolved_name.clone()));
     lower_expression_into(content, inc_dec.expression(), context, false);
-    content.push(native_function(if inc_dec.is_increment() {
-        "+"
+    content.push(RuntimeObject::NativeFunction(if inc_dec.is_increment() {
+        NativeFunction::Add
     } else {
-        "-"
+        NativeFunction::Subtract
     }));
     if context.path_mode().is_local_variable(name) {
         content.push(RuntimeObject::TempVariableReassignment(resolved_name));

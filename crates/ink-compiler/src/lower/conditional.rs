@@ -1,11 +1,10 @@
-use ink_story_json_format::{Container, ControlCommand, Object as RuntimeObject};
+use ink_story_json_format::{Container, ControlCommand, NativeFunction, Object as RuntimeObject};
 
 use crate::parsed::Conditional;
 
 use super::context::LoweringContext;
 use super::expression::lower_expression_into;
 use super::lower_object_into_with_context;
-use super::native_function;
 use super::weave::{lower_choice_weave_with_initial_content, weave_has_choice};
 use super::{named_container, named_content};
 
@@ -54,7 +53,7 @@ pub(super) fn lower_conditional_into(
                 lower_expression_into(&mut branch_content, condition, context, false);
             }
             if switch_like {
-                branch_content.push(native_function("=="));
+                branch_content.push(RuntimeObject::NativeFunction(NativeFunction::Equal));
             }
             if needs_eval {
                 branch_content.push(RuntimeObject::ControlCommand(ControlCommand::EvalEnd));
