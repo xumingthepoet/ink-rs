@@ -2346,6 +2346,79 @@ A game which uses ink as a script rather than a literal output might often gener
 	...
 ```
 
+#### Example: generating choices from an array
+
+Threads can also generate a runtime number of choices from data. There is no
+source-level `for` loop that expands an array into `*` lines, but a recursive
+thread can walk an array and offer one choice for each enabled element.
+
+The choice behavior still needs to live in authored knots or stitches. Store
+those targets in the data as `->` values, then use an explicit dynamic divert
+when a generated choice is selected.
+
+```
+=== module game ===
+
+STRUCT ChoiceOption {
+text: string
+target: ->
+enabled: bool
+}
+
+VAR options: ChoiceOption[] = [{ text: "A", target: -> a, enabled: true }, { text: "B", target: -> b, enabled: true }, { text: "C", target: -> c, enabled: false }, { text: "D", target: -> d, enabled: true }]
+
+== main ==
+<- emit_options(LEN(options) - 1)
+-> DONE
+
+== emit_options(i: int) ==
+{ i >= 0:
+	<- emit_options(i - 1)
+
+	{ options[i].enabled:
+		~ temp option: ChoiceOption = options[i]
+		* <>{option.text}
+			-> {option.target}
+	}
+}
+-> DONE
+
+== a ==
+A chosen.
+-> END
+
+== b ==
+B chosen.
+-> END
+
+== c ==
+C chosen.
+-> END
+
+== d ==
+D chosen.
+-> END
+```
+
+This presents `A`, `B`, and `D`; `C` is skipped because its `enabled` field is
+false.
+
+The helper starts at `LEN(options) - 1` so the displayed choices keep array
+order. A thread runs the forked content first, then returns to the current fork,
+so each layer first asks the previous index to generate its choices and then
+generates its own.
+
+The local `option` temp is deliberate. A generated choice captures the thread at
+the time the choice was created, so copying `options[i]` before the `*` line
+keeps the displayed text and selected target together. Without that temp, later
+changes to shared global data can make a pending generated choice run with data
+that no longer matches what the player saw.
+
+The `<>` before `{option.text}` is also deliberate. At the beginning of a choice
+line, braced expressions are parsed as choice conditions. Glue is invisible
+content, so it ends the condition area without adding visible text, allowing the
+choice display text to be completely dynamic.
+
 # Part 5: International character support in identifiers
 
 By default, ink has no limitations on the use of non-ASCII characters inside the story content. However, a limitation currently exsits

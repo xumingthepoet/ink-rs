@@ -25,6 +25,33 @@ Each entry should include:
 - migration guidance
 - tests
 
+## 2026-04-27: Data-Driven Choice Generation With Threads
+
+- status: supported
+- upstream behavior: upstream Ink uses authored choice points and threads to
+  collect choices from multiple flows. It does not provide a general source
+  loop that expands an arbitrary data collection into choice syntax.
+- ink-rs behavior: existing ink-rs arrays, structs, `LEN`, dynamic divert
+  target values, and thread forking can be composed to generate a runtime number
+  of choices from data. A recursive thread can walk an array and offer one
+  choice per enabled element. The selected branch can then use the element's
+  stored `->` target.
+- documentation effect: `WritingWithInk-latest.md` now documents the recursive
+  thread pattern for dynamic data-driven choices, including why the recursion
+  starts from the last index, why each element should be copied to a local temp
+  before offering the choice, and why `<>` is needed when the displayed choice
+  text starts with a dynamic expression.
+- rationale: this is a useful authoring pattern made possible by already
+  supported language features. Documenting it avoids mistaking the lack of a
+  source-level `for` loop for a hard limit on runtime choice counts.
+- migration guidance: replace fixed preallocated choice slots with a recursive
+  thread helper when the number of generated options should follow an array's
+  current length. Keep branch behavior in authored knots or stitches and store
+  their divert targets in the data.
+- tests: documentation-only change; the example pattern was manually compiled
+  and run with the existing local `ink_compile` and runtime artifacts, producing
+  choices `A`, `B`, and `D` from a four-item array where `C` was disabled.
+
 ## 2026-04-27: Explicit Modules And Imports Replace Include
 
 - status: supported/removed
