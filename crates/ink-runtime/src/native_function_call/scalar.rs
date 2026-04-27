@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use super::Op;
+use super::{params, Op};
 use crate::{object::RTObject, story_error::StoryError, value::Value, value_type::ValueType};
 
 pub(super) fn call(op: Op, params: Vec<Rc<dyn RTObject>>) -> Result<Rc<dyn RTObject>, StoryError> {
@@ -51,8 +51,8 @@ fn call_type(op: Op, coerced_params: &[Rc<Value>]) -> Result<Rc<dyn RTObject>, S
 }
 
 fn add(params: &[Rc<dyn RTObject>]) -> Result<Rc<dyn RTObject>, StoryError> {
-    let left = native_value_param(params, 0, "+")?;
-    let right = native_value_param(params, 1, "+")?;
+    let left = params::value_for_operation(params, 0, "+")?;
+    let right = params::value_for_operation(params, 1, "+")?;
     if matches!(left.value, ValueType::String(_)) || matches!(right.value, ValueType::String(_)) {
         return match (&left.value, &right.value) {
             (ValueType::String(left), ValueType::String(right)) => {
@@ -72,8 +72,8 @@ fn add(params: &[Rc<dyn RTObject>]) -> Result<Rc<dyn RTObject>, StoryError> {
 }
 
 fn equal(params: &[Rc<dyn RTObject>]) -> Result<Rc<dyn RTObject>, StoryError> {
-    let left = native_value_param(params, 0, "==")?;
-    let right = native_value_param(params, 1, "==")?;
+    let left = params::value_for_operation(params, 0, "==")?;
+    let right = params::value_for_operation(params, 1, "==")?;
     let equal = if value_type_is_composite(&left.value) || value_type_is_composite(&right.value) {
         value_types_equal(&left.value, &right.value)
     } else {
@@ -104,7 +104,7 @@ fn coerce_values_to_single_type(
         // "higher level" types infect both so that binary operations
         // use the same type on both sides. e.g. binary operation of
         // int and float causes the int to be casted to a float.
-        if let Some(v) = obj.as_ref().as_any().downcast_ref::<Value>() {
+        if let Some(v) = params::runtime_value(obj.as_ref()) {
             if v.get_cast_ordinal() > dest_type {
                 dest_type = v.get_cast_ordinal();
             }
@@ -112,20 +112,14 @@ fn coerce_values_to_single_type(
     }
 
     for obj in params.iter() {
-        if let Some(v) = obj.as_ref().as_any().downcast_ref::<Value>() {
-            match v.cast(dest_type)? {
-                Some(casted_value) => result.push(Rc::new(casted_value)),
-                None => {
-                    if let Ok(obj) = obj.clone().into_any().downcast::<Value>() {
-                        result.push(obj);
-                    }
+        let value = params::value_object(obj.as_ref())?;
+        match value.cast(dest_type)? {
+            Some(casted_value) => result.push(Rc::new(casted_value)),
+            None => {
+                if let Ok(obj) = obj.clone().into_any().downcast::<Value>() {
+                    result.push(obj);
                 }
             }
-        } else {
-            return Err(StoryError::InvalidStoryState(format!(
-                "RTObject of type Value expected: {}",
-                obj
-            )));
         }
     }
 
@@ -525,20 +519,6 @@ fn float_op(params: &[Rc<Value>]) -> Result<Rc<dyn RTObject>, StoryError> {
             "Operation not available for type.".to_owned(),
         )),
     }
-}
-
-fn native_value_param<'a>(
-    params: &'a [Rc<dyn RTObject>],
-    index: usize,
-    op_name: &str,
-) -> Result<&'a Value, StoryError> {
-    params[index]
-        .as_ref()
-        .as_any()
-        .downcast_ref::<Value>()
-        .ok_or_else(|| {
-            StoryError::InvalidStoryState(format!("{op_name} expected value parameters"))
-        })
 }
 
 fn value_type_is_composite(value: &ValueType) -> bool {

@@ -1,286 +1,97 @@
 use std::rc::Rc;
 
+use super::params;
 use crate::{object::RTObject, story_error::StoryError, value::Value, value_type::ValueType};
 
+const FIELD_OBJECT: &str = "FIELD expected an object value as its first parameter";
+const FIELD_NAME: &str = "FIELD expected a string field name as its second parameter";
+const INDEX_ARRAY: &str = "INDEX expected an array value as its first parameter";
+const INDEX_VALUE: &str = "INDEX expected an int index as its second parameter";
+const SET_FIELD_OBJECT: &str = "SET_FIELD expected an object value as its first parameter";
+const SET_FIELD_NAME: &str = "SET_FIELD expected a string field name as its second parameter";
+const SET_FIELD_VALUE: &str = "SET_FIELD expected a value as its third parameter";
+const SET_INDEX_ARRAY: &str = "SET_INDEX expected an array value as its first parameter";
+const SET_INDEX_VALUE: &str = "SET_INDEX expected an int index as its second parameter";
+const SET_INDEX_NEW_VALUE: &str = "SET_INDEX expected a value as its third parameter";
+const LEN_ARRAY: &str = "LEN expected an array value as its parameter";
+const ARRAY_REMOVE_ARRAY: &str = "ARRAY_REMOVE expected an array value as its first parameter";
+const ARRAY_REMOVE_INDEX: &str = "ARRAY_REMOVE expected an int index as its second parameter";
+
 pub(super) fn field_read(params: &[Rc<dyn RTObject>]) -> Result<Rc<dyn RTObject>, StoryError> {
-    let value = params[0]
-        .as_ref()
-        .as_any()
-        .downcast_ref::<Value>()
-        .ok_or_else(|| {
-            StoryError::InvalidStoryState(
-                "FIELD expected an object value as its first parameter".to_owned(),
-            )
-        })?;
-    let field = params[1]
-        .as_ref()
-        .as_any()
-        .downcast_ref::<Value>()
-        .ok_or_else(|| {
-            StoryError::InvalidStoryState(
-                "FIELD expected a string field name as its second parameter".to_owned(),
-            )
-        })?;
+    let value = params::value(params, 0, FIELD_OBJECT)?;
+    let field_name = params::string(params, 1, FIELD_NAME)?;
+    let fields = params::object_fields(value, FIELD_OBJECT)?;
 
-    let field_name = match &field.value {
-        ValueType::String(field_name) => &field_name.string,
-        _ => {
-            return Err(StoryError::InvalidStoryState(
-                "FIELD expected a string field name as its second parameter".to_owned(),
-            ));
-        }
-    };
-
-    match &value.value {
-        ValueType::Object(fields) => fields
-            .get(field_name)
-            .cloned()
-            .map(Value::new_value_type)
-            .map(|value| Rc::new(value) as Rc<dyn RTObject>)
-            .ok_or_else(|| {
-                StoryError::InvalidStoryState(format!("Object field not found: '{field_name}'"))
-            }),
-        _ => Err(StoryError::InvalidStoryState(
-            "FIELD expected an object value as its first parameter".to_owned(),
-        )),
-    }
+    fields
+        .get(field_name)
+        .cloned()
+        .map(Value::new_value_type)
+        .map(|value| Rc::new(value) as Rc<dyn RTObject>)
+        .ok_or_else(|| {
+            StoryError::InvalidStoryState(format!("Object field not found: '{field_name}'"))
+        })
 }
 
 pub(super) fn index_read(params: &[Rc<dyn RTObject>]) -> Result<Rc<dyn RTObject>, StoryError> {
-    let value = params[0]
-        .as_ref()
-        .as_any()
-        .downcast_ref::<Value>()
-        .ok_or_else(|| {
-            StoryError::InvalidStoryState(
-                "INDEX expected an array value as its first parameter".to_owned(),
-            )
-        })?;
-    let index = params[1]
-        .as_ref()
-        .as_any()
-        .downcast_ref::<Value>()
-        .ok_or_else(|| {
-            StoryError::InvalidStoryState(
-                "INDEX expected an int index as its second parameter".to_owned(),
-            )
-        })?;
+    let value = params::value(params, 0, INDEX_ARRAY)?;
+    let index = params::int(params, 1, INDEX_VALUE)?;
+    let values = params::array_values(value, INDEX_ARRAY)?;
+    let array_index = params::array_index_in_bounds(index, values.len())?;
 
-    let index = match index.value {
-        ValueType::Int(index) => index,
-        _ => {
-            return Err(StoryError::InvalidStoryState(
-                "INDEX expected an int index as its second parameter".to_owned(),
-            ));
-        }
-    };
-
-    match &value.value {
-        ValueType::Array(values) => {
-            let array_index = usize::try_from(index).map_err(|_| {
-                StoryError::InvalidStoryState(format!("Array index out of bounds: {index}"))
-            })?;
-            values
-                .get(array_index)
-                .cloned()
-                .map(Value::new_value_type)
-                .map(|value| Rc::new(value) as Rc<dyn RTObject>)
-                .ok_or_else(|| {
-                    StoryError::InvalidStoryState(format!("Array index out of bounds: {index}"))
-                })
-        }
-        _ => Err(StoryError::InvalidStoryState(
-            "INDEX expected an array value as its first parameter".to_owned(),
-        )),
-    }
+    Ok(Rc::new(Value::new_value_type(values[array_index].clone())))
 }
 
 pub(super) fn field_write(params: &[Rc<dyn RTObject>]) -> Result<Rc<dyn RTObject>, StoryError> {
-    let value = params[0]
-        .as_ref()
-        .as_any()
-        .downcast_ref::<Value>()
-        .ok_or_else(|| {
-            StoryError::InvalidStoryState(
-                "SET_FIELD expected an object value as its first parameter".to_owned(),
-            )
-        })?;
-    let field = params[1]
-        .as_ref()
-        .as_any()
-        .downcast_ref::<Value>()
-        .ok_or_else(|| {
-            StoryError::InvalidStoryState(
-                "SET_FIELD expected a string field name as its second parameter".to_owned(),
-            )
-        })?;
-    let new_value = params[2]
-        .as_ref()
-        .as_any()
-        .downcast_ref::<Value>()
-        .ok_or_else(|| {
-            StoryError::InvalidStoryState(
-                "SET_FIELD expected a value as its third parameter".to_owned(),
-            )
-        })?;
+    let value = params::value(params, 0, SET_FIELD_OBJECT)?;
+    let field_name = params::string(params, 1, SET_FIELD_NAME)?;
+    let new_value = params::value(params, 2, SET_FIELD_VALUE)?;
+    let fields = params::object_fields(value, SET_FIELD_OBJECT)?;
 
-    let field_name = match &field.value {
-        ValueType::String(field_name) => &field_name.string,
-        _ => {
-            return Err(StoryError::InvalidStoryState(
-                "SET_FIELD expected a string field name as its second parameter".to_owned(),
-            ));
-        }
-    };
-
-    match &value.value {
-        ValueType::Object(fields) => {
-            if !fields.contains_key(field_name) {
-                return Err(StoryError::InvalidStoryState(format!(
-                    "Object field not found: '{field_name}'"
-                )));
-            }
-
-            let mut updated_fields = fields.clone();
-            updated_fields.insert(field_name.clone(), new_value.value.clone());
-            Ok(Rc::new(Value::new_value_type(ValueType::Object(
-                updated_fields,
-            ))))
-        }
-        _ => Err(StoryError::InvalidStoryState(
-            "SET_FIELD expected an object value as its first parameter".to_owned(),
-        )),
+    if !fields.contains_key(field_name) {
+        return Err(StoryError::InvalidStoryState(format!(
+            "Object field not found: '{field_name}'"
+        )));
     }
+
+    let mut updated_fields = fields.clone();
+    updated_fields.insert(field_name.to_owned(), new_value.value.clone());
+    Ok(Rc::new(Value::new_value_type(ValueType::Object(
+        updated_fields,
+    ))))
 }
 
 pub(super) fn index_write(params: &[Rc<dyn RTObject>]) -> Result<Rc<dyn RTObject>, StoryError> {
-    let value = params[0]
-        .as_ref()
-        .as_any()
-        .downcast_ref::<Value>()
-        .ok_or_else(|| {
-            StoryError::InvalidStoryState(
-                "SET_INDEX expected an array value as its first parameter".to_owned(),
-            )
-        })?;
-    let index = params[1]
-        .as_ref()
-        .as_any()
-        .downcast_ref::<Value>()
-        .ok_or_else(|| {
-            StoryError::InvalidStoryState(
-                "SET_INDEX expected an int index as its second parameter".to_owned(),
-            )
-        })?;
-    let new_value = params[2]
-        .as_ref()
-        .as_any()
-        .downcast_ref::<Value>()
-        .ok_or_else(|| {
-            StoryError::InvalidStoryState(
-                "SET_INDEX expected a value as its third parameter".to_owned(),
-            )
-        })?;
+    let value = params::value(params, 0, SET_INDEX_ARRAY)?;
+    let index = params::int(params, 1, SET_INDEX_VALUE)?;
+    let new_value = params::value(params, 2, SET_INDEX_NEW_VALUE)?;
+    let values = params::array_values(value, SET_INDEX_ARRAY)?;
+    let array_index = params::array_index_in_bounds(index, values.len())?;
 
-    let index = match index.value {
-        ValueType::Int(index) => index,
-        _ => {
-            return Err(StoryError::InvalidStoryState(
-                "SET_INDEX expected an int index as its second parameter".to_owned(),
-            ));
-        }
-    };
-
-    match &value.value {
-        ValueType::Array(values) => {
-            let array_index = usize::try_from(index).map_err(|_| {
-                StoryError::InvalidStoryState(format!("Array index out of bounds: {index}"))
-            })?;
-            if array_index >= values.len() {
-                return Err(StoryError::InvalidStoryState(format!(
-                    "Array index out of bounds: {index}"
-                )));
-            }
-
-            let mut updated_values = values.clone();
-            updated_values[array_index] = new_value.value.clone();
-            Ok(Rc::new(Value::new_value_type(ValueType::Array(
-                updated_values,
-            ))))
-        }
-        _ => Err(StoryError::InvalidStoryState(
-            "SET_INDEX expected an array value as its first parameter".to_owned(),
-        )),
-    }
+    let mut updated_values = values.to_vec();
+    updated_values[array_index] = new_value.value.clone();
+    Ok(Rc::new(Value::new_value_type(ValueType::Array(
+        updated_values,
+    ))))
 }
 
 pub(super) fn len(params: &[Rc<dyn RTObject>]) -> Result<Rc<dyn RTObject>, StoryError> {
-    let value = params[0]
-        .as_ref()
-        .as_any()
-        .downcast_ref::<Value>()
-        .ok_or_else(|| {
-            StoryError::InvalidStoryState("LEN expected an array value as its parameter".to_owned())
-        })?;
+    let value = params::value(params, 0, LEN_ARRAY)?;
+    let values = params::array_values(value, LEN_ARRAY)?;
 
-    match &value.value {
-        ValueType::Array(values) => Ok(Rc::new(Value::new::<i32>(values.len() as i32))),
-        _ => Err(StoryError::InvalidStoryState(
-            "LEN expected an array value as its parameter".to_owned(),
-        )),
-    }
+    Ok(Rc::new(Value::new::<i32>(values.len() as i32)))
 }
 
 pub(super) fn array_remove(params: &[Rc<dyn RTObject>]) -> Result<Rc<dyn RTObject>, StoryError> {
-    let value = params[0]
-        .as_ref()
-        .as_any()
-        .downcast_ref::<Value>()
-        .ok_or_else(|| {
-            StoryError::InvalidStoryState(
-                "ARRAY_REMOVE expected an array value as its first parameter".to_owned(),
-            )
-        })?;
-    let index = params[1]
-        .as_ref()
-        .as_any()
-        .downcast_ref::<Value>()
-        .ok_or_else(|| {
-            StoryError::InvalidStoryState(
-                "ARRAY_REMOVE expected an int index as its second parameter".to_owned(),
-            )
-        })?;
+    let value = params::value(params, 0, ARRAY_REMOVE_ARRAY)?;
+    let index = params::int(params, 1, ARRAY_REMOVE_INDEX)?;
+    let values = params::array_values(value, ARRAY_REMOVE_ARRAY)?;
+    let array_index = params::array_index_in_bounds(index, values.len())?;
 
-    let index = match index.value {
-        ValueType::Int(index) => index,
-        _ => {
-            return Err(StoryError::InvalidStoryState(
-                "ARRAY_REMOVE expected an int index as its second parameter".to_owned(),
-            ));
-        }
-    };
-
-    match &value.value {
-        ValueType::Array(values) => {
-            let array_index = usize::try_from(index).map_err(|_| {
-                StoryError::InvalidStoryState(format!("Array index out of bounds: {index}"))
-            })?;
-            if array_index >= values.len() {
-                return Err(StoryError::InvalidStoryState(format!(
-                    "Array index out of bounds: {index}"
-                )));
-            }
-
-            let mut updated_values = values.clone();
-            updated_values.remove(array_index);
-            Ok(Rc::new(Value::new_value_type(ValueType::Array(
-                updated_values,
-            ))))
-        }
-        _ => Err(StoryError::InvalidStoryState(
-            "ARRAY_REMOVE expected an array value as its first parameter".to_owned(),
-        )),
-    }
+    let mut updated_values = values.to_vec();
+    updated_values.remove(array_index);
+    Ok(Rc::new(Value::new_value_type(ValueType::Array(
+        updated_values,
+    ))))
 }
 
 #[cfg(test)]
@@ -310,12 +121,24 @@ mod tests {
         Rc::new(Value::new_value_type(ValueType::Object(object_fields)))
     }
 
+    fn non_value_object() -> Rc<dyn RTObject> {
+        Rc::new(NativeFunctionCall::new(Op::Add))
+    }
+
     fn value_type(value: &dyn RTObject) -> &ValueType {
         &value
             .as_any()
             .downcast_ref::<Value>()
             .expect("expected runtime value")
             .value
+    }
+
+    fn invalid_state(result: Result<Rc<dyn RTObject>, StoryError>) -> String {
+        match result {
+            Ok(_) => panic!("expected invalid story state"),
+            Err(StoryError::InvalidStoryState(message)) => message,
+            Err(error) => panic!("expected invalid story state, got {error:?}"),
+        }
     }
 
     #[test]
@@ -402,6 +225,52 @@ mod tests {
             Err(error) => panic!("expected invalid story state, got {error:?}"),
         };
         assert_eq!(out_of_bounds, "Array index out of bounds: 4");
+    }
+
+    #[test]
+    fn composite_operations_keep_invalid_parameter_type_errors() {
+        let object_error = invalid_state(
+            NativeFunctionCall::new(Op::FieldRead)
+                .call(vec![non_value_object(), string_value("hp")]),
+        );
+        assert_eq!(
+            object_error,
+            "FIELD expected an object value as its first parameter"
+        );
+
+        let field_name_error = invalid_state(NativeFunctionCall::new(Op::FieldRead).call(vec![
+            object_value(vec![("hp", ValueType::Int(7))]),
+            int_value(0),
+        ]));
+        assert_eq!(
+            field_name_error,
+            "FIELD expected a string field name as its second parameter"
+        );
+
+        let index_error = invalid_state(NativeFunctionCall::new(Op::IndexRead).call(vec![
+            array_value(vec![ValueType::Int(1)]),
+            string_value("0"),
+        ]));
+        assert_eq!(
+            index_error,
+            "INDEX expected an int index as its second parameter"
+        );
+
+        let new_value_error = invalid_state(NativeFunctionCall::new(Op::FieldWrite).call(vec![
+            object_value(vec![("hp", ValueType::Int(7))]),
+            string_value("hp"),
+            non_value_object(),
+        ]));
+        assert_eq!(
+            new_value_error,
+            "SET_FIELD expected a value as its third parameter"
+        );
+
+        let negative_index = invalid_state(
+            NativeFunctionCall::new(Op::IndexRead)
+                .call(vec![array_value(vec![ValueType::Int(1)]), int_value(-1)]),
+        );
+        assert_eq!(negative_index, "Array index out of bounds: -1");
     }
 
     fn object_value_type(fields: Vec<(&str, ValueType)>) -> ValueType {

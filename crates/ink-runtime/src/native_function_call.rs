@@ -4,6 +4,7 @@ use ink_story_json_format::NativeFunction;
 
 mod composite;
 mod metadata;
+mod params;
 mod scalar;
 pub use metadata::Op;
 
