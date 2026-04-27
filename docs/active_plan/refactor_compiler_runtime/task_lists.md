@@ -1,4 +1,4 @@
-Progress: 14/24
+Progress: 15/24
 
 # Task List: Compiler And Runtime Refactor
 
@@ -799,7 +799,7 @@ Commit: d5a6a5e3e75102b620f1452022e1599e39f7d129
 
 ## Milestone 4: Runtime JSON Robustness
 
-### [ ] Task 15: Add Save-State JSON Read Helpers
+### [x] Task 15: Add Save-State JSON Read Helpers
 
 Goal:
 
@@ -836,9 +836,16 @@ Validation:
 - `cargo fmt --all --check`
 - `make gate`
 
-Validation status: pending.
+Validation status:
 
-Commit: pending.
+- `cargo test -p ink-runtime json` passed before implementation commit.
+- `cargo fmt --all --check` passed before implementation commit.
+- `make gate` passed before implementation commit.
+
+Review status: passed after reviewing the implementation commit and rerunning
+validation.
+
+Commit: 0d4073ea8a5bf34f1c7602240928073ced00717d
 
 ### [ ] Task 16: Convert Choice And Tag Save-State Reading To Helpers
 
