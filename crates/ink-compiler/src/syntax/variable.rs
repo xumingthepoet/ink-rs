@@ -244,15 +244,14 @@ fn complex_inc_dec_statement(source: &str, span: crate::source::SourceSpan) -> O
 }
 
 fn split_compound_once(source: &str) -> Option<(&str, &str, &str)> {
-    for (index, token) in scan::top_level_token_matches_with_options(
+    scan::top_level_token_matches_with_options(
         source,
         &["++", "--", "+=", "-="],
         scan::ScanOptions::expression(),
-    ) {
-        return Some((&source[..index], token, &source[index + token.len()..]));
-    }
-
-    None
+    )
+    .into_iter()
+    .next()
+    .map(|(index, token)| (&source[..index], token, &source[index + token.len()..]))
 }
 
 fn complex_assignment_statement(

@@ -656,6 +656,10 @@ pub(super) fn collect_counted_paths_in_weave(
     }
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "counted path collection still passes explicit recursion context"
+)]
 fn collect_counted_paths_in_flow(
     flow: &Flow,
     module_name: Option<&str>,

@@ -232,10 +232,8 @@ pub fn jtoken_to_runtime_object(
     token: &JsonValue,
     name: Option<String>,
 ) -> Result<Rc<dyn RTObject>, StoryError> {
-    if token.is_array() {
-        if name.is_some() {
-            return jarray_to_container(json_array(token, "container token")?, name);
-        }
+    if token.is_array() && name.is_some() {
+        return jarray_to_container(json_array(token, "container token")?, name);
     }
 
     if token.is_object() {

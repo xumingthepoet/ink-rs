@@ -121,7 +121,7 @@ fn removed_include_column(text: &str) -> Option<usize> {
         .chars()
         .take_while(|ch| matches!(ch, ' ' | '\t'))
         .count();
-    let trimmed = text.trim_start_matches(|ch| matches!(ch, ' ' | '\t'));
+    let trimmed = text.trim_start_matches([' ', '\t']);
     let rest = trimmed.strip_prefix("INCLUDE")?;
     if rest.is_empty() || rest.starts_with(char::is_whitespace) {
         Some(leading_whitespace + 1)
@@ -135,7 +135,7 @@ fn normalize_line_text(mut text: String, index: usize) -> String {
         text = text.trim_start_matches('\u{feff}').to_string();
     }
 
-    if text.trim_start().starts_with(|ch| matches!(ch, '*' | '+')) {
+    if text.trim_start().starts_with(['*', '+']) {
         text
     } else {
         text.trim_end().to_string()

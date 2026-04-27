@@ -278,6 +278,8 @@ mod tests {
 
     use super::*;
 
+    type RecordedContext = (Option<String>, Option<String>, Option<String>, bool);
+
     #[derive(Default)]
     struct RecordingVisitor {
         saw_story: bool,
@@ -286,8 +288,8 @@ mod tests {
         flows: Vec<String>,
         module_contexts: Vec<Option<String>>,
         import_contexts: Vec<Option<String>>,
-        flow_contexts: Vec<(Option<String>, Option<String>, Option<String>, bool)>,
-        story_context: Option<(Option<String>, Option<String>, Option<String>, bool)>,
+        flow_contexts: Vec<RecordedContext>,
+        story_context: Option<RecordedContext>,
         weave_count: usize,
         content_list_count: usize,
         objects: Vec<&'static str>,

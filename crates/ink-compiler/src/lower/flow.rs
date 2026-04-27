@@ -100,6 +100,10 @@ fn lower_flow_in_module(
     )
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "flow lowering still carries explicit module and path context until a broader context refactor"
+)]
 fn lower_flow_with_context(
     flow: &Flow,
     module_name: Option<&str>,

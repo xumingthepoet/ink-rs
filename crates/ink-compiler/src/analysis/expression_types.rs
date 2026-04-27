@@ -445,6 +445,10 @@ fn infer_binary_type(
     }
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "type inference still passes separate analysis indexes; refactor needs a dedicated context task"
+)]
 fn infer_binary_expression_type(
     operator: BinaryOperator,
     left: &Expression,

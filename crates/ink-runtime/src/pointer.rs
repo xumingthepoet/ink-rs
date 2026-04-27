@@ -23,13 +23,10 @@ impl Pointer {
         match &self.container {
             Some(container) => {
                 if self.index < 0 || container.content.is_empty() {
-                    return Some(container.clone());
+                    Some(container.clone())
+                } else {
+                    container.content.get(self.index as usize).cloned()
                 }
-
-                return match container.content.get(self.index as usize) {
-                    Some(o) => Some(o.clone()),
-                    None => None,
-                };
             }
             None => None,
         }

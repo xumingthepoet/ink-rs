@@ -325,9 +325,7 @@ impl Parser {
         let had_error = line_parser.had_error();
         self.diagnostics.extend(line_parser.finish());
 
-        let Some(declaration) = declaration else {
-            return None;
-        };
+        let declaration = declaration?;
 
         if had_error {
             return None;
@@ -397,9 +395,7 @@ impl Parser {
         let had_error = line_parser.had_error();
         self.diagnostics.extend(line_parser.finish());
 
-        let Some(declaration) = declaration else {
-            return None;
-        };
+        let declaration = declaration?;
 
         if had_error {
             return None;
@@ -465,9 +461,7 @@ impl Parser {
         let had_error = line_parser.had_error();
         self.diagnostics.extend(line_parser.finish());
 
-        let Some(mut header) = header else {
-            return None;
-        };
+        let mut header = header?;
 
         *index += 1;
         if had_error {
@@ -566,11 +560,7 @@ impl Parser {
         index: &mut usize,
     ) -> Option<Vec<Object>> {
         let line = &lines[*index];
-        if !line
-            .text
-            .trim_start()
-            .starts_with(|ch| matches!(ch, '*' | '+'))
-        {
+        if !line.text.trim_start().starts_with(['*', '+']) {
             return None;
         }
 

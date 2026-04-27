@@ -31,9 +31,6 @@ impl SearchResult {
     pub fn container(&self) -> Option<Rc<Container>> {
         let c = self.obj.clone().into_any().downcast::<Container>();
 
-        match c {
-            Ok(c) => Some(c),
-            Err(_) => None,
-        }
+        c.ok()
     }
 }

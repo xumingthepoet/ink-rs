@@ -105,7 +105,7 @@ pub(super) fn parse_module_declaration(parser: &mut RuleParser<'_>) -> Option<Mo
     }
 
     let suffix = parser.parse_rule(|parser| parser.take_while(|ch| ch == '='));
-    if !suffix.is_some_and(|suffix| suffix.chars().count() == 3) {
+    if suffix.is_none_or(|suffix| suffix.chars().count() != 3) {
         parser.diagnostic(crate::diagnostic::Diagnostic::error(
             parser.current_span(),
             "Module declarations must use `=== module name ===`",

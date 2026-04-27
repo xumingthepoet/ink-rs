@@ -49,8 +49,8 @@ pub(in crate::analysis) fn module_import_diagnostics(
             diagnostics.extend(qualified_import_use_diagnostics(
                 module.name(),
                 uses,
-                &symbol_index,
-                &import_index,
+                symbol_index,
+                import_index,
             ));
         }
 

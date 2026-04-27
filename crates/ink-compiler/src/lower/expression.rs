@@ -63,6 +63,10 @@ pub(super) fn lower_expression_into(
     );
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "expression lowering still threads separate lowering indexes while context migration continues"
+)]
 fn lower_expression_into_with_constants(
     content: &mut Vec<RuntimeObject>,
     expression: &Expression,
@@ -326,6 +330,10 @@ fn lower_expression_into_with_constants(
     }
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "constant lowering shares the current expression lowering parameter bundle"
+)]
 fn lower_constant_expression_into(
     content: &mut Vec<RuntimeObject>,
     constant: &ConstantValue,
@@ -366,6 +374,10 @@ fn lower_constant_expression_into(
     );
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "function call lowering shares the current expression lowering parameter bundle"
+)]
 fn lower_function_call_into(
     content: &mut Vec<RuntimeObject>,
     name: &str,
@@ -543,6 +555,10 @@ fn runtime_function_target(name: &str, path_mode: &ChoicePathMode) -> String {
     module_scoped_source_path_to_runtime_path(path_mode.current_module_name(), name)
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "array-remove lowering shares the current expression lowering parameter bundle"
+)]
 fn lower_array_remove_call_into(
     content: &mut Vec<RuntimeObject>,
     args: &[Expression],
@@ -638,6 +654,10 @@ pub(super) fn lower_function_arg_into(
     );
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "argument lowering shares the current expression lowering parameter bundle"
+)]
 fn lower_function_arg_into_parts(
     content: &mut Vec<RuntimeObject>,
     arg: &Expression,

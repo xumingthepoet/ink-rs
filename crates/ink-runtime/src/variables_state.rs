@@ -202,8 +202,8 @@ impl VariablesState {
     }
 
     pub fn get(&self, variable_name: &str) -> Option<ValueType> {
-        if self.patch.is_some() {
-            if let Some(var) = self.patch.as_ref().unwrap().get_global(variable_name) {
+        if let Some(patch) = self.patch.as_ref() {
+            if let Some(var) = patch.get_global(variable_name) {
                 return Some(var.value.clone());
             }
         }

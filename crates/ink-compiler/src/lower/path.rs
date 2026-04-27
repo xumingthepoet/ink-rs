@@ -235,8 +235,7 @@ fn compact_path_strings_in_container_at(
         compact_path_strings_in_container_at(&mut named.container, &path, semantic_paths);
     }
 
-    let mut content_index = 0;
-    for object in &mut container.content {
+    for (content_index, object) in container.content.iter_mut().enumerate() {
         let object_path = match object {
             RuntimeObject::Container(container) => container
                 .name
@@ -246,7 +245,6 @@ fn compact_path_strings_in_container_at(
             _ => child_path(container_path, &content_index.to_string()),
         };
         compact_path_strings_in_object(object, &object_path, semantic_paths);
-        content_index += 1;
     }
 }
 
@@ -304,8 +302,7 @@ fn collect_semantic_paths(
         collect_semantic_path_for_container(&named.container, &path, paths);
     }
 
-    let mut content_index = 0;
-    for object in &container.content {
+    for (content_index, object) in container.content.iter().enumerate() {
         let object_path = match object {
             RuntimeObject::Container(container) => container
                 .name
@@ -318,7 +315,6 @@ fn collect_semantic_paths(
         if let RuntimeObject::Container(container) = object {
             collect_semantic_path_for_container(container, &object_path, paths);
         }
-        content_index += 1;
     }
 }
 

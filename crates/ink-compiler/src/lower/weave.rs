@@ -323,6 +323,10 @@ pub(super) fn lower_choice_weave_with_initial_content(
     }
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "weave section lowering still carries explicit lowering state"
+)]
 fn lower_weave_section(
     objects: &[Object],
     index: &mut usize,
@@ -401,7 +405,7 @@ fn section_contains_choice(objects: &[Object], start: usize, end: usize) -> bool
 }
 
 fn gather_container_at_location_mut<'a>(
-    main_content: &'a mut Vec<RuntimeObject>,
+    main_content: &'a mut [RuntimeObject],
     named_content: &'a mut [NamedContainer],
     location: &GatherLocation,
 ) -> Option<&'a mut Container> {
@@ -421,7 +425,7 @@ fn nested_container_in_named_content_mut<'a>(
 }
 
 fn nested_container_in_runtime_content_mut<'a>(
-    content: &'a mut Vec<RuntimeObject>,
+    content: &'a mut [RuntimeObject],
     path: &[usize],
 ) -> Option<&'a mut Container> {
     let (&first, rest) = path.split_first()?;
@@ -444,6 +448,10 @@ fn nested_container_in_container_mut<'a>(
     nested_container_in_container_mut(child, rest)
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "choice lowering still carries explicit weave lowering state"
+)]
 fn lower_choice_in_section(
     objects: &[Object],
     index: &mut usize,

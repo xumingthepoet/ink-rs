@@ -53,6 +53,10 @@ pub(super) fn build_label_index(
     labels
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "label collection still passes explicit recursion context"
+)]
 fn collect_flow_labels(
     flow: &Flow,
     module_name: Option<&str>,
@@ -102,6 +106,10 @@ fn collect_flow_labels(
     }
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "weave label collection still passes explicit recursion context"
+)]
 fn collect_weave_labels(
     weave: &Weave,
     container_path: &str,

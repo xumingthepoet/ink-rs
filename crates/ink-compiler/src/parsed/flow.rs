@@ -89,6 +89,10 @@ impl Flow {
         )
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "flow construction keeps parsed fields explicit for tests and parser call sites"
+    )]
     pub fn new_with_span(
         level: FlowLevel,
         name: impl Into<String>,

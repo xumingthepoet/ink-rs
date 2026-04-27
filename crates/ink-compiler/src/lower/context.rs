@@ -562,7 +562,6 @@ impl ChoicePathMode {
                 sibling_stitch_names,
                 parent_flow_name,
                 flow_name,
-                self_target_relative,
                 ..
             } => {
                 if parent_flow_name.is_some() {
@@ -576,8 +575,6 @@ impl ChoicePathMode {
                     }
                 } else if sibling_stitch_names.iter().any(|s| s == target) {
                     format!("{flow_name}.{target}")
-                } else if *self_target_relative && target == *flow_name {
-                    target.to_string()
                 } else {
                     target.to_string()
                 }
