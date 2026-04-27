@@ -1,4 +1,4 @@
-Progress: 10/24
+Progress: 11/24
 
 # Task List: Compiler And Runtime Refactor
 
@@ -576,7 +576,7 @@ Review status: passed; no follow-up fixes required.
 
 Commit: b76f894d61ed412ce55ee89947fe7f889d8ab6dc
 
-### [ ] Task 11: Extract Dependency Graph And Reachability Analysis
+### [x] Task 11: Extract Dependency Graph And Reachability Analysis
 
 Goal:
 
@@ -617,9 +617,18 @@ Validation:
 - `cargo fmt --all --check`
 - `make gate`
 
-Validation status: pending.
+Validation status:
 
-Commit: pending.
+- `cargo test -p ink-compiler analysis::modules` passed before implementation
+  commit.
+- `cargo test -p ink-test --test language module` passed before implementation
+  commit.
+- `cargo fmt --all --check` passed before implementation commit.
+- `make gate` passed before implementation commit.
+
+Review status: passed after rerunning validation; no follow-up fixes required.
+
+Commit: b1d5a8cfef6363a2a58cc4bd016f8ca818f3c432
 
 ### [ ] Task 12: Extract Import Use Checking
 
