@@ -1,4 +1,4 @@
-Progress: 18/24
+Progress: 19/24
 
 # Task List: Compiler And Runtime Refactor
 
@@ -999,7 +999,7 @@ Commit: e5418648b4c8f773e84e59a927c3c0155101a4e1
 
 ## Milestone 5: Runtime Native Function Organization
 
-### [ ] Task 19: Extract Native Function Operation Metadata
+### [x] Task 19: Extract Native Function Operation Metadata
 
 Goal:
 
@@ -1039,9 +1039,18 @@ Validation:
 - `cargo fmt --all --check`
 - `make gate`
 
-Validation status: pending.
+Validation status:
 
-Commit: pending.
+- `cargo test -p ink-runtime native_function_call` passed before
+  implementation commit.
+- `cargo test -p ink-story-json-format` passed before implementation commit.
+- `cargo fmt --all --check` passed before implementation commit.
+- `make gate` passed before implementation commit.
+
+Review status: passed after reviewing the implementation commit and rerunning
+validation.
+
+Commit: 64915e422a0ef765f0e8136b6bc7ef2381411b11
 
 ### [ ] Task 20: Extract Composite Native Operations
 
