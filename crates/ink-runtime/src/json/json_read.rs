@@ -295,7 +295,7 @@ fn jobject_to_choice(obj: &Map<String, serde_json::Value>) -> Result<Rc<dyn RTOb
     let source_path = required_string(obj, "originalChoicePath")?;
     let original_thread_index = required_usize(obj, "originalThreadIndex")?;
     let path_string_on_choice = required_string(obj, "targetPath")?;
-    let choice_tags = jarray_to_tags(obj);
+    let choice_tags = jarray_to_tags(obj)?;
 
     Ok(Rc::new(Choice::new_from_json(
         path_string_on_choice,
@@ -307,18 +307,16 @@ fn jobject_to_choice(obj: &Map<String, serde_json::Value>) -> Result<Rc<dyn RTOb
     )))
 }
 
-fn jarray_to_tags(obj: &Map<String, serde_json::Value>) -> Vec<String> {
+fn jarray_to_tags(obj: &Map<String, serde_json::Value>) -> Result<Vec<String>, StoryError> {
     let mut tags: Vec<String> = Vec::new();
 
-    let prop_value = obj.get("tags");
-    if let Some(pv) = prop_value {
-        let tags_array = pv.as_array().unwrap();
-        for tag in tags_array {
-            tags.push(tag.as_str().unwrap().to_string());
+    if let Some(tags_array) = optional_array(obj, "tags")? {
+        for (index, tag) in tags_array.iter().enumerate() {
+            tags.push(tag_string(tag, "tags", index)?.to_string());
         }
     }
 
-    tags
+    Ok(tags)
 }
 
 pub(crate) fn jobject_to_hashmap_values(
@@ -371,6 +369,15 @@ fn required_usize(obj: &Map<String, JsonValue>, field: &str) -> Result<usize, St
     })
 }
 
+fn optional_array<'a>(
+    obj: &'a Map<String, JsonValue>,
+    field: &str,
+) -> Result<Option<&'a Vec<JsonValue>>, StoryError> {
+    obj.get(field)
+        .map(|value| json_array(value, &format!("JSON field '{field}'")))
+        .transpose()
+}
+
 fn json_array<'a>(value: &'a JsonValue, context: &str) -> Result<&'a Vec<JsonValue>, StoryError> {
     value
         .as_array()
@@ -386,9 +393,16 @@ fn json_object<'a>(
         .ok_or_else(|| StoryError::BadJson(format!("{context} must be an object")))
 }
 
+fn tag_string<'a>(value: &'a JsonValue, field: &str, index: usize) -> Result<&'a str, StoryError> {
+    value.as_str().ok_or_else(|| {
+        StoryError::BadJson(format!("JSON field '{field}[{index}]' must be a string"))
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::json::json_write;
     use crate::native_function_call::{NativeFunctionCall, Op};
     use serde_json::json;
 
@@ -509,6 +523,67 @@ mod tests {
         }));
 
         assert!(error.contains("JSON field 'index' must be a non-negative integer"));
+    }
+
+    #[test]
+    fn rejects_missing_save_state_choice_text() {
+        let error = runtime_object_error(&json!({
+            "index": 0,
+            "originalChoicePath": "0",
+            "originalThreadIndex": 0,
+            "targetPath": "done"
+        }));
+
+        assert!(error.contains("Missing required JSON field 'text'"));
+    }
+
+    #[test]
+    fn rejects_non_array_save_state_choice_tags() {
+        let error = runtime_object_error(&json!({
+            "text": "Go",
+            "index": 0,
+            "originalChoicePath": "0",
+            "originalThreadIndex": 0,
+            "targetPath": "done",
+            "tags": "not-array"
+        }));
+
+        assert!(error.contains("JSON field 'tags' must be an array"));
+    }
+
+    #[test]
+    fn rejects_non_string_save_state_choice_tag() {
+        let error = runtime_object_error(&json!({
+            "text": "Go",
+            "index": 0,
+            "originalChoicePath": "0",
+            "originalThreadIndex": 0,
+            "targetPath": "done",
+            "tags": [7]
+        }));
+
+        assert!(error.contains("JSON field 'tags[0]' must be a string"));
+    }
+
+    #[test]
+    fn save_state_choice_json_round_trips_unchanged() {
+        let token = json!({
+            "text": "Go",
+            "index": 2,
+            "originalChoicePath": "0.1",
+            "originalThreadIndex": 3,
+            "targetPath": "done",
+            "tags": ["urgent", "visible"]
+        });
+        let runtime_object =
+            jtoken_to_runtime_object(&token, None).expect("choice JSON should load");
+        let choice = runtime_object
+            .as_any()
+            .downcast_ref::<Choice>()
+            .expect("runtime object should be a choice");
+
+        assert_eq!(choice.tags, vec!["urgent", "visible"]);
+        assert_eq!(json_write::write_choice(choice), token);
     }
 
     fn runtime_object_error(token: &serde_json::Value) -> String {
