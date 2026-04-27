@@ -3,6 +3,7 @@ use std::collections::{HashMap, HashSet};
 mod assignment;
 mod conditional;
 mod context;
+mod divert;
 mod expression;
 mod flow;
 mod indexes;
@@ -19,7 +20,7 @@ use ink_story_json_format::{
 use crate::{
     analysis::CheckedStory,
     compiler::StageOutput,
-    parsed::{Choice, Divert, DivertTarget, Expression, Object},
+    parsed::{Choice, Object},
 };
 
 use assignment::{
@@ -27,10 +28,10 @@ use assignment::{
 };
 use conditional::lower_conditional_into;
 use context::{ChoicePathMode, LoweringContext};
-use expression::{
-    lower_expression_into, lower_function_arg_into, lower_logic_line_into,
-    lower_output_expression_into,
+use divert::{
+    lower_tail_recursive_return_into, lower_tunnel_onwards_into, push_divert_with_context,
 };
+use expression::{lower_expression_into, lower_logic_line_into, lower_output_expression_into};
 use flow::{lower_flow, lower_module_flow, lower_root_weave};
 use indexes::{
     ConstantValues, ExternalSignatures, LoweringIndexes, RuntimeLenEstimator, StructDefinitions,
@@ -366,29 +367,9 @@ fn lower_object_into_with_context_count(
             lower_logic_line_into(content, expression, &lowering_context);
         }
         Object::Glue(_) => content.push(RuntimeObject::Glue),
-        Object::Divert(divert) => push_divert_with_context(
-            content,
-            divert,
-            path_mode,
-            choice_labels,
-            global_labels,
-            global_variables,
-            external_signatures,
-            constants,
-            struct_definitions,
-        ),
+        Object::Divert(divert) => push_divert_with_context(content, divert, &lowering_context),
         Object::TunnelOnwards(tunnel_onwards) => {
-            lower_tunnel_onwards_into(
-                content,
-                tunnel_onwards,
-                path_mode,
-                choice_labels,
-                global_labels,
-                global_variables,
-                external_signatures,
-                constants,
-                struct_definitions,
-            );
+            lower_tunnel_onwards_into(content, tunnel_onwards, &lowering_context);
         }
         Object::Choice(_) => {}
         Object::ConstantDeclaration(_) => {}
@@ -401,17 +382,7 @@ fn lower_object_into_with_context_count(
             lower_inc_dec_into(content, inc_dec, &lowering_context);
         }
         Object::Return(ret) => {
-            if lower_tail_recursive_return_into(
-                content,
-                ret,
-                path_mode,
-                choice_labels,
-                global_labels,
-                global_variables,
-                external_signatures,
-                constants,
-                struct_definitions,
-            ) {
+            if lower_tail_recursive_return_into(content, ret, &lowering_context) {
                 return;
             }
             content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
@@ -452,317 +423,6 @@ fn lower_object_into_with_context_count(
         }
         Object::ExternalDeclaration(_) => {}
     }
-}
-
-fn lower_tail_recursive_return_into(
-    content: &mut Vec<RuntimeObject>,
-    ret: &crate::parsed::Return,
-    path_mode: &ChoicePathMode,
-    choice_labels: &LabelIndex,
-    global_labels: &LabelIndex,
-    global_variables: &HashSet<String>,
-    external_signatures: &ExternalSignatures,
-    constants: &ConstantValues,
-    struct_definitions: &StructDefinitions,
-) -> bool {
-    let Some(flow_name) = path_mode.current_flow_name() else {
-        return false;
-    };
-    let signature_name = path_mode
-        .current_module_name()
-        .map(|module_name| format!("{module_name}::{flow_name}"))
-        .filter(|qualified_name| external_signatures.contains_key(qualified_name))
-        .unwrap_or_else(|| flow_name.to_string());
-    let Some(tail_args) = ret.direct_self_tail_call_args(flow_name) else {
-        return false;
-    };
-    let Some(indexes::CallSignature::Ink {
-        args: expected_args,
-        ..
-    }) = external_signatures.get(&signature_name)
-    else {
-        return false;
-    };
-    if expected_args.len() != tail_args.len() {
-        return false;
-    }
-    let Some(body_start_target) = path_mode.current_flow_body_start_target(expected_args.len())
-    else {
-        return false;
-    };
-
-    content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
-    let mut visiting_constants = HashSet::new();
-    let context = LoweringContext::new(
-        path_mode.clone(),
-        choice_labels,
-        global_labels,
-        global_variables,
-        external_signatures,
-        constants,
-        struct_definitions,
-    );
-    for (index, arg) in tail_args.iter().enumerate() {
-        lower_function_arg_into(
-            content,
-            arg,
-            expected_args.get(index),
-            &context,
-            false,
-            &mut visiting_constants,
-        );
-    }
-    for argument in expected_args.iter().rev() {
-        content.push(RuntimeObject::VariableAssignment(
-            argument.name().to_string(),
-        ));
-    }
-    content.push(RuntimeObject::ControlCommand(ControlCommand::EvalEnd));
-    content.push(RuntimeObject::Divert {
-        target: body_start_target,
-        variable: false,
-    });
-
-    true
-}
-
-fn push_divert_with_context(
-    content: &mut Vec<RuntimeObject>,
-    divert: &Divert,
-    path_mode: &ChoicePathMode,
-    choice_labels: &LabelIndex,
-    global_labels: &LabelIndex,
-    global_variables: &HashSet<String>,
-    external_signatures: &ExternalSignatures,
-    constants: &ConstantValues,
-    struct_definitions: &StructDefinitions,
-) {
-    if let DivertTarget::Dynamic(expression) = divert.target() {
-        push_dynamic_divert_with_context(
-            content,
-            divert,
-            DynamicDivertTarget {
-                expression: expression.clone(),
-                divert_arguments: divert.arguments().to_vec(),
-            },
-            path_mode,
-            choice_labels,
-            global_labels,
-            global_variables,
-            external_signatures,
-            constants,
-            struct_definitions,
-        );
-        return;
-    }
-
-    if !divert.arguments().is_empty() {
-        content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
-        let context = LoweringContext::new(
-            path_mode.clone(),
-            choice_labels,
-            global_labels,
-            global_variables,
-            external_signatures,
-            constants,
-            struct_definitions,
-        );
-        for argument in divert.arguments() {
-            lower_expression_into(content, argument, &context, false);
-        }
-        content.push(RuntimeObject::ControlCommand(ControlCommand::EvalEnd));
-    }
-
-    if divert.is_thread() {
-        content.push(RuntimeObject::ControlCommand(ControlCommand::StartThread));
-    }
-
-    match divert.target() {
-        DivertTarget::Done => content.push(RuntimeObject::ControlCommand(ControlCommand::Done)),
-        DivertTarget::End => content.push(RuntimeObject::ControlCommand(ControlCommand::End)),
-        DivertTarget::Dynamic(_) => {
-            unreachable!("dynamic divert targets return before static lowering")
-        }
-        DivertTarget::Path(target) => {
-            let resolved_target = if let Some(choice_target) = choice_labels.get(target) {
-                runtime_divert(choice_target.to_string(), false, divert.is_tunnel())
-            } else if let Some(label_target) = path_mode
-                .scoped_label_target(target, global_labels)
-                .filter(|label_target| *label_target != target)
-            {
-                runtime_divert(
-                    path_mode.resolve_label_target(label_target),
-                    false,
-                    divert.is_tunnel(),
-                )
-            } else {
-                runtime_divert(
-                    path_mode.resolve_divert_target(target),
-                    false,
-                    divert.is_tunnel(),
-                )
-            };
-            content.push(resolved_target);
-        }
-        DivertTarget::QualifiedPath(target) => {
-            let target = target.as_str();
-            let resolved_target = if let Some(choice_target) = choice_labels.get(target) {
-                runtime_divert(choice_target.to_string(), false, divert.is_tunnel())
-            } else if let Some(label_target) = path_mode
-                .scoped_label_target(target, global_labels)
-                .filter(|label_target| *label_target != target)
-            {
-                runtime_divert(
-                    path_mode.resolve_label_target(label_target),
-                    false,
-                    divert.is_tunnel(),
-                )
-            } else {
-                runtime_divert(
-                    path_mode.resolve_divert_target(target),
-                    false,
-                    divert.is_tunnel(),
-                )
-            };
-            content.push(resolved_target);
-        }
-        DivertTarget::Empty => {
-            content.push(runtime_divert(String::new(), false, divert.is_tunnel()))
-        }
-    }
-}
-
-struct DynamicDivertTarget {
-    expression: Expression,
-    divert_arguments: Vec<Expression>,
-}
-
-fn push_dynamic_divert_with_context(
-    content: &mut Vec<RuntimeObject>,
-    divert: &Divert,
-    dynamic_target: DynamicDivertTarget,
-    path_mode: &ChoicePathMode,
-    choice_labels: &LabelIndex,
-    global_labels: &LabelIndex,
-    global_variables: &HashSet<String>,
-    external_signatures: &ExternalSignatures,
-    constants: &ConstantValues,
-    struct_definitions: &StructDefinitions,
-) {
-    const DYNAMIC_DIVERT_TARGET_TEMP: &str = "$divertTarget";
-
-    content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
-    let context = LoweringContext::new(
-        path_mode.clone(),
-        choice_labels,
-        global_labels,
-        global_variables,
-        external_signatures,
-        constants,
-        struct_definitions,
-    );
-    for argument in &dynamic_target.divert_arguments {
-        lower_expression_into(content, argument, &context, false);
-    }
-    lower_expression_into(content, &dynamic_target.expression, &context, false);
-    content.push(RuntimeObject::VariableAssignment(
-        DYNAMIC_DIVERT_TARGET_TEMP.to_string(),
-    ));
-    content.push(RuntimeObject::ControlCommand(ControlCommand::EvalEnd));
-
-    if divert.is_thread() {
-        content.push(RuntimeObject::ControlCommand(ControlCommand::StartThread));
-    }
-    content.push(runtime_divert(
-        DYNAMIC_DIVERT_TARGET_TEMP.to_string(),
-        true,
-        divert.is_tunnel(),
-    ));
-}
-
-fn runtime_divert(target: String, variable: bool, is_tunnel: bool) -> RuntimeObject {
-    if is_tunnel {
-        RuntimeObject::TunnelDivert { target, variable }
-    } else {
-        RuntimeObject::Divert { target, variable }
-    }
-}
-
-fn lower_tunnel_onwards_into(
-    content: &mut Vec<RuntimeObject>,
-    tunnel_onwards: &crate::parsed::TunnelOnwards,
-    path_mode: &ChoicePathMode,
-    choice_labels: &LabelIndex,
-    global_labels: &LabelIndex,
-    global_variables: &HashSet<String>,
-    external_signatures: &ExternalSignatures,
-    constants: &ConstantValues,
-    struct_definitions: &StructDefinitions,
-) {
-    content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
-    let context = LoweringContext::new(
-        path_mode.clone(),
-        choice_labels,
-        global_labels,
-        global_variables,
-        external_signatures,
-        constants,
-        struct_definitions,
-    );
-    for argument in tunnel_onwards.arguments() {
-        lower_expression_into(content, argument, &context, false);
-    }
-    if let Some(target) = tunnel_onwards.override_target() {
-        match target {
-            DivertTarget::Dynamic(expression) => {
-                lower_expression_into(content, expression, &context, false);
-            }
-            DivertTarget::Path(target) => {
-                if let Some(choice_target) = choice_labels.get(target) {
-                    content.push(RuntimeObject::DivertTarget(choice_target.to_string()));
-                } else if let Some(label_target) = path_mode
-                    .scoped_label_target(target, global_labels)
-                    .filter(|label_target| *label_target != target)
-                {
-                    content.push(RuntimeObject::DivertTarget(
-                        path_mode.resolve_label_target(label_target),
-                    ));
-                } else if path_mode.is_local_variable(target) || global_variables.contains(target) {
-                    content.push(RuntimeObject::VariableReference(target.clone()));
-                } else {
-                    content.push(RuntimeObject::DivertTarget(
-                        path_mode.resolve_divert_target(target),
-                    ));
-                }
-            }
-            DivertTarget::QualifiedPath(target) => {
-                let target = target.as_str();
-                if let Some(choice_target) = choice_labels.get(target) {
-                    content.push(RuntimeObject::DivertTarget(choice_target.to_string()));
-                } else if let Some(label_target) = path_mode
-                    .scoped_label_target(target, global_labels)
-                    .filter(|label_target| *label_target != target)
-                {
-                    content.push(RuntimeObject::DivertTarget(
-                        path_mode.resolve_label_target(label_target),
-                    ));
-                } else if path_mode.is_local_variable(target) || global_variables.contains(target) {
-                    content.push(RuntimeObject::VariableReference(target.to_string()));
-                } else {
-                    content.push(RuntimeObject::DivertTarget(
-                        path_mode.resolve_divert_target(target),
-                    ));
-                }
-            }
-            DivertTarget::Done => content.push(RuntimeObject::DivertTarget("DONE".to_string())),
-            DivertTarget::End => content.push(RuntimeObject::DivertTarget("END".to_string())),
-            DivertTarget::Empty => content.push(RuntimeObject::Void),
-        }
-    } else {
-        content.push(RuntimeObject::Void);
-    }
-    content.push(RuntimeObject::ControlCommand(ControlCommand::EvalEnd));
-    content.push(RuntimeObject::ControlCommand(ControlCommand::PopTunnel));
 }
 
 fn ends_with_flow_terminator(content: &[RuntimeObject]) -> bool {
@@ -1175,6 +835,96 @@ mod tests {
                 json!(1),
                 json!("ARRAY_REMOVE"),
                 json!({"VAR=": "game::items", "re": true})
+            ]
+        ));
+    }
+
+    #[test]
+    fn divert_lowering_context_preserves_current_control_flow_json() {
+        let source = concat!(
+            "=== module game ===\n",
+            "EXTERNAL ext(value: int) => int\n",
+            "VAR next: -> = -> dynamic_target\n",
+            "== main ==\n",
+            "{ext(1)}|{count_down(2, 0)}\n",
+            "-> static_target\n",
+            "== static_target ==\n",
+            "-> {next}\n",
+            "== dynamic_target ==\n",
+            "-> tunnel ->\n",
+            "Back.\n",
+            "-> END\n",
+            "== tunnel ==\n",
+            "->-> tunnel_exit\n",
+            "== tunnel_exit ==\n",
+            "Tunnel exit.\n",
+            "-> END\n",
+            "== function count_down(n: int, acc: int) => int ==\n",
+            "{ n <= 0:\n",
+            "    ~ return acc\n",
+            "- else:\n",
+            "    ~ return count_down(n - 1, acc + 1)\n",
+            "}\n",
+        );
+        let compiled = Compiler::default().compile(SourceInput::new(source));
+
+        assert!(
+            compiled.artifact.is_some(),
+            "module story should compile: {:#?}",
+            compiled.diagnostics
+        );
+        let json = compiled
+            .artifact
+            .expect("compiled story")
+            .program
+            .to_json_value();
+
+        assert!(json_contains_sequence(
+            &json,
+            &[json!({"->": "game.static_target"})]
+        ));
+        assert!(json_contains_sequence(
+            &json,
+            &[
+                json!("ev"),
+                json!({"VAR?": "game::next"}),
+                json!({"temp=": "$divertTarget"}),
+                json!("/ev"),
+                json!({"->": "$divertTarget", "var": true})
+            ]
+        ));
+        assert!(json_contains_sequence(
+            &json,
+            &[json!({"->t->": "game.tunnel"})]
+        ));
+        assert!(json_contains_sequence(
+            &json,
+            &[
+                json!("ev"),
+                json!({"^->": "game.tunnel_exit"}),
+                json!("/ev"),
+                json!("->->")
+            ]
+        ));
+        assert!(
+            json.to_string().contains("\"x()\":\"game::ext\""),
+            "{json:#}"
+        );
+        assert!(
+            json.to_string().contains("\"f()\":\"game.count_down\""),
+            "{json:#}"
+        );
+        assert!(json_contains_sequence(
+            &json,
+            &[
+                json!({"VAR?": "n"}),
+                json!(1),
+                json!("-"),
+                json!({"VAR?": "acc"}),
+                json!(1),
+                json!("+"),
+                json!({"temp=": "acc"}),
+                json!({"temp=": "n"})
             ]
         ));
     }
