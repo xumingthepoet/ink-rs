@@ -103,7 +103,13 @@ fn run_analysis_passes(story: &Story) -> Vec<Diagnostic> {
     diagnostics.extend(modules::mixed_root_module_diagnostics(story));
     diagnostics.extend(modules::module_entry_point_diagnostics(story));
     diagnostics.extend(modules::module_dependency_diagnostics(story));
-    diagnostics.extend(modules::module_import_diagnostics(story));
+    let module_symbols = modules::build_module_symbol_index(story);
+    let module_imports = modules::build_module_import_index(story);
+    diagnostics.extend(modules::module_import_diagnostics(
+        story,
+        &module_symbols,
+        &module_imports,
+    ));
     let graph = modules::build_module_dependency_graph(story);
     let entry_point = modules::module_entry_point(story);
     let reachability = modules::build_module_reachability(&graph, entry_point.as_ref());

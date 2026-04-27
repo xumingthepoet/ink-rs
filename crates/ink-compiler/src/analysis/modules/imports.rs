@@ -9,7 +9,7 @@ use crate::{
     source::SourceSpan,
 };
 
-use super::{build_module_symbol_index, sort_diagnostics, ModuleSymbolIndex};
+use super::{sort_diagnostics, ModuleSymbolIndex};
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ModuleImportIndex {
@@ -35,9 +35,11 @@ pub fn build_module_import_index(story: &Story) -> ModuleImportIndex {
     index
 }
 
-pub(in crate::analysis) fn module_import_diagnostics(story: &Story) -> Vec<Diagnostic> {
-    let symbol_index = build_module_symbol_index(story);
-    let import_index = build_module_import_index(story);
+pub(in crate::analysis) fn module_import_diagnostics(
+    story: &Story,
+    symbol_index: &ModuleSymbolIndex,
+    import_index: &ModuleImportIndex,
+) -> Vec<Diagnostic> {
     let qualified_uses = collect_qualified_uses(story);
     let qualified_use_sets = qualified_use_sets_by_module(&qualified_uses);
     let mut diagnostics = Vec::new();

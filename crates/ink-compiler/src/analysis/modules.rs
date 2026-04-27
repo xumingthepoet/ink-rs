@@ -122,6 +122,12 @@ mod tests {
         *,
     };
 
+    fn import_diagnostics(story: &Story) -> Vec<Diagnostic> {
+        let symbol_index = build_module_symbol_index(story);
+        let import_index = build_module_import_index(story);
+        module_import_diagnostics(story, &symbol_index, &import_index)
+    }
+
     #[test]
     fn indexes_every_first_phase_importable_declaration_kind() {
         let story = parse_story(
@@ -391,7 +397,7 @@ mod tests {
              -> END",
         );
 
-        let diagnostics = module_import_diagnostics(&story);
+        let diagnostics = import_diagnostics(&story);
 
         assert_eq!(diagnostics.len(), 1, "{diagnostics:#?}");
         assert_eq!(diagnostics[0].severity, DiagnosticSeverity::Error);
@@ -414,7 +420,7 @@ mod tests {
              -> END",
         );
 
-        let diagnostics = module_import_diagnostics(&story);
+        let diagnostics = import_diagnostics(&story);
 
         assert_eq!(diagnostics.len(), 1, "{diagnostics:#?}");
         assert_eq!(diagnostics[0].severity, DiagnosticSeverity::Error);
@@ -438,7 +444,7 @@ mod tests {
              -> END",
         );
 
-        let diagnostics = module_import_diagnostics(&story);
+        let diagnostics = import_diagnostics(&story);
 
         assert_eq!(diagnostics.len(), 1, "{diagnostics:#?}");
         assert_eq!(diagnostics[0].severity, DiagnosticSeverity::Error);
@@ -486,7 +492,7 @@ mod tests {
              -> END",
         );
 
-        let diagnostics = module_import_diagnostics(&story);
+        let diagnostics = import_diagnostics(&story);
 
         assert!(diagnostics.is_empty(), "{diagnostics:#?}");
     }
@@ -504,7 +510,7 @@ mod tests {
              ~ return",
         );
 
-        let diagnostics = module_import_diagnostics(&story);
+        let diagnostics = import_diagnostics(&story);
 
         assert!(diagnostics.is_empty(), "{diagnostics:#?}");
     }
@@ -521,7 +527,7 @@ mod tests {
              ~ return",
         );
 
-        let diagnostics = module_import_diagnostics(&story);
+        let diagnostics = import_diagnostics(&story);
 
         assert_eq!(diagnostics.len(), 1, "{diagnostics:#?}");
         assert_eq!(diagnostics[0].severity, DiagnosticSeverity::Error);
@@ -550,7 +556,7 @@ mod tests {
              ~ return",
         );
 
-        let diagnostics = module_import_diagnostics(&story);
+        let diagnostics = import_diagnostics(&story);
 
         assert_eq!(diagnostics.len(), 1, "{diagnostics:#?}");
         assert_eq!(diagnostics[0].severity, DiagnosticSeverity::Error);
@@ -576,7 +582,7 @@ mod tests {
              ~ return",
         );
 
-        let diagnostics = module_import_diagnostics(&story);
+        let diagnostics = import_diagnostics(&story);
 
         assert_eq!(diagnostics.len(), 1, "{diagnostics:#?}");
         assert_eq!(diagnostics[0].severity, DiagnosticSeverity::Error);
@@ -597,7 +603,7 @@ mod tests {
              ~ return",
         );
 
-        let diagnostics = module_import_diagnostics(&story);
+        let diagnostics = import_diagnostics(&story);
 
         assert!(diagnostics.is_empty(), "{diagnostics:#?}");
     }
@@ -614,7 +620,7 @@ mod tests {
              ~ return",
         );
 
-        let diagnostics = module_import_diagnostics(&story);
+        let diagnostics = import_diagnostics(&story);
 
         assert_eq!(diagnostics.len(), 1, "{diagnostics:#?}");
         assert_eq!(diagnostics[0].severity, DiagnosticSeverity::Error);
@@ -640,7 +646,7 @@ mod tests {
              -> END",
         );
 
-        let diagnostics = module_import_diagnostics(&story);
+        let diagnostics = import_diagnostics(&story);
 
         assert!(diagnostics.is_empty(), "{diagnostics:#?}");
     }
@@ -660,7 +666,7 @@ mod tests {
              -> END",
         );
 
-        let diagnostics = module_import_diagnostics(&story);
+        let diagnostics = import_diagnostics(&story);
 
         assert_single_diagnostic(
             &diagnostics,
