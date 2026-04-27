@@ -325,13 +325,13 @@ pub(crate) fn jobject_to_hashmap_values(
     let mut dict: HashMap<String, Rc<Value>> = HashMap::new();
 
     for (k, v) in jobj.iter() {
-        dict.insert(
-            k.clone(),
-            jtoken_to_runtime_object(v, None)?
-                .into_any()
-                .downcast::<Value>()
-                .unwrap(),
-        );
+        let value = jtoken_to_runtime_object(v, None)?
+            .into_any()
+            .downcast::<Value>()
+            .map_err(|_| {
+                StoryError::BadJson(format!("JSON field '{k}' must decode to a runtime value"))
+            })?;
+        dict.insert(k.clone(), value);
     }
 
     Ok(dict)
@@ -584,6 +584,46 @@ mod tests {
 
         assert_eq!(choice.tags, vec!["urgent", "visible"]);
         assert_eq!(json_write::write_choice(choice), token);
+    }
+
+    #[test]
+    fn loads_value_dictionary_save_state_entries() {
+        let value = json!({
+            "health": 3,
+            "items": [1, true],
+            "player": {
+                "hp": 10
+            }
+        });
+        let dictionary = jobject_to_hashmap_values(value.as_object().expect("object"))
+            .expect("dictionary should load");
+
+        assert!(matches!(
+            dictionary.get("health").map(|value| &value.value),
+            Some(ValueType::Int(3))
+        ));
+        assert!(matches!(
+            dictionary.get("items").map(|value| &value.value),
+            Some(ValueType::Array(_))
+        ));
+        assert!(matches!(
+            dictionary.get("player").map(|value| &value.value),
+            Some(ValueType::Object(_))
+        ));
+    }
+
+    #[test]
+    fn rejects_non_value_dictionary_save_state_entries() {
+        let value = json!({
+            "bad": "done"
+        });
+        let error = match jobject_to_hashmap_values(value.as_object().expect("object")) {
+            Ok(_) => panic!("expected non-value dictionary entry to fail"),
+            Err(StoryError::BadJson(message)) => message,
+            Err(error) => panic!("expected BadJson, got {error:?}"),
+        };
+
+        assert!(error.contains("JSON field 'bad' must decode to a runtime value"));
     }
 
     fn runtime_object_error(token: &serde_json::Value) -> String {
