@@ -1,4 +1,4 @@
-Progress: 15/24
+Progress: 16/24
 
 # Task List: Compiler And Runtime Refactor
 
@@ -847,7 +847,7 @@ validation.
 
 Commit: 0d4073ea8a5bf34f1c7602240928073ced00717d
 
-### [ ] Task 16: Convert Choice And Tag Save-State Reading To Helpers
+### [x] Task 16: Convert Choice And Tag Save-State Reading To Helpers
 
 Goal:
 
@@ -883,9 +883,17 @@ Validation:
 - `cargo fmt --all --check`
 - `make gate`
 
-Validation status: pending.
+Validation status:
 
-Commit: pending.
+- `cargo test -p ink-runtime json` passed before implementation commit.
+- `cargo test -p ink-runtime story_state` passed before implementation commit.
+- `cargo fmt --all --check` passed before implementation commit.
+- `make gate` passed before implementation commit.
+
+Review status: passed after reviewing the implementation commit and rerunning
+validation.
+
+Commit: 043f959e52a3da26923cd909c1b1cae1279972b5
 
 ### [ ] Task 17: Convert Runtime Value Dictionary Save-State Reading To Helpers
 
