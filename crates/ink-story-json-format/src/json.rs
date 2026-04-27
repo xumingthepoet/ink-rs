@@ -547,6 +547,20 @@ mod tests {
     }
 
     #[test]
+    fn native_function_metadata_keeps_string_backed_json_shape() {
+        let known = Object::from_json_value(json!("+")).unwrap();
+        assert_eq!(known, Object::NativeFunction("+".to_string()));
+        assert_eq!(known.to_json_value(), json!("+"));
+
+        let unknown = Object::from_json_value(json!("UNKNOWN_NATIVE")).unwrap();
+        assert_eq!(
+            unknown,
+            Object::NativeFunction("UNKNOWN_NATIVE".to_string())
+        );
+        assert_eq!(unknown.to_json_value(), json!("UNKNOWN_NATIVE"));
+    }
+
+    #[test]
     fn roundtrips_dynamic_array_values() {
         let object = Object::ValueArray(vec![
             Object::Int(1),
