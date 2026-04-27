@@ -1,4 +1,4 @@
-Progress: 3/24
+Progress: 4/24
 
 # Task List: Compiler And Runtime Refactor
 
@@ -196,7 +196,7 @@ Validation status:
 
 Commit: 6fa7cba636d27708a223a88cd265858dc78518a1
 
-### [ ] Task 04: Move Divert And Return Lowering Behind The Context
+### [x] Task 04: Move Divert And Return Lowering Behind The Context
 
 Goal:
 
@@ -238,9 +238,15 @@ Validation:
 - `cargo fmt --all --check`
 - `make gate`
 
-Validation status: pending.
+Validation status:
 
-Commit: pending.
+- `cargo test -p ink-compiler lower::` passed.
+- `cargo test -p ink-test --test language divert` passed.
+- `cargo test -p ink-test --test language module` passed.
+- `cargo fmt --all --check` passed.
+- `make gate` passed.
+
+Commit: 126c861f3a78a01755c82edc40b23f468e21d11c
 
 ### [ ] Task 05: Finish Lowering Context Migration Across Weave, Sequence, And Conditional Code
 
