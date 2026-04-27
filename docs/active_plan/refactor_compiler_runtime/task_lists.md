@@ -1,4 +1,4 @@
-Progress: 20/24
+Progress: 21/24
 
 # Task List: Compiler And Runtime Refactor
 
@@ -1105,7 +1105,7 @@ validation.
 
 Commit: 2b566ba175d28866ad936a5857de7a8c206966ef
 
-### [ ] Task 21: Extract Numeric, String, And Boolean Native Operations
+### [x] Task 21: Extract Numeric, String, And Boolean Native Operations
 
 Goal:
 
@@ -1146,9 +1146,19 @@ Validation:
 - `cargo fmt --all --check`
 - `make gate`
 
-Validation status: pending.
+Validation status:
 
-Commit: pending.
+- `cargo test -p ink-runtime native_function_call` passed before
+  implementation commit.
+- `cargo test -p ink-test --test conformance` passed before implementation
+  commit.
+- `cargo fmt --all --check` passed before implementation commit.
+- `make gate` passed before implementation commit.
+
+Review status: passed after reviewing the implementation commit and rerunning
+validation.
+
+Commit: 74db0d646f4e24c05391a4107e7cea0d75c4187f
 
 ### [ ] Task 22: Centralize Runtime Native Value Parameter Helpers
 
