@@ -1,4 +1,4 @@
-Progress: 13/24
+Progress: 14/24
 
 # Task List: Compiler And Runtime Refactor
 
@@ -742,7 +742,7 @@ validation.
 
 Commit: 5e75bb61cadf156a5a7027a50bd534db7953d28e
 
-### [ ] Task 14: Share Module Analysis Indexes Across Diagnostics And CheckedStory
+### [x] Task 14: Share Module Analysis Indexes Across Diagnostics And CheckedStory
 
 Goal:
 
@@ -783,9 +783,19 @@ Validation:
 - `cargo fmt --all --check`
 - `make gate`
 
-Validation status: pending.
+Validation status:
 
-Commit: pending.
+- `cargo test -p ink-compiler analysis::modules` passed before implementation
+  commit.
+- `cargo test -p ink-test --test language module` passed before implementation
+  commit.
+- `cargo fmt --all --check` passed before implementation commit.
+- `make gate` passed before implementation commit.
+
+Review status: passed after reviewing the implementation commit and rerunning
+validation.
+
+Commit: d5a6a5e3e75102b620f1452022e1599e39f7d129
 
 ## Milestone 4: Runtime JSON Robustness
 
