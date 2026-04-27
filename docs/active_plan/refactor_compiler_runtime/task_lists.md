@@ -1,4 +1,4 @@
-Progress: 11/24
+Progress: 12/24
 
 # Task List: Compiler And Runtime Refactor
 
@@ -630,7 +630,7 @@ Review status: passed after rerunning validation; no follow-up fixes required.
 
 Commit: b1d5a8cfef6363a2a58cc4bd016f8ca818f3c432
 
-### [ ] Task 12: Extract Import Use Checking
+### [x] Task 12: Extract Import Use Checking
 
 Goal:
 
@@ -671,9 +671,21 @@ Validation:
 - `cargo fmt --all --check`
 - `make gate`
 
-Validation status: pending.
+Validation status:
 
-Commit: pending.
+- `cargo test -p ink-compiler analysis::modules` passed before implementation
+  commit.
+- `cargo test -p ink-test --test language module` passed before implementation
+  commit.
+- `cargo fmt --all --check` passed before implementation commit.
+- `make gate` passed before implementation commit.
+
+Review status: passed after follow-up fix and rerunning validation.
+
+Commit:
+
+- Implementation: fe81e292ddd8dc8f8ff601e0f33d536c87f0d4c7
+- Review fix: 8b735051beb5a1d7aa27bcffc9218e6f4e66a503
 
 ### [ ] Task 13: Extract Entry Point And Mixed Root Diagnostics
 
