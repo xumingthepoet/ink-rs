@@ -117,6 +117,44 @@ fn public_compile_sources_preserves_source_filenames_in_diagnostics() {
 }
 
 #[test]
+fn public_compile_sources_rejects_mixed_root_and_module_inputs() {
+    let module_source = SourceInput::named(
+        "=== module game ===\n\
+         == main ==\n\
+         -> END",
+        "game.ink",
+    );
+    let cases = [
+        (SourceInput::named("Line.", "legacy.ink"), "legacy.ink"),
+        (
+            SourceInput::named("== start ==\n-> END", "flow.ink"),
+            "flow.ink",
+        ),
+    ];
+
+    for (legacy_source, expected_filename) in cases {
+        let output =
+            Compiler::default().compile_sources(vec![legacy_source, module_source.clone()]);
+
+        assert!(output.has_errors());
+        assert!(output.artifact.is_none());
+        let diagnostic = output
+            .diagnostics
+            .iter()
+            .find(|diagnostic| {
+                diagnostic.message
+                    == "Explicit module compilation cannot be mixed with root story content or top-level flows"
+            })
+            .expect("expected mixed root/module diagnostic");
+        assert_eq!(
+            diagnostic.source_filename.as_deref(),
+            Some(expected_filename)
+        );
+        assert_eq!(diagnostic.line, 1);
+    }
+}
+
+#[test]
 fn public_parse_sources_combines_modules_from_multiple_inputs() {
     let output = Compiler::default().parse_sources(vec![
         SourceInput::named(

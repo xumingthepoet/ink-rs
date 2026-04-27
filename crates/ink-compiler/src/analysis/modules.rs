@@ -9,7 +9,7 @@ use crate::{
     source::SourceSpan,
 };
 
-use super::ModuleEntryPoint;
+use super::{span::object_span, ModuleEntryPoint};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum ModuleSymbolKind {
@@ -179,6 +179,22 @@ pub(super) fn module_dependency_diagnostics(story: &Story) -> Vec<Diagnostic> {
     module_dependency_cycle_diagnostics(&dependencies)
 }
 
+pub(super) fn mixed_root_module_diagnostics(story: &Story) -> Vec<Diagnostic> {
+    if story.modules().is_empty() {
+        return Vec::new();
+    }
+
+    if let Some(object) = story.root_weave().content().first() {
+        return vec![mixed_root_module_diagnostic(object_span(object))];
+    }
+
+    if let Some(flow) = story.flows().first() {
+        return vec![mixed_root_module_diagnostic(flow.span().clone())];
+    }
+
+    Vec::new()
+}
+
 pub(super) fn module_import_diagnostics(story: &Story) -> Vec<Diagnostic> {
     let symbol_index = build_module_symbol_index(story);
     let import_index = build_module_import_index(story);
@@ -260,6 +276,13 @@ pub(super) fn module_import_diagnostics(story: &Story) -> Vec<Diagnostic> {
 
     sort_diagnostics(&mut diagnostics);
     diagnostics
+}
+
+fn mixed_root_module_diagnostic(span: SourceSpan) -> Diagnostic {
+    Diagnostic::error(
+        span,
+        "Explicit module compilation cannot be mixed with root story content or top-level flows",
+    )
 }
 
 fn qualified_import_use_diagnostics(

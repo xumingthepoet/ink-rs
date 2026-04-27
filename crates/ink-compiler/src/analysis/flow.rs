@@ -29,6 +29,9 @@ pub(super) fn flow_diagnostics(story: &Story) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
     check_global_var_declaration_scope(story, &mut diagnostics);
     check_nested_choice_termination_in_weave(story.root_weave(), false, &mut diagnostics);
+    for module in story.modules() {
+        check_nested_choice_termination_in_weave(module.weave(), false, &mut diagnostics);
+    }
     {
         let mut condition_checker = ConditionTypeChecker {
             diagnostics: &mut diagnostics,
@@ -37,7 +40,18 @@ pub(super) fn flow_diagnostics(story: &Story) -> Vec<Diagnostic> {
         walk_story(story, &mut condition_checker);
     }
     for flow in story.flows() {
-        check_flow(flow, flow.name(), &analysis, &mut diagnostics);
+        check_flow(None, flow, flow.name(), &analysis, &mut diagnostics);
+    }
+    for module in story.modules() {
+        for flow in module.flows() {
+            check_flow(
+                Some(module.name()),
+                flow,
+                flow.name(),
+                &analysis,
+                &mut diagnostics,
+            );
+        }
     }
     diagnostics
 }
@@ -48,6 +62,14 @@ fn check_global_var_declaration_scope(story: &Story, diagnostics: &mut Vec<Diagn
     }
     for flow in story.flows() {
         check_global_var_declaration_scope_in_flow(flow, diagnostics);
+    }
+    for module in story.modules() {
+        for object in module.weave().content() {
+            check_global_var_declaration_scope_in_object(object, true, diagnostics);
+        }
+        for flow in module.flows() {
+            check_global_var_declaration_scope_in_flow(flow, diagnostics);
+        }
     }
 }
 
@@ -325,6 +347,7 @@ fn combine_condition_signals(
 }
 
 fn check_flow(
+    current_module: Option<&str>,
     flow: &Flow,
     current_flow_path: &str,
     analysis: &FlowAnalysisIndexes<'_>,
@@ -334,7 +357,13 @@ fn check_flow(
     let found_return = find_return_in_flow(flow);
 
     if flow.is_function() {
-        check_function_flow_control(flow, current_flow_path, analysis, diagnostics);
+        check_function_flow_control(
+            current_module,
+            flow,
+            current_flow_path,
+            analysis,
+            diagnostics,
+        );
     } else if let Some(found_return) = found_return {
         diagnostics.push(Diagnostic::error(
             found_return.span().clone(),
@@ -352,7 +381,13 @@ fn check_flow(
 
     for child in flow.child_flows() {
         let child_flow_path = format!("{current_flow_path}.{}", child.name());
-        check_flow(child, &child_flow_path, analysis, diagnostics);
+        check_flow(
+            current_module,
+            child,
+            &child_flow_path,
+            analysis,
+            diagnostics,
+        );
     }
 }
 
@@ -484,6 +519,7 @@ fn choice_flow_terminates(choice: &Choice, following: &[Object]) -> bool {
 }
 
 fn check_function_flow_control(
+    current_module: Option<&str>,
     flow: &Flow,
     current_flow_path: &str,
     analysis: &FlowAnalysisIndexes<'_>,
@@ -515,6 +551,7 @@ fn check_function_flow_control(
         analysis,
     };
     let context = VisitContext {
+        current_module: current_module.map(str::to_string),
         current_flow_path: Some(current_flow_path.to_string()),
         inside_function: true,
         ..VisitContext::default()
@@ -846,6 +883,55 @@ mod tests {
              ~ return default_player\n\
              == function scores() => int[] ==\n\
              ~ return default_scores",
+        );
+
+        assert_eq!(flow_diagnostics(&story), []);
+    }
+
+    #[test]
+    fn module_functions_reject_diverts() {
+        let story = parse_story(
+            "=== module game ===\n\
+             == main ==\n\
+             ~ helper()\n\
+             -> DONE\n\
+             == function helper() => void ==\n\
+             -> DONE",
+        );
+        let diagnostics = flow_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Functions may not contain diverts, but saw '-> DONE'",
+        );
+    }
+
+    #[test]
+    fn module_flows_report_loose_end_warnings() {
+        let story = parse_story(
+            "=== module game ===\n\
+             == main ==\n\
+             Line.",
+        );
+        let diagnostics = flow_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Warning,
+            "Apparent loose end exists where the flow runs out. Do you need a '-> DONE' statement, choice or divert?",
+        );
+    }
+
+    #[test]
+    fn module_function_return_types_use_module_scope() {
+        let story = parse_story(
+            "=== module game ===\n\
+             VAR score: int = 1\n\
+             == main ==\n\
+             -> DONE\n\
+             == function current_score() => int ==\n\
+             ~ return score",
         );
 
         assert_eq!(flow_diagnostics(&story), []);

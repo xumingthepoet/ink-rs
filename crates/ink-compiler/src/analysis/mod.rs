@@ -100,6 +100,7 @@ fn run_analysis_passes(story: &Story) -> Vec<Diagnostic> {
     diagnostics.extend(author_warning_diagnostics(story));
     diagnostics.extend(struct_type_diagnostics(story));
     diagnostics.extend(modules::module_symbol_diagnostics(story));
+    diagnostics.extend(modules::mixed_root_module_diagnostics(story));
     diagnostics.extend(modules::module_entry_point_diagnostics(story));
     diagnostics.extend(modules::module_dependency_diagnostics(story));
     diagnostics.extend(modules::module_import_diagnostics(story));

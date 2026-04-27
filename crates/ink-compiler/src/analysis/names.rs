@@ -26,30 +26,64 @@ impl SymbolKind {
 }
 
 pub(super) fn naming_diagnostics(story: &Story) -> Vec<Diagnostic> {
-    let mut top_level_flows = HashMap::new();
-    for flow in story.flows() {
-        let kind = if flow.is_function() {
-            SymbolKind::Function
-        } else {
-            SymbolKind::Knot
-        };
-        top_level_flows.insert(flow.name().to_string(), kind);
-    }
-
-    let mut global_variables = HashSet::new();
-    collect_global_variables(story.root_weave(), &mut global_variables);
-    for flow in story.flows() {
-        collect_global_variables_in_flow(flow, &mut global_variables);
-    }
-
     let mut diagnostics = Vec::new();
-    check_weave_point_names(story.root_weave(), &global_variables, &mut diagnostics);
+
+    let root_top_level_flows = top_level_flow_kinds(story.flows());
+    let root_global_variables = scoped_global_variables(story.root_weave(), story.flows());
+
+    check_weave_point_names(story.root_weave(), &root_global_variables, &mut diagnostics);
     for flow in story.flows() {
-        check_subflow_and_weave_names(flow, &global_variables, &mut diagnostics);
-        check_flow_arguments(flow, &top_level_flows, &global_variables, &mut diagnostics);
+        check_subflow_and_weave_names(flow, &root_global_variables, &mut diagnostics);
+        check_flow_arguments(
+            flow,
+            &root_top_level_flows,
+            &root_global_variables,
+            &mut diagnostics,
+        );
         check_temporary_names_against_arguments(flow, &mut diagnostics);
     }
+
+    for module in story.modules() {
+        let module_top_level_flows = top_level_flow_kinds(module.flows());
+        let module_global_variables = scoped_global_variables(module.weave(), module.flows());
+
+        check_weave_point_names(module.weave(), &module_global_variables, &mut diagnostics);
+        for flow in module.flows() {
+            check_subflow_and_weave_names(flow, &module_global_variables, &mut diagnostics);
+            check_flow_arguments(
+                flow,
+                &module_top_level_flows,
+                &module_global_variables,
+                &mut diagnostics,
+            );
+            check_temporary_names_against_arguments(flow, &mut diagnostics);
+        }
+    }
+
     diagnostics
+}
+
+fn top_level_flow_kinds(flows: &[Flow]) -> HashMap<String, SymbolKind> {
+    flows
+        .iter()
+        .map(|flow| {
+            let kind = if flow.is_function() {
+                SymbolKind::Function
+            } else {
+                SymbolKind::Knot
+            };
+            (flow.name().to_string(), kind)
+        })
+        .collect()
+}
+
+fn scoped_global_variables(weave: &Weave, flows: &[Flow]) -> HashSet<String> {
+    let mut global_variables = HashSet::new();
+    collect_global_variables(weave, &mut global_variables);
+    for flow in flows {
+        collect_global_variables_in_flow(flow, &mut global_variables);
+    }
+    global_variables
 }
 
 fn collect_global_variables(weave: &Weave, global_variables: &mut HashSet<String>) {
@@ -477,6 +511,40 @@ mod tests {
             &diagnostics,
             DiagnosticSeverity::Error,
             "Multiple arguments with the same name: 'a'",
+        );
+    }
+
+    #[test]
+    fn reports_module_temporary_names_conflicting_with_arguments() {
+        let story = parse_story(
+            "=== module game ===\n\
+             == main(arg: int) ==\n\
+             ~ temp arg: int = 0\n\
+             -> DONE",
+        );
+        let diagnostics = naming_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "temp 'arg': name has already been used for an argument to main",
+        );
+    }
+
+    #[test]
+    fn reports_module_argument_names_conflicting_with_module_globals() {
+        let story = parse_story(
+            "=== module game ===\n\
+             VAR score: int = 0\n\
+             == main(score: int) ==\n\
+             -> DONE",
+        );
+        let diagnostics = naming_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "argument 'score': name has already been used for a var",
         );
     }
 }

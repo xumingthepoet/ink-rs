@@ -85,7 +85,7 @@ Validation status:
 - `cargo fmt --all --check` passed.
 - `make gate` passed.
 
-Commit: 068edea
+Commit: 9dfbfad7c52c977581d7cb77ca565682c51c4241 (squashed from 068edea)
 
 ### [x] Task 02: Diagnose Removed INCLUDE And Retire Include Loading
 
@@ -144,7 +144,7 @@ Validation status:
 - `cargo check --workspace` passed.
 - `make gate` passed.
 
-Commit: 7db301f
+Commit: 9dfbfad7c52c977581d7cb77ca565682c51c4241 (squashed from 7db301f)
 
 ### [x] Task 03: Update CLI Source Loading For Explicit Inputs
 
@@ -187,7 +187,7 @@ Validation status:
 - `cargo fmt --all --check` passed.
 - `make gate` passed.
 
-Commit: f57855e
+Commit: 9dfbfad7c52c977581d7cb77ca565682c51c4241 (squashed from f57855e)
 
 ## Milestone 2: Parsed Module Syntax
 
@@ -230,7 +230,7 @@ Validation status:
 - `cargo fmt --all --check` passed.
 - `make gate` passed.
 
-Commit: aa09b09
+Commit: 9dfbfad7c52c977581d7cb77ca565682c51c4241 (squashed from aa09b09)
 
 ### [x] Task 05: Parse Module Headers
 
@@ -275,7 +275,7 @@ Validation status:
 - `cargo fmt --all --check` passed.
 - `make gate` passed.
 
-Commit: 349d64e
+Commit: 9dfbfad7c52c977581d7cb77ca565682c51c4241 (squashed from 349d64e)
 
 ### [x] Task 06: Parse Import Declarations
 
@@ -319,7 +319,7 @@ Validation status:
 - `cargo fmt --all --check` passed.
 - `make gate` passed.
 
-Commit: a067438
+Commit: 9dfbfad7c52c977581d7cb77ca565682c51c4241 (squashed from a067438)
 
 ### [x] Task 07: Reshape Story Parsing Around Explicit Modules
 
@@ -374,7 +374,7 @@ Validation status:
 - `cargo fmt --all --check` passed.
 - `make gate` passed.
 
-Commit: 5f9a462
+Commit: 9dfbfad7c52c977581d7cb77ca565682c51c4241 (squashed from 5f9a462)
 
 ### [x] Task 08: Parse Multiple Explicit Source Inputs As One Compilation Unit
 
@@ -418,7 +418,7 @@ Validation status:
 - `cargo fmt --all --check` passed.
 - `make gate` passed.
 
-Commit: 685e763
+Commit: 9dfbfad7c52c977581d7cb77ca565682c51c4241 (squashed from 685e763)
 
 ## Milestone 3: Module Namespace And Import Analysis
 
@@ -462,7 +462,7 @@ Validation status:
 - `cargo fmt --all --check` passed.
 - `make gate` passed.
 
-Commit: b6fc00e
+Commit: 9dfbfad7c52c977581d7cb77ca565682c51c4241 (squashed from b6fc00e)
 
 ### [x] Task 10: Diagnose Duplicate Modules And Namespace Collisions
 
@@ -507,7 +507,7 @@ Validation status:
 - `cargo fmt --all --check` passed.
 - `make gate` passed.
 
-Commit: 5853d4b
+Commit: 9dfbfad7c52c977581d7cb77ca565682c51c4241 (squashed from 5853d4b)
 
 ### [x] Task 11: Enforce Main Entry Point Rules
 
@@ -548,7 +548,7 @@ Validation status:
 - `cargo fmt --all --check` passed.
 - `make gate` passed.
 
-Commit: bf3db0b
+Commit: 9dfbfad7c52c977581d7cb77ca565682c51c4241 (squashed from bf3db0b)
 
 ### [x] Task 12: Build Import Dependency Graph And Cycle Diagnostics
 
@@ -589,7 +589,7 @@ Validation status:
 - `cargo fmt --all --check` passed.
 - `make gate` passed.
 
-Commit: 275236a
+Commit: 9dfbfad7c52c977581d7cb77ca565682c51c4241 (squashed from 275236a)
 
 ### [x] Task 13: Validate Imports And Reachability Warnings
 
@@ -629,7 +629,7 @@ Validation:
 - `cargo fmt --all --check` passed.
 - `make gate` passed.
 
-Commit: 17ec08a
+Commit: 9dfbfad7c52c977581d7cb77ca565682c51c4241 (squashed from 17ec08a)
 
 ## Milestone 4: Qualified Names And Resolution
 
@@ -666,7 +666,7 @@ Validation:
 - `cargo fmt --all --check` passed.
 - `make gate` passed.
 
-Commit: 2c02e30
+Commit: 9dfbfad7c52c977581d7cb77ca565682c51c4241 (squashed from 2c02e30)
 
 ### [x] Task 15: Make Unqualified Lookup Module-Local
 
@@ -700,7 +700,7 @@ Validation:
 - `cargo fmt --all --check` passed.
 - `make gate` passed.
 
-Commit: fad4ec8
+Commit: 9dfbfad7c52c977581d7cb77ca565682c51c4241 (squashed from fad4ec8)
 
 ### [x] Task 16: Enforce Qualified Import Allow-Lists
 
@@ -736,7 +736,7 @@ Validation:
 - `cargo fmt --all --check` passed.
 - `make gate` passed.
 
-Commit: c1c4039
+Commit: 9dfbfad7c52c977581d7cb77ca565682c51c4241 (squashed from c1c4039)
 
 ### [x] Task 17: Preserve Same-Module Stitch Lookup And Reject Cross-Module Stitches
 
@@ -771,7 +771,7 @@ Validation:
 - `cargo fmt --all --check` passed.
 - `make gate` passed.
 
-Commit: 041aae2
+Commit: 9dfbfad7c52c977581d7cb77ca565682c51c4241 (squashed from 041aae2)
 
 ## Milestone 5: Imported Values, Types, Calls, And Assignments
 
@@ -809,7 +809,7 @@ Validation:
 - `cargo fmt --all --check` passed.
 - `make gate` passed.
 
-Commit: 1ef7f4a
+Commit: 9dfbfad7c52c977581d7cb77ca565682c51c4241 (squashed from 1ef7f4a)
 
 ### [x] Task 19: Support Imported Global Variable Reads And Writes
 
@@ -852,7 +852,7 @@ Validation status:
 - `cargo fmt --all --check` passed.
 - `make gate` passed.
 
-Commit: 3996932
+Commit: 9dfbfad7c52c977581d7cb77ca565682c51c4241 (squashed from 3996932)
 
 ### [x] Task 20: Support Qualified Function And External Calls
 
@@ -894,7 +894,7 @@ Validation status:
 - `cargo fmt --all --check` passed.
 - `make gate` passed.
 
-Commit: 2e2bdcd
+Commit: 9dfbfad7c52c977581d7cb77ca565682c51c4241 (squashed from 2e2bdcd)
 
 ## Milestone 6: Module Lowering And Runtime Compatibility
 
@@ -939,7 +939,7 @@ Validation status:
 - `cargo fmt --all --check` passed.
 - `make gate` passed.
 
-Commit: d44e683
+Commit: 9dfbfad7c52c977581d7cb77ca565682c51c4241 (squashed from d44e683)
 
 ### [x] Task 22: Lower Module Containers And Root Entry
 
@@ -980,7 +980,7 @@ Validation status:
 - `cargo fmt --all --check` passed.
 - `make gate` passed.
 
-Commit: fbbead9
+Commit: 9dfbfad7c52c977581d7cb77ca565682c51c4241 (squashed from fbbead9)
 
 ### [x] Task 23: Map Qualified Flow Paths To Runtime Paths
 
@@ -1022,7 +1022,7 @@ Validation status:
 - `cargo fmt --all --check` passed.
 - `make gate` passed.
 
-Commit: 8813842
+Commit: 9dfbfad7c52c977581d7cb77ca565682c51c4241 (squashed from 8813842)
 
 ### [x] Task 24: Lower Module Globals And Externals With Qualified Names
 
@@ -1068,7 +1068,7 @@ Validation status:
 - `cargo fmt --all --check` passed.
 - `make gate` passed.
 
-Commit: 084aefa
+Commit: 9dfbfad7c52c977581d7cb77ca565682c51c4241 (squashed from 084aefa)
 
 ### [x] Task 25: Exclude Unreachable Modules And Verify Format Roundtrips
 
@@ -1114,7 +1114,7 @@ Validation status:
 - `cargo fmt --all --check` passed.
 - `make gate` passed.
 
-Commit: 8d2bdc9
+Commit: 9dfbfad7c52c977581d7cb77ca565682c51c4241 (squashed from 8d2bdc9)
 
 ## Milestone 7: Fixture, Compatibility, Docs, And Editor Migration
 
@@ -1167,7 +1167,7 @@ Validation status:
 - `cargo fmt --all --check` passed.
 - `make gate` passed.
 
-Commit: 078e58c
+Commit: 9dfbfad7c52c977581d7cb77ca565682c51c4241 (squashed from 078e58c)
 
 ### [x] Task 27: Migrate Inline And C# Compatibility Tests
 
@@ -1215,7 +1215,7 @@ Validation status:
 - `cargo fmt --all --check` passed.
 - `make gate` passed.
 
-Commit: 6195e5c
+Commit: 9dfbfad7c52c977581d7cb77ca565682c51c4241 (squashed from 6195e5c)
 
 ### [x] Task 28: Update Maintained Docs With Tested Module Examples
 
@@ -1263,7 +1263,7 @@ Validation status:
 - `cargo fmt --all --check` passed.
 - `make gate` passed.
 
-Commit: b045079
+Commit: 9dfbfad7c52c977581d7cb77ca565682c51c4241 (squashed from b045079)
 
 ### [x] Task 29: Update Editor Grammar For Module Syntax
 
@@ -1304,7 +1304,7 @@ Validation status:
 - `cargo fmt --all --check` passed.
 - `make gate` passed.
 
-Commit: 46a1d24
+Commit: 9dfbfad7c52c977581d7cb77ca565682c51c4241 (squashed from 46a1d24)
 
 ## Milestone 8: Closeout
 
@@ -1359,4 +1359,4 @@ Validation status:
 - `cargo test --workspace` passed.
 - `make gate` passed.
 
-Commit: 0eb4bfe
+Commit: 9dfbfad7c52c977581d7cb77ca565682c51c4241 (squashed from 0eb4bfe)
