@@ -1,6 +1,67 @@
 use std::collections::HashSet;
 
+use super::indexes::{ConstantValues, ExternalSignatures, StructDefinitions};
 use super::path::{child_path, module_scoped_source_path_to_runtime_path, LabelIndex};
+
+pub(super) struct LoweringContext<'a> {
+    path_mode: ChoicePathMode,
+    choice_labels: &'a LabelIndex,
+    global_labels: &'a LabelIndex,
+    global_variables: &'a HashSet<String>,
+    external_signatures: &'a ExternalSignatures,
+    constants: &'a ConstantValues,
+    struct_definitions: &'a StructDefinitions,
+}
+
+impl<'a> LoweringContext<'a> {
+    pub(super) fn new(
+        path_mode: ChoicePathMode,
+        choice_labels: &'a LabelIndex,
+        global_labels: &'a LabelIndex,
+        global_variables: &'a HashSet<String>,
+        external_signatures: &'a ExternalSignatures,
+        constants: &'a ConstantValues,
+        struct_definitions: &'a StructDefinitions,
+    ) -> Self {
+        Self {
+            path_mode,
+            choice_labels,
+            global_labels,
+            global_variables,
+            external_signatures,
+            constants,
+            struct_definitions,
+        }
+    }
+
+    pub(super) fn path_mode(&self) -> &ChoicePathMode {
+        &self.path_mode
+    }
+
+    pub(super) fn choice_labels(&self) -> &LabelIndex {
+        self.choice_labels
+    }
+
+    pub(super) fn global_labels(&self) -> &LabelIndex {
+        self.global_labels
+    }
+
+    pub(super) fn global_variables(&self) -> &HashSet<String> {
+        self.global_variables
+    }
+
+    pub(super) fn external_signatures(&self) -> &ExternalSignatures {
+        self.external_signatures
+    }
+
+    pub(super) fn constants(&self) -> &ConstantValues {
+        self.constants
+    }
+
+    pub(super) fn struct_definitions(&self) -> &StructDefinitions {
+        self.struct_definitions
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum ChoicePathMode {

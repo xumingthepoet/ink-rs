@@ -22,7 +22,7 @@ use crate::{
 };
 
 use conditional::lower_conditional_into;
-use context::ChoicePathMode;
+use context::{ChoicePathMode, LoweringContext};
 use expression::{
     lower_expression_into, lower_function_arg_into, lower_logic_line_into,
     lower_output_expression_into,
@@ -206,16 +206,19 @@ fn lower_global_declarations(
                 module_name: module_name.to_string(),
             })
             .unwrap_or(ChoicePathMode::Root);
-        if lower_assignment_initializer_into(
-            &mut content,
-            declaration.assignment(),
+        let context = LoweringContext::new(
+            path_mode,
             &choice_labels,
             &indexes.global_labels,
             &indexes.global_variables,
             &indexes.external_signatures,
             &indexes.constants,
-            &path_mode,
             &indexes.struct_definitions,
+        );
+        if lower_assignment_initializer_with_context(
+            &mut content,
+            declaration.assignment(),
+            &context,
         ) {
             content.push(RuntimeObject::GlobalVariableAssignment(
                 declaration.runtime_name().to_string(),
@@ -540,6 +543,24 @@ fn lower_assignment_initializer_into(
         })
         .map(|default_value| content.push(default_value))
         .is_some()
+}
+
+fn lower_assignment_initializer_with_context(
+    content: &mut Vec<RuntimeObject>,
+    assignment: &crate::parsed::VariableAssignment,
+    context: &LoweringContext<'_>,
+) -> bool {
+    lower_assignment_initializer_into(
+        content,
+        assignment,
+        context.choice_labels(),
+        context.global_labels(),
+        context.global_variables(),
+        context.external_signatures(),
+        context.constants(),
+        context.path_mode(),
+        context.struct_definitions(),
+    )
 }
 
 enum AssignmentPathComponent<'a> {
@@ -1553,6 +1574,58 @@ mod tests {
         assert!(json_text.contains("support::shown"), "{json:#}");
         assert!(!json_text.contains("unused"), "{json:#}");
         assert!(!json_text.contains("unused::hidden"), "{json:#}");
+    }
+
+    #[test]
+    fn module_global_initializer_lowering_uses_scoped_runtime_names() {
+        let source = concat!(
+            "=== module game ===\n",
+            "IMPORT helper FROM support\n",
+            "== main ==\n",
+            "-> support::helper\n",
+            "=== module support ===\n",
+            "VAR shown: int = 7\n",
+            "== helper ==\n",
+            "-> END\n",
+            "=== module unused ===\n",
+            "VAR hidden: int = 9\n",
+            "== spare ==\n",
+            "-> END\n",
+        );
+        let compiled = Compiler::default().compile(SourceInput::new(source));
+
+        assert!(
+            compiled.artifact.is_some(),
+            "module story should compile with unreachable warning only: {:#?}",
+            compiled.diagnostics
+        );
+        let json = compiled
+            .artifact
+            .expect("compiled story")
+            .program
+            .to_json_value();
+        let root = json
+            .get("root")
+            .and_then(Value::as_array)
+            .expect("root should encode as JSON array");
+        let named = root
+            .last()
+            .and_then(Value::as_object)
+            .expect("root should end with named content object");
+        let global_decl = named
+            .get("global decl")
+            .and_then(Value::as_array)
+            .expect("global declarations should encode as a container");
+
+        assert!(global_decl.contains(&json!(7)), "{json:#}");
+        assert!(
+            global_decl.contains(&json!({"VAR=": "support::shown"})),
+            "{json:#}"
+        );
+        assert!(
+            !global_decl.contains(&json!({"VAR=": "unused::hidden"})),
+            "{json:#}"
+        );
     }
 
     #[test]
