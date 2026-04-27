@@ -4,7 +4,7 @@ use ink_story_json_format::{Container, ControlCommand, Object as RuntimeObject};
 
 use crate::parsed::Conditional;
 
-use super::context::ChoicePathMode;
+use super::context::{ChoicePathMode, LoweringContext};
 use super::expression::lower_expression_into;
 use super::indexes::{ConstantValues, ExternalSignatures, StructDefinitions};
 use super::lower_object_into_with_context;
@@ -23,20 +23,18 @@ pub(super) fn lower_conditional_into(
     struct_definitions: &StructDefinitions,
     path_mode: &ChoicePathMode,
 ) {
+    let lowering_context = LoweringContext::new(
+        path_mode.clone(),
+        choice_labels,
+        global_labels,
+        global_variables,
+        external_signatures,
+        constants,
+        struct_definitions,
+    );
     if let Some(condition) = conditional.initial_condition() {
         content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
-        lower_expression_into(
-            content,
-            condition,
-            choice_labels,
-            global_labels,
-            global_variables,
-            external_signatures,
-            constants,
-            struct_definitions,
-            path_mode,
-            false,
-        );
+        lower_expression_into(content, condition, &lowering_context, false);
         content.push(RuntimeObject::ControlCommand(ControlCommand::EvalEnd));
     }
 
@@ -70,18 +68,7 @@ pub(super) fn lower_conditional_into(
                 branch_content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
             }
             if let Some(condition) = branch.own_condition() {
-                lower_expression_into(
-                    &mut branch_content,
-                    condition,
-                    choice_labels,
-                    global_labels,
-                    global_variables,
-                    external_signatures,
-                    constants,
-                    struct_definitions,
-                    path_mode,
-                    false,
-                );
+                lower_expression_into(&mut branch_content, condition, &lowering_context, false);
             }
             if switch_like {
                 branch_content.push(RuntimeObject::NativeFunction("==".to_string()));

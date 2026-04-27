@@ -4,7 +4,7 @@ use ink_story_json_format::{ControlCommand, Object as RuntimeObject};
 
 use crate::parsed::{AssignmentTarget, BinaryOperator, Expression, FlowArgument};
 
-use super::context::ChoicePathMode;
+use super::context::{ChoicePathMode, LoweringContext};
 use super::indexes::{
     CallSignature, ConstantValue, ConstantValues, ExternalSignatures, StructDefinitions,
 };
@@ -21,27 +21,10 @@ use super::{
 pub(super) fn lower_output_expression_into(
     content: &mut Vec<RuntimeObject>,
     expression: &Expression,
-    choice_labels: &LabelIndex,
-    global_labels: &LabelIndex,
-    global_variables: &HashSet<String>,
-    external_signatures: &ExternalSignatures,
-    constants: &ConstantValues,
-    struct_definitions: &StructDefinitions,
-    path_mode: &ChoicePathMode,
+    context: &LoweringContext<'_>,
 ) {
     content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
-    lower_expression_into(
-        content,
-        expression,
-        choice_labels,
-        global_labels,
-        global_variables,
-        external_signatures,
-        constants,
-        struct_definitions,
-        path_mode,
-        false,
-    );
+    lower_expression_into(content, expression, context, false);
     content.push(RuntimeObject::ControlCommand(ControlCommand::EvalOutput));
     content.push(RuntimeObject::ControlCommand(ControlCommand::EvalEnd));
 }
@@ -49,27 +32,10 @@ pub(super) fn lower_output_expression_into(
 pub(super) fn lower_logic_line_into(
     content: &mut Vec<RuntimeObject>,
     expression: &Expression,
-    choice_labels: &LabelIndex,
-    global_labels: &LabelIndex,
-    global_variables: &HashSet<String>,
-    external_signatures: &ExternalSignatures,
-    constants: &ConstantValues,
-    struct_definitions: &StructDefinitions,
-    path_mode: &ChoicePathMode,
+    context: &LoweringContext<'_>,
 ) {
     content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
-    lower_expression_into(
-        content,
-        expression,
-        choice_labels,
-        global_labels,
-        global_variables,
-        external_signatures,
-        constants,
-        struct_definitions,
-        path_mode,
-        false,
-    );
+    lower_expression_into(content, expression, context, false);
     content.push(RuntimeObject::ControlCommand(ControlCommand::Pop));
     content.push(RuntimeObject::ControlCommand(ControlCommand::EvalEnd));
     content.push(RuntimeObject::String("\n".to_string()));
@@ -78,26 +44,20 @@ pub(super) fn lower_logic_line_into(
 pub(super) fn lower_expression_into(
     content: &mut Vec<RuntimeObject>,
     expression: &Expression,
-    choice_labels: &LabelIndex,
-    global_labels: &LabelIndex,
-    global_variables: &HashSet<String>,
-    external_signatures: &ExternalSignatures,
-    constants: &ConstantValues,
-    struct_definitions: &StructDefinitions,
-    path_mode: &ChoicePathMode,
+    context: &LoweringContext<'_>,
     has_start_content: bool,
 ) {
     let mut visiting_constants = HashSet::new();
     lower_expression_into_with_constants(
         content,
         expression,
-        choice_labels,
-        global_labels,
-        global_variables,
-        external_signatures,
-        constants,
-        struct_definitions,
-        path_mode,
+        context.choice_labels(),
+        context.global_labels(),
+        context.global_variables(),
+        context.external_signatures(),
+        context.constants(),
+        context.struct_definitions(),
+        context.path_mode(),
         has_start_content,
         &mut visiting_constants,
     );
@@ -439,7 +399,7 @@ fn lower_function_call_into(
         }
         "RANDOM" => {
             for arg in args {
-                lower_function_arg_into(
+                lower_function_arg_into_parts(
                     content,
                     arg,
                     None,
@@ -458,7 +418,7 @@ fn lower_function_call_into(
         }
         "SEED_RANDOM" => {
             for arg in args {
-                lower_function_arg_into(
+                lower_function_arg_into_parts(
                     content,
                     arg,
                     None,
@@ -477,7 +437,7 @@ fn lower_function_call_into(
         }
         _ if is_builtin_function(name) => {
             for arg in args {
-                lower_function_arg_into(
+                lower_function_arg_into_parts(
                     content,
                     arg,
                     None,
@@ -500,7 +460,7 @@ fn lower_function_call_into(
         ) =>
         {
             for arg in args {
-                lower_function_arg_into(
+                lower_function_arg_into_parts(
                     content,
                     arg,
                     None,
@@ -530,7 +490,7 @@ fn lower_function_call_into(
                 _ => &[],
             };
             for (index, arg) in args.iter().enumerate() {
-                lower_function_arg_into(
+                lower_function_arg_into_parts(
                     content,
                     arg,
                     expected_args.get(index),
@@ -551,7 +511,7 @@ fn lower_function_call_into(
         }
         _ => {
             for arg in args {
-                lower_function_arg_into(
+                lower_function_arg_into_parts(
                     content,
                     arg,
                     None,
@@ -660,6 +620,30 @@ fn lower_array_remove_call_into(
 }
 
 pub(super) fn lower_function_arg_into(
+    content: &mut Vec<RuntimeObject>,
+    arg: &Expression,
+    expected_arg: Option<&FlowArgument>,
+    context: &LoweringContext<'_>,
+    has_start_content: bool,
+    visiting_constants: &mut HashSet<String>,
+) {
+    lower_function_arg_into_parts(
+        content,
+        arg,
+        expected_arg,
+        context.choice_labels(),
+        context.global_labels(),
+        context.global_variables(),
+        context.external_signatures(),
+        context.constants(),
+        context.struct_definitions(),
+        context.path_mode(),
+        has_start_content,
+        visiting_constants,
+    );
+}
+
+fn lower_function_arg_into_parts(
     content: &mut Vec<RuntimeObject>,
     arg: &Expression,
     expected_arg: Option<&FlowArgument>,

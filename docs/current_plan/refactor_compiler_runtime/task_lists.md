@@ -1,4 +1,4 @@
-Progress: 1/24
+Progress: 2/24
 
 # Task List: Compiler And Runtime Refactor
 
@@ -89,7 +89,7 @@ Validation status:
 
 Commit: ab4791c9c3c39e07c2d1af8be69eec7546d5eaad
 
-### [ ] Task 02: Migrate Expression Lowering To The Context
+### [x] Task 02: Migrate Expression Lowering To The Context
 
 Goal:
 
@@ -131,7 +131,14 @@ Validation:
 - `cargo fmt --all --check`
 - `make gate`
 
-Validation status: pending.
+Validation status:
+
+- `cargo test -p ink-compiler lower::` passed.
+- `cargo test -p ink-test --test language expression` passed with no matching
+  tests; `cargo test -p ink-test --test language` passed as the effective
+  language coverage.
+- `cargo fmt --all --check` passed.
+- `make gate` passed.
 
 Commit: pending.
 

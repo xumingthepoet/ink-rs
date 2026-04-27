@@ -4,7 +4,7 @@ use ink_story_json_format::{Container, ControlCommand, NamedContainer, Object as
 
 use crate::parsed::{Choice, ContentList, Object, Weave};
 
-use super::context::ChoicePathMode;
+use super::context::{ChoicePathMode, LoweringContext};
 use super::expression::lower_expression_into;
 use super::indexes::{
     collect_counted_paths_in_weave, ConstantValues, CountedFlowPaths, ExternalSignatures,
@@ -757,16 +757,19 @@ fn choice_outer(
     }
 
     if let Some(condition) = choice.condition() {
-        lower_expression_into(
-            &mut outer_content,
-            condition,
+        let context = LoweringContext::new(
+            path_mode.clone(),
             choice_labels,
             global_labels,
             global_variables,
             external_signatures,
             constants,
             struct_definitions,
-            path_mode,
+        );
+        lower_expression_into(
+            &mut outer_content,
+            condition,
+            &context,
             choice.has_start_content(),
         );
     }

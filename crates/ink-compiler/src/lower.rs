@@ -320,6 +320,15 @@ fn lower_object_into_with_context_count(
     struct_definitions: &StructDefinitions,
     count_all_visits: bool,
 ) {
+    let lowering_context = LoweringContext::new(
+        path_mode.clone(),
+        choice_labels,
+        global_labels,
+        global_variables,
+        external_signatures,
+        constants,
+        struct_definitions,
+    );
     match object {
         Object::Text(text) => content.push(RuntimeObject::String(text.text().to_string())),
         Object::AuthorWarning(_) => {}
@@ -336,17 +345,9 @@ fn lower_object_into_with_context_count(
                 struct_definitions,
             );
         }
-        Object::Expression(expression) => lower_output_expression_into(
-            content,
-            expression,
-            choice_labels,
-            global_labels,
-            global_variables,
-            external_signatures,
-            constants,
-            struct_definitions,
-            path_mode,
-        ),
+        Object::Expression(expression) => {
+            lower_output_expression_into(content, expression, &lowering_context)
+        }
         Object::Conditional(conditional) => lower_conditional_into(
             content,
             conditional,
@@ -359,17 +360,7 @@ fn lower_object_into_with_context_count(
             path_mode,
         ),
         Object::LogicLine(expression) => {
-            lower_logic_line_into(
-                content,
-                expression,
-                choice_labels,
-                global_labels,
-                global_variables,
-                external_signatures,
-                constants,
-                struct_definitions,
-                path_mode,
-            );
+            lower_logic_line_into(content, expression, &lowering_context);
         }
         Object::Glue(_) => content.push(RuntimeObject::Glue),
         Object::Divert(divert) => push_divert_with_context(
@@ -442,18 +433,7 @@ fn lower_object_into_with_context_count(
             }
             content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
             if let Some(expr) = ret.returned_expression() {
-                lower_expression_into(
-                    content,
-                    expr,
-                    choice_labels,
-                    global_labels,
-                    global_variables,
-                    external_signatures,
-                    constants,
-                    struct_definitions,
-                    path_mode,
-                    false,
-                );
+                lower_expression_into(content, expr, &lowering_context, false);
             } else {
                 content.push(RuntimeObject::Void);
             }
@@ -517,18 +497,16 @@ fn lower_assignment_initializer_into(
             }
         }
 
-        lower_expression_into(
-            content,
-            expression,
+        let context = LoweringContext::new(
+            path_mode.clone(),
             choice_labels,
             global_labels,
             global_variables,
             external_signatures,
             constants,
             struct_definitions,
-            path_mode,
-            false,
         );
+        lower_expression_into(content, expression, &context, false);
         return true;
     }
 
@@ -612,6 +590,15 @@ fn lower_assignment_path_component_key_into(
     path_mode: &ChoicePathMode,
     struct_definitions: &StructDefinitions,
 ) {
+    let context = LoweringContext::new(
+        path_mode.clone(),
+        choice_labels,
+        global_labels,
+        global_variables,
+        external_signatures,
+        constants,
+        struct_definitions,
+    );
     match component {
         AssignmentPathComponent::Field(field) => {
             content.push(RuntimeObject::String((*field).to_string()));
@@ -619,18 +606,9 @@ fn lower_assignment_path_component_key_into(
         AssignmentPathComponent::CachedIndex(name) => {
             content.push(RuntimeObject::VariableReference(name.clone()));
         }
-        AssignmentPathComponent::Index(index) => lower_expression_into(
-            content,
-            index,
-            choice_labels,
-            global_labels,
-            global_variables,
-            external_signatures,
-            constants,
-            struct_definitions,
-            path_mode,
-            false,
-        ),
+        AssignmentPathComponent::Index(index) => {
+            lower_expression_into(content, index, &context, false)
+        }
     }
 }
 
@@ -682,19 +660,19 @@ fn lower_assignment_update_value_into(
     path_mode: &ChoicePathMode,
     struct_definitions: &StructDefinitions,
 ) {
+    let context = LoweringContext::new(
+        path_mode.clone(),
+        choice_labels,
+        global_labels,
+        global_variables,
+        external_signatures,
+        constants,
+        struct_definitions,
+    );
     match value {
-        AssignmentUpdateValue::Expression(expression) => lower_expression_into(
-            content,
-            expression,
-            choice_labels,
-            global_labels,
-            global_variables,
-            external_signatures,
-            constants,
-            struct_definitions,
-            path_mode,
-            false,
-        ),
+        AssignmentUpdateValue::Expression(expression) => {
+            lower_expression_into(content, expression, &context, false)
+        }
         AssignmentUpdateValue::Compound {
             expression,
             operator,
@@ -711,18 +689,7 @@ fn lower_assignment_update_value_into(
                 path_mode,
                 struct_definitions,
             );
-            lower_expression_into(
-                content,
-                expression,
-                choice_labels,
-                global_labels,
-                global_variables,
-                external_signatures,
-                constants,
-                struct_definitions,
-                path_mode,
-                false,
-            );
+            lower_expression_into(content, expression, &context, false);
             content.push(RuntimeObject::NativeFunction(operator.to_string()));
         }
         AssignmentUpdateValue::ArrayRemove { index } => {
@@ -738,18 +705,7 @@ fn lower_assignment_update_value_into(
                 path_mode,
                 struct_definitions,
             );
-            lower_expression_into(
-                content,
-                index,
-                choice_labels,
-                global_labels,
-                global_variables,
-                external_signatures,
-                constants,
-                struct_definitions,
-                path_mode,
-                false,
-            );
+            lower_expression_into(content, index, &context, false);
             content.push(RuntimeObject::NativeFunction("ARRAY_REMOVE".to_string()));
         }
     }
@@ -844,6 +800,15 @@ fn lower_cached_assignment_indexes_into<'a>(
 ) -> Vec<AssignmentPathComponent<'a>> {
     let mut cached_components = Vec::with_capacity(components.len());
     let mut next_index = 0;
+    let context = LoweringContext::new(
+        path_mode.clone(),
+        choice_labels,
+        global_labels,
+        global_variables,
+        external_signatures,
+        constants,
+        struct_definitions,
+    );
     for component in components {
         match component {
             AssignmentPathComponent::Field(field) => {
@@ -855,18 +820,7 @@ fn lower_cached_assignment_indexes_into<'a>(
             AssignmentPathComponent::Index(index) => {
                 let temp_name = format!("$lvalue{next_index}");
                 next_index += 1;
-                lower_expression_into(
-                    content,
-                    index,
-                    choice_labels,
-                    global_labels,
-                    global_variables,
-                    external_signatures,
-                    constants,
-                    struct_definitions,
-                    path_mode,
-                    false,
-                );
+                lower_expression_into(content, index, &context, false);
                 content.push(RuntimeObject::VariableAssignment(temp_name.clone()));
                 cached_components.push(AssignmentPathComponent::CachedIndex(temp_name));
             }
@@ -942,18 +896,21 @@ fn lower_tail_recursive_return_into(
 
     content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
     let mut visiting_constants = HashSet::new();
+    let context = LoweringContext::new(
+        path_mode.clone(),
+        choice_labels,
+        global_labels,
+        global_variables,
+        external_signatures,
+        constants,
+        struct_definitions,
+    );
     for (index, arg) in tail_args.iter().enumerate() {
         lower_function_arg_into(
             content,
             arg,
             expected_args.get(index),
-            choice_labels,
-            global_labels,
-            global_variables,
-            external_signatures,
-            constants,
-            struct_definitions,
-            path_mode,
+            &context,
             false,
             &mut visiting_constants,
         );
@@ -1107,18 +1064,16 @@ fn lower_inc_dec_into(
     content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
     let resolved_name = resolve_runtime_variable_name(name, path_mode, global_variables);
     content.push(RuntimeObject::VariableReference(resolved_name.clone()));
-    lower_expression_into(
-        content,
-        inc_dec.expression(),
+    let context = LoweringContext::new(
+        path_mode.clone(),
         choice_labels,
         global_labels,
         global_variables,
         external_signatures,
         constants,
         struct_definitions,
-        path_mode,
-        false,
     );
+    lower_expression_into(content, inc_dec.expression(), &context, false);
     content.push(RuntimeObject::NativeFunction(
         if inc_dec.is_increment() { "+" } else { "-" }.to_string(),
     ));
@@ -1162,19 +1117,17 @@ fn push_divert_with_context(
 
     if !divert.arguments().is_empty() {
         content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
+        let context = LoweringContext::new(
+            path_mode.clone(),
+            choice_labels,
+            global_labels,
+            global_variables,
+            external_signatures,
+            constants,
+            struct_definitions,
+        );
         for argument in divert.arguments() {
-            lower_expression_into(
-                content,
-                argument,
-                choice_labels,
-                global_labels,
-                global_variables,
-                external_signatures,
-                constants,
-                struct_definitions,
-                path_mode,
-                false,
-            );
+            lower_expression_into(content, argument, &context, false);
         }
         content.push(RuntimeObject::ControlCommand(ControlCommand::EvalEnd));
     }
@@ -1258,32 +1211,19 @@ fn push_dynamic_divert_with_context(
     const DYNAMIC_DIVERT_TARGET_TEMP: &str = "$divertTarget";
 
     content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
-    for argument in &dynamic_target.divert_arguments {
-        lower_expression_into(
-            content,
-            argument,
-            choice_labels,
-            global_labels,
-            global_variables,
-            external_signatures,
-            constants,
-            struct_definitions,
-            path_mode,
-            false,
-        );
-    }
-    lower_expression_into(
-        content,
-        &dynamic_target.expression,
+    let context = LoweringContext::new(
+        path_mode.clone(),
         choice_labels,
         global_labels,
         global_variables,
         external_signatures,
         constants,
         struct_definitions,
-        path_mode,
-        false,
     );
+    for argument in &dynamic_target.divert_arguments {
+        lower_expression_into(content, argument, &context, false);
+    }
+    lower_expression_into(content, &dynamic_target.expression, &context, false);
     content.push(RuntimeObject::VariableAssignment(
         DYNAMIC_DIVERT_TARGET_TEMP.to_string(),
     ));
@@ -1319,35 +1259,22 @@ fn lower_tunnel_onwards_into(
     struct_definitions: &StructDefinitions,
 ) {
     content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
+    let context = LoweringContext::new(
+        path_mode.clone(),
+        choice_labels,
+        global_labels,
+        global_variables,
+        external_signatures,
+        constants,
+        struct_definitions,
+    );
     for argument in tunnel_onwards.arguments() {
-        lower_expression_into(
-            content,
-            argument,
-            choice_labels,
-            global_labels,
-            global_variables,
-            external_signatures,
-            constants,
-            struct_definitions,
-            path_mode,
-            false,
-        );
+        lower_expression_into(content, argument, &context, false);
     }
     if let Some(target) = tunnel_onwards.override_target() {
         match target {
             DivertTarget::Dynamic(expression) => {
-                lower_expression_into(
-                    content,
-                    expression,
-                    choice_labels,
-                    global_labels,
-                    global_variables,
-                    external_signatures,
-                    constants,
-                    struct_definitions,
-                    path_mode,
-                    false,
-                );
+                lower_expression_into(content, expression, &context, false);
             }
             DivertTarget::Path(target) => {
                 if let Some(choice_target) = choice_labels.get(target) {
@@ -1654,11 +1581,92 @@ mod tests {
         );
     }
 
+    #[test]
+    fn expression_lowering_context_preserves_current_expression_json() {
+        let source = concat!(
+            "=== module game ===\n",
+            "IMPORT add FROM math\n",
+            "STRUCT Stats {\n",
+            "hp: int\n",
+            "}\n",
+            "CONST LIMIT: int = 3\n",
+            "VAR state: Stats = { hp: 4 }\n",
+            "VAR items: int[] = [5, 8]\n",
+            "== main ==\n",
+            "{math::add(LIMIT, state.hp)}|{items[1]}|{\"HP {state.hp}\"}\n",
+            "-> END\n",
+            "=== module math ===\n",
+            "== function add(left: int, right: int) => int ==\n",
+            "~ return left + right\n",
+        );
+        let compiled = Compiler::default().compile(SourceInput::new(source));
+
+        assert!(
+            compiled.artifact.is_some(),
+            "module story should compile: {:#?}",
+            compiled.diagnostics
+        );
+        let json = compiled
+            .artifact
+            .expect("compiled story")
+            .program
+            .to_json_value();
+
+        assert!(json_contains_sequence(
+            &json,
+            &[
+                json!(3),
+                json!({"VAR?": "game::state"}),
+                json!("^hp"),
+                json!("FIELD")
+            ]
+        ));
+        assert!(json_contains_sequence(
+            &json,
+            &[json!({"VAR?": "game::items"}), json!(1), json!("INDEX")]
+        ));
+        assert!(json_contains_sequence(
+            &json,
+            &[
+                json!("str"),
+                json!("^HP "),
+                json!("ev"),
+                json!({"VAR?": "game::state"}),
+                json!("^hp"),
+                json!("FIELD"),
+                json!("out"),
+                json!("/ev"),
+                json!("/str")
+            ]
+        ));
+        assert!(
+            json.to_string().contains("\"f()\":\"math.add\""),
+            "{json:#}"
+        );
+    }
+
     fn container_json_has_named_content(container: &Value, name: &str) -> bool {
         container
             .as_array()
             .and_then(|items| items.last())
             .and_then(Value::as_object)
             .is_some_and(|named| named.contains_key(name))
+    }
+
+    fn json_contains_sequence(value: &Value, expected: &[Value]) -> bool {
+        match value {
+            Value::Array(items) => {
+                items
+                    .windows(expected.len())
+                    .any(|window| window == expected)
+                    || items
+                        .iter()
+                        .any(|item| json_contains_sequence(item, expected))
+            }
+            Value::Object(object) => object
+                .values()
+                .any(|item| json_contains_sequence(item, expected)),
+            _ => false,
+        }
     }
 }
