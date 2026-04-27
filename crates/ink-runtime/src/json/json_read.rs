@@ -4,7 +4,7 @@ use std::{
 };
 
 use ink_story_json_format as format;
-use serde_json::Map;
+use serde_json::{Map, Value as JsonValue};
 
 use crate::{
     choice::Choice, choice_point::ChoicePoint, container::Container,
@@ -229,22 +229,23 @@ fn format_divert_to_runtime(divert: format::Object) -> Divert {
 }
 
 pub fn jtoken_to_runtime_object(
-    token: &serde_json::Value,
+    token: &JsonValue,
     name: Option<String>,
 ) -> Result<Rc<dyn RTObject>, StoryError> {
-    if let serde_json::Value::Array(value) = token {
+    if token.is_array() {
         if name.is_some() {
-            return jarray_to_container(value, name);
+            return jarray_to_container(json_array(token, "container token")?, name);
         }
     }
 
-    if let serde_json::Value::Object(obj) = token {
+    if token.is_object() {
+        let obj = json_object(token, "runtime object token")?;
         if obj.get("originalChoicePath").is_some() {
             return jobject_to_choice(obj);
         }
 
-        if let Some(prop_value) = obj.get("#") {
-            return Ok(Rc::new(Tag::new(prop_value.as_str().unwrap())));
+        if obj.get("#").is_some() {
+            return Ok(Rc::new(Tag::new(required_string(obj, "#")?)));
         }
     }
 
@@ -258,10 +259,10 @@ pub fn jtoken_to_runtime_object(
 }
 
 fn jarray_to_container(
-    jarray: &[serde_json::Value],
+    jarray: &[JsonValue],
     name: Option<String>,
 ) -> Result<Rc<dyn RTObject>, StoryError> {
-    let container_value = serde_json::Value::Array(jarray.to_vec());
+    let container_value = JsonValue::Array(jarray.to_vec());
     let container = format::Container::from_json_value(container_value, name)
         .map_err(|error| StoryError::BadJson(error.to_string()))?;
     let runtime_container: Rc<dyn RTObject> = format_container_to_runtime(&container)?;
@@ -269,7 +270,7 @@ fn jarray_to_container(
 }
 
 pub fn jarray_to_runtime_obj_list(
-    jarray: &Vec<serde_json::Value>,
+    jarray: &[JsonValue],
     skip_last: bool,
 ) -> Result<Vec<Rc<dyn RTObject>>, StoryError> {
     let mut count = jarray.len();
@@ -289,11 +290,11 @@ pub fn jarray_to_runtime_obj_list(
 }
 
 fn jobject_to_choice(obj: &Map<String, serde_json::Value>) -> Result<Rc<dyn RTObject>, StoryError> {
-    let text = obj.get("text").unwrap().as_str().unwrap();
-    let index = obj.get("index").unwrap().as_u64().unwrap() as usize;
-    let source_path = obj.get("originalChoicePath").unwrap().as_str().unwrap();
-    let original_thread_index = obj.get("originalThreadIndex").unwrap().as_i64().unwrap() as usize;
-    let path_string_on_choice = obj.get("targetPath").unwrap().as_str().unwrap();
+    let text = required_string(obj, "text")?;
+    let index = required_usize(obj, "index")?;
+    let source_path = required_string(obj, "originalChoicePath")?;
+    let original_thread_index = required_usize(obj, "originalThreadIndex")?;
+    let path_string_on_choice = required_string(obj, "targetPath")?;
     let choice_tags = jarray_to_tags(obj);
 
     Ok(Rc::new(Choice::new_from_json(
@@ -336,6 +337,53 @@ pub(crate) fn jobject_to_hashmap_values(
     }
 
     Ok(dict)
+}
+
+fn required_value<'a>(
+    obj: &'a Map<String, JsonValue>,
+    field: &str,
+) -> Result<&'a JsonValue, StoryError> {
+    obj.get(field)
+        .ok_or_else(|| StoryError::BadJson(format!("Missing required JSON field '{field}'")))
+}
+
+fn required_string<'a>(
+    obj: &'a Map<String, JsonValue>,
+    field: &str,
+) -> Result<&'a str, StoryError> {
+    required_value(obj, field)?
+        .as_str()
+        .ok_or_else(|| StoryError::BadJson(format!("JSON field '{field}' must be a string")))
+}
+
+fn required_i64(obj: &Map<String, JsonValue>, field: &str) -> Result<i64, StoryError> {
+    required_value(obj, field)?
+        .as_i64()
+        .ok_or_else(|| StoryError::BadJson(format!("JSON field '{field}' must be an integer")))
+}
+
+fn required_usize(obj: &Map<String, JsonValue>, field: &str) -> Result<usize, StoryError> {
+    let value = required_i64(obj, field)?;
+    usize::try_from(value).map_err(|_| {
+        StoryError::BadJson(format!(
+            "JSON field '{field}' must be a non-negative integer"
+        ))
+    })
+}
+
+fn json_array<'a>(value: &'a JsonValue, context: &str) -> Result<&'a Vec<JsonValue>, StoryError> {
+    value
+        .as_array()
+        .ok_or_else(|| StoryError::BadJson(format!("{context} must be an array")))
+}
+
+fn json_object<'a>(
+    value: &'a JsonValue,
+    context: &str,
+) -> Result<&'a Map<String, JsonValue>, StoryError> {
+    value
+        .as_object()
+        .ok_or_else(|| StoryError::BadJson(format!("{context} must be an object")))
 }
 
 #[cfg(test)]
@@ -441,5 +489,33 @@ mod tests {
         };
         assert!(matches!(fields.get("name"), Some(ValueType::String(_))));
         assert!(matches!(fields.get("stats"), Some(ValueType::Object(_))));
+    }
+
+    #[test]
+    fn rejects_non_string_save_state_tag_text() {
+        let error = runtime_object_error(&json!({ "#": 7 }));
+
+        assert!(error.contains("JSON field '#' must be a string"));
+    }
+
+    #[test]
+    fn rejects_negative_save_state_choice_index() {
+        let error = runtime_object_error(&json!({
+            "text": "Go",
+            "index": -1,
+            "originalChoicePath": "0",
+            "originalThreadIndex": 0,
+            "targetPath": "done"
+        }));
+
+        assert!(error.contains("JSON field 'index' must be a non-negative integer"));
+    }
+
+    fn runtime_object_error(token: &serde_json::Value) -> String {
+        match jtoken_to_runtime_object(token, None) {
+            Ok(_) => panic!("expected malformed runtime object JSON to fail"),
+            Err(StoryError::BadJson(message)) => message,
+            Err(error) => panic!("expected BadJson, got {error:?}"),
+        }
     }
 }
