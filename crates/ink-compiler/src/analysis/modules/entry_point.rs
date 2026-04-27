@@ -2,6 +2,25 @@ use crate::{diagnostic::Diagnostic, parsed::Story, source::SourceSpan};
 
 use super::super::{span::object_span, ModuleEntryPoint};
 
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(in crate::analysis) struct ModuleEntryPointAnalysis {
+    main_knots: Vec<ModuleMainKnot>,
+    entry_point: Option<ModuleEntryPoint>,
+}
+
+pub(in crate::analysis) fn build_module_entry_point_analysis(
+    story: &Story,
+) -> ModuleEntryPointAnalysis {
+    let main_knots = module_main_knots(story);
+    let entry_point = (main_knots.len() == 1)
+        .then(|| ModuleEntryPoint::new(main_knots[0].module.clone(), "main"));
+
+    ModuleEntryPointAnalysis {
+        main_knots,
+        entry_point,
+    }
+}
+
 pub(in crate::analysis) fn mixed_root_module_diagnostics(story: &Story) -> Vec<Diagnostic> {
     if story.modules().is_empty() {
         return Vec::new();
@@ -25,24 +44,32 @@ fn mixed_root_module_diagnostic(span: SourceSpan) -> Diagnostic {
     )
 }
 
-pub(in crate::analysis) fn module_entry_point(story: &Story) -> Option<ModuleEntryPoint> {
-    let mains = module_main_knots(story);
-    (mains.len() == 1).then(|| ModuleEntryPoint::new(mains[0].module.clone(), "main"))
+impl ModuleEntryPointAnalysis {
+    pub(in crate::analysis) fn entry_point(&self) -> Option<&ModuleEntryPoint> {
+        self.entry_point.as_ref()
+    }
+
+    pub(in crate::analysis) fn into_entry_point(self) -> Option<ModuleEntryPoint> {
+        self.entry_point
+    }
 }
 
-pub(in crate::analysis) fn module_entry_point_diagnostics(story: &Story) -> Vec<Diagnostic> {
+pub(in crate::analysis) fn module_entry_point_diagnostics(
+    story: &Story,
+    analysis: &ModuleEntryPointAnalysis,
+) -> Vec<Diagnostic> {
     if story.modules().is_empty() {
         return Vec::new();
     }
 
-    let mains = module_main_knots(story);
-    match mains.len() {
+    match analysis.main_knots.len() {
         0 => vec![Diagnostic::error(
             story.modules()[0].span().clone(),
             "Explicit module compilation requires exactly one module to define a knot named 'main'",
         )],
         1 => Vec::new(),
-        _ => mains
+        _ => analysis
+            .main_knots
             .iter()
             .skip(1)
             .map(|main| {

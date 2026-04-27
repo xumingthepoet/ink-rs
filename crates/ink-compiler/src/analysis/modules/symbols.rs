@@ -77,8 +77,10 @@ pub(in crate::analysis) fn build_module_symbol_index(story: &Story) -> ModuleSym
     index
 }
 
-pub(in crate::analysis) fn module_symbol_diagnostics(story: &Story) -> Vec<Diagnostic> {
-    let index = build_module_symbol_index(story);
+pub(in crate::analysis) fn module_symbol_diagnostics(
+    story: &Story,
+    index: &ModuleSymbolIndex,
+) -> Vec<Diagnostic> {
     index.validate_internal_consistency();
 
     let mut diagnostics = duplicate_module_diagnostics(story);

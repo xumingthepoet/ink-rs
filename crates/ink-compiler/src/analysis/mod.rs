@@ -71,13 +71,10 @@ impl ModuleEntryPoint {
 }
 
 pub(crate) fn analyze(parsed: Story) -> StageOutput<CheckedStory> {
-    let diagnostics = run_analysis_passes(&parsed);
-    let entry_point = modules::module_entry_point(&parsed);
-    let module_symbols = modules::build_module_symbol_index(&parsed);
-    let module_dependencies = modules::build_module_dependency_graph(&parsed);
-    let module_imports = modules::build_module_import_index(&parsed);
-    let module_reachability =
-        modules::build_module_reachability(&module_dependencies, entry_point.as_ref());
+    let module_analysis = modules::ModuleAnalysis::build(&parsed);
+    let diagnostics = run_analysis_passes_with_modules(&parsed, &module_analysis);
+    let (entry_point, module_symbols, module_dependencies, module_imports, module_reachability) =
+        module_analysis.into_checked_parts();
     StageOutput {
         artifact: Some(CheckedStory {
             parsed,
@@ -91,7 +88,16 @@ pub(crate) fn analyze(parsed: Story) -> StageOutput<CheckedStory> {
     }
 }
 
+#[cfg(test)]
 fn run_analysis_passes(story: &Story) -> Vec<Diagnostic> {
+    let module_analysis = modules::ModuleAnalysis::build(story);
+    run_analysis_passes_with_modules(story, &module_analysis)
+}
+
+fn run_analysis_passes_with_modules(
+    story: &Story,
+    module_analysis: &modules::ModuleAnalysis,
+) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
     // Constants and author warnings are story-wide discovery passes. They do
@@ -99,23 +105,26 @@ fn run_analysis_passes(story: &Story) -> Vec<Diagnostic> {
     diagnostics.extend(constant_redefinition_diagnostics(story));
     diagnostics.extend(author_warning_diagnostics(story));
     diagnostics.extend(struct_type_diagnostics(story));
-    diagnostics.extend(modules::module_symbol_diagnostics(story));
+    diagnostics.extend(modules::module_symbol_diagnostics(
+        story,
+        &module_analysis.symbols,
+    ));
     diagnostics.extend(modules::mixed_root_module_diagnostics(story));
-    diagnostics.extend(modules::module_entry_point_diagnostics(story));
-    diagnostics.extend(modules::module_dependency_diagnostics(story));
-    let module_symbols = modules::build_module_symbol_index(story);
-    let module_imports = modules::build_module_import_index(story);
+    diagnostics.extend(modules::module_entry_point_diagnostics(
+        story,
+        &module_analysis.entry_points,
+    ));
+    diagnostics.extend(modules::module_dependency_diagnostics(
+        &module_analysis.dependencies,
+    ));
     diagnostics.extend(modules::module_import_diagnostics(
         story,
-        &module_symbols,
-        &module_imports,
+        &module_analysis.symbols,
+        &module_analysis.imports,
     ));
-    let graph = modules::build_module_dependency_graph(story);
-    let entry_point = modules::module_entry_point(story);
-    let reachability = modules::build_module_reachability(&graph, entry_point.as_ref());
     diagnostics.extend(modules::unreachable_module_diagnostics(
         story,
-        &reachability,
+        &module_analysis.reachability,
     ));
 
     // Naming must run before target checks so name collisions are reported

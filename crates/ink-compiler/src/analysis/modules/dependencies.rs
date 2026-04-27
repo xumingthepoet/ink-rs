@@ -5,9 +5,10 @@ use crate::{diagnostic::Diagnostic, parsed::Story, source::SourceSpan};
 use super::super::ModuleEntryPoint;
 use super::sort_diagnostics;
 
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default)]
 pub struct ModuleDependencyGraph {
     direct_dependencies: BTreeMap<String, Vec<String>>,
+    dependency_spans: BTreeMap<String, BTreeMap<String, SourceSpan>>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -17,21 +18,20 @@ pub struct ModuleReachability {
 }
 
 pub fn build_module_dependency_graph(story: &Story) -> ModuleDependencyGraph {
-    let direct_dependencies = collect_import_dependencies(story)
-        .into_iter()
+    let dependency_spans = collect_import_dependencies(story);
+    let direct_dependencies = dependency_spans
+        .iter()
         .map(|(module, dependencies)| {
             (
-                module,
-                dependencies
-                    .into_iter()
-                    .map(|dependency| dependency.module)
-                    .collect(),
+                module.clone(),
+                dependencies.keys().cloned().collect::<Vec<_>>(),
             )
         })
         .collect();
 
     ModuleDependencyGraph {
         direct_dependencies,
+        dependency_spans,
     }
 }
 
@@ -52,9 +52,10 @@ pub fn build_module_reachability(
     }
 }
 
-pub(in crate::analysis) fn module_dependency_diagnostics(story: &Story) -> Vec<Diagnostic> {
-    let dependencies = collect_import_dependencies(story);
-    module_dependency_cycle_diagnostics(&dependencies)
+pub(in crate::analysis) fn module_dependency_diagnostics(
+    graph: &ModuleDependencyGraph,
+) -> Vec<Diagnostic> {
+    module_dependency_cycle_diagnostics(graph)
 }
 
 pub(in crate::analysis) fn unreachable_module_diagnostics(
@@ -104,7 +105,21 @@ impl ModuleDependencyGraph {
             .iter()
             .any(|candidate| candidate == dependency)
     }
+
+    fn dependency_span(&self, module: &str, dependency: &str) -> Option<&SourceSpan> {
+        self.dependency_spans
+            .get(module)
+            .and_then(|dependencies| dependencies.get(dependency))
+    }
 }
+
+impl PartialEq for ModuleDependencyGraph {
+    fn eq(&self, other: &Self) -> bool {
+        self.direct_dependencies == other.direct_dependencies
+    }
+}
+
+impl Eq for ModuleDependencyGraph {}
 
 impl ModuleReachability {
     pub fn entry_module(&self) -> Option<&str> {
@@ -120,13 +135,7 @@ impl ModuleReachability {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct ModuleDependency {
-    module: String,
-    span: SourceSpan,
-}
-
-fn collect_import_dependencies(story: &Story) -> BTreeMap<String, Vec<ModuleDependency>> {
+fn collect_import_dependencies(story: &Story) -> BTreeMap<String, BTreeMap<String, SourceSpan>> {
     let mut dependencies_by_module = BTreeMap::new();
 
     for module in story.modules() {
@@ -136,13 +145,7 @@ fn collect_import_dependencies(story: &Story) -> BTreeMap<String, Vec<ModuleDepe
                 .entry(import.source_module().to_string())
                 .or_insert_with(|| import.source_module_span().clone());
         }
-        dependencies_by_module.insert(
-            module.name().to_string(),
-            dependencies
-                .into_iter()
-                .map(|(module, span)| ModuleDependency { module, span })
-                .collect(),
-        );
+        dependencies_by_module.insert(module.name().to_string(), dependencies);
     }
 
     dependencies_by_module
@@ -162,17 +165,15 @@ fn collect_reachable_modules(
     }
 }
 
-fn module_dependency_cycle_diagnostics(
-    dependencies_by_module: &BTreeMap<String, Vec<ModuleDependency>>,
-) -> Vec<Diagnostic> {
+fn module_dependency_cycle_diagnostics(graph: &ModuleDependencyGraph) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
     let mut reported_cycles = BTreeSet::new();
 
-    for module in dependencies_by_module.keys() {
+    for module in graph.modules() {
         let mut path = Vec::new();
         collect_cycles_from_module(
             module,
-            dependencies_by_module,
+            graph,
             &mut path,
             &mut reported_cycles,
             &mut diagnostics,
@@ -185,26 +186,30 @@ fn module_dependency_cycle_diagnostics(
 
 fn collect_cycles_from_module(
     current: &str,
-    dependencies_by_module: &BTreeMap<String, Vec<ModuleDependency>>,
+    graph: &ModuleDependencyGraph,
     path: &mut Vec<String>,
     reported_cycles: &mut BTreeSet<String>,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     path.push(current.to_string());
 
-    if let Some(dependencies) = dependencies_by_module.get(current) {
+    if let Some(dependencies) = graph.direct_dependencies.get(current) {
         for dependency in dependencies {
-            if !dependencies_by_module.contains_key(&dependency.module) {
+            if !graph.direct_dependencies.contains_key(dependency) {
                 continue;
             }
 
-            if let Some(cycle_start) = path.iter().position(|module| module == &dependency.module) {
+            if let Some(cycle_start) = path.iter().position(|module| module == dependency) {
                 let mut cycle = path[cycle_start..].to_vec();
-                cycle.push(dependency.module.clone());
+                cycle.push(dependency.clone());
                 let key = canonical_cycle_key(&cycle);
                 if reported_cycles.insert(key) {
+                    let span = graph
+                        .dependency_span(current, dependency)
+                        .expect("dependency graph must retain import spans")
+                        .clone();
                     diagnostics.push(Diagnostic::error(
-                        dependency.span.clone(),
+                        span,
                         format!(
                             "Cyclic module import detected: {}",
                             format_module_path(&cycle)
@@ -214,13 +219,7 @@ fn collect_cycles_from_module(
                 continue;
             }
 
-            collect_cycles_from_module(
-                &dependency.module,
-                dependencies_by_module,
-                path,
-                reported_cycles,
-                diagnostics,
-            );
+            collect_cycles_from_module(dependency, graph, path, reported_cycles, diagnostics);
         }
     }
 

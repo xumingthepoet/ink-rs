@@ -4,7 +4,9 @@ mod imports;
 mod symbols;
 
 use crate::diagnostic::Diagnostic;
+use crate::parsed::Story;
 
+use super::ModuleEntryPoint;
 pub use dependencies::{
     build_module_dependency_graph, build_module_reachability, ModuleDependencyGraph,
     ModuleReachability,
@@ -13,7 +15,8 @@ pub(in crate::analysis) use dependencies::{
     module_dependency_diagnostics, unreachable_module_diagnostics,
 };
 pub(in crate::analysis) use entry_point::{
-    mixed_root_module_diagnostics, module_entry_point, module_entry_point_diagnostics,
+    build_module_entry_point_analysis, mixed_root_module_diagnostics,
+    module_entry_point_diagnostics, ModuleEntryPointAnalysis,
 };
 pub(in crate::analysis) use imports::module_import_diagnostics;
 pub use imports::{build_module_import_index, ModuleImportIndex};
@@ -21,6 +24,51 @@ pub use symbols::ModuleSymbolIndex;
 #[cfg(test)]
 use symbols::ModuleSymbolKind;
 pub(in crate::analysis) use symbols::{build_module_symbol_index, module_symbol_diagnostics};
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(in crate::analysis) struct ModuleAnalysis {
+    pub(in crate::analysis) entry_points: ModuleEntryPointAnalysis,
+    pub(in crate::analysis) symbols: ModuleSymbolIndex,
+    pub(in crate::analysis) dependencies: ModuleDependencyGraph,
+    pub(in crate::analysis) imports: ModuleImportIndex,
+    pub(in crate::analysis) reachability: ModuleReachability,
+}
+
+impl ModuleAnalysis {
+    pub(in crate::analysis) fn build(story: &Story) -> Self {
+        let entry_points = build_module_entry_point_analysis(story);
+        let symbols = build_module_symbol_index(story);
+        let dependencies = build_module_dependency_graph(story);
+        let imports = build_module_import_index(story);
+        let reachability = build_module_reachability(&dependencies, entry_points.entry_point());
+
+        Self {
+            entry_points,
+            symbols,
+            dependencies,
+            imports,
+            reachability,
+        }
+    }
+
+    pub(in crate::analysis) fn into_checked_parts(
+        self,
+    ) -> (
+        Option<ModuleEntryPoint>,
+        ModuleSymbolIndex,
+        ModuleDependencyGraph,
+        ModuleImportIndex,
+        ModuleReachability,
+    ) {
+        (
+            self.entry_points.into_entry_point(),
+            self.symbols,
+            self.dependencies,
+            self.imports,
+            self.reachability,
+        )
+    }
+}
 
 fn sort_diagnostics(diagnostics: &mut [Diagnostic]) {
     diagnostics.sort_by(|left, right| {
@@ -53,6 +101,25 @@ mod tests {
         let symbol_index = build_module_symbol_index(story);
         let import_index = build_module_import_index(story);
         module_import_diagnostics(story, &symbol_index, &import_index)
+    }
+
+    fn dependency_diagnostics(story: &Story) -> Vec<Diagnostic> {
+        let graph = build_module_dependency_graph(story);
+        module_dependency_diagnostics(&graph)
+    }
+
+    fn symbol_diagnostics(story: &Story) -> Vec<Diagnostic> {
+        let symbol_index = build_module_symbol_index(story);
+        module_symbol_diagnostics(story, &symbol_index)
+    }
+
+    fn entry_point_diagnostics(story: &Story) -> Vec<Diagnostic> {
+        let entry_points = build_module_entry_point_analysis(story);
+        module_entry_point_diagnostics(story, &entry_points)
+    }
+
+    fn entry_point(story: &Story) -> Option<ModuleEntryPoint> {
+        build_module_entry_point_analysis(story).into_entry_point()
     }
 
     #[test]
@@ -276,7 +343,7 @@ mod tests {
              -> END",
         );
 
-        let diagnostics = module_dependency_diagnostics(&story);
+        let diagnostics = dependency_diagnostics(&story);
 
         assert_eq!(diagnostics.len(), 1, "{diagnostics:#?}");
         assert_eq!(diagnostics[0].severity, DiagnosticSeverity::Error);
@@ -304,7 +371,7 @@ mod tests {
              -> END",
         );
 
-        let diagnostics = module_dependency_diagnostics(&story);
+        let diagnostics = dependency_diagnostics(&story);
 
         assert_eq!(diagnostics.len(), 1, "{diagnostics:#?}");
         assert_eq!(diagnostics[0].severity, DiagnosticSeverity::Error);
@@ -613,8 +680,8 @@ mod tests {
              -> END",
         );
         let graph = build_module_dependency_graph(&story);
-        let entry_point = module_entry_point(&story);
-        let reachability = build_module_reachability(&graph, entry_point.as_ref());
+        let entry_points = build_module_entry_point_analysis(&story);
+        let reachability = build_module_reachability(&graph, entry_points.entry_point());
 
         let diagnostics = unreachable_module_diagnostics(&story, &reachability);
 
@@ -664,7 +731,7 @@ mod tests {
              === module game ===",
         );
 
-        let diagnostics = module_symbol_diagnostics(&story);
+        let diagnostics = symbol_diagnostics(&story);
 
         assert_eq!(diagnostics.len(), 1, "{diagnostics:#?}");
         assert_eq!(diagnostics[0].severity, DiagnosticSeverity::Error);
@@ -684,7 +751,7 @@ mod tests {
         assert!(!parsed.has_errors(), "{:#?}", parsed.diagnostics);
         let story = parsed.artifact.expect("expected parsed story");
 
-        let diagnostics = module_symbol_diagnostics(&story);
+        let diagnostics = symbol_diagnostics(&story);
 
         assert_eq!(diagnostics.len(), 1, "{diagnostics:#?}");
         assert_eq!(
@@ -713,7 +780,7 @@ mod tests {
              -> END",
         );
 
-        let diagnostics = module_symbol_diagnostics(&story);
+        let diagnostics = symbol_diagnostics(&story);
 
         assert_eq!(diagnostics.len(), 3, "{diagnostics:#?}");
         assert_eq!(diagnostics[0].line, 3);
@@ -746,7 +813,7 @@ mod tests {
              -> END",
         );
 
-        let diagnostics = module_symbol_diagnostics(&story);
+        let diagnostics = symbol_diagnostics(&story);
 
         assert!(diagnostics.is_empty(), "{diagnostics:#?}");
     }
@@ -763,7 +830,7 @@ mod tests {
              -> END",
         );
 
-        let diagnostics = module_symbol_diagnostics(&story);
+        let diagnostics = symbol_diagnostics(&story);
 
         assert!(diagnostics.is_empty(), "{diagnostics:#?}");
     }
@@ -776,7 +843,7 @@ mod tests {
              -> END",
         );
 
-        let diagnostics = module_entry_point_diagnostics(&story);
+        let diagnostics = entry_point_diagnostics(&story);
 
         assert_eq!(diagnostics.len(), 1, "{diagnostics:#?}");
         assert_eq!(diagnostics[0].severity, DiagnosticSeverity::Error);
@@ -785,7 +852,7 @@ mod tests {
             diagnostics[0].message,
             "Explicit module compilation requires exactly one module to define a knot named 'main'"
         );
-        assert!(module_entry_point(&story).is_none());
+        assert!(entry_point(&story).is_none());
     }
 
     #[test]
@@ -859,7 +926,7 @@ mod tests {
              -> END",
         );
 
-        let diagnostics = module_entry_point_diagnostics(&story);
+        let diagnostics = entry_point_diagnostics(&story);
 
         assert_eq!(diagnostics.len(), 1, "{diagnostics:#?}");
         assert_eq!(diagnostics[0].severity, DiagnosticSeverity::Error);
@@ -868,14 +935,14 @@ mod tests {
             diagnostics[0].message,
             "Multiple 'main' knots are declared; runnable entry point must be unique"
         );
-        assert!(module_entry_point(&story).is_none());
+        assert!(entry_point(&story).is_none());
     }
 
     #[test]
     fn legacy_sources_do_not_require_module_main_until_root_migration() {
         let story = parse_story("Line.");
 
-        assert!(module_entry_point_diagnostics(&story).is_empty());
-        assert!(module_entry_point(&story).is_none());
+        assert!(entry_point_diagnostics(&story).is_empty());
+        assert!(entry_point(&story).is_none());
     }
 }
