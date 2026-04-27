@@ -265,7 +265,7 @@ not part of this closed first phase.
 ## Requirement Log
 
 - 2026-04-26: Create this requirements document under
-  `docs/current_plan/module_support/` as the active tracking location for
+  `docs/active_plan/module_support/` as the active tracking location for
   module support requirements.
 - 2026-04-26: Redesign include/import semantics around explicit dependencies,
   no default transitive or sibling visibility leakage, module namespaces for

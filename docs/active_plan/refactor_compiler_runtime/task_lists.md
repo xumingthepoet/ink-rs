@@ -2,7 +2,8 @@ Progress: 9/24
 
 # Task List: Compiler And Runtime Refactor
 
-Status key: `[ ]` pending, `[~]` in progress, `[x]` complete, `[!]` blocked.
+Status key: `[ ]` pending, `[~]` in progress, `[>]` waiting review, `[x]`
+complete, `[!]` blocked.
 
 This task list is an implementation plan, not a research log. Except for final
 plan closeout, every task must edit production code, test code, fixtures, editor
@@ -12,13 +13,16 @@ behavior.
 
 Completion protocol for every task:
 
-- Update the task checkbox from `[ ]` or `[~]` to `[x]`.
-- Update `Progress: X/24`.
 - Run the task's focused validation.
 - Run `make gate`.
-- Commit immediately after validation passes.
-- Record the commit hash in that task's `Commit` field before starting another
-  task.
+- Commit implementation code immediately after validation passes.
+- Update the task marker to `[>]` waiting review and record the implementation
+  commit hash in that task's `Commit` field.
+- Review the implementation commit before starting the next implementation
+  task. Fix issues in follow-up code commits if needed, then rerun the focused
+  validation and `make gate`.
+- Only after review and any fixes pass, update the task marker to `[x]`, update
+  `Progress: X/24`, and commit the task-list completion record separately.
 
 Do not append notes, logs, or running commentary after this task list. Record
 validation and commit metadata inside the relevant task section.
@@ -519,7 +523,7 @@ Commit: be491d686043311dbd06bbce4b6776169742ec0b
 
 ## Milestone 3: Module Analysis Structure
 
-### [ ] Task 10: Extract Module Symbol Indexing
+### [>] Task 10: Extract Module Symbol Indexing
 
 Goal:
 
@@ -559,9 +563,18 @@ Validation:
 - `cargo fmt --all --check`
 - `make gate`
 
-Validation status: pending.
+Validation status:
 
-Commit: pending.
+- `cargo test -p ink-compiler analysis::modules` passed before implementation
+  commit.
+- `cargo test -p ink-test --test language module` passed before implementation
+  commit.
+- `cargo fmt --all --check` passed before implementation commit.
+- `make gate` passed before implementation commit.
+
+Review status: pending.
+
+Commit: b76f894d61ed412ce55ee89947fe7f889d8ab6dc
 
 ### [ ] Task 11: Extract Dependency Graph And Reachability Analysis
 
@@ -1146,7 +1159,7 @@ Implementation method:
 - Review `requirement_plan.md` against completed work and update only for actual
   clarified compatibility notes.
 - Run broad compiler, runtime, format, conformance, and gate validation.
-- Move `docs/current_plan/refactor_compiler_runtime/` to
+- Move `docs/active_plan/refactor_compiler_runtime/` to
   `docs/finished_plans/refactor_compiler_runtime/` only after validation
   passes.
 
@@ -1154,7 +1167,7 @@ Acceptance criteria:
 
 - All refactor tasks are complete and recorded.
 - Full validation passes.
-- No active refactor plan remains under `docs/current_plan/`.
+- No active refactor plan remains under `docs/active_plan/`.
 
 Forbidden shortcuts:
 

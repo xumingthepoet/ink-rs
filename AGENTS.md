@@ -7,7 +7,7 @@ The upstream reference lives in `ink-csharp/`.
 ## Project Goal
 
 - Continue the compiled story JSON format refactor tracked by the active plan
-  under `docs/current_plan/`, when one exists.
+  under `docs/active_plan/`, when one exists.
 - Keep `crates/ink-story-json-format` as the single typed owner of compiled
   story JSON data structures, token names, memory-to-JSON serialization, and
   JSON-to-memory deserialization.
@@ -43,7 +43,7 @@ The upstream reference lives in `ink-csharp/`.
 - `ink-csharp/compiler`: historical C# compiler reference
 - `ink-csharp/ink-engine-runtime`: historical C# runtime reference
 - `ink-csharp/tests`: historical C# test corpus
-- `docs/current_plan`: active implementation plan workspace
+- `docs/active_plan`: active implementation plan workspace
 - `docs/finished_plans`: completed implementation plans
 - `docs/WritingWithInk-updates.md`: ink-rs syntax and semantic change log
 - `docs/WritingWithInk-latest.md`: current maintained writing guide
@@ -81,18 +81,20 @@ The upstream reference lives in `ink-csharp/`.
   tests, diagnostics, and code-facing comments. When renaming a concept,
   directory, or workflow term, update related documentation references in the
   same change.
-- Keep active plan details in `docs/current_plan/`; do not add one-off plan file
+- Use `active plan` terminology consistently. Do not create or reference legacy
+  aliases for the active-plan directory or concept.
+- Keep active plan details in `docs/active_plan/`; do not add one-off plan file
   names to `AGENTS.md`.
 - Keep `docs/WritingWithInk-updates.md` synchronized with syntax and semantic
   changes, then apply those updates to `docs/WritingWithInk-latest.md`.
-- Store active implementation plans under `docs/current_plan/`. When a plan is
+- Store active implementation plans under `docs/active_plan/`. When a plan is
   complete, move it to `docs/finished_plans/`. Do not update `AGENTS.md` for
   each new plan unless the planning workflow itself changes.
 - Do not edit `docs/WritingWithInk-origin.md`; it is the upstream C# snapshot.
 
 ## Active Plan Task Lists
 
-- Task lists under `docs/current_plan/` must be implementation plans, not
+- Task lists under `docs/active_plan/` must be implementation plans, not
   research logs. A task is not valid if it is only read-only inventory,
   planning, or context gathering.
 - Put necessary inventory inside the implementation method of the first task
@@ -104,8 +106,12 @@ The upstream reference lives in `ink-csharp/`.
   shortcuts, modification boundaries, validation commands, and commit record.
 - The first non-blank line of every task list must be a progress indicator in
   `Progress: X/N` form.
-- Every task must be represented by a checkbox in its task heading, such as
-  `### [ ] Task 01: ...`. Do not rely only on table status columns.
+- Every task must be represented by a status marker in its task heading, such
+  as `### [ ] Task 01: ...`. Do not rely only on table status columns.
+- Use these task heading markers: `[ ]` pending, `[~]` in progress, `[>]`
+  waiting review, `[x]` complete, and `[!]` blocked. `[>]` means the
+  implementation commit exists after focused validation and `make gate`, and
+  the next required work is reviewing that commit plus any fixes.
 - Group related tasks under milestone sections so parser, analysis, lowering,
   runtime, fixture, and documentation work are easy to navigate.
 - Prefer task lists with more than 20-25 tasks and fewer than 100 tasks. Split
@@ -121,18 +127,26 @@ The upstream reference lives in `ink-csharp/`.
   implementation, diagnostics, docs, and migration updates together when those
   pieces are required for the behavior to be correct.
 - Every active-plan task must pass focused validation relevant to the changed
-  surface and then `make gate` before being marked complete. Do not add
-  documentation-only or read-only exceptions to task completion, except for the
-  final plan closeout task after implementation is already validated.
+  surface and then `make gate` before its implementation commit can be treated
+  as waiting review. Do not add documentation-only or read-only exceptions to
+  task completion, except for the final plan closeout task after implementation
+  is already validated.
 - Keep the progress counter, status key, acceptance conditions, forbidden
   shortcuts, and modification boundaries in the task list itself. Update task
   status and progress only after validation has passed.
 - Record validation and commit metadata inside the relevant task section. Do not
   append separate notes, logs, journals, or running commentary after the task
   list.
-- Commit after each completed task and record the commit hash in that task
-  section. Do not start the next task with uncommitted changes from the prior
-  task.
+- Commit implementation code separately from task-list progress records. After
+  implementation validation passes, commit the code and move the task to `[>]`
+  waiting review.
+- The next task-list action after `[>]` is to review that implementation commit,
+  fix issues in follow-up code commits if needed, rerun the focused validation
+  and `make gate`, then mark the task `[x]`, update `Progress: X/N`, and commit
+  the completion record separately.
+- Do not start the next implementation task until the prior task has passed
+  review, any fixes have been committed, and the task-list completion record has
+  been committed.
 
 ## User Assumption Checks
 
@@ -160,14 +174,14 @@ The upstream reference lives in `ink-csharp/`.
 - If the user sends a continuation prompt such as `continue`, `go on`, `keep
   going`, `next`, or a localized equivalent without replacing the task,
   interpret it as: continue the active implementation plan in
-  `docs/current_plan/` if one exists, otherwise continue the current project goal
+  `docs/active_plan/` if one exists, otherwise continue the current project goal
   from the repository state and durable notes.
-- Active plan directories under `docs/current_plan/` should contain the task
+- Active plan directories under `docs/active_plan/` should contain the task
   instructions for that plan. They may also contain a progress file that must be
   kept synchronized while development proceeds; follow the plan's own files for
   the exact progress-tracking convention.
 - When an active plan is complete, move its plan directory from
-  `docs/current_plan/` to `docs/finished_plans/`.
+  `docs/active_plan/` to `docs/finished_plans/`.
 - Validate continuation work with the smallest relevant tests first, then
   `make gate` when the change is ready.
 - `make gate` is still the full project gate. If intentional language changes

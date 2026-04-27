@@ -1322,7 +1322,7 @@ Implementation method:
 - Run focused parser, analysis, lowering, runtime, fixture, docs, and editor
   validation from prior tasks.
 - Run broad validation.
-- Move `docs/current_plan/module_support/` to
+- Move `docs/active_plan/module_support/` to
   `docs/finished_plans/module_support/` only after validation passes.
 
 Acceptance criteria:
@@ -1330,7 +1330,7 @@ Acceptance criteria:
 - Every requirement is implemented, explicitly deferred with owner approval, or
   documented as changed.
 - Full validation passes.
-- No active module-support plan remains under `docs/current_plan/`.
+- No active module-support plan remains under `docs/active_plan/`.
 
 Modification boundary:
 
