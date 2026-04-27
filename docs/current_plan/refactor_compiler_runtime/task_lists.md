@@ -1,4 +1,4 @@
-Progress: 2/24
+Progress: 3/24
 
 # Task List: Compiler And Runtime Refactor
 
@@ -142,7 +142,7 @@ Validation status:
 
 Commit: 436fce33d3a68b6396078639b8c5eb90ec6ee339
 
-### [ ] Task 03: Move Assignment Lowering Behind The Context
+### [x] Task 03: Move Assignment Lowering Behind The Context
 
 Goal:
 
@@ -186,9 +186,15 @@ Validation:
 - `cargo fmt --all --check`
 - `make gate`
 
-Validation status: pending.
+Validation status:
 
-Commit: pending.
+- `cargo test -p ink-compiler lower::` passed.
+- `cargo test -p ink-test --test language assignment` passed.
+- `cargo test -p ink-test --test language module` passed.
+- `cargo fmt --all --check` passed.
+- `make gate` passed.
+
+Commit: 6fa7cba636d27708a223a88cd265858dc78518a1
 
 ### [ ] Task 04: Move Divert And Return Lowering Behind The Context
 
