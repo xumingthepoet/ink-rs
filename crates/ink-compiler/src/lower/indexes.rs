@@ -2,14 +2,11 @@ use std::collections::{HashMap, HashSet};
 
 use crate::parsed::{
     Choice, ContentList, Expression, Flow, FlowArgument, Object, Story, TypeName,
-    VariableAssignment, Weave,
+    VariableAssignment,
 };
 
-use super::context::ChoicePathMode;
-use super::flow::collect_flow_local_variables;
 use super::labels::build_label_index;
 use super::path::LabelIndex;
-use super::weave::weave_has_weave_points;
 
 #[derive(Debug)]
 pub(super) struct LoweringIndexes<'a> {
@@ -19,7 +16,6 @@ pub(super) struct LoweringIndexes<'a> {
     pub(super) variable_declarations: Vec<VariableDeclaration<'a>>,
     pub(super) external_signatures: ExternalSignatures,
     pub(super) struct_definitions: StructDefinitions,
-    pub(super) counted_flow_paths: CountedFlowPaths,
 }
 
 pub(super) struct RuntimeLenEstimator {
@@ -43,7 +39,6 @@ impl<'a> LoweringIndexes<'a> {
             &estimator,
         );
         let external_signatures = build_external_signatures(story);
-        let counted_flow_paths = build_counted_flow_paths(story, &constants);
 
         Self {
             constants,
@@ -52,15 +47,8 @@ impl<'a> LoweringIndexes<'a> {
             variable_declarations,
             external_signatures,
             struct_definitions,
-            counted_flow_paths,
         }
     }
-}
-
-#[derive(Debug, Default)]
-pub(super) struct CountedFlowPaths {
-    pub(super) visits: HashSet<String>,
-    pub(super) turns: HashSet<String>,
 }
 
 pub(super) type ExternalSignatures = HashMap<String, CallSignature>;
@@ -578,250 +566,5 @@ fn collect_external_signatures_in_object(
             collect_external_signatures_in_objects(weave.content(), module_name, signatures);
         }
         _ => {}
-    }
-}
-
-fn build_counted_flow_paths(story: &Story, constants: &ConstantValues) -> CountedFlowPaths {
-    let paths = CountedFlowPaths::default();
-    let mut context = CountedPathCollectionContext { constants };
-    collect_counted_paths_in_weave_with_context(
-        story.root_weave(),
-        &ChoicePathMode::Root,
-        &mut context,
-    );
-    for flow in story.flows() {
-        let child_stitch_names = flow
-            .child_flows()
-            .iter()
-            .map(|child| child.name().to_string())
-            .collect::<Vec<_>>();
-        collect_counted_paths_in_flow(flow, None, None, &child_stitch_names, &mut context);
-    }
-    for module in story.modules() {
-        for flow in module.flows() {
-            let child_stitch_names = flow
-                .child_flows()
-                .iter()
-                .map(|child| child.name().to_string())
-                .collect::<Vec<_>>();
-            collect_counted_paths_in_flow(
-                flow,
-                Some(module.name()),
-                None,
-                &child_stitch_names,
-                &mut context,
-            );
-        }
-    }
-    paths
-}
-
-struct CountedPathCollectionContext<'a> {
-    constants: &'a ConstantValues,
-}
-
-pub(super) fn collect_counted_paths_in_weave(
-    weave: &Weave,
-    constants: &ConstantValues,
-    path_mode: &ChoicePathMode,
-    _paths: &mut CountedFlowPaths,
-) {
-    let mut context = CountedPathCollectionContext { constants };
-    collect_counted_paths_in_weave_with_context(weave, path_mode, &mut context);
-}
-
-fn collect_counted_paths_in_weave_with_context(
-    weave: &Weave,
-    path_mode: &ChoicePathMode,
-    context: &mut CountedPathCollectionContext<'_>,
-) {
-    for object in weave.content() {
-        collect_counted_paths_in_object(object, path_mode, context);
-    }
-}
-
-fn collect_counted_paths_in_flow(
-    flow: &Flow,
-    module_name: Option<&str>,
-    parent_flow_name: Option<&str>,
-    sibling_stitch_names: &[String],
-    context: &mut CountedPathCollectionContext<'_>,
-) {
-    let source_flow_path = parent_flow_name
-        .map(|parent| format!("{parent}.{}", flow.name()))
-        .unwrap_or_else(|| flow.name().to_string());
-    let flow_path = module_name
-        .map(|module| format!("{module}.{source_flow_path}"))
-        .unwrap_or_else(|| source_flow_path.clone());
-    let container_path = if weave_has_weave_points(flow.weave()) {
-        format!("{}.{}", flow_path, flow.arguments().len())
-    } else {
-        flow_path.clone()
-    };
-    let path_mode = ChoicePathMode::Flow {
-        module_name: module_name.map(str::to_string),
-        flow_name: flow.name().to_string(),
-        container_path,
-        parent_flow_name: parent_flow_name.map(str::to_string),
-        sibling_stitch_names: sibling_stitch_names.to_vec(),
-        local_variables: collect_flow_local_variables(flow),
-        self_target_relative: false,
-        fallback_gather_target: None,
-    };
-    collect_counted_paths_in_weave_with_context(flow.weave(), &path_mode, context);
-
-    let child_stitch_names = flow
-        .child_flows()
-        .iter()
-        .map(|child| child.name().to_string())
-        .collect::<Vec<_>>();
-    for child in flow.child_flows() {
-        collect_counted_paths_in_flow(
-            child,
-            module_name,
-            Some(&source_flow_path),
-            &child_stitch_names,
-            context,
-        );
-    }
-}
-
-fn collect_counted_paths_in_content_list(
-    content_list: &ContentList,
-    path_mode: &ChoicePathMode,
-    context: &mut CountedPathCollectionContext<'_>,
-) {
-    for object in content_list.objects() {
-        collect_counted_paths_in_object(object, path_mode, context);
-    }
-}
-
-fn collect_counted_paths_in_object(
-    object: &Object,
-    path_mode: &ChoicePathMode,
-    context: &mut CountedPathCollectionContext<'_>,
-) {
-    match object {
-        Object::ContentList(content_list) => {
-            collect_counted_paths_in_content_list(content_list, path_mode, context);
-        }
-        Object::Expression(expression) | Object::LogicLine(expression) => {
-            collect_counted_paths_in_expression(expression, path_mode, context);
-        }
-        Object::Conditional(conditional) => {
-            if let Some(condition) = conditional.initial_condition() {
-                collect_counted_paths_in_expression(condition, path_mode, context);
-            }
-            for branch in conditional.branches() {
-                if let Some(condition) = branch.own_condition() {
-                    collect_counted_paths_in_expression(condition, path_mode, context);
-                }
-                collect_counted_paths_in_weave_with_context(branch.content(), path_mode, context);
-            }
-        }
-        Object::Choice(choice) => {
-            if let Some(condition) = choice.condition() {
-                collect_counted_paths_in_expression(condition, path_mode, context);
-            }
-            if let Some(content) = choice.start_content() {
-                collect_counted_paths_in_content_list(content, path_mode, context);
-            }
-            collect_counted_paths_in_content_list(choice.inner_content(), path_mode, context);
-        }
-        Object::Divert(divert) => {
-            for argument in divert.arguments() {
-                collect_counted_paths_in_expression(argument, path_mode, context);
-            }
-        }
-        Object::Sequence(sequence) => {
-            for element in sequence.elements() {
-                collect_counted_paths_in_content_list(element, path_mode, context);
-            }
-        }
-        Object::VariableAssignment(assignment) => {
-            if let Some(expression) = assignment.expression() {
-                collect_counted_paths_in_expression(expression, path_mode, context);
-            }
-        }
-        Object::Return(ret) => {
-            if let Some(expr) = ret.returned_expression() {
-                collect_counted_paths_in_expression(expr, path_mode, context);
-            }
-        }
-        Object::Weave(weave) => {
-            collect_counted_paths_in_weave_with_context(weave, path_mode, context)
-        }
-        Object::AuthorWarning(_)
-        | Object::Text(_)
-        | Object::ConstantDeclaration(_)
-        | Object::Glue(_)
-        | Object::IncDec(_)
-        | Object::Gather(_)
-        | Object::TunnelOnwards(_)
-        | Object::ExternalDeclaration(_)
-        | Object::StructDeclaration(_)
-        | Object::Tag(_) => {}
-    }
-}
-
-fn collect_counted_paths_in_expression(
-    expression: &Expression,
-    path_mode: &ChoicePathMode,
-    context: &mut CountedPathCollectionContext<'_>,
-) {
-    match expression {
-        Expression::VariableReference(name) => {
-            if let Some(constant) = context.constants.get(name) {
-                collect_counted_paths_in_expression(constant.expression(), path_mode, context);
-            }
-        }
-        Expression::QualifiedReference(name) => {
-            if let Some(constant) = context.constants.get(name.as_str()) {
-                collect_counted_paths_in_expression(constant.expression(), path_mode, context);
-            }
-        }
-        Expression::StringContent(content) => {
-            collect_counted_paths_in_content_list(content, path_mode, context);
-        }
-        Expression::FunctionCall { name: _, args }
-        | Expression::QualifiedFunctionCall { name: _, args } => {
-            for arg in args {
-                collect_counted_paths_in_expression(arg, path_mode, context);
-            }
-        }
-        Expression::ArrayLiteral(elements) => {
-            for element in elements {
-                collect_counted_paths_in_expression(element, path_mode, context);
-            }
-        }
-        Expression::StructLiteral(fields) => {
-            for field in fields {
-                collect_counted_paths_in_expression(field.expression(), path_mode, context);
-            }
-        }
-        Expression::FieldAccess { base, .. } => {
-            collect_counted_paths_in_expression(base, path_mode, context);
-        }
-        Expression::IndexAccess { base, index } => {
-            collect_counted_paths_in_expression(base, path_mode, context);
-            collect_counted_paths_in_expression(index, path_mode, context);
-        }
-        Expression::MultipleCondition(args) => {
-            for arg in args {
-                collect_counted_paths_in_expression(arg, path_mode, context);
-            }
-        }
-        Expression::Binary { left, right, .. } => {
-            collect_counted_paths_in_expression(left, path_mode, context);
-            collect_counted_paths_in_expression(right, path_mode, context);
-        }
-        Expression::Unary { expression, .. } => {
-            collect_counted_paths_in_expression(expression, path_mode, context);
-        }
-        Expression::DivertTarget(_) => {}
-        Expression::String(_)
-        | Expression::NumberInt(_)
-        | Expression::NumberFloat(_)
-        | Expression::NumberBool(_) => {}
     }
 }

@@ -213,19 +213,7 @@ fn lower_flow_with_context(flow: &Flow, context: &FlowLoweringContext<'_, '_>) -
             content,
             named_content: child_containers,
             name: Some(flow.name().to_string()),
-            flags: flow_container_flags(
-                context
-                    .indexes
-                    .counted_flow_paths
-                    .turns
-                    .contains(&flow_path),
-                context
-                    .indexes
-                    .counted_flow_paths
-                    .visits
-                    .contains(&flow_path),
-                context.count_all_visits,
-            ),
+            flags: flow_container_flags(context.count_all_visits),
         };
     }
 
@@ -233,32 +221,12 @@ fn lower_flow_with_context(flow: &Flow, context: &FlowLoweringContext<'_, '_>) -
         content,
         named_content: Vec::new(),
         name: Some(flow.name().to_string()),
-        flags: flow_container_flags(
-            context
-                .indexes
-                .counted_flow_paths
-                .turns
-                .contains(&flow_path),
-            context
-                .indexes
-                .counted_flow_paths
-                .visits
-                .contains(&flow_path),
-            context.count_all_visits,
-        ),
+        flags: flow_container_flags(context.count_all_visits),
     }
 }
 
-fn flow_container_flags(
-    count_turns: bool,
-    count_visits: bool,
-    count_all_visits: bool,
-) -> Option<i32> {
-    match (count_turns, count_visits || count_all_visits) {
-        (true, _) => Some(3),
-        (false, true) => Some(1),
-        (false, false) => None,
-    }
+fn flow_container_flags(count_visits: bool) -> Option<i32> {
+    count_visits.then_some(1)
 }
 
 fn lower_flow_arguments_into(content: &mut Vec<RuntimeObject>, flow: &Flow) {

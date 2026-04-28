@@ -4,7 +4,6 @@ use crate::parsed::{Choice, ContentList, Object, Weave};
 
 use super::context::{ChoicePathMode, LoweringContext};
 use super::expression::lower_expression_into;
-use super::indexes::{collect_counted_paths_in_weave, CountedFlowPaths};
 use super::path::{child_path, LabelIndex};
 use super::{
     done_container, ends_with_end_or_done, lower_object_into_with_context,
@@ -39,19 +38,12 @@ impl GatherLocation {
     }
 }
 
-fn named_container_flags(
-    count_visits: bool,
-    count_turns: bool,
-    force_named_flag: bool,
-) -> Option<i32> {
+fn named_container_flags(count_visits: bool, force_named_flag: bool) -> Option<i32> {
     let mut flags = 0;
     if count_visits {
         flags |= 1;
     }
-    if count_turns {
-        flags |= 2;
-    }
-    if force_named_flag || count_visits || count_turns {
+    if force_named_flag || count_visits {
         flags |= 4;
     }
 
@@ -126,8 +118,6 @@ pub(super) fn lower_choice_weave_with_initial_content(
     let mut current_path_mode = path_mode.clone();
     let objects = weave.content();
     let mut choice_labels = collect_local_weave_labels(objects, &path_mode);
-    let mut counted_paths = CountedFlowPaths::default();
-    collect_counted_paths_in_weave(weave, context.constants(), &path_mode, &mut counted_paths);
 
     let has_explicit_gather = objects.iter().any(|o| matches!(o, Object::Gather(_)));
 
@@ -162,7 +152,6 @@ pub(super) fn lower_choice_weave_with_initial_content(
                     weave_path_mode: &path_mode,
                     has_explicit_gather,
                     count_all_visits,
-                    counted_paths: &counted_paths,
                 };
                 last_section_had_choice =
                     lower_weave_section(objects, &mut index, &mut main_content, &mut section);
@@ -205,7 +194,6 @@ pub(super) fn lower_choice_weave_with_initial_content(
                     weave_path_mode: &path_mode,
                     has_explicit_gather,
                     count_all_visits,
-                    counted_paths: &counted_paths,
                 };
                 let gather_has_choice =
                     lower_weave_section(objects, &mut index, &mut gather_content, &mut section);
@@ -223,14 +211,7 @@ pub(super) fn lower_choice_weave_with_initial_content(
                     named_content: gather_named_content,
                     name: Some(gather_name),
                     flags: named_container_flags(
-                        count_all_visits
-                            || gather.identifier().is_some()
-                            || counted_paths
-                                .visits
-                                .contains(&gather_path_mode.container_path()),
-                        counted_paths
-                            .turns
-                            .contains(&gather_path_mode.container_path()),
+                        count_all_visits || gather.identifier().is_some(),
                         gather.identifier().is_some(),
                     ),
                 };
@@ -273,7 +254,6 @@ pub(super) fn lower_choice_weave_with_initial_content(
                     weave_path_mode: &path_mode,
                     has_explicit_gather,
                     count_all_visits,
-                    counted_paths: &counted_paths,
                 };
                 last_section_had_choice =
                     lower_weave_section(objects, &mut index, &mut main_content, &mut section);
@@ -372,7 +352,6 @@ struct WeaveSectionLowering<'a, 'ctx> {
     weave_path_mode: &'a ChoicePathMode,
     has_explicit_gather: bool,
     count_all_visits: bool,
-    counted_paths: &'a CountedFlowPaths,
 }
 
 fn section_contains_choice(objects: &[Object], start: usize, end: usize) -> bool {
@@ -521,15 +500,7 @@ fn lower_choice_in_section(
         .push(named_container(Container::named_with_flags(
             choice_container_name,
             choice_content,
-            named_container_flags(
-                section.count_all_visits
-                    || section
-                        .counted_paths
-                        .visits
-                        .contains(&choice_container_path),
-                section.counted_paths.turns.contains(&choice_container_path),
-                false,
-            ),
+            named_container_flags(section.count_all_visits, false),
         )));
     if let Some(identifier) = choice.identifier() {
         section.choice_labels.insert(
