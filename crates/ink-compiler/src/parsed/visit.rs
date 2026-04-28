@@ -271,7 +271,8 @@ where
 mod tests {
     use crate::{
         parsed::{
-            BinaryOperator, ConditionalBranch, FlowLevel, Gather, SequenceType, Text, UnaryOperator,
+            BinaryOperator, ConditionalBranch, FlowLevel, FlowParts, Gather, SequenceType, Text,
+            UnaryOperator,
         },
         source::SourceSpan,
     };
@@ -428,24 +429,22 @@ mod tests {
                 }),
                 Object::Weave(Weave::new(vec![Object::Gather(Gather::new(span(), 1))], 1)),
             ],
-            vec![Flow::new(
-                FlowLevel::Knot,
-                "knot",
-                vec![Object::Expression(Expression::DivertTarget(
-                    "target".to_string(),
-                ))],
-                vec![Flow::new(
-                    FlowLevel::Stitch,
-                    "stitch",
-                    vec![Object::Text(Text::new("nested", span()))],
-                    Vec::new(),
-                    Vec::new(),
-                    crate::parsed::TypeName::void(),
-                    true,
-                )],
-                Vec::new(),
-                crate::parsed::TypeName::void(),
-                false,
+            vec![Flow::from_parts(
+                FlowParts::new(
+                    FlowLevel::Knot,
+                    "knot",
+                    vec![Object::Expression(Expression::DivertTarget(
+                        "target".to_string(),
+                    ))],
+                )
+                .child_flows(vec![Flow::from_parts(
+                    FlowParts::new(
+                        FlowLevel::Stitch,
+                        "stitch",
+                        vec![Object::Text(Text::new("nested", span()))],
+                    )
+                    .function(true),
+                )]),
             )],
         );
 
@@ -520,15 +519,11 @@ mod tests {
                     span(),
                 )],
                 vec![Object::Text(Text::new("module text", span()))],
-                vec![Flow::new(
+                vec![Flow::from_parts(FlowParts::new(
                     FlowLevel::Knot,
                     "main",
                     Vec::new(),
-                    Vec::new(),
-                    Vec::new(),
-                    crate::parsed::TypeName::void(),
-                    false,
-                )],
+                ))],
                 span(),
                 span(),
             )],

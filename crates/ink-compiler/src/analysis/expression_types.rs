@@ -104,21 +104,46 @@ pub(super) fn infer_expression_type(
     current_module: Option<&str>,
     current_flow_path: Option<&str>,
 ) -> Result<TypeName, TypeInferenceError> {
+    let context = TypeInferenceContext {
+        variable_scopes,
+        struct_types,
+        target_symbols,
+        current_module,
+        current_flow_path,
+    };
+    infer_expression_type_in_context(expression, &context)
+}
+
+struct TypeInferenceContext<'a> {
+    variable_scopes: &'a VariableScopeIndex,
+    struct_types: &'a StructTypeIndex,
+    target_symbols: &'a TargetSymbolIndex,
+    current_module: Option<&'a str>,
+    current_flow_path: Option<&'a str>,
+}
+
+fn infer_expression_type_in_context(
+    expression: &Expression,
+    context: &TypeInferenceContext<'_>,
+) -> Result<TypeName, TypeInferenceError> {
     match expression {
         Expression::FieldAccess { base, field } => {
-            let base_type = infer_expression_type(
-                base,
-                variable_scopes,
-                struct_types,
-                target_symbols,
-                current_module,
-                current_flow_path,
-            )?;
-            infer_field_type(&base_type, field, struct_types, current_module)
+            let base_type = infer_expression_type_in_context(base, context)?;
+            infer_field_type(
+                &base_type,
+                field,
+                context.struct_types,
+                context.current_module,
+            )
         }
         Expression::FunctionCall { name, .. } => {
             typed_builtin_return_type(name).map(Ok).unwrap_or_else(|| {
-                infer_function_return_type(name, target_symbols, current_module, current_flow_path)
+                infer_function_return_type(
+                    name,
+                    context.target_symbols,
+                    context.current_module,
+                    context.current_flow_path,
+                )
             })
         }
         Expression::QualifiedFunctionCall { name, .. } => typed_builtin_return_type(name.as_str())
@@ -126,47 +151,23 @@ pub(super) fn infer_expression_type(
             .unwrap_or_else(|| {
                 infer_function_return_type(
                     name.as_str(),
-                    target_symbols,
-                    current_module,
-                    current_flow_path,
+                    context.target_symbols,
+                    context.current_module,
+                    context.current_flow_path,
                 )
             }),
         Expression::Unary {
             operator,
             expression,
-        } => infer_unary_expression_type(
-            *operator,
-            expression,
-            variable_scopes,
-            struct_types,
-            target_symbols,
-            current_module,
-            current_flow_path,
-        ),
+        } => infer_unary_expression_type(*operator, expression, context),
         Expression::Binary {
             operator,
             left,
             right,
-        } => infer_binary_expression_type(
-            *operator,
-            left,
-            right,
-            variable_scopes,
-            struct_types,
-            target_symbols,
-            current_module,
-            current_flow_path,
-        ),
+        } => infer_binary_expression_type(*operator, left, right, context),
         Expression::MultipleCondition(expressions) => {
             for expression in expressions {
-                let expression_type = infer_expression_type(
-                    expression,
-                    variable_scopes,
-                    struct_types,
-                    target_symbols,
-                    current_module,
-                    current_flow_path,
-                )?;
+                let expression_type = infer_expression_type_in_context(expression, context)?;
                 if expression_type != TypeName::bool() {
                     return Err(operator_type_error(
                         "multiple condition",
@@ -177,22 +178,8 @@ pub(super) fn infer_expression_type(
             Ok(TypeName::bool())
         }
         Expression::IndexAccess { base, index } => {
-            let base_type = infer_expression_type(
-                base,
-                variable_scopes,
-                struct_types,
-                target_symbols,
-                current_module,
-                current_flow_path,
-            )?;
-            let index_type = infer_expression_type(
-                index,
-                variable_scopes,
-                struct_types,
-                target_symbols,
-                current_module,
-                current_flow_path,
-            )?;
+            let base_type = infer_expression_type_in_context(base, context)?;
+            let index_type = infer_expression_type_in_context(index, context)?;
             infer_index_type(&base_type, &index_type)
         }
         Expression::String(_)
@@ -206,9 +193,9 @@ pub(super) fn infer_expression_type(
         | Expression::ArrayLiteral(_)
         | Expression::StructLiteral(_) => infer_primitive_expression_type(
             expression,
-            variable_scopes,
-            current_module,
-            current_flow_path,
+            context.variable_scopes,
+            context.current_module,
+            context.current_flow_path,
         ),
     }
 }
@@ -349,20 +336,9 @@ fn infer_unary_type(
 fn infer_unary_expression_type(
     operator: UnaryOperator,
     expression: &Expression,
-    variable_scopes: &VariableScopeIndex,
-    struct_types: &StructTypeIndex,
-    target_symbols: &TargetSymbolIndex,
-    current_module: Option<&str>,
-    current_flow_path: Option<&str>,
+    context: &TypeInferenceContext<'_>,
 ) -> Result<TypeName, TypeInferenceError> {
-    let expression_type = infer_expression_type(
-        expression,
-        variable_scopes,
-        struct_types,
-        target_symbols,
-        current_module,
-        current_flow_path,
-    )?;
+    let expression_type = infer_expression_type_in_context(expression, context)?;
     match operator {
         UnaryOperator::Negate if expression_type == TypeName::int() => Ok(TypeName::int()),
         UnaryOperator::Negate if expression_type == TypeName::float() => Ok(TypeName::float()),
@@ -445,36 +421,14 @@ fn infer_binary_type(
     }
 }
 
-#[expect(
-    clippy::too_many_arguments,
-    reason = "type inference still passes separate analysis indexes; refactor needs a dedicated context task"
-)]
 fn infer_binary_expression_type(
     operator: BinaryOperator,
     left: &Expression,
     right: &Expression,
-    variable_scopes: &VariableScopeIndex,
-    struct_types: &StructTypeIndex,
-    target_symbols: &TargetSymbolIndex,
-    current_module: Option<&str>,
-    current_flow_path: Option<&str>,
+    context: &TypeInferenceContext<'_>,
 ) -> Result<TypeName, TypeInferenceError> {
-    let left_type = infer_expression_type(
-        left,
-        variable_scopes,
-        struct_types,
-        target_symbols,
-        current_module,
-        current_flow_path,
-    )?;
-    let right_type = infer_expression_type(
-        right,
-        variable_scopes,
-        struct_types,
-        target_symbols,
-        current_module,
-        current_flow_path,
-    )?;
+    let left_type = infer_expression_type_in_context(left, context)?;
+    let right_type = infer_expression_type_in_context(right, context)?;
 
     infer_binary_operator_type(operator, left_type, right_type)
 }

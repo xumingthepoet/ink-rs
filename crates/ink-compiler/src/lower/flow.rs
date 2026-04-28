@@ -5,9 +5,7 @@ use ink_story_json_format::{Container, Object as RuntimeObject};
 use crate::parsed::{ContentList, Flow, Object, Weave};
 
 use super::context::{ChoicePathMode, LoweringContext};
-use super::indexes::{
-    ConstantValues, CountedFlowPaths, ExternalSignatures, LoweringIndexes, StructDefinitions,
-};
+use super::indexes::LoweringIndexes;
 use super::path::LabelIndex;
 use super::weave::{
     lower_choice_weave, lower_linear_weave, lower_linear_weave_into_context, weave_has_choice,
@@ -85,43 +83,32 @@ fn lower_flow_in_module(
         .iter()
         .map(|f| f.name().to_string())
         .collect();
-    lower_flow_with_context(
-        flow,
+    let context = FlowLoweringContext {
         module_name,
-        None,
-        &child_stitch_names,
-        &indexes.global_labels,
-        &indexes.global_variables,
-        &indexes.external_signatures,
-        &indexes.constants,
-        &indexes.struct_definitions,
-        &indexes.counted_flow_paths,
+        parent_knot_name: None,
+        sibling_stitch_names: &child_stitch_names,
+        indexes,
         count_all_visits,
-    )
+    };
+    lower_flow_with_context(flow, &context)
 }
 
-#[expect(
-    clippy::too_many_arguments,
-    reason = "flow lowering still carries explicit module and path context until a broader context refactor"
-)]
-fn lower_flow_with_context(
-    flow: &Flow,
-    module_name: Option<&str>,
-    parent_knot_name: Option<&str>,
-    sibling_stitch_names: &[String],
-    global_labels: &LabelIndex,
-    global_variables: &HashSet<String>,
-    external_signatures: &ExternalSignatures,
-    constants: &ConstantValues,
-    struct_definitions: &StructDefinitions,
-    counted_flow_paths: &CountedFlowPaths,
+struct FlowLoweringContext<'a, 'idx> {
+    module_name: Option<&'a str>,
+    parent_knot_name: Option<&'a str>,
+    sibling_stitch_names: &'a [String],
+    indexes: &'a LoweringIndexes<'idx>,
     count_all_visits: bool,
-) -> Container {
+}
+
+fn lower_flow_with_context(flow: &Flow, context: &FlowLoweringContext<'_, '_>) -> Container {
     let mut content = Vec::new();
-    let source_flow_path = parent_knot_name
+    let source_flow_path = context
+        .parent_knot_name
         .map(|parent| format!("{parent}.{}", flow.name()))
         .unwrap_or_else(|| flow.name().to_string());
-    let flow_path = module_name
+    let flow_path = context
+        .module_name
         .map(|module| format!("{module}.{source_flow_path}"))
         .unwrap_or_else(|| source_flow_path.clone());
     let local_variables = collect_flow_local_variables(flow);
@@ -129,64 +116,67 @@ fn lower_flow_with_context(
     lower_flow_arguments_into(&mut content, flow);
 
     if weave_has_weave_points(flow.weave()) {
-        let flow_container_path = parent_knot_name
+        let flow_container_path = context
+            .parent_knot_name
             .map(|parent| {
-                module_name
+                context
+                    .module_name
                     .map(|module| format!("{module}.{parent}.{}.{}", flow.name(), content.len()))
                     .unwrap_or_else(|| format!("{parent}.{}.{}", flow.name(), content.len()))
             })
             .unwrap_or_else(|| {
-                module_name
+                context
+                    .module_name
                     .map(|module| format!("{module}.{}.{}", flow.name(), content.len()))
                     .unwrap_or_else(|| format!("{}.{}", flow.name(), content.len()))
             });
         let path_mode = ChoicePathMode::Flow {
-            module_name: module_name.map(str::to_string),
+            module_name: context.module_name.map(str::to_string),
             flow_name: flow.name().to_string(),
             container_path: flow_container_path,
-            parent_flow_name: parent_knot_name.map(|s| s.to_string()),
-            sibling_stitch_names: sibling_stitch_names.to_vec(),
+            parent_flow_name: context.parent_knot_name.map(|s| s.to_string()),
+            sibling_stitch_names: context.sibling_stitch_names.to_vec(),
             local_variables: local_variables.clone(),
             self_target_relative: false,
             fallback_gather_target: None,
         };
         let choice_labels = LabelIndex::new();
-        let context = LoweringContext::new(
+        let lowering_context = LoweringContext::new(
             path_mode,
             &choice_labels,
-            global_labels,
-            global_variables,
-            external_signatures,
-            constants,
-            struct_definitions,
+            &context.indexes.global_labels,
+            &context.indexes.global_variables,
+            &context.indexes.external_signatures,
+            &context.indexes.constants,
+            &context.indexes.struct_definitions,
         );
         content.push(RuntimeObject::Container(lower_choice_weave(
             flow.weave(),
-            &context,
-            count_all_visits,
+            &lowering_context,
+            context.count_all_visits,
         )));
     } else if !flow.weave().content().is_empty() {
         let path_mode = ChoicePathMode::Flow {
-            module_name: module_name.map(str::to_string),
+            module_name: context.module_name.map(str::to_string),
             flow_name: flow.name().to_string(),
             container_path: flow_path.clone(),
-            parent_flow_name: parent_knot_name.map(str::to_string),
-            sibling_stitch_names: sibling_stitch_names.to_vec(),
+            parent_flow_name: context.parent_knot_name.map(str::to_string),
+            sibling_stitch_names: context.sibling_stitch_names.to_vec(),
             local_variables,
             self_target_relative: false,
             fallback_gather_target: None,
         };
         let choice_labels = LabelIndex::new();
-        let context = LoweringContext::new(
+        let lowering_context = LoweringContext::new(
             path_mode,
             &choice_labels,
-            global_labels,
-            global_variables,
-            external_signatures,
-            constants,
-            struct_definitions,
+            &context.indexes.global_labels,
+            &context.indexes.global_variables,
+            &context.indexes.external_signatures,
+            &context.indexes.constants,
+            &context.indexes.struct_definitions,
         );
-        lower_linear_weave_into_context(&mut content, flow.weave(), &context);
+        lower_linear_weave_into_context(&mut content, flow.weave(), &lowering_context);
     }
 
     if !flow.child_flows().is_empty() {
@@ -208,19 +198,14 @@ fn lower_flow_with_context(
             .child_flows()
             .iter()
             .map(|child| {
-                named_container(lower_flow_with_context(
-                    child,
-                    module_name,
-                    Some(flow.name()),
-                    &child_stitch_names,
-                    global_labels,
-                    global_variables,
-                    external_signatures,
-                    constants,
-                    struct_definitions,
-                    counted_flow_paths,
-                    count_all_visits,
-                ))
+                let child_context = FlowLoweringContext {
+                    module_name: context.module_name,
+                    parent_knot_name: Some(flow.name()),
+                    sibling_stitch_names: &child_stitch_names,
+                    indexes: context.indexes,
+                    count_all_visits: context.count_all_visits,
+                };
+                named_container(lower_flow_with_context(child, &child_context))
             })
             .collect();
 
@@ -229,9 +214,17 @@ fn lower_flow_with_context(
             named_content: child_containers,
             name: Some(flow.name().to_string()),
             flags: flow_container_flags(
-                counted_flow_paths.turns.contains(&flow_path),
-                counted_flow_paths.visits.contains(&flow_path),
-                count_all_visits,
+                context
+                    .indexes
+                    .counted_flow_paths
+                    .turns
+                    .contains(&flow_path),
+                context
+                    .indexes
+                    .counted_flow_paths
+                    .visits
+                    .contains(&flow_path),
+                context.count_all_visits,
             ),
         };
     }
@@ -241,9 +234,17 @@ fn lower_flow_with_context(
         named_content: Vec::new(),
         name: Some(flow.name().to_string()),
         flags: flow_container_flags(
-            counted_flow_paths.turns.contains(&flow_path),
-            counted_flow_paths.visits.contains(&flow_path),
-            count_all_visits,
+            context
+                .indexes
+                .counted_flow_paths
+                .turns
+                .contains(&flow_path),
+            context
+                .indexes
+                .counted_flow_paths
+                .visits
+                .contains(&flow_path),
+            context.count_all_visits,
         ),
     }
 }

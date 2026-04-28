@@ -3,7 +3,7 @@ use crate::source::SourceInput;
 use crate::{
     compiler::StageOutput,
     diagnostic::Diagnostic,
-    parsed::{Flow, ImportDeclaration, Module, Object, Story},
+    parsed::{Flow, FlowParts, ImportDeclaration, Module, Object, Story},
     source::{SourceFile, SourceLine},
 };
 
@@ -376,15 +376,17 @@ impl Parser {
         }
         self.allow_global_var_declarations = previous_global_var_setting;
 
-        Some(Flow::new_with_span(
-            declaration.level,
-            declaration.name,
-            group_weave_content(content),
-            child_flows,
-            declaration.arguments,
-            declaration.return_type,
-            declaration.is_function,
-            line.span.clone(),
+        Some(Flow::from_parts(
+            FlowParts::new(
+                declaration.level,
+                declaration.name,
+                group_weave_content(content),
+            )
+            .child_flows(child_flows)
+            .arguments(declaration.arguments)
+            .return_type(declaration.return_type)
+            .function(declaration.is_function)
+            .span(line.span.clone()),
         ))
     }
 
@@ -438,15 +440,16 @@ impl Parser {
         }
         self.allow_global_var_declarations = previous_global_var_setting;
 
-        Some(Flow::new_with_span(
-            declaration.level,
-            declaration.name,
-            group_weave_content(content),
-            Vec::new(),
-            declaration.arguments,
-            declaration.return_type,
-            declaration.is_function,
-            line.span.clone(),
+        Some(Flow::from_parts(
+            FlowParts::new(
+                declaration.level,
+                declaration.name,
+                group_weave_content(content),
+            )
+            .arguments(declaration.arguments)
+            .return_type(declaration.return_type)
+            .function(declaration.is_function)
+            .span(line.span.clone()),
         ))
     }
 

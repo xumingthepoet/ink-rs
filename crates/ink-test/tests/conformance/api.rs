@@ -371,39 +371,19 @@ impl Story {
     }
 
     #[cfg(feature = "csharp-tests")]
-    #[allow(non_snake_case)]
-    pub fn ResetState(&mut self) {
+    pub fn reset_state(&mut self) {
         self.inner.reset_state().expect("expected state to reset")
     }
 
     #[cfg(feature = "csharp-tests")]
-    #[allow(non_snake_case)]
-    pub fn UnbindExternalFunction(&mut self, func_name: String) {
+    pub fn unbind_external_function(&mut self, func_name: &str) {
         self.inner
-            .unbind_external_function(&func_name)
+            .unbind_external_function(func_name)
             .expect("expected external function to unbind")
     }
 
     #[cfg(feature = "csharp-tests")]
-    #[allow(non_snake_case)]
-    pub fn TagsForContentAtPath(&self, path: String) -> Vec<String> {
-        self.tags_for_content_at_path(&path)
-    }
-
-    #[cfg(feature = "csharp-tests")]
-    #[allow(non_snake_case)]
-    pub fn EvaluateFunction(
-        &mut self,
-        function_name: String,
-        arguments: Vec<ValueType>,
-    ) -> Option<ValueType> {
-        let mut text_output = String::new();
-        self.evaluate_function(&function_name, Some(arguments), &mut text_output)
-    }
-
-    #[cfg(feature = "csharp-tests")]
-    #[allow(non_snake_case)]
-    pub fn get_hasWarning(&self) -> bool {
+    pub fn get_has_warning(&self) -> bool {
         !self.get_current_warnings().is_empty()
     }
 }

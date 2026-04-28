@@ -9,12 +9,8 @@ use super::assignment::{
     lower_cached_assignment_indexes_into, push_reassignment_for_name, AssignmentUpdateValue,
 };
 use super::context::{ChoicePathMode, LoweringContext};
-use super::indexes::{
-    CallSignature, ConstantValue, ConstantValues, ExternalSignatures, StructDefinitions,
-};
-use super::path::{
-    module_scoped_source_path_to_runtime_path, source_path_to_runtime_path, LabelIndex,
-};
+use super::indexes::{CallSignature, ConstantValue, ConstantValues, ExternalSignatures};
+use super::path::{module_scoped_source_path_to_runtime_path, source_path_to_runtime_path};
 use super::value::{lower_value_literal, resolve_divert_target_value};
 use super::weave::lower_content_list_into_context;
 
@@ -48,38 +44,26 @@ pub(super) fn lower_expression_into(
     has_start_content: bool,
 ) {
     let mut visiting_constants = HashSet::new();
-    lower_expression_into_with_constants(
-        content,
-        expression,
-        context.choice_labels(),
-        context.global_labels(),
-        context.global_variables(),
-        context.external_signatures(),
-        context.constants(),
-        context.struct_definitions(),
-        context.path_mode(),
+    let mut lowering = ExpressionLoweringContext {
+        context,
         has_start_content,
-        &mut visiting_constants,
-    );
+        visiting_constants: &mut visiting_constants,
+    };
+    lower_expression_into_with_constants(content, expression, &mut lowering);
 }
 
-#[expect(
-    clippy::too_many_arguments,
-    reason = "expression lowering still threads separate lowering indexes while context migration continues"
-)]
+struct ExpressionLoweringContext<'a, 'ctx> {
+    context: &'a LoweringContext<'ctx>,
+    has_start_content: bool,
+    visiting_constants: &'a mut HashSet<String>,
+}
+
 fn lower_expression_into_with_constants(
     content: &mut Vec<RuntimeObject>,
     expression: &Expression,
-    choice_labels: &LabelIndex,
-    global_labels: &LabelIndex,
-    global_variables: &HashSet<String>,
-    external_signatures: &ExternalSignatures,
-    constants: &ConstantValues,
-    struct_definitions: &StructDefinitions,
-    path_mode: &ChoicePathMode,
-    has_start_content: bool,
-    visiting_constants: &mut HashSet<String>,
+    lowering: &mut ExpressionLoweringContext<'_, '_>,
 ) {
+    let context = lowering.context;
     match expression {
         Expression::String(value) => {
             content.push(RuntimeObject::ControlCommand(ControlCommand::BeginString));
@@ -88,16 +72,7 @@ fn lower_expression_into_with_constants(
         }
         Expression::StringContent(string_content) => {
             content.push(RuntimeObject::ControlCommand(ControlCommand::BeginString));
-            let context = LoweringContext::new(
-                path_mode.clone(),
-                choice_labels,
-                global_labels,
-                global_variables,
-                external_signatures,
-                constants,
-                struct_definitions,
-            );
-            lower_content_list_into_context(content, string_content, &context);
+            lower_content_list_into_context(content, string_content, context);
             content.push(RuntimeObject::ControlCommand(ControlCommand::EndString));
         }
         Expression::NumberInt(value) => content.push(RuntimeObject::Int(*value)),
@@ -106,32 +81,27 @@ fn lower_expression_into_with_constants(
         Expression::DivertTarget(target) => {
             content.push(RuntimeObject::DivertTarget(resolve_divert_target_value(
                 target,
-                choice_labels,
-                global_labels,
-                path_mode,
+                context.choice_labels(),
+                context.global_labels(),
+                context.path_mode(),
             )));
         }
         Expression::VariableReference(name) => {
-            let resolved_name = resolve_runtime_variable_name(name, path_mode, global_variables);
-            if let Some(constant_name) = resolve_constant_name(name, path_mode, constants) {
-                let constant = constants
+            let resolved_name = resolve_runtime_variable_name(
+                name,
+                context.path_mode(),
+                context.global_variables(),
+            );
+            if let Some(constant_name) =
+                resolve_constant_name(name, context.path_mode(), context.constants())
+            {
+                let constant = context
+                    .constants()
                     .get(constant_name.as_str())
                     .expect("resolved constant name must exist");
-                if visiting_constants.insert(constant_name.clone()) {
-                    lower_constant_expression_into(
-                        content,
-                        constant,
-                        choice_labels,
-                        global_labels,
-                        global_variables,
-                        external_signatures,
-                        constants,
-                        struct_definitions,
-                        path_mode,
-                        has_start_content,
-                        visiting_constants,
-                    );
-                    visiting_constants.remove(constant_name.as_str());
+                if lowering.visiting_constants.insert(constant_name.clone()) {
+                    lower_constant_expression_into(content, constant, lowering);
+                    lowering.visiting_constants.remove(constant_name.as_str());
                     return;
                 }
             }
@@ -139,22 +109,13 @@ fn lower_expression_into_with_constants(
             content.push(RuntimeObject::VariableReference(resolved_name));
         }
         Expression::QualifiedReference(name) => {
-            if let Some(constant) = constants.get(name.as_str()) {
-                if visiting_constants.insert(name.as_str().to_string()) {
-                    lower_constant_expression_into(
-                        content,
-                        constant,
-                        choice_labels,
-                        global_labels,
-                        global_variables,
-                        external_signatures,
-                        constants,
-                        struct_definitions,
-                        path_mode,
-                        has_start_content,
-                        visiting_constants,
-                    );
-                    visiting_constants.remove(name.as_str());
+            if let Some(constant) = context.constants().get(name.as_str()) {
+                if lowering
+                    .visiting_constants
+                    .insert(name.as_str().to_string())
+                {
+                    lower_constant_expression_into(content, constant, lowering);
+                    lowering.visiting_constants.remove(name.as_str());
                     return;
                 }
             }
@@ -162,93 +123,31 @@ fn lower_expression_into_with_constants(
             content.push(RuntimeObject::VariableReference(name.as_str().to_string()));
         }
         Expression::FunctionCall { name, args } => {
-            lower_function_call_into(
-                content,
-                name,
-                args,
-                choice_labels,
-                global_labels,
-                global_variables,
-                external_signatures,
-                constants,
-                struct_definitions,
-                path_mode,
-                has_start_content,
-                visiting_constants,
-            );
+            lower_function_call_into(content, name, args, lowering);
         }
         Expression::QualifiedFunctionCall { name, args } => {
-            lower_function_call_into(
-                content,
-                name.as_str(),
-                args,
-                choice_labels,
-                global_labels,
-                global_variables,
-                external_signatures,
-                constants,
-                struct_definitions,
-                path_mode,
-                has_start_content,
-                visiting_constants,
-            );
+            lower_function_call_into(content, name.as_str(), args, lowering);
         }
         Expression::ArrayLiteral(_) | Expression::StructLiteral(_) => {
             if let Some(value) = lower_value_literal(
                 expression,
                 None,
-                struct_definitions,
-                choice_labels,
-                global_labels,
-                path_mode,
+                context.struct_definitions(),
+                context.choice_labels(),
+                context.global_labels(),
+                context.path_mode(),
             ) {
                 content.push(value);
             }
         }
         Expression::FieldAccess { base, field } => {
-            lower_expression_into_with_constants(
-                content,
-                base,
-                choice_labels,
-                global_labels,
-                global_variables,
-                external_signatures,
-                constants,
-                struct_definitions,
-                path_mode,
-                has_start_content,
-                visiting_constants,
-            );
+            lower_expression_into_with_constants(content, base, lowering);
             content.push(RuntimeObject::String(field.clone()));
             content.push(RuntimeObject::NativeFunction(NativeFunction::FieldRead));
         }
         Expression::IndexAccess { base, index } => {
-            lower_expression_into_with_constants(
-                content,
-                base,
-                choice_labels,
-                global_labels,
-                global_variables,
-                external_signatures,
-                constants,
-                struct_definitions,
-                path_mode,
-                has_start_content,
-                visiting_constants,
-            );
-            lower_expression_into_with_constants(
-                content,
-                index,
-                choice_labels,
-                global_labels,
-                global_variables,
-                external_signatures,
-                constants,
-                struct_definitions,
-                path_mode,
-                has_start_content,
-                visiting_constants,
-            );
+            lower_expression_into_with_constants(content, base, lowering);
+            lower_expression_into_with_constants(content, index, lowering);
             content.push(RuntimeObject::NativeFunction(NativeFunction::IndexRead));
         }
         Expression::Binary {
@@ -256,32 +155,8 @@ fn lower_expression_into_with_constants(
             left,
             right,
         } => {
-            lower_expression_into_with_constants(
-                content,
-                left,
-                choice_labels,
-                global_labels,
-                global_variables,
-                external_signatures,
-                constants,
-                struct_definitions,
-                path_mode,
-                has_start_content,
-                visiting_constants,
-            );
-            lower_expression_into_with_constants(
-                content,
-                right,
-                choice_labels,
-                global_labels,
-                global_variables,
-                external_signatures,
-                constants,
-                struct_definitions,
-                path_mode,
-                has_start_content,
-                visiting_constants,
-            );
+            lower_expression_into_with_constants(content, left, lowering);
+            lower_expression_into_with_constants(content, right, lowering);
             content.push(RuntimeObject::NativeFunction(
                 native_function_for_binary_operator(*operator),
             ));
@@ -290,38 +165,14 @@ fn lower_expression_into_with_constants(
             operator,
             expression,
         } => {
-            lower_expression_into_with_constants(
-                content,
-                expression,
-                choice_labels,
-                global_labels,
-                global_variables,
-                external_signatures,
-                constants,
-                struct_definitions,
-                path_mode,
-                has_start_content,
-                visiting_constants,
-            );
+            lower_expression_into_with_constants(content, expression, lowering);
             content.push(RuntimeObject::NativeFunction(
                 native_function_for_unary_operator(*operator),
             ));
         }
         Expression::MultipleCondition(expressions) => {
             for (index, expression) in expressions.iter().enumerate() {
-                lower_expression_into_with_constants(
-                    content,
-                    expression,
-                    choice_labels,
-                    global_labels,
-                    global_variables,
-                    external_signatures,
-                    constants,
-                    struct_definitions,
-                    path_mode,
-                    has_start_content,
-                    visiting_constants,
-                );
+                lower_expression_into_with_constants(content, expression, lowering);
                 if index > 0 {
                     content.push(RuntimeObject::NativeFunction(NativeFunction::And));
                 }
@@ -330,164 +181,68 @@ fn lower_expression_into_with_constants(
     }
 }
 
-#[expect(
-    clippy::too_many_arguments,
-    reason = "constant lowering shares the current expression lowering parameter bundle"
-)]
 fn lower_constant_expression_into(
     content: &mut Vec<RuntimeObject>,
     constant: &ConstantValue,
-    choice_labels: &LabelIndex,
-    global_labels: &LabelIndex,
-    global_variables: &HashSet<String>,
-    external_signatures: &ExternalSignatures,
-    constants: &ConstantValues,
-    struct_definitions: &StructDefinitions,
-    path_mode: &ChoicePathMode,
-    has_start_content: bool,
-    visiting_constants: &mut HashSet<String>,
+    lowering: &mut ExpressionLoweringContext<'_, '_>,
 ) {
+    let context = lowering.context;
     if let Some(value) = lower_value_literal(
         constant.expression(),
         Some(constant.declared_type()),
-        struct_definitions,
-        choice_labels,
-        global_labels,
-        path_mode,
+        context.struct_definitions(),
+        context.choice_labels(),
+        context.global_labels(),
+        context.path_mode(),
     ) {
         content.push(value);
         return;
     }
 
-    lower_expression_into_with_constants(
-        content,
-        constant.expression(),
-        choice_labels,
-        global_labels,
-        global_variables,
-        external_signatures,
-        constants,
-        struct_definitions,
-        path_mode,
-        has_start_content,
-        visiting_constants,
-    );
+    lower_expression_into_with_constants(content, constant.expression(), lowering);
 }
 
-#[expect(
-    clippy::too_many_arguments,
-    reason = "function call lowering shares the current expression lowering parameter bundle"
-)]
 fn lower_function_call_into(
     content: &mut Vec<RuntimeObject>,
     name: &str,
     args: &[Expression],
-    choice_labels: &LabelIndex,
-    global_labels: &LabelIndex,
-    global_variables: &HashSet<String>,
-    external_signatures: &ExternalSignatures,
-    constants: &ConstantValues,
-    struct_definitions: &StructDefinitions,
-    path_mode: &ChoicePathMode,
-    has_start_content: bool,
-    visiting_constants: &mut HashSet<String>,
+    lowering: &mut ExpressionLoweringContext<'_, '_>,
 ) {
-    let resolved_name = resolve_callable_name(name, external_signatures, path_mode);
+    let context = lowering.context;
+    let resolved_name =
+        resolve_callable_name(name, context.external_signatures(), context.path_mode());
     let builtin_function = builtin_native_function(name);
     match name {
         "ARRAY_REMOVE" => {
-            lower_array_remove_call_into(
-                content,
-                args,
-                choice_labels,
-                global_labels,
-                global_variables,
-                external_signatures,
-                constants,
-                struct_definitions,
-                path_mode,
-                visiting_constants,
-            );
+            lower_array_remove_call_into(content, args, lowering);
         }
         "RANDOM" => {
             for arg in args {
-                lower_function_arg_into_parts(
-                    content,
-                    arg,
-                    None,
-                    choice_labels,
-                    global_labels,
-                    global_variables,
-                    external_signatures,
-                    constants,
-                    struct_definitions,
-                    path_mode,
-                    has_start_content,
-                    visiting_constants,
-                );
+                lower_function_arg_into_parts(content, arg, None, lowering);
             }
             content.push(RuntimeObject::ControlCommand(ControlCommand::Random));
         }
         "SEED_RANDOM" => {
             for arg in args {
-                lower_function_arg_into_parts(
-                    content,
-                    arg,
-                    None,
-                    choice_labels,
-                    global_labels,
-                    global_variables,
-                    external_signatures,
-                    constants,
-                    struct_definitions,
-                    path_mode,
-                    has_start_content,
-                    visiting_constants,
-                );
+                lower_function_arg_into_parts(content, arg, None, lowering);
             }
             content.push(RuntimeObject::ControlCommand(ControlCommand::SeedRandom));
         }
         _ if builtin_function.is_some() => {
             for arg in args {
-                lower_function_arg_into_parts(
-                    content,
-                    arg,
-                    None,
-                    choice_labels,
-                    global_labels,
-                    global_variables,
-                    external_signatures,
-                    constants,
-                    struct_definitions,
-                    path_mode,
-                    has_start_content,
-                    visiting_constants,
-                );
+                lower_function_arg_into_parts(content, arg, None, lowering);
             }
             content.push(RuntimeObject::NativeFunction(
                 builtin_function.expect("builtin function guard should provide a native function"),
             ));
         }
         _ if matches!(
-            external_signatures.get(resolved_name.as_str()),
+            context.external_signatures().get(resolved_name.as_str()),
             Some(CallSignature::External { .. })
         ) =>
         {
             for arg in args {
-                lower_function_arg_into_parts(
-                    content,
-                    arg,
-                    None,
-                    choice_labels,
-                    global_labels,
-                    global_variables,
-                    external_signatures,
-                    constants,
-                    struct_definitions,
-                    path_mode,
-                    has_start_content,
-                    visiting_constants,
-                );
+                lower_function_arg_into_parts(content, arg, None, lowering);
             }
             content.push(RuntimeObject::ExternalFunction {
                 target: resolved_name.clone(),
@@ -495,53 +250,27 @@ fn lower_function_call_into(
             });
         }
         _ if matches!(
-            external_signatures.get(resolved_name.as_str()),
+            context.external_signatures().get(resolved_name.as_str()),
             Some(CallSignature::Ink { .. })
         ) =>
         {
-            let expected_args = match external_signatures.get(resolved_name.as_str()) {
+            let expected_args = match context.external_signatures().get(resolved_name.as_str()) {
                 Some(CallSignature::Ink { args, .. }) => args.as_slice(),
                 _ => &[],
             };
             for (index, arg) in args.iter().enumerate() {
-                lower_function_arg_into_parts(
-                    content,
-                    arg,
-                    expected_args.get(index),
-                    choice_labels,
-                    global_labels,
-                    global_variables,
-                    external_signatures,
-                    constants,
-                    struct_definitions,
-                    path_mode,
-                    has_start_content,
-                    visiting_constants,
-                );
+                lower_function_arg_into_parts(content, arg, expected_args.get(index), lowering);
             }
             content.push(RuntimeObject::FunctionDivert {
-                target: runtime_function_target(resolved_name.as_str(), path_mode),
+                target: runtime_function_target(resolved_name.as_str(), context.path_mode()),
             });
         }
         _ => {
             for arg in args {
-                lower_function_arg_into_parts(
-                    content,
-                    arg,
-                    None,
-                    choice_labels,
-                    global_labels,
-                    global_variables,
-                    external_signatures,
-                    constants,
-                    struct_definitions,
-                    path_mode,
-                    has_start_content,
-                    visiting_constants,
-                );
+                lower_function_arg_into_parts(content, arg, None, lowering);
             }
             content.push(RuntimeObject::FunctionDivert {
-                target: runtime_function_target(resolved_name.as_str(), path_mode),
+                target: runtime_function_target(resolved_name.as_str(), context.path_mode()),
             });
         }
     }
@@ -555,22 +284,12 @@ fn runtime_function_target(name: &str, path_mode: &ChoicePathMode) -> String {
     module_scoped_source_path_to_runtime_path(path_mode.current_module_name(), name)
 }
 
-#[expect(
-    clippy::too_many_arguments,
-    reason = "array-remove lowering shares the current expression lowering parameter bundle"
-)]
 fn lower_array_remove_call_into(
     content: &mut Vec<RuntimeObject>,
     args: &[Expression],
-    choice_labels: &LabelIndex,
-    global_labels: &LabelIndex,
-    global_variables: &HashSet<String>,
-    external_signatures: &ExternalSignatures,
-    constants: &ConstantValues,
-    struct_definitions: &StructDefinitions,
-    path_mode: &ChoicePathMode,
-    visiting_constants: &mut HashSet<String>,
+    lowering: &mut ExpressionLoweringContext<'_, '_>,
 ) {
+    let context = lowering.context;
     let (Some(target_expression), Some(index_expression)) = (args.first(), args.get(1)) else {
         content.push(RuntimeObject::Void);
         return;
@@ -585,33 +304,16 @@ fn lower_array_remove_call_into(
         content.push(RuntimeObject::Void);
         return;
     };
-    let context = LoweringContext::new(
-        path_mode.clone(),
-        choice_labels,
-        global_labels,
-        global_variables,
-        external_signatures,
-        constants,
-        struct_definitions,
-    );
-    let cached_components = lower_cached_assignment_indexes_into(content, &components, &context);
-    let resolved_root_name = resolve_runtime_variable_name(root_name, path_mode, global_variables);
+    let cached_components = lower_cached_assignment_indexes_into(content, &components, context);
+    let resolved_root_name =
+        resolve_runtime_variable_name(root_name, context.path_mode(), context.global_variables());
 
     if cached_components.is_empty() {
         content.push(RuntimeObject::VariableReference(resolved_root_name.clone()));
-        lower_expression_into_with_constants(
-            content,
-            index_expression,
-            choice_labels,
-            global_labels,
-            global_variables,
-            external_signatures,
-            constants,
-            struct_definitions,
-            path_mode,
-            false,
-            visiting_constants,
-        );
+        let previous_has_start_content = lowering.has_start_content;
+        lowering.has_start_content = false;
+        lower_expression_into_with_constants(content, index_expression, lowering);
+        lowering.has_start_content = previous_has_start_content;
         content.push(RuntimeObject::NativeFunction(NativeFunction::ArrayRemove));
     } else {
         lower_assignment_path_update_value_into(
@@ -622,11 +324,11 @@ fn lower_array_remove_call_into(
             AssignmentUpdateValue::ArrayRemove {
                 index: index_expression,
             },
-            &context,
+            context,
         );
     }
 
-    push_reassignment_for_name(content, resolved_root_name.as_str(), path_mode);
+    push_reassignment_for_name(content, resolved_root_name.as_str(), context.path_mode());
     content.push(RuntimeObject::Void);
 }
 
@@ -638,44 +340,29 @@ pub(super) fn lower_function_arg_into(
     has_start_content: bool,
     visiting_constants: &mut HashSet<String>,
 ) {
-    lower_function_arg_into_parts(
-        content,
-        arg,
-        expected_arg,
-        context.choice_labels(),
-        context.global_labels(),
-        context.global_variables(),
-        context.external_signatures(),
-        context.constants(),
-        context.struct_definitions(),
-        context.path_mode(),
+    let mut lowering = ExpressionLoweringContext {
+        context,
         has_start_content,
         visiting_constants,
-    );
+    };
+    lower_function_arg_into_parts(content, arg, expected_arg, &mut lowering);
 }
 
-#[expect(
-    clippy::too_many_arguments,
-    reason = "argument lowering shares the current expression lowering parameter bundle"
-)]
 fn lower_function_arg_into_parts(
     content: &mut Vec<RuntimeObject>,
     arg: &Expression,
     expected_arg: Option<&FlowArgument>,
-    choice_labels: &LabelIndex,
-    global_labels: &LabelIndex,
-    global_variables: &HashSet<String>,
-    external_signatures: &ExternalSignatures,
-    constants: &ConstantValues,
-    struct_definitions: &StructDefinitions,
-    path_mode: &ChoicePathMode,
-    has_start_content: bool,
-    visiting_constants: &mut HashSet<String>,
+    lowering: &mut ExpressionLoweringContext<'_, '_>,
 ) {
+    let context = lowering.context;
     if expected_arg.is_some_and(FlowArgument::is_by_reference) {
         if let Expression::VariableReference(name) = arg {
             content.push(RuntimeObject::VariablePointer {
-                name: resolve_runtime_variable_name(name, path_mode, global_variables),
+                name: resolve_runtime_variable_name(
+                    name,
+                    context.path_mode(),
+                    context.global_variables(),
+                ),
                 context_index: -1,
             });
             return;
@@ -694,10 +381,10 @@ fn lower_function_arg_into_parts(
             if let Some(value) = lower_value_literal(
                 arg,
                 Some(expected_type),
-                struct_definitions,
-                choice_labels,
-                global_labels,
-                path_mode,
+                context.struct_definitions(),
+                context.choice_labels(),
+                context.global_labels(),
+                context.path_mode(),
             ) {
                 content.push(value);
                 return;
@@ -705,19 +392,7 @@ fn lower_function_arg_into_parts(
         }
     }
 
-    lower_expression_into_with_constants(
-        content,
-        arg,
-        choice_labels,
-        global_labels,
-        global_variables,
-        external_signatures,
-        constants,
-        struct_definitions,
-        path_mode,
-        has_start_content,
-        visiting_constants,
-    );
+    lower_expression_into_with_constants(content, arg, lowering);
 }
 
 fn native_function_for_binary_operator(operator: BinaryOperator) -> NativeFunction {

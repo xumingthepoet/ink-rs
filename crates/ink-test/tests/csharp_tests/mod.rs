@@ -1,10 +1,3 @@
-#![allow(
-    unused_variables,
-    non_snake_case,
-    non_camel_case_types,
-    non_upper_case_globals
-)]
-
 use crate::api::{ExternalFunction, Story as RuntimeStory, ValueType, VariableObserver};
 use ink_compiler::{
     eliminate_comments, Compiler, CompilerOptions, Diagnostic, DiagnosticSeverity, ParsedStory,
@@ -23,9 +16,8 @@ struct CharacterRangeIdentifier(&'static str);
 
 struct CharacterRangeParser;
 
-#[allow(non_snake_case)]
 impl CharacterRangeParser {
-    pub fn ListAllCharacterRanges() -> Vec<CharacterRangeIdentifier> {
+    pub fn list_all_character_ranges() -> Vec<CharacterRangeIdentifier> {
         vec![
             CharacterRangeIdentifier("Az"),
             CharacterRangeIdentifier("Ā"),
@@ -54,13 +46,14 @@ struct StringParser {
     cursor: usize,
 }
 
-#[allow(non_snake_case)]
+type StringParserRule<T> = fn(&mut StringParser) -> Option<ParseResult<T>>;
+
 impl StringParser {
     fn new(input: String) -> Self {
         Self { input, cursor: 0 }
     }
 
-    fn ParseString(&mut self, target: String) -> Option<ParseResult<String>> {
+    fn parse_string(&mut self, target: String) -> Option<ParseResult<String>> {
         let remainder = &self.input[self.cursor..];
         if !remainder.starts_with(&target) {
             return None;
@@ -69,7 +62,7 @@ impl StringParser {
         Some(ParseResult::Value(target))
     }
 
-    fn Optional<T, R>(mut rule: R) -> impl FnMut(&mut Self) -> Option<ParseResult<T>>
+    fn optional<T, R>(mut rule: R) -> impl FnMut(&mut Self) -> Option<ParseResult<T>>
     where
         R: FnMut(&mut Self) -> Option<ParseResult<T>>,
     {
@@ -86,11 +79,11 @@ impl StringParser {
         }
     }
 
-    fn Interleave<T, A, B>(
+    fn interleave<T, A, B>(
         &mut self,
         mut first: A,
         mut second: B,
-        _until: Option<fn(&mut Self) -> Option<ParseResult<T>>>,
+        _until: Option<StringParserRule<T>>,
         _flatten: bool,
     ) -> Option<Vec<T>>
     where
@@ -469,13 +462,33 @@ mod tests {
             let line = line.trim_start();
             if let Some(rest) = line.strip_prefix("fn ") {
                 if let Some((name, _)) = rest.split_once('(') {
-                    if name.starts_with("Test") {
+                    if name.starts_with("test_") {
                         names.insert(name.to_string());
                     }
                 }
             }
         }
         names
+    }
+
+    fn csharp_test_name_to_rust_name(name: &str) -> String {
+        let mut result = String::new();
+        let mut previous_was_lower_or_digit = false;
+        let mut chars = name.chars().peekable();
+
+        while let Some(ch) = chars.next() {
+            let next_is_lower = chars.peek().is_some_and(|next| next.is_lowercase());
+            if ch.is_uppercase()
+                && !result.is_empty()
+                && (previous_was_lower_or_digit || next_is_lower)
+            {
+                result.push('_');
+            }
+            result.extend(ch.to_lowercase());
+            previous_was_lower_or_digit = ch.is_lowercase() || ch.is_ascii_digit();
+        }
+
+        result
     }
 
     fn csharp_test_names() -> BTreeSet<String> {
@@ -553,7 +566,7 @@ mod tests {
         for line in source.lines() {
             let line = line.trim_start();
             if !line.is_empty() && !line.starts_with('#') && !excluded.contains(line) {
-                names.insert(line.to_string());
+                names.insert(csharp_test_name_to_rust_name(line));
             }
         }
         names
@@ -566,7 +579,7 @@ mod tests {
     //             Assert.AreEqual("Hello world\n", story.Continue());
     //         }
     #[test]
-    fn TestHelloWorld() {
+    fn test_hello_world() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string("Hello world", false, false)
@@ -591,7 +604,7 @@ mod tests {
     //             Assert.AreEqual("36\n2\n3\n2\n2"+System.Globalization.NumberFormatInfo.CurrentInfo.NumberDecimalSeparator+"3333333\n8\n8\n", story.ContinueMaximally());
     //         }
     #[test]
-    fn TestArithmetic() {
+    fn test_arithmetic() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -630,7 +643,7 @@ mod tests {
     //             Assert.AreEqual("true\n", CompileString("{3 > 1}").Continue());
     //         }
     #[test]
-    fn TestBools() {
+    fn test_bools() {
         run_in_both_modes(|suite| {
             assert_eq!(
                 "true\n",
@@ -713,7 +726,7 @@ mod tests {
     //         	Assert.IsTrue (story.state.evaluationStack.Count == 0);
     //         }
     #[test]
-    fn TestAllSwitchBranchesFailIsClean() {
+    fn test_all_switch_branches_fail_is_clean() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -759,7 +772,7 @@ mod tests {
     //             Assert.IsTrue(HadError("name has already been used for a var"));
     //         }
     #[test]
-    fn TestArgumentNameCollisions() {
+    fn test_argument_name_collisions() {
         run_in_both_modes(|suite| {
             suite
                 .compile_string_without_runtime(
@@ -803,7 +816,7 @@ VAR global_var: int = 5
     // ");
     //         }
     #[test]
-    fn TestArgumentShouldntConflictWithGatherElsewhere() {
+    fn test_argument_shouldnt_conflict_with_gather_elsewhere() {
         run_in_both_modes(|suite| {
             suite
                 .compile_string_without_runtime(
@@ -844,7 +857,7 @@ Nothing
     //             Assert.AreEqual("one (1)\none and a half (1"+ System.Globalization.NumberFormatInfo.CurrentInfo.NumberDecimalSeparator+"5)\ntwo (2)\nthree (3)\n", story.ContinueMaximally());
     //         }
     #[test]
-    fn TestComplexTunnels() {
+    fn test_complex_tunnels() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -912,7 +925,7 @@ two ({num})
     // C#: }
 
     #[test]
-    fn TestElseBranches() {
+    fn test_else_branches() {
         run_in_both_modes(|suite| {
             let story_str = r#"
 VAR x: int = 3
@@ -975,7 +988,7 @@ VAR x: int = 3
     //             Assert.IsTrue(HadError("Functions may not contain diverts"));
     //         }
     #[test]
-    fn TestEndOfContent() {
+    fn test_end_of_content() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string("Hello world", false, true)
@@ -1024,7 +1037,7 @@ VAR x: int = 3
     //             Assert.AreEqual("this is a '|' character\n", story.ContinueMaximally());
     //         }
     #[test]
-    fn TestEscapeCharacter() {
+    fn test_escape_character() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -1077,7 +1090,7 @@ VAR x: int = 3
     //             Assert.AreEqual("MESSAGE: hello world", message);
     //         }
     #[test]
-    fn TestExternalBinding() {
+    fn test_external_binding() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -1184,7 +1197,7 @@ EXTERNAL times(i: int, str: string) => string
     //             Assert.AreEqual("One\nTwo\n", result);
     //         }
     #[test]
-    fn TestLookupSafeOrNot() {
+    fn test_lookup_safe_or_not() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -1218,8 +1231,8 @@ Two
             assert_eq!(2, *call_count.lock().unwrap());
 
             *call_count.lock().unwrap() = 0;
-            story.ResetState();
-            story.UnbindExternalFunction("game::myAction".to_string());
+            story.reset_state();
+            story.unbind_external_function("game::myAction");
 
             let unsafe_count = Arc::clone(&call_count);
             story.bind_external_function(
@@ -1285,7 +1298,7 @@ One
     //             Assert.AreEqual("120\n", story.ContinueMaximally());
     //         }
     #[test]
-    fn TestFactorialByReference() {
+    fn test_factorial_by_reference() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -1331,7 +1344,7 @@ VAR result: int = 0
     //             Assert.AreEqual("120\n", story.ContinueMaximally());
     //         }
     #[test]
-    fn TestFactorialRecursive() {
+    fn test_factorial_recursive() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -1380,7 +1393,7 @@ VAR result: int = 0
     //             Assert.IsTrue(_errorMessages[1].Contains("can only be called as a function"));
     //         }
     #[test]
-    fn TestFunctionCallRestrictions() {
+    fn test_function_call_restrictions() {
         run_in_both_modes(|suite| {
             suite
                 .compile_string_without_runtime(
@@ -1450,7 +1463,7 @@ This is a normal knot.
     //             Assert.IsTrue(_errorMessages[6].Contains("Return statements can only be used in knots that"));
     //         }
     #[test]
-    fn TestFunctionPurityChecks() {
+    fn test_function_purity_checks() {
         run_in_both_modes(|suite| {
             suite
                 .compile_string_without_runtime(
@@ -1488,7 +1501,7 @@ Hello world
     //             Assert.IsTrue (HadError ("Empty diverts (->) are only valid on choices"));
     //         }
     #[test]
-    fn TestDisallowEmptyDiverts() {
+    fn test_disallow_empty_diverts() {
         run_in_both_modes(|suite| {
             suite
                 .compile_string_without_runtime("->", true)
@@ -1511,7 +1524,7 @@ Hello world
     //             Assert.AreEqual (string.Empty, story.ContinueMaximally ());
     //         }
     #[test]
-    fn TestDoneStopsThread() {
+    fn test_done_stops_thread() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -1673,9 +1686,9 @@ This content is inaccessible.
     //             }
     //         }
     #[test]
-    fn TestCharacterRangeIdentifiersForConstNamesWithAsciiPrefix() {
+    fn test_character_range_identifiers_for_const_names_with_ascii_prefix() {
         run_in_both_modes(|suite| {
-            let mut ranges = CharacterRangeParser::ListAllCharacterRanges();
+            let mut ranges = CharacterRangeParser::list_all_character_ranges();
             for range in ranges.iter_mut() {
                 let identifier = generate_identifier_from_character_range(range, None);
                 let story_str = format!(
@@ -1713,9 +1726,9 @@ This content is inaccessible.
     //             }
     //         }
     #[test]
-    fn TestCharacterRangeIdentifiersForConstNamesWithAsciiSuffix() {
+    fn test_character_range_identifiers_for_const_names_with_ascii_suffix() {
         run_in_both_modes(|suite| {
-            let mut ranges = CharacterRangeParser::ListAllCharacterRanges();
+            let mut ranges = CharacterRangeParser::list_all_character_ranges();
             for range in ranges.iter_mut() {
                 let identifier = generate_identifier_from_character_range(range, None);
                 let story_str = format!(
@@ -1753,9 +1766,9 @@ This content is inaccessible.
     //             }
     //         }
     #[test]
-    fn TestCharacterRangeIdentifiersForSimpleVariableNamesWithAsciiPrefix() {
+    fn test_character_range_identifiers_for_simple_variable_names_with_ascii_prefix() {
         run_in_both_modes(|suite| {
-            let mut ranges = CharacterRangeParser::ListAllCharacterRanges();
+            let mut ranges = CharacterRangeParser::list_all_character_ranges();
             for range in ranges.iter_mut() {
                 let identifier = generate_identifier_from_character_range(range, None);
                 let story_str = format!(
@@ -1793,9 +1806,9 @@ This content is inaccessible.
     //             }
     //         }
     #[test]
-    fn TestCharacterRangeIdentifiersForSimpleVariableNamesWithAsciiSuffix() {
+    fn test_character_range_identifiers_for_simple_variable_names_with_ascii_suffix() {
         run_in_both_modes(|suite| {
-            let mut ranges = CharacterRangeParser::ListAllCharacterRanges();
+            let mut ranges = CharacterRangeParser::list_all_character_ranges();
             for range in ranges.iter_mut() {
                 let identifier = generate_identifier_from_character_range(range, None);
                 let story_str = format!(
@@ -1833,9 +1846,9 @@ This content is inaccessible.
     //             }
     //         }
     #[test]
-    fn TestCharacterRangeIdentifiersForDivertNamesWithAsciiPrefix() {
+    fn test_character_range_identifiers_for_divert_names_with_ascii_prefix() {
         run_in_both_modes(|suite| {
-            let mut ranges = CharacterRangeParser::ListAllCharacterRanges();
+            let mut ranges = CharacterRangeParser::list_all_character_ranges();
             for range in ranges.iter_mut() {
                 let range_string = generate_identifier_from_character_range(range, None);
                 let story_str = format!("\n== divert{0} ==\n-> END\n", range_string);
@@ -1871,9 +1884,9 @@ This content is inaccessible.
     //             }
     //         }
     #[test]
-    fn TestCharacterRangeIdentifiersForDivertNamesWithAsciiSuffix() {
+    fn test_character_range_identifiers_for_divert_names_with_ascii_suffix() {
         run_in_both_modes(|suite| {
-            let mut ranges = CharacterRangeParser::ListAllCharacterRanges();
+            let mut ranges = CharacterRangeParser::list_all_character_ranges();
             for range in ranges.iter_mut() {
                 let range_string = generate_identifier_from_character_range(range, None);
                 let story_str = format!("\n== {0}divert ==\n-> END\n", range_string);
@@ -1896,7 +1909,7 @@ This content is inaccessible.
     //             Assert.AreEqual("Hello world 1\nHello world 2.\n", story.ContinueMaximally());
     //         }
     #[test]
-    fn TestBasicStringLiterals() {
+    fn test_basic_string_literals() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -1928,7 +1941,7 @@ Hello {"world"} 2.
     //             Assert.AreEqual("Hello world\n", story.Continue());
     //         }
     #[test]
-    fn TestBasicTunnel() {
+    fn test_basic_tunnel() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -1975,7 +1988,7 @@ Hello
     //             Assert.AreEqual("different knot\nsame knot\nsame knot\ndifferent knot\nsame knot\nsame knot\n", story.ContinueMaximally());
     //         }
     #[test]
-    fn TestCompareDivertTargets() {
+    fn test_compare_divert_targets() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -2031,7 +2044,7 @@ VAR to_two: -> = -> two
     //             Assert.AreEqual("8\n", story.Continue());
     //         }
     #[test]
-    fn TestCallStackEvaluation() {
+    fn test_call_stack_evaluation() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -2083,7 +2096,7 @@ VAR to_two: -> = -> two
     //             Assert.AreEqual("four", story.currentChoices[3].text);
     //         }
     #[test]
-    fn TestConditionalChoices() {
+    fn test_conditional_choices() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -2151,7 +2164,7 @@ VAR to_two: -> = -> two
     //             Assert.AreEqual("true\ntrue\ntrue\ntrue\ntrue\ngreat\nright?\n", story.ContinueMaximally());
     //         }
     #[test]
-    fn TestConditionals() {
+    fn test_conditionals() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -2208,7 +2221,7 @@ VAR to_two: -> = -> two
     //             Assert.AreEqual("5\n", story.Continue());
     //         }
     #[test]
-    fn TestConst() {
+    fn test_const() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -2238,7 +2251,7 @@ CONST c: int = 5
     //             Assert.AreEqual("x\n", story.Continue());
     //         }
     #[test]
-    fn TestDefaultSimpleGather() {
+    fn test_default_simple_gather() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -2268,7 +2281,7 @@ CONST c: int = 5
     //             Assert.IsTrue(HadError("not found"));
     //         }
     #[test]
-    fn TestDivertNotFoundError() {
+    fn test_divert_not_found_error() {
         run_in_both_modes(|suite| {
             let _ = suite.compile_string_without_runtime(
                 r#"
@@ -2292,7 +2305,7 @@ Knot.
     //             Assert.AreEqual(string.Empty, story.currentText);
     //         }
     #[test]
-    fn TestEmpty() {
+    fn test_empty() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string("", false, false)
@@ -2323,7 +2336,7 @@ Knot.
     //             Assert.AreEqual(1, warningCount);
     //         }
     #[test]
-    fn TestEmptyChoice() {
+    fn test_empty_choice() {
         let mut suite = CSharpTestSuite::new(TestMode::Normal);
         suite.compile_string_without_runtime("*", true);
         assert!(suite.had_warning(Some("completely empty")));
@@ -2349,7 +2362,7 @@ Knot.
     //             Assert.AreEqual(expected.Replace("\r", ""), result.Replace("\r", "")); //Windows perculiarity
     //         }
     #[test]
-    fn TestCommentEliminator() {
+    fn test_comment_eliminator() {
         let test_content = "A// C\nA /* C */ A\n\nA * A * /* * C *// A/*\nC C C\n\n*/";
         let processed = eliminate_comments(test_content);
         let expected = "A\nA  A\n\nA * A * / A\n\n\n";
@@ -2371,7 +2384,7 @@ Knot.
     //             Assert.AreEqual(expected, result);
     //         }
     #[test]
-    fn TestCommentEliminatorMixedNewlines() {
+    fn test_comment_eliminator_mixed_newlines() {
         let test_content =
             "A B\nC D // comment\nA B\r\nC D // comment\r\n/* block comment\r\nsecond line\r\n */ ";
         let processed = eliminate_comments(test_content);
@@ -2391,11 +2404,11 @@ Knot.
     //             Assert.AreEqual(expected, results);
     //         }
     #[test]
-    fn TestStringParserA() {
+    fn test_string_parser_a() {
         let mut p = StringParser::new("A".to_string());
-        let results = p.Interleave::<String, _, _>(
-            |p| p.ParseString("A".to_string()),
-            |p| p.ParseString("B".to_string()),
+        let results = p.interleave::<String, _, _>(
+            |p| p.parse_string("A".to_string()),
+            |p| p.parse_string("B".to_string()),
             None,
             true,
         );
@@ -2414,11 +2427,11 @@ Knot.
     //             Assert.AreEqual(expected, results);
     //         }
     #[test]
-    fn TestStringParserABAB() {
+    fn test_string_parser_abab() {
         let mut p = StringParser::new("ABAB".to_string());
-        let results = p.Interleave::<String, _, _>(
-            |p| p.ParseString("A".to_string()),
-            |p| p.ParseString("B".to_string()),
+        let results = p.interleave::<String, _, _>(
+            |p| p.parse_string("A".to_string()),
+            |p| p.parse_string("B".to_string()),
             None,
             true,
         );
@@ -2445,11 +2458,11 @@ Knot.
     //             Assert.AreEqual(expected, results);
     //         }
     #[test]
-    fn TestStringParserABAOptional() {
+    fn test_string_parser_aba_optional() {
         let mut p = StringParser::new("ABAA".to_string());
-        let results = p.Interleave::<String, _, _>(
-            |p| p.ParseString("A".to_string()),
-            StringParser::Optional(|p| p.ParseString("B".to_string())),
+        let results = p.interleave::<String, _, _>(
+            |p| p.parse_string("A".to_string()),
+            StringParser::optional(|p| p.parse_string("B".to_string())),
             None,
             true,
         );
@@ -2476,11 +2489,11 @@ Knot.
     //             Assert.AreEqual(expected, results);
     //         }
     #[test]
-    fn TestStringParserABAOptional2() {
+    fn test_string_parser_aba_optional2() {
         let mut p = StringParser::new("BABB".to_string());
-        let results = p.Interleave::<String, _, _>(
-            StringParser::Optional(|p| p.ParseString("A".to_string())),
-            |p| p.ParseString("B".to_string()),
+        let results = p.interleave::<String, _, _>(
+            StringParser::optional(|p| p.parse_string("A".to_string())),
+            |p| p.parse_string("B".to_string()),
             None,
             true,
         );
@@ -2506,11 +2519,11 @@ Knot.
     //             Assert.IsNull(result);
     //         }
     #[test]
-    fn TestStringParserB() {
+    fn test_string_parser_b() {
         let mut p = StringParser::new("B".to_string());
-        let result = p.Interleave::<String, _, _>(
-            |p| p.ParseString("A".to_string()),
-            |p| p.ParseString("B".to_string()),
+        let result = p.interleave::<String, _, _>(
+            |p| p.parse_string("A".to_string()),
+            |p| p.parse_string("B".to_string()),
             None,
             true,
         );
@@ -2531,7 +2544,7 @@ Knot.
     //             Assert.AreEqual("", story.Continue());
     //         }
     #[test]
-    fn TestEmptyMultilineConditionalBranch() {
+    fn test_empty_multiline_conditional_branch() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -2564,7 +2577,7 @@ Knot.
     //             Assert.AreEqual("hello\n", story.ContinueMaximally());
     //         }
     #[test]
-    fn TestEnd() {
+    fn test_end() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -2598,7 +2611,7 @@ world
     //             Assert.AreEqual("hello\n", story.ContinueMaximally());
     //         }
     #[test]
-    fn TestEnd2() {
+    fn test_end2() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -2636,7 +2649,7 @@ world
     //             Assert.AreNotEqual(path1, path3);
     //         }
     #[test]
-    fn TestPaths() {
+    fn test_paths() {
         #[derive(Debug, PartialEq, Eq)]
         struct TestPath {
             relative_to_weave: bool,
@@ -2689,7 +2702,7 @@ world
     //             story.ChooseChoiceIndex(0);
     //         }
     #[test]
-    fn TestPathToSelf() {
+    fn test_path_to_self() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -2785,7 +2798,7 @@ world
     // ".Replace("\r", ""), story.ContinueMaximally().Replace("\r", ""));
     //         }
     #[test]
-    fn TestPrintNum() {
+    fn test_print_num() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -2820,7 +2833,7 @@ world
     //             Assert.AreEqual("My name is \"Joe\"\n", story.ContinueMaximally());
     //         }
     #[test]
-    fn TestQuoteCharacterSignificance() {
+    fn test_quote_character_significance() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(r##"My name is "{"J{"o"}e"}""##, false, false)
@@ -2845,7 +2858,7 @@ world
     //             Assert.Throws<TestWarningException>(() => parser.Parse());
     //         }
     #[test]
-    fn TestReturnTextWarning() {
+    fn test_return_text_warning() {
         let mut suite = CSharpTestSuite::new(TestMode::Normal);
         suite.compile_string_without_runtime("== test ==\n return something", true);
         assert!(suite.had_warning(Some("Do you need a '~' before 'return'?")));
@@ -2867,7 +2880,7 @@ world
     //             Assert.AreEqual("We hurried home to Savile Row as fast as we could.\n", story.Continue());
     //         }
     #[test]
-    fn TestSameLineDivertIsInline() {
+    fn test_same_line_divert_is_inline() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -2901,7 +2914,7 @@ as fast as we could.
     //             Assert.AreEqual("Some content with glue.\n", story.Continue());
     //         }
     #[test]
-    fn TestSimpleGlue() {
+    fn test_simple_glue() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string("Some <> \ncontent<> with glue.\n", false, false)
@@ -2931,7 +2944,7 @@ as fast as we could.
     //             Assert.AreEqual(2, story.currentChoices.Count);
     //         }
     #[test]
-    fn TestStickyChoicesStaySticky() {
+    fn test_sticky_choices_stay_sticky() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -2968,7 +2981,7 @@ Second line.
     //             Assert.AreEqual("hi\n", story.Continue());
     //         }
     #[test]
-    fn TestStringConstants() {
+    fn test_string_constants() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -2997,7 +3010,7 @@ CONST kX: string = "hi"
     //             Assert.AreEqual("same\ndifferent\n", story.ContinueMaximally());
     //         }
     #[test]
-    fn TestStringTypeCoersion() {
+    fn test_string_type_coersion() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -3024,7 +3037,7 @@ CONST kX: string = "hi"
     //             Assert.AreEqual("54\n", story.Continue());
     //         }
     #[test]
-    fn TestTemporariesAtGlobalScope() {
+    fn test_temporaries_at_global_scope() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -3059,7 +3072,7 @@ VAR x: int = 5
     //             Assert.AreEqual("This is a thread example\nHello.\nThe example is now complete.\n", story.ContinueMaximally());
     //         }
     #[test]
-    fn TestThreadDone() {
+    fn test_thread_done() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -3105,7 +3118,7 @@ World.
     //             Assert.AreEqual("Hello...\n...world.\nThe End.\n", story.ContinueMaximally());
     //         }
     #[test]
-    fn TestTunnelOnwardsAfterTunnel() {
+    fn test_tunnel_onwards_after_tunnel() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -3171,7 +3184,7 @@ Hello...
     //             Assert.IsTrue(story.ContinueMaximally().Contains("Done."));
     //         }
     #[test]
-    fn TestTunnelVsThreadBehaviour() {
+    fn test_tunnel_vs_thread_behaviour() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -3229,7 +3242,7 @@ Done.
     //             Assert.AreEqual("5\n", story.Continue());
     //         }
     #[test]
-    fn TestVariableDeclarationInConditional() {
+    fn test_variable_declaration_in_conditional() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -3292,7 +3305,7 @@ VAR x: int = 0
     //             Assert.AreEqual(2, observerCallCount);
     //         }
     #[test]
-    fn TestVariableObserver() {
+    fn test_variable_observer() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -3366,7 +3379,7 @@ Hello world 2!
     //             Assert.AreEqual("6\n", story.Continue());
     //         }
     #[test]
-    fn TestVariablePointerRefFromKnot() {
+    fn test_variable_pointer_ref_from_knot() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -3415,7 +3428,7 @@ VAR val: int = 5
     //             Assert.AreEqual("1 2\n", story.ContinueMaximally());
     //         }
     #[test]
-    fn TestVariableSwapRecurse() {
+    fn test_variable_swap_recurse() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -3447,7 +3460,7 @@ VAR val: int = 5
     //             Assert.IsTrue (HadError ("Expected target for new thread"));
     //         }
     #[test]
-    fn TestEmptyThreadError() {
+    fn test_empty_thread_error() {
         run_in_both_modes(|suite| {
             suite
                 .compile_string_without_runtime("<-", true)
@@ -3470,7 +3483,7 @@ VAR val: int = 5
     //             Assert.IsFalse (HadError ());
     //         }
     #[test]
-    fn TestAuthorWarningsInsideContentListBug() {
+    fn test_author_warnings_inside_content_list_bug() {
         run_in_both_modes(|suite| {
             suite.compile_string(
                 r#"
@@ -3499,7 +3512,7 @@ TODO: b
     //             Assert.IsTrue(HadError("need to explicitly divert"));
     //         }
     #[test]
-    fn TestNestedChoiceError() {
+    fn test_nested_choice_error() {
         run_in_both_modes(|suite| {
             suite
                 .compile_string(
@@ -3532,7 +3545,7 @@ TODO: b
     //             Assert.IsTrue (HadError ("already been used for a var"));
     //         }
     #[test]
-    fn TestStitchNamingCollision() {
+    fn test_stitch_naming_collision() {
         run_in_both_modes(|suite| {
             suite
                 .compile_string(
@@ -3567,7 +3580,7 @@ VAR stitch: int = 0
     //             Assert.IsTrue(HadError ("with the same label"));
     //         }
     #[test]
-    fn TestWeavePointNamingCollision() {
+    fn test_weave_point_naming_collision() {
         run_in_both_modes(|suite| {
             suite
                 .compile_string(
@@ -3598,7 +3611,7 @@ opts1
     //             Assert.IsTrue (HadError ("has already been used"));
     //         }
     #[test]
-    fn TestVariableNamingCollisionWithArg() {
+    fn test_variable_naming_collision_with_arg() {
         run_in_both_modes(|suite| {
             suite
                 .compile_string(
@@ -3630,7 +3643,7 @@ opts1
     //             Assert.AreEqual ("1\n2\n3\n", story.ContinueMaximally ());
     //         }
     #[test]
-    fn TestVariousDefaultChoices() {
+    fn test_various_default_choices() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -3670,7 +3683,7 @@ Unreachable
     //             Assert.AreEqual ("8\n", story.ContinueMaximally ());
     //         }
     #[test]
-    fn TestTunnelOnwardsWithParamDefaultChoice() {
+    fn test_tunnel_onwards_with_param_default_choice() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -3715,7 +3728,7 @@ Unreachable
     //             Assert.AreEqual ("This is outer\nThis is the_esc\n", story.ContinueMaximally ());
     //         }
     #[test]
-    fn TestTunnelOnwardsToVariableDivertTarget() {
+    fn test_tunnel_onwards_to_variable_divert_target() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -3780,7 +3793,7 @@ This is the_esc
     //             Assert.IsFalse(story.hasWarning);
     //         }
     #[test]
-    fn TestChoiceThreadForking() {
+    fn test_choice_thread_forking() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -3821,7 +3834,7 @@ This is the_esc
             story.load_state(&saved_state);
             story.choose_choice_index(0);
             story.cont_maximally();
-            assert!(!story.get_hasWarning());
+            assert!(!story.get_has_warning());
         });
     }
 
@@ -3850,7 +3863,7 @@ This is the_esc
     //             Assert.AreEqual("somewhere else\n", story.ContinueMaximally());
     //         }
     #[test]
-    fn TestCleanCallstackResetOnPathChoice() {
+    fn test_clean_callstack_reset_on_path_choice() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -3906,7 +3919,7 @@ The second line.
     //             Assert.IsTrue (HadError ("'z' has been redefined"));
     //         }
     #[test]
-    fn TestConstRedefinition() {
+    fn test_const_redefinition() {
         let mut suite = CSharpTestSuite::new(TestMode::Normal);
         suite.compile_string_without_runtime(
             r#"
@@ -3976,7 +3989,7 @@ CONST z: bool = false
     //             Assert.AreEqual ("End\n", story.Continue ());
     //         }
     #[test]
-    fn TestEvaluatingFunctionVariableStateBug() {
+    fn test_evaluating_function_variable_state_bug() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -4042,7 +4055,7 @@ In tunnel.
     //             Assert.AreEqual ("somewhere.here", returnedDivertTarget);
     //         }
     #[test]
-    fn TestEvaluatingInkFunctionsFromGame() {
+    fn test_evaluating_ink_functions_from_game() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -4062,7 +4075,8 @@ Top level content
                 )
                 .expect("compile should succeed");
             story.cont();
-            let result = story.EvaluateFunction("test".to_string(), Vec::new());
+            let mut text_output = String::new();
+            let result = story.evaluate_function("test", Some(Vec::new()), &mut text_output);
             assert_eq!(
                 Some(ValueType::String("somewhere.here".to_string())),
                 result
@@ -4114,7 +4128,7 @@ Top level content
     //             Assert.AreEqual ("Three\n", story.Continue ());
     //         }
     #[test]
-    fn TestEvaluatingInkFunctionsFromGame2() {
+    fn test_evaluating_ink_functions_from_game2() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -4179,7 +4193,7 @@ x = {x}, y = {y}
     //             Assert.AreEqual("Should be 1 not 0: 1.\n", story.Continue());
     //         }
     #[test]
-    fn TestFallbackChoiceOnThread() {
+    fn test_fallback_choice_on_thread() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -4218,7 +4232,7 @@ x = {x}, y = {y}
     //             Assert.AreEqual("1\n1\n2\n0.6666667\n0\n1\n", story.ContinueMaximally());
     //         }
     #[test]
-    fn TestFloorCeilingAndCasts() {
+    fn test_floor_ceiling_and_casts() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -4277,7 +4291,7 @@ x = {x}, y = {y}
     //             Assert.AreEqual ("In top external\n", strResult);
     //         }
     #[test]
-    fn TestGameInkBackAndForth() {
+    fn test_game_ink_back_and_forth() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -4298,7 +4312,7 @@ In top external
             story.bind_external_function(
                 "gameInc",
                 boxed_external_function(move |_func, args| {
-                    if let Some(ValueType::Int(x)) = args.get(0).cloned() {
+                    if let Some(ValueType::Int(x)) = args.first().cloned() {
                         // gameInc does x++ then calls inkInc(x) which returns x+1
                         // So gameInc(5) -> x=6 -> inkInc(6) -> 7
                         Some(ValueType::Int(x + 2))
@@ -4335,7 +4349,7 @@ In top external
     //             Assert.AreEqual("world", story.currentChoices[0].text);
     //         }
     #[test]
-    fn TestGatherChoiceSameLine() {
+    fn test_gather_choice_same_line() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string("- * hello\n- * world", false, false)
@@ -4364,7 +4378,7 @@ In top external
     //             Assert.AreEqual("512x2 = 1024\n512x2p2 = 1026\n", story.ContinueMaximally());
     //         }
     #[test]
-    fn TestIdentifersCanStartWithNumbers() {
+    fn test_identifers_can_start_with_numbers() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -4401,7 +4415,7 @@ In top external
     //             Assert.AreEqual("I have five eggs.\n", story.Continue());
     //         }
     #[test]
-    fn TestImplicitInlineGlue() {
+    fn test_implicit_inline_glue() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -4438,7 +4452,7 @@ five
     //             Assert.AreEqual ("A\nX\n", story.ContinueMaximally ());
     //         }
     #[test]
-    fn TestImplicitInlineGlueB() {
+    fn test_implicit_inline_glue_b() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -4476,7 +4490,7 @@ X
     //             Assert.AreEqual ("A\nC\n", story.ContinueMaximally ());
     //         }
     #[test]
-    fn TestImplicitInlineGlueC() {
+    fn test_implicit_inline_glue_c() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -4513,7 +4527,7 @@ C
     //             Assert.AreEqual("This is include 1.\nThis is include 2.\nThis is the main file.\n", story.ContinueMaximally());
     //         }
     #[test]
-    fn TestInclude() {
+    fn test_include() {
         run_in_both_modes(|suite| {
             suite.compile_string(
                 r#"
@@ -4547,7 +4561,7 @@ This is the main file.
     //             Assert.AreEqual("6\n5\n", story.ContinueMaximally());
     //         }
     #[test]
-    fn TestIncrement() {
+    fn test_increment() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -4580,7 +4594,7 @@ VAR x: int = 5
     //             Assert.AreEqual("g\n", story.Continue());
     //         }
     #[test]
-    fn TestKnotDotGather() {
+    fn test_knot_dot_gather() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -4612,7 +4626,7 @@ VAR x: int = 5
     //             Assert.IsTrue(_warningMessages.Count == 0);
     //         }
     #[test]
-    fn TestKnotTerminationSkipsGlobalObjects() {
+    fn test_knot_termination_skips_global_objects() {
         let mut suite = CSharpTestSuite::new(TestMode::Normal);
         suite.compile_string_without_runtime(
             r#"
@@ -4647,7 +4661,7 @@ CONST Y: int = 2
     //             Assert.AreEqual ("A line.\nAnother line.\n", story.ContinueMaximally ());
     //         }
     #[test]
-    fn TestLeftRightGlueMatching() {
+    fn test_left_right_glue_matching() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -4684,7 +4698,7 @@ A line.
     //             Assert.AreEqual("-1\nfalse\ntrue\n", story.ContinueMaximally());
     //         }
     #[test]
-    fn TestLiteralUnary() {
+    fn test_literal_unary() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -4728,7 +4742,7 @@ VAR negativeLiteral3: bool = !(false)
     //             Assert.AreEqual("text1\ntext 2\ntext1\ntext 2\n", story.ContinueMaximally ());
     //         }
     #[test]
-    fn TestLogicLinesWithNewlines() {
+    fn test_logic_lines_with_newlines() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -4787,7 +4801,7 @@ text 2
     //             Assert.IsTrue (_authorMessages.Count == 1);
     //         }
     #[test]
-    fn TestLooseEnds() {
+    fn test_loose_ends() {
         let mut suite = CSharpTestSuite::new(TestMode::Normal);
         suite.compile_string_without_runtime(
             r#"
@@ -4843,7 +4857,7 @@ Loose end when there's no weave
     //         	Assert.AreEqual ("a b\na b\n", story.ContinueMaximally ());
     //         }
     #[test]
-    fn TestMultilineLogicWithGlue() {
+    fn test_multiline_logic_with_glue() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -4879,7 +4893,7 @@ Loose end when there's no weave
     //             Assert.AreEqual("success\n", story.Continue());
     //         }
     #[test]
-    fn TestMultipleConstantReferences() {
+    fn test_multiple_constant_references() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -4912,7 +4926,7 @@ VAR varStr: string = CONST_STR
     //             Assert.AreEqual("The value of a variable in test file 2 is 5.\nThis is the main file\nThe value when accessed from knot_in_2 is 5.\n", story.ContinueMaximally());
     //         }
     #[test]
-    fn TestNestedInclude() {
+    fn test_nested_include() {
         run_in_both_modes(|suite| {
             suite.compile_string(
                 r#"
@@ -4959,7 +4973,7 @@ This is the main file
     //             Assert.AreEqual("5\n625\n", story.ContinueMaximally());
     //         }
     #[test]
-    fn TestNestedPassByReference() {
+    fn test_nested_pass_by_reference() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -5006,7 +5020,7 @@ VAR globalVal: int = 5
     // C#:     Assert.AreEqual("X\nx\n", story.ContinueMaximally());
     // C#: }
     #[test]
-    fn TestNewlineAtStartOfMultilineConditional() {
+    fn test_newline_at_start_of_multiline_conditional() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -5050,7 +5064,7 @@ VAR globalVal: int = 5
     // C#:     Assert.AreEqual("Phrase 1\nPhrase 2\n", story.ContinueMaximally());
     // C#: }
     #[test]
-    fn TestNewlinesTrimmingWithFuncExternalFallback() {
+    fn test_newlines_trimming_with_func_external_fallback() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -5098,7 +5112,7 @@ Phrase 1
     // C#:     Assert.AreEqual("A\nB\nA\n3\nB\n", story.ContinueMaximally());
     // C#: }
     #[test]
-    fn TestNewlinesWithStringEval() {
+    fn test_newlines_with_string_eval() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -5139,7 +5153,7 @@ B
     // C#:     });
     // C#: }
     #[test]
-    fn TestSetNonExistantVariable() {
+    fn test_set_non_existant_variable() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -5177,7 +5191,7 @@ Hello {x}.
     // C#:     Assert.AreEqual("5\n", story.Continue());
     // C#: }
     #[test]
-    fn TestStateRollbackOverDefaultChoice() {
+    fn test_state_rollback_over_default_choice() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -5216,7 +5230,7 @@ Text.
     // C#:     Assert.AreEqual("true\nfalse\ntrue\ntrue\n", result);
     // C#: }
     #[test]
-    fn TestStringContains() {
+    fn test_string_contains() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -5284,7 +5298,7 @@ Text.
     // C#:     Assert.AreEqual(knotTagWhenContinuedTwice, story.currentTags);
     // C#: }
     #[test]
-    fn TestTags() {
+    fn test_tags() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -5319,13 +5333,10 @@ Stitch content
             assert_eq!(Vec::<String>::new(), story.global_tags());
             assert_eq!("This is the content\n", story.cont());
             assert_eq!(main_tags, story.current_tags());
-            assert_eq!(
-                knot_tags,
-                story.TagsForContentAtPath("game.knot".to_string())
-            );
+            assert_eq!(knot_tags, story.tags_for_content_at_path("game.knot"));
             assert_eq!(
                 stitch_tags,
-                story.TagsForContentAtPath("game.knot.stitch".to_string())
+                story.tags_for_content_at_path("game.knot.stitch")
             );
             story.choose_path_string_simple("game.knot");
             assert_eq!("Knot content\n", story.cont());
@@ -5360,7 +5371,7 @@ Stitch content
     // C#:     Assert.AreEqual("0\n", story.Continue());
     // C#: }
     #[test]
-    fn TestTempGlobalConflict() {
+    fn test_temp_global_conflict() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -5409,7 +5420,7 @@ Stitch content
     // C#:     Assert.IsTrue(HadError("Unresolved variable: y"));
     // C#: }
     #[test]
-    fn TestTempNotAllowedCrossStitch() {
+    fn test_temp_not_allowed_cross_stitch() {
         let mut suite = CSharpTestSuite::new(TestMode::Normal);
         suite.compile_string_without_runtime(
             r#"
@@ -5444,7 +5455,7 @@ Stitch content
     // C#:     Assert.IsTrue(HadWarning());
     // C#: }
     #[test]
-    fn TestTempNotFound() {
+    fn test_temp_not_found() {
         let mut suite = CSharpTestSuite::new(TestMode::Normal);
         suite.compile_string_without_runtime(
             r#"
@@ -5489,7 +5500,7 @@ hello
     // C#:     Assert.IsTrue(story.currentChoices.Count == 1);
     // C#: }
     #[test]
-    fn TestTopFlowTerminatorShouldntKillThreadChoices() {
+    fn test_top_flow_terminator_shouldnt_kill_thread_choices() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -5511,7 +5522,7 @@ Limes
     }
 
     #[test]
-    fn TestTrivialCondition() {
+    fn test_trivial_condition() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -5549,7 +5560,7 @@ Limes
     //             Assert.AreEqual ("8\n", story.ContinueMaximally ());
     //         }
     #[test]
-    fn TestTunnelOnwardsDivertAfterWithArg() {
+    fn test_tunnel_onwards_divert_after_with_arg() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -5592,7 +5603,7 @@ Limes
     //             Assert.AreEqual ("This is A\nNow in B.\n", story.ContinueMaximally());
     //         }
     #[test]
-    fn TestTunnelOnwardsDivertOverride() {
+    fn test_tunnel_onwards_divert_override() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -5632,7 +5643,7 @@ Now in B.
     //             CompileStringWithoutRuntime(storyStr);
     //         }
     #[test]
-    fn TestUsingFunctionAndIncrementTogether() {
+    fn test_using_function_and_increment_together() {
         let mut suite = CSharpTestSuite::new(TestMode::Normal);
         suite.compile_string_without_runtime(
             r#"
@@ -5665,7 +5676,7 @@ VAR x: int = 5
     //             Assert.AreEqual("Hello!\nWorld.\n", story.ContinueMaximally());
     //         }
     #[test]
-    fn TestWhitespace() {
+    fn test_whitespace() {
         run_in_both_modes(|suite| {
             let mut story = suite
                 .compile_string(
@@ -5709,7 +5720,7 @@ VAR x: int = 5
     //             Assert.IsTrue (HadError ("it shouldn't be preceded by '->'"));
     //         }
     #[test]
-    fn TestWrongVariableDivertTargetReference() {
+    fn test_wrong_variable_divert_target_reference() {
         let mut suite = CSharpTestSuite::new(TestMode::Normal);
         suite.compile_string_without_runtime(
             r#"
@@ -5735,7 +5746,7 @@ Should be able to get here!
     // ---------------------------------------------------------------------------
 
     #[test]
-    fn TestOfficialCoverage() {
+    fn test_official_coverage() {
         let rust = rust_test_names();
         let csharp = csharp_test_names();
         let missing: Vec<_> = csharp.difference(&rust).cloned().collect();

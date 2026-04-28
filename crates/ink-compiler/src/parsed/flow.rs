@@ -29,6 +29,18 @@ pub struct Flow {
     span: SourceSpan,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FlowParts {
+    level: FlowLevel,
+    name: String,
+    content: Vec<Object>,
+    child_flows: Vec<Flow>,
+    arguments: Vec<FlowArgument>,
+    return_type: TypeName,
+    is_function: bool,
+    span: SourceSpan,
+}
+
 impl FlowArgument {
     pub fn new(
         name: impl Into<String>,
@@ -67,51 +79,57 @@ impl FlowArgument {
     }
 }
 
-impl Flow {
-    pub fn new(
-        level: FlowLevel,
-        name: impl Into<String>,
-        content: Vec<Object>,
-        child_flows: Vec<Flow>,
-        arguments: Vec<FlowArgument>,
-        return_type: TypeName,
-        is_function: bool,
-    ) -> Self {
-        Self::new_with_span(
-            level,
-            name,
-            content,
-            child_flows,
-            arguments,
-            return_type,
-            is_function,
-            SourceSpan::new(None, 1, 1),
-        )
-    }
-
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "flow construction keeps parsed fields explicit for tests and parser call sites"
-    )]
-    pub fn new_with_span(
-        level: FlowLevel,
-        name: impl Into<String>,
-        content: Vec<Object>,
-        child_flows: Vec<Flow>,
-        arguments: Vec<FlowArgument>,
-        return_type: TypeName,
-        is_function: bool,
-        span: SourceSpan,
-    ) -> Self {
+impl FlowParts {
+    pub fn new(level: FlowLevel, name: impl Into<String>, content: Vec<Object>) -> Self {
         Self {
             level,
             name: name.into(),
-            weave: Weave::new(content, 0),
-            child_flows,
-            arguments,
-            return_type,
-            is_function,
-            span,
+            content,
+            child_flows: Vec::new(),
+            arguments: Vec::new(),
+            return_type: TypeName::void(),
+            is_function: false,
+            span: SourceSpan::new(None, 1, 1),
+        }
+    }
+
+    pub fn child_flows(mut self, child_flows: Vec<Flow>) -> Self {
+        self.child_flows = child_flows;
+        self
+    }
+
+    pub fn arguments(mut self, arguments: Vec<FlowArgument>) -> Self {
+        self.arguments = arguments;
+        self
+    }
+
+    pub fn return_type(mut self, return_type: TypeName) -> Self {
+        self.return_type = return_type;
+        self
+    }
+
+    pub fn function(mut self, is_function: bool) -> Self {
+        self.is_function = is_function;
+        self
+    }
+
+    pub fn span(mut self, span: SourceSpan) -> Self {
+        self.span = span;
+        self
+    }
+}
+
+impl Flow {
+    pub fn from_parts(parts: FlowParts) -> Self {
+        Self {
+            level: parts.level,
+            name: parts.name,
+            weave: Weave::new(parts.content, 0),
+            child_flows: parts.child_flows,
+            arguments: parts.arguments,
+            return_type: parts.return_type,
+            is_function: parts.is_function,
+            span: parts.span,
         }
     }
 

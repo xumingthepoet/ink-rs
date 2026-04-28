@@ -59,7 +59,7 @@ impl Story {
 mod tests {
     use crate::{
         parsed::{
-            Flow, FlowLevel, ImportDeclaration, ImportedName, Module, Object, Text, TypeName,
+            Flow, FlowLevel, FlowParts, ImportDeclaration, ImportedName, Module, Object, Text,
         },
         source::SourceSpan,
     };
@@ -80,15 +80,11 @@ mod tests {
                     span_at(2, 1),
                 )],
                 vec![Object::Text(Text::new("Line.", span_at(3, 1)))],
-                vec![Flow::new(
+                vec![Flow::from_parts(FlowParts::new(
                     FlowLevel::Knot,
                     "main",
                     Vec::new(),
-                    Vec::new(),
-                    Vec::new(),
-                    TypeName::void(),
-                    false,
-                )],
+                ))],
                 span_at(1, 12),
                 span_at(1, 1),
             )],

@@ -32,7 +32,7 @@ pub use content_list::ContentList;
 pub use divert::{Divert, DivertTarget};
 pub use expression::{BinaryOperator, Expression, FloatLiteral, StructLiteralField, UnaryOperator};
 pub use external_declaration::ExternalDeclaration;
-pub use flow::{Flow, FlowArgument, FlowLevel};
+pub use flow::{Flow, FlowArgument, FlowLevel, FlowParts};
 pub use gather::Gather;
 pub use glue::Glue;
 pub use inc_dec::IncDec;
