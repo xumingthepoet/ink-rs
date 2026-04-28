@@ -2,6 +2,11 @@
 name = "ink-runtime"
 version = "1.2.1"
 edition.workspace = true
+description = "Runtime story engine for ink-rs interactive narratives."
+documentation = "https://docs.rs/ink-runtime"
+repository.workspace = true
+keywords.workspace = true
+include = ["/Cargo.toml", "/src/**"]
 
 [dependencies]
 ink-story-json-format = { version = "0.1.0", path = "../ink-story-json-format" }

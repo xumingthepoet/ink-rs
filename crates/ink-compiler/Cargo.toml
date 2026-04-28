@@ -2,6 +2,11 @@
 name = "ink-compiler"
 version = "0.1.0"
 edition.workspace = true
+description = "Compiler for the ink-rs interactive narrative language."
+documentation = "https://docs.rs/ink-compiler"
+repository.workspace = true
+keywords.workspace = true
+include = ["/Cargo.toml", "/src/**"]
 
 [dependencies]
 ink-story-json-format = { version = "0.1.0", path = "../ink-story-json-format" }

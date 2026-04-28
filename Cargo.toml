@@ -3,6 +3,19 @@ name = "ink-rs"
 version = "0.1.0"
 edition.workspace = true
 description = "Rust implementation and language fork of Ink for interactive narratives."
+documentation = "https://docs.rs/ink-rs"
+repository.workspace = true
+readme = "README.md"
+keywords.workspace = true
+include = [
+    "/Cargo.toml",
+    "/README.md",
+    "/src/**",
+    "/docs/Architecture.md",
+    "/docs/WritingWithInk-latest.md",
+    "/docs/WritingWithInk-updates.md",
+    "/docs/ink_JSON_runtime_format.md",
+]
 
 [features]
 default = ["runtime"]
@@ -36,3 +49,5 @@ resolver = "2"
 
 [workspace.package]
 edition = "2021"
+repository = "https://github.com/xumingthepoet/ink-rs"
+keywords = ["ink", "interactive-fiction", "narrative", "game"]
