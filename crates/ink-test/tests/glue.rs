@@ -89,6 +89,13 @@ fn source_simple_glue_fixture_runs() {
 }
 
 #[test]
+fn inline_glue_binds_content_without_spacing_padding() {
+    let compiled = compile_fixture("glue/inline-glue.ink");
+
+    assert_story_output(&compiled, "Some content with glue.\n");
+}
+
+#[test]
 fn diverts_are_glue_and_add_single_whitespace_after_story_text() {
     let compiled =
         compile_fixture("glue/diverts-are-glue-and-add-single-whitespace-after-story-text.ink");
