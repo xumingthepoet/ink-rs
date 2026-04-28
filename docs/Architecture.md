@@ -462,7 +462,7 @@ crates/ink-test/
 |   |-- compiler_snapshots.rs
 |   |-- compiler_snapshots/
 |   |   |-- common.rs
-|   |   `-- generated.rs
+|   |   `-- fixtures.rs
 |   |-- conditionals.rs
 |   |-- diagnostics.rs
 |   |-- diverts.rs
@@ -516,6 +516,9 @@ Test policy:
 - Every `.ink` integration fixture should use explicit module syntax.
 - Tests should load repository fixtures instead of constructing Ink source
   inline.
+- `.ink.json` fixtures are allowed only as expected compiler-output snapshots
+  beside the matching `.ink` source fixture; runtime integration tests compile
+  source fixtures instead of loading compiled JSON directly.
 - Tests and fixture paths should be grouped by behavior, not by historical
   origin.
 - Shared helpers belong under `tests/support/` only when they are harness code,

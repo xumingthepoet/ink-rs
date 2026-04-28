@@ -1,14 +1,10 @@
 mod support;
 
-use support::{
-    runtime::{Story, StoryError},
-    story_runner as common,
-};
+use support::{runtime::StoryError, story_runner as common};
 
 #[test]
 fn auto_stitch_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("stitches/auto-stitch.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("stitches/auto-stitch.ink");
     let mut text: Vec<String> = Vec::new();
 
     common::next_all(&mut story, &mut text);
@@ -21,8 +17,7 @@ fn auto_stitch_test() -> Result<(), StoryError> {
 
 #[test]
 fn auto_stitch2_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("stitches/auto-stitch.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("stitches/auto-stitch.ink");
     let mut text: Vec<String> = Vec::new();
 
     common::next_all(&mut story, &mut text);
@@ -38,8 +33,7 @@ fn auto_stitch2_test() -> Result<(), StoryError> {
 
 #[test]
 fn manual_stitch_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("stitches/manual-stitch.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("stitches/manual-stitch.ink");
     let mut text: Vec<String> = Vec::new();
 
     common::next_all(&mut story, &mut text);
@@ -59,8 +53,7 @@ fn manual_stitch_test() -> Result<(), StoryError> {
 
 #[test]
 fn manual_stitch2_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("stitches/manual-stitch.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("stitches/manual-stitch.ink");
     let mut text: Vec<String> = Vec::new();
 
     common::next_all(&mut story, &mut text);

@@ -13,8 +13,7 @@ fn choose(story: &mut Story, index: usize) -> String {
 
 #[test]
 fn variable_declaration_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("variables/variable-declaration.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("variables/variable-declaration.ink");
     let mut text: Vec<String> = Vec::new();
     common::next_all(&mut story, &mut text);
 
@@ -29,8 +28,7 @@ fn variable_declaration_test() -> Result<(), StoryError> {
 
 #[test]
 fn var_calc_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("variables/varcalc.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("variables/varcalc.ink");
     let mut text: Vec<String> = Vec::new();
     common::next_all(&mut story, &mut text);
 
@@ -42,8 +40,7 @@ fn var_calc_test() -> Result<(), StoryError> {
 
 #[test]
 fn var_string_ink_bug_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("variables/varstringinc.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("variables/varstringinc.ink");
     let mut text: Vec<String> = Vec::new();
 
     common::next_all(&mut story, &mut text);
@@ -59,8 +56,7 @@ fn var_string_ink_bug_test() -> Result<(), StoryError> {
 
 #[test]
 fn var_divert_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("variables/var-divert.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("variables/var-divert.ink");
     let mut text: Vec<String> = Vec::new();
 
     common::next_all(&mut story, &mut text);

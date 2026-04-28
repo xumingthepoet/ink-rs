@@ -9,7 +9,7 @@ pub(super) struct ModuleDecl {
     pub(super) span: SourceSpan,
 }
 
-pub(super) fn is_module_like_declaration_line(line: &str) -> bool {
+pub(crate) fn is_module_like_declaration_line(line: &str) -> bool {
     let trimmed = line.trim_start();
     if !trimmed.starts_with('=') {
         return false;

@@ -4,16 +4,14 @@ mod support;
 
 use support::{
     compiler::{assert_story_output, compile_fixture},
-    runtime::{Story, StoryError},
+    runtime::StoryError,
     story_runner as common,
 };
 
 #[test]
 fn oneline_test() -> Result<(), StoryError> {
     println!("{}", env::current_dir().unwrap().to_string_lossy());
-
-    let json_string = common::get_json_string("text/oneline.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("text/oneline.ink");
     println!("{}", story.build_string_of_hierarchy());
 
     assert!(story.can_continue());
@@ -27,8 +25,7 @@ fn oneline_test() -> Result<(), StoryError> {
 
 #[test]
 fn twolines_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("text/twolines.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("text/twolines.ink");
     println!("{}", story.build_string_of_hierarchy());
 
     let mut text: Vec<String> = Vec::new();

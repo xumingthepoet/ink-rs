@@ -71,15 +71,6 @@ pub(super) fn content_list_has_choice(content_list: &ContentList) -> bool {
         .any(|object| matches!(object, Object::Choice(_)))
 }
 
-pub(super) fn lower_linear_weave(
-    weave: &Weave,
-    context: &LoweringContext<'_>,
-) -> Vec<RuntimeObject> {
-    let mut content = Vec::new();
-    lower_linear_weave_into_context(&mut content, weave, context);
-    content
-}
-
 pub(super) fn lower_linear_weave_into_context(
     content: &mut Vec<RuntimeObject>,
     weave: &Weave,

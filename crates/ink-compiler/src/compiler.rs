@@ -5,7 +5,7 @@ use crate::{
     diagnostic::{Diagnostic, DiagnosticSeverity},
     emit, lower,
     parsed::Story as ParsedStory,
-    source::{prepare_source_input, SourceInput, SourceSpan},
+    source::{prepare_source_input, SourceFile, SourceInput, SourceSpan},
     syntax,
 };
 
@@ -64,6 +64,13 @@ impl Compiler {
                 diagnostics,
             };
         };
+        if let Some(diagnostic) = explicit_module_diagnostic(&source) {
+            diagnostics.push(diagnostic);
+            return StageOutput {
+                artifact: None,
+                diagnostics,
+            };
+        }
 
         let parsed = syntax::parse_source(source);
         diagnostics.extend(parsed.diagnostics);
@@ -112,6 +119,16 @@ impl Compiler {
     }
 
     pub fn analyze(&self, parsed: ParsedStory) -> StageOutput<CheckedStory> {
+        if parsed.modules().is_empty() {
+            return StageOutput {
+                artifact: None,
+                diagnostics: vec![Diagnostic::error(
+                    SourceSpan::new(None, 1, 1),
+                    "Cannot analyze a story without explicit modules",
+                )],
+            };
+        }
+
         analysis::analyze(parsed)
     }
 
@@ -214,38 +231,75 @@ fn diagnostics_have_errors(diagnostics: &[Diagnostic]) -> bool {
         .any(|diagnostic| diagnostic.severity == DiagnosticSeverity::Error)
 }
 
+fn explicit_module_diagnostic(source: &SourceFile) -> Option<Diagnostic> {
+    let Some(first_content) = source
+        .lines
+        .iter()
+        .find(|line| !line.text.trim().is_empty())
+    else {
+        return Some(Diagnostic::error(
+            SourceSpan::new(None, 1, 1),
+            "Source files must start with an explicit module declaration (`=== module name ===`)",
+        ));
+    };
+
+    (!syntax::is_module_like_declaration_line(&first_content.text)).then(|| {
+        Diagnostic::error(
+            first_content.span.clone(),
+            "Source files must start with an explicit module declaration (`=== module name ===`)",
+        )
+    })
+}
+
 #[cfg(test)]
 mod tests {
-    use serde_json::json;
+    use crate::parsed::{Object, Text};
 
     use super::*;
 
     #[test]
-    fn compiles_plain_text_json() {
+    fn rejects_plain_text_without_explicit_module() {
         let compiler = Compiler::default();
         let output = compiler.compile(SourceInput::new("Line."));
-        assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
 
-        let json: serde_json::Value =
-            serde_json::from_str(&output.artifact.unwrap().json).expect("valid json");
+        assert!(output.artifact.is_none());
+        assert_eq!(output.diagnostics.len(), 1);
         assert_eq!(
-            json,
-            json!({
-                "inkVersion": 1,
-                "root": [["^Line.", "\n", ["done", {"#n": "g-0"}], null], "done", null]
-            })
+            output.diagnostics[0].message,
+            "Source files must start with an explicit module declaration (`=== module name ===`)"
         );
     }
 
     #[test]
     fn current_syntax_errors_block_compile() {
         let compiler = Compiler::default();
-        let output = compiler.compile(SourceInput::new("VAR score = 1"));
+        let output = compiler.compile(SourceInput::new(
+            "=== module game ===\nVAR score = 1\n== main ==\n-> DONE",
+        ));
         assert!(output.artifact.is_none());
         assert_eq!(output.diagnostics.len(), 1);
         assert_eq!(
             output.diagnostics[0].message,
             "Variable 'score' is missing a type"
+        );
+    }
+
+    #[test]
+    fn public_analyze_rejects_root_story_artifacts() {
+        let story = ParsedStory::new(
+            vec![Object::Text(Text::new(
+                "Line.",
+                SourceSpan::new(None, 1, 1),
+            ))],
+            Vec::new(),
+        );
+        let output = Compiler::default().analyze(story);
+
+        assert!(output.artifact.is_none());
+        assert_eq!(output.diagnostics.len(), 1);
+        assert_eq!(
+            output.diagnostics[0].message,
+            "Cannot analyze a story without explicit modules"
         );
     }
 

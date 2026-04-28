@@ -1,14 +1,10 @@
 mod support;
 
-use support::{
-    runtime::{Story, StoryError},
-    story_runner as common,
-};
+use support::{runtime::StoryError, story_runner as common};
 
 #[test]
 fn thread_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("threads/thread-bug.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("threads/thread-bug.ink");
     println!("{}", story.build_string_of_hierarchy());
 
     assert_eq!(
@@ -33,8 +29,7 @@ fn thread_test() -> Result<(), StoryError> {
 
 #[test]
 fn thread_test_bug() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("threads/thread-bug.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("threads/thread-bug.ink");
     println!("{}", story.build_string_of_hierarchy());
 
     assert_eq!(
@@ -47,7 +42,7 @@ fn thread_test_bug() -> Result<(), StoryError> {
 
     let save_string = story.save_state();
     println!("{}", save_string);
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("threads/thread-bug.ink");
     story.load_state(&save_string);
 
     story.choose_choice_index(0);

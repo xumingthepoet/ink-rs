@@ -27,6 +27,8 @@ const SOURCE_CONSTRUCTION_PATTERNS: &[&str] = &[
     "assert_compile_errors(",
     "compile_string(",
     "compile_string_without_runtime(",
+    "get_json_string(",
+    ".ink.json",
     "SourceInput::new(\"",
     "SourceInput::named(\"",
 ];
@@ -100,6 +102,27 @@ fn origin_label_policy_tracks_test_and_fixture_names() {
     assert!(
         offenders.is_empty(),
         "origin/example-suite labels must not appear in test targets, helper module paths, fixture paths, or test names: {offenders:#?}"
+    );
+}
+
+#[test]
+fn compiled_json_fixtures_have_source_siblings() {
+    let fixture_root = ink_test::fixture_root();
+    let orphaned_json = files_under(&fixture_root, |path| {
+        path.file_name()
+            .is_some_and(|name| name.to_string_lossy().ends_with(".ink.json"))
+    })
+    .into_iter()
+    .filter(|path| {
+        let source_path = PathBuf::from(path.to_string_lossy().trim_end_matches(".json"));
+        !source_path.exists()
+    })
+    .map(|path| relative_path(&fixture_root, &path))
+    .collect::<Vec<_>>();
+
+    assert!(
+        orphaned_json.is_empty(),
+        "compiled JSON fixtures must be snapshots for source .ink fixtures, not runtime integration inputs: {orphaned_json:#?}"
     );
 }
 

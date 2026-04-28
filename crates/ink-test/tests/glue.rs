@@ -1,15 +1,11 @@
 mod support;
 
 use support::compiler::{assert_story_output, compile_fixture};
-use support::{
-    runtime::{Story, StoryError},
-    story_runner as common,
-};
+use support::{runtime::StoryError, story_runner as common};
 
 #[test]
 fn simple_glue_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("glue/simple-glue.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("glue/simple-glue.ink");
 
     let mut text: Vec<String> = Vec::new();
     common::next_all(&mut story, &mut text);
@@ -21,8 +17,7 @@ fn simple_glue_test() -> Result<(), StoryError> {
 
 #[test]
 fn glue_with_divert_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("glue/glue-with-divert.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("glue/glue-with-divert.ink");
     let mut text: Vec<String> = Vec::new();
 
     common::next_all(&mut story, &mut text);
@@ -38,8 +33,7 @@ fn glue_with_divert_test() -> Result<(), StoryError> {
 
 #[test]
 fn has_left_right_glue_matching_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("glue/left-right-glue-matching.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("glue/left-right-glue-matching.ink");
     let mut text: Vec<String> = Vec::new();
 
     common::next_all(&mut story, &mut text);
@@ -53,8 +47,7 @@ fn has_left_right_glue_matching_test() -> Result<(), StoryError> {
 
 #[test]
 fn bugfix1_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("glue/testbugfix1.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("glue/testbugfix1.ink");
     let mut text: Vec<String> = Vec::new();
 
     common::next_all(&mut story, &mut text);
@@ -68,8 +61,7 @@ fn bugfix1_test() -> Result<(), StoryError> {
 
 #[test]
 fn bugfix2_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("glue/testbugfix2.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("glue/testbugfix2.ink");
     let mut text: Vec<String> = Vec::new();
 
     common::next_all(&mut story, &mut text);

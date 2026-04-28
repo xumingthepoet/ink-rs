@@ -109,9 +109,30 @@ Each entry should include:
 - tests: `docs_module_import_example_runs`,
   `module_imported_global_variable_reads_and_writes_run`, and
   `explicit_module_removed_root_behaviors_emit_diagnostics` in
-  `crates/ink-test/tests/language.rs`, plus module parser, analysis, lowering,
-  compiler API, fixture, C# compatibility divergence, and runtime-loading
-  tests.
+  the behavior-focused files under `crates/ink-test/tests/`, plus module
+  parser, analysis, lowering, compiler API, fixture, C# compatibility
+  divergence, and runtime-loading tests.
+
+## 2026-04-28: Compiler Entry Requires Explicit Module Headers
+
+- status: supported/removed
+- upstream behavior: upstream Ink accepts root-level story content and top-level
+  flows without an explicit module wrapper.
+- ink-rs behavior: public compiler entry points reject source files whose first
+  non-blank line is not `=== module name ===`. The parser still has internal
+  root-weave structures for syntax tests and parsed-model bookkeeping, but
+  user-authored compiled stories must enter through explicit modules.
+- documentation effect: `WritingWithInk-latest.md` now states that each source
+  file must begin with a module declaration.
+- rationale: accepting root stories in production kept a legacy path alive after
+  maintained fixtures had moved to module syntax, making tests less faithful to
+  the current language.
+- migration guidance: move old root-level story content into a knot or stitch
+  inside an explicit module, and ensure exactly one compiled module defines
+  `== main ==`.
+- tests: compiler entry tests cover the explicit-module diagnostic; integration
+  policy rejects direct source-string construction and JSON-only runtime
+  fixtures.
 
 ## 2026-04-26: Divert Target Values And Return Type Marker
 
@@ -140,8 +161,8 @@ Each entry should include:
 - tests: `typed_divert_target_fixture_runs`,
   `old_function_return_marker_reports_new_marker`, and
   `old_external_return_marker_reports_new_marker` in
-  `crates/ink-test/tests/language.rs`, plus compiler parser, analysis, and
-  lowering unit tests.
+  the behavior-focused files under `crates/ink-test/tests/`, plus compiler
+  parser, analysis, and lowering unit tests.
 
 ## 2026-04-26: Explicit Dynamic Diverts And Minimal Stateful Runtime
 
@@ -204,8 +225,8 @@ Each entry should include:
   value`.
 - tests: `typed_constants_support_struct_and_array_values` and
   `untyped_constant_declaration_reports_missing_type` in
-  `crates/ink-test/tests/language.rs`, plus compiler parser, initializer,
-  struct literal, and array literal unit tests.
+  the behavior-focused files under `crates/ink-test/tests/`, plus compiler
+  parser, initializer, struct literal, and array literal unit tests.
 
 ## 2026-04-26: Global VAR Declarations Restricted To Module Top Level
 
@@ -226,7 +247,7 @@ Each entry should include:
   the value is only needed inside a knot, stitch, function, choice, conditional,
   or sequence, replace it with a typed `temp` declaration.
 - tests: `nested_global_var_declarations_report_current_syntax_error` in
-  `crates/ink-test/tests/language.rs`,
+  the behavior-focused files under `crates/ink-test/tests/`,
   `global_var_declarations_inside_flows_report_removed_feature` in
   `crates/ink-compiler/src/syntax/parser.rs`, and
   `reports_global_var_declarations_outside_story_top_level` in
@@ -280,8 +301,8 @@ Each entry should include:
   `array_remove_mutates_arrays_and_returns_void_at_runtime`,
   `typed_external_calls_keep_runtime_shape_and_return_values`, and
   `tail_recursion_rewrites_parameters_and_preserves_other_recursion` in
-  `crates/ink-test/tests/language.rs`, plus the related compiler analysis,
-  parser, runtime, and JSON format unit tests.
+  the behavior-focused files under `crates/ink-test/tests/`, plus the related
+  compiler analysis, parser, runtime, and JSON format unit tests.
 
 ## 2026-04-25: LIST Declarations Removed
 
@@ -301,4 +322,4 @@ Each entry should include:
 - migration guidance: use variables, functions, or host-side data for inventory
   and set-like game state until a replacement list design is added.
 - tests: `removed_list_declaration_reports_removed_feature_diagnostic` in
-  `crates/ink-test/tests/language.rs`.
+  the behavior-focused files under `crates/ink-test/tests/`.

@@ -1,229 +1,11 @@
-use std::{
-    cell::RefCell,
-    collections::BTreeMap,
-    error::Error,
-    fmt,
-    rc::Rc,
-    sync::{Arc, Mutex},
+use std::{cell::RefCell, rc::Rc};
+
+use ink_runtime::{choice::Choice, story::Story as RuntimeStory};
+
+pub use ink_runtime::{
+    story::external_functions::ExternalFunction, story::variable_observer::VariableObserver,
+    story_error::StoryError, value_type::ValueType,
 };
-
-use ink_runtime::{
-    choice::Choice, story::external_functions::ExternalFunction as RuntimeExternalFunction,
-    story::variable_observer::VariableObserver as RuntimeVariableObserver,
-    story::Story as RuntimeStory, story_error::StoryError as RuntimeStoryError,
-    value_type::ValueType as RuntimeValueType,
-};
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct StoryError(pub String);
-
-impl fmt::Display for StoryError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.0)
-    }
-}
-
-impl Error for StoryError {}
-
-impl From<RuntimeStoryError> for StoryError {
-    fn from(value: RuntimeStoryError) -> Self {
-        Self(value.to_string())
-    }
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum ValueType {
-    Bool(bool),
-    Int(i32),
-    Float(f32),
-    String(String),
-    Array(Vec<ValueType>),
-    Object(BTreeMap<String, ValueType>),
-}
-
-pub trait FromValueType: Sized {
-    fn from_value(value: &ValueType) -> Option<Self>;
-}
-
-impl FromValueType for i32 {
-    fn from_value(value: &ValueType) -> Option<Self> {
-        value.coerce_to_int()
-    }
-}
-
-impl FromValueType for bool {
-    fn from_value(value: &ValueType) -> Option<Self> {
-        value.coerce_to_bool()
-    }
-}
-
-impl FromValueType for String {
-    fn from_value(value: &ValueType) -> Option<Self> {
-        match value {
-            ValueType::String(text) => Some(text.clone()),
-            ValueType::Int(value) => Some(value.to_string()),
-            ValueType::Float(value) => Some(value.to_string()),
-            ValueType::Bool(value) => Some(value.to_string()),
-            ValueType::Array(_) | ValueType::Object(_) => None,
-        }
-    }
-}
-
-impl ValueType {
-    pub fn new<T: Into<ValueType>>(value: T) -> Self {
-        value.into()
-    }
-
-    pub fn coerce_to_int(&self) -> Option<i32> {
-        match self {
-            ValueType::Int(value) => Some(*value),
-            ValueType::Bool(value) => Some(if *value { 1 } else { 0 }),
-            ValueType::Float(value) => Some(*value as i32),
-            ValueType::String(text) => text.parse::<i32>().ok(),
-            ValueType::Array(_) | ValueType::Object(_) => None,
-        }
-    }
-
-    pub fn coerce_to_bool(&self) -> Option<bool> {
-        match self {
-            ValueType::Bool(value) => Some(*value),
-            ValueType::Int(value) => Some(*value != 0),
-            ValueType::Float(value) => Some(*value != 0.0),
-            ValueType::String(text) => Some(!text.is_empty()),
-            ValueType::Array(_) | ValueType::Object(_) => None,
-        }
-    }
-
-    pub fn get<T: FromValueType>(&self) -> Option<T> {
-        T::from_value(self)
-    }
-
-    fn into_runtime_value(self) -> RuntimeValueType {
-        match self {
-            ValueType::Bool(value) => RuntimeValueType::Bool(value),
-            ValueType::Int(value) => RuntimeValueType::Int(value),
-            ValueType::Float(value) => RuntimeValueType::Float(value),
-            ValueType::String(value) => RuntimeValueType::from(value.as_str()),
-            ValueType::Array(values) => RuntimeValueType::Array(
-                values
-                    .into_iter()
-                    .map(ValueType::into_runtime_value)
-                    .collect(),
-            ),
-            ValueType::Object(fields) => RuntimeValueType::Object(
-                fields
-                    .into_iter()
-                    .map(|(key, value)| (key, value.into_runtime_value()))
-                    .collect(),
-            ),
-        }
-    }
-
-    fn from_runtime_value(value: RuntimeValueType) -> Self {
-        match value {
-            RuntimeValueType::Bool(value) => ValueType::Bool(value),
-            RuntimeValueType::Int(value) => ValueType::Int(value),
-            RuntimeValueType::Float(value) => ValueType::Float(value),
-            RuntimeValueType::String(value) => ValueType::String(value.string),
-            RuntimeValueType::DivertTarget(path) => ValueType::String(path.to_string()),
-            RuntimeValueType::Array(values) => ValueType::Array(
-                values
-                    .into_iter()
-                    .map(ValueType::from_runtime_value)
-                    .collect(),
-            ),
-            RuntimeValueType::Object(fields) => ValueType::Object(
-                fields
-                    .into_iter()
-                    .map(|(key, value)| (key, ValueType::from_runtime_value(value)))
-                    .collect(),
-            ),
-            _ => ValueType::String("<unsupported runtime value>".to_string()),
-        }
-    }
-}
-
-impl From<&str> for ValueType {
-    fn from(value: &str) -> Self {
-        Self::String(value.to_string())
-    }
-}
-
-impl From<String> for ValueType {
-    fn from(value: String) -> Self {
-        Self::String(value)
-    }
-}
-
-impl From<bool> for ValueType {
-    fn from(value: bool) -> Self {
-        Self::Bool(value)
-    }
-}
-
-impl From<i32> for ValueType {
-    fn from(value: i32) -> Self {
-        Self::Int(value)
-    }
-}
-
-impl From<f32> for ValueType {
-    fn from(value: f32) -> Self {
-        Self::Float(value)
-    }
-}
-
-impl From<Vec<ValueType>> for ValueType {
-    fn from(value: Vec<ValueType>) -> Self {
-        Self::Array(value)
-    }
-}
-
-impl From<BTreeMap<String, ValueType>> for ValueType {
-    fn from(value: BTreeMap<String, ValueType>) -> Self {
-        Self::Object(value)
-    }
-}
-
-pub trait ExternalFunction: Send {
-    fn call(&mut self, func_name: &str, args: Vec<ValueType>) -> Option<ValueType>;
-}
-
-pub trait VariableObserver: Send {
-    fn changed(&mut self, variable_name: &str, new_value: &ValueType);
-}
-
-struct ExternalFunctionAdapter {
-    function: Arc<Mutex<dyn ExternalFunction>>,
-}
-
-impl RuntimeExternalFunction for ExternalFunctionAdapter {
-    fn call(&mut self, func_name: &str, args: Vec<RuntimeValueType>) -> Option<RuntimeValueType> {
-        let args = args
-            .into_iter()
-            .map(ValueType::from_runtime_value)
-            .collect::<Vec<_>>();
-
-        let mut function = self.function.lock().expect("external function lock");
-        function
-            .call(func_name, args)
-            .map(ValueType::into_runtime_value)
-    }
-}
-
-struct VariableObserverAdapter {
-    observer: Arc<Mutex<dyn VariableObserver>>,
-}
-
-impl RuntimeVariableObserver for VariableObserverAdapter {
-    fn changed(&mut self, variable_name: &str, value: &RuntimeValueType) {
-        let converted = ValueType::from_runtime_value(value.clone());
-        self.observer
-            .lock()
-            .expect("variable observer lock")
-            .changed(variable_name, &converted);
-    }
-}
 
 pub struct Story {
     inner: RuntimeStory,
@@ -277,15 +59,8 @@ impl Story {
         reset_callstack: bool,
         arguments: Option<Vec<ValueType>>,
     ) {
-        let runtime_args = arguments.map(|values| {
-            values
-                .into_iter()
-                .map(ValueType::into_runtime_value)
-                .collect::<Vec<_>>()
-        });
-
         self.inner
-            .choose_path_string(path, reset_callstack, runtime_args.as_ref())
+            .choose_path_string(path, reset_callstack, arguments.as_ref())
             .expect("expected path to resolve");
     }
 
@@ -316,39 +91,31 @@ impl Story {
     }
 
     pub fn get_variable(&self, name: &str) -> Option<ValueType> {
-        self.inner
-            .get_variable(name)
-            .map(ValueType::from_runtime_value)
+        self.inner.get_variable(name)
     }
 
     pub fn set_variable(&mut self, name: &str, value: &ValueType) -> Result<(), StoryError> {
-        self.inner
-            .set_variable(name, &value.clone().into_runtime_value())
-            .map_err(StoryError::from)
+        self.inner.set_variable(name, value)
     }
 
     pub fn bind_external_function(
         &mut self,
         func_name: &str,
-        func: Arc<Mutex<dyn ExternalFunction>>,
+        func: Rc<RefCell<dyn ExternalFunction>>,
         lookahead_safe: bool,
     ) {
-        let adapter: Rc<RefCell<dyn RuntimeExternalFunction>> =
-            Rc::new(RefCell::new(ExternalFunctionAdapter { function: func }));
         self.inner
-            .bind_external_function(func_name, adapter, lookahead_safe)
+            .bind_external_function(func_name, func, lookahead_safe)
             .expect("expected external function binding to succeed");
     }
 
     pub fn observe_variable(
         &mut self,
         variable_name: &str,
-        observer: Arc<Mutex<dyn VariableObserver>>,
+        observer: Rc<RefCell<dyn VariableObserver>>,
     ) {
-        let adapter: Rc<RefCell<dyn RuntimeVariableObserver>> =
-            Rc::new(RefCell::new(VariableObserverAdapter { observer }));
         self.inner
-            .observe_variable(variable_name, adapter)
+            .observe_variable(variable_name, observer)
             .expect("expected variable observer registration to succeed");
     }
 

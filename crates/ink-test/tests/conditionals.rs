@@ -1,14 +1,10 @@
 mod support;
 
-use support::{
-    runtime::{Story, StoryError},
-    story_runner as common,
-};
+use support::{runtime::StoryError, story_runner as common};
 
 #[test]
 fn iftrue_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("conditionals/iftrue.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("conditionals/iftrue.ink");
     println!("{}", story.build_string_of_hierarchy());
 
     let mut text: Vec<String> = Vec::new();
@@ -22,8 +18,7 @@ fn iftrue_test() -> Result<(), StoryError> {
 
 #[test]
 fn iffalse_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("conditionals/iffalse.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("conditionals/iffalse.ink");
     println!("{}", story.build_string_of_hierarchy());
 
     let mut text: Vec<String> = Vec::new();
@@ -37,8 +32,7 @@ fn iffalse_test() -> Result<(), StoryError> {
 
 #[test]
 fn ifelse_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("conditionals/ifelse.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("conditionals/ifelse.ink");
     println!("{}", story.build_string_of_hierarchy());
 
     let mut text: Vec<String> = Vec::new();
@@ -52,8 +46,7 @@ fn ifelse_test() -> Result<(), StoryError> {
 
 #[test]
 fn ifelse_ext_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("conditionals/ifelse-ext.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("conditionals/ifelse-ext.ink");
     println!("{}", story.build_string_of_hierarchy());
 
     let mut text: Vec<String> = Vec::new();
@@ -67,8 +60,7 @@ fn ifelse_ext_test() -> Result<(), StoryError> {
 
 #[test]
 fn ifelse_ext_text1_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("conditionals/ifelse-ext-text1.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("conditionals/ifelse-ext-text1.ink");
     println!("{}", story.build_string_of_hierarchy());
 
     let mut text: Vec<String> = Vec::new();
@@ -88,8 +80,7 @@ fn ifelse_ext_text1_test() -> Result<(), StoryError> {
 
 #[test]
 fn ifelse_ext_text2_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("conditionals/ifelse-ext-text2.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("conditionals/ifelse-ext-text2.ink");
     println!("{}", story.build_string_of_hierarchy());
 
     let mut text: Vec<String> = Vec::new();
@@ -109,8 +100,7 @@ fn ifelse_ext_text2_test() -> Result<(), StoryError> {
 
 #[test]
 fn ifelse_ext_text3_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("conditionals/ifelse-ext-text3.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("conditionals/ifelse-ext-text3.ink");
     println!("{}", story.build_string_of_hierarchy());
 
     let mut text: Vec<String> = Vec::new();
@@ -130,8 +120,7 @@ fn ifelse_ext_text3_test() -> Result<(), StoryError> {
 
 #[test]
 fn cond_text2_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("conditionals/condtext.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("conditionals/condtext.ink");
     println!("{}", story.build_string_of_hierarchy());
     let mut text: Vec<String> = Vec::new();
 
@@ -151,8 +140,7 @@ fn cond_text2_test() -> Result<(), StoryError> {
 
 #[test]
 fn cond_opt2_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("conditionals/condopt.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("conditionals/condopt.ink");
     println!("{}", story.build_string_of_hierarchy());
     let mut text: Vec<String> = Vec::new();
 

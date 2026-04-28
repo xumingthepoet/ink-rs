@@ -1,14 +1,10 @@
 mod support;
 
-use support::{
-    runtime::{Story, StoryError},
-    story_runner as common,
-};
+use support::{runtime::StoryError, story_runner as common};
 
 #[test]
 fn single_line_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("knots/single-line.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("knots/single-line.ink");
     let mut text: Vec<String> = Vec::new();
 
     common::next_all(&mut story, &mut text);
@@ -21,8 +17,7 @@ fn single_line_test() -> Result<(), StoryError> {
 
 #[test]
 fn multi_line_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("knots/multi-line.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("knots/multi-line.ink");
     let mut text: Vec<String> = Vec::new();
 
     common::next_all(&mut story, &mut text);
@@ -37,8 +32,7 @@ fn multi_line_test() -> Result<(), StoryError> {
 
 #[test]
 fn strip_empty_lines_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("knots/strip-empty-lines.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("knots/strip-empty-lines.ink");
     let mut text: Vec<String> = Vec::new();
 
     common::next_all(&mut story, &mut text);
@@ -53,8 +47,7 @@ fn strip_empty_lines_test() -> Result<(), StoryError> {
 
 #[test]
 fn param_strings_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("knots/param-strings.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("knots/param-strings.ink");
     let mut text: Vec<String> = Vec::new();
 
     common::next_all(&mut story, &mut text);
@@ -71,8 +64,7 @@ fn param_strings_test() -> Result<(), StoryError> {
 
 #[test]
 fn param_ints_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("knots/param-ints.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("knots/param-ints.ink");
     let mut text: Vec<String> = Vec::new();
 
     common::next_all(&mut story, &mut text);
@@ -89,8 +81,7 @@ fn param_ints_test() -> Result<(), StoryError> {
 
 #[test]
 fn param_floats_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("knots/param-floats.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("knots/param-floats.ink");
     let mut text: Vec<String> = Vec::new();
 
     common::next_all(&mut story, &mut text);
@@ -107,8 +98,7 @@ fn param_floats_test() -> Result<(), StoryError> {
 
 #[test]
 fn param_vars_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("knots/param-vars.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("knots/param-vars.ink");
     let mut text: Vec<String> = Vec::new();
 
     common::next_all(&mut story, &mut text);
@@ -125,8 +115,7 @@ fn param_vars_test() -> Result<(), StoryError> {
 
 #[test]
 fn param_multi_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("knots/param-multi.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("knots/param-multi.ink");
     let mut text: Vec<String> = Vec::new();
 
     common::next_all(&mut story, &mut text);
@@ -143,8 +132,7 @@ fn param_multi_test() -> Result<(), StoryError> {
 
 #[test]
 fn param_recurse_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("knots/param-recurse.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("knots/param-recurse.ink");
     let mut text: Vec<String> = Vec::new();
 
     common::next_all(&mut story, &mut text);

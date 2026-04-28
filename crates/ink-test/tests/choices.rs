@@ -10,7 +10,7 @@ use support::{
 fn no_choice_test() -> Result<(), StoryError> {
     let mut errors: Vec<String> = Vec::new();
 
-    let text = common::run_story("choices/no-choice-text.ink.json", None, &mut errors);
+    let text = common::run_story("choices/no-choice-text.ink", None, &mut errors);
 
     assert_eq!(0, errors.len());
     assert_eq!("Hello world!\nHello back!\n", common::join_text(&text));
@@ -22,7 +22,7 @@ fn no_choice_test() -> Result<(), StoryError> {
 fn one_test() -> Result<(), StoryError> {
     let mut errors: Vec<String> = Vec::new();
 
-    let text = common::run_story("choices/one.ink.json", None, &mut errors);
+    let text = common::run_story("choices/one.ink", None, &mut errors);
 
     assert_eq!(0, errors.len());
     assert_eq!(
@@ -37,7 +37,7 @@ fn one_test() -> Result<(), StoryError> {
 fn multi_choice_test() -> Result<(), StoryError> {
     let mut errors: Vec<String> = Vec::new();
 
-    let text = common::run_story("choices/multi-choice.ink.json", Some(vec![0]), &mut errors);
+    let text = common::run_story("choices/multi-choice.ink", Some(vec![0]), &mut errors);
 
     assert_eq!(0, errors.len());
     assert_eq!(
@@ -46,7 +46,7 @@ fn multi_choice_test() -> Result<(), StoryError> {
     );
 
     // Select second choice
-    let text = common::run_story("choices/multi-choice.ink.json", Some(vec![1]), &mut errors);
+    let text = common::run_story("choices/multi-choice.ink", Some(vec![1]), &mut errors);
 
     assert_eq!(0, errors.len());
     assert_eq!(
@@ -59,8 +59,7 @@ fn multi_choice_test() -> Result<(), StoryError> {
 
 #[test]
 fn single_choice1_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("choices/single-choice.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("choices/single-choice.ink");
     let mut text: Vec<String> = Vec::new();
     common::next_all(&mut story, &mut text);
 
@@ -72,8 +71,7 @@ fn single_choice1_test() -> Result<(), StoryError> {
 
 #[test]
 fn single_choic2_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("choices/single-choice.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("choices/single-choice.ink");
     let mut text: Vec<String> = Vec::new();
     common::next_all(&mut story, &mut text);
     story.choose_choice_index(0);
@@ -89,8 +87,7 @@ fn single_choic2_test() -> Result<(), StoryError> {
 
 #[test]
 fn suppress_choice_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("choices/suppress-choice.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("choices/suppress-choice.ink");
     let mut text: Vec<String> = Vec::new();
 
     common::next_all(&mut story, &mut text);
@@ -111,8 +108,7 @@ fn suppress_choice_test() -> Result<(), StoryError> {
 
 #[test]
 fn mixed_choice_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("choices/mixed-choice.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("choices/mixed-choice.ink");
     let mut text: Vec<String> = Vec::new();
 
     common::next_all(&mut story, &mut text);
@@ -134,8 +130,7 @@ fn mixed_choice_test() -> Result<(), StoryError> {
 
 #[test]
 fn sticky_choice_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("choices/sticky-choice.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("choices/sticky-choice.ink");
     let mut text: Vec<String> = Vec::new();
 
     common::next_all(&mut story, &mut text);
@@ -152,8 +147,7 @@ fn sticky_choice_test() -> Result<(), StoryError> {
 
 #[test]
 fn fallback_choice_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("choices/fallback-choice.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("choices/fallback-choice.ink");
     let mut text: Vec<String> = Vec::new();
 
     common::next_all(&mut story, &mut text);
@@ -164,8 +158,7 @@ fn fallback_choice_test() -> Result<(), StoryError> {
 
 #[test]
 fn conditional_choice_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("choices/conditional-choice.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("choices/conditional-choice.ink");
     let mut text: Vec<String> = Vec::new();
 
     common::next_all(&mut story, &mut text);

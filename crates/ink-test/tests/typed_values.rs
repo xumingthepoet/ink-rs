@@ -1,7 +1,4 @@
-use std::{
-    collections::BTreeMap,
-    sync::{Arc, Mutex},
-};
+use std::{cell::RefCell, collections::BTreeMap, rc::Rc};
 
 use serde_json::json;
 
@@ -289,7 +286,7 @@ fn external_values_run() {
     let compiled = compile_fixture("typed/externals.ink");
     let mut story = Story::new(&compiled.json);
     for name in ["game::next_score", "game::make_scores", "game::make_player"] {
-        story.bind_external_function(name, Arc::new(Mutex::new(TypedExternal)), true);
+        story.bind_external_function(name, Rc::new(RefCell::new(TypedExternal)), true);
     }
     let output = story.continue_maximally();
 
@@ -315,7 +312,7 @@ fn external_calls_keep_runtime_shape_and_return_values() {
 
     let mut story = Story::new(&compiled.json);
     for name in ["game::next_score", "game::make_scores", "game::make_player"] {
-        story.bind_external_function(name, Arc::new(Mutex::new(TypedExternal)), true);
+        story.bind_external_function(name, Rc::new(RefCell::new(TypedExternal)), true);
     }
     let output = story.continue_maximally();
 

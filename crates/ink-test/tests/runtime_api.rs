@@ -1,8 +1,5 @@
 use core::panic;
-use std::{
-    error::Error,
-    sync::{Arc, Mutex},
-};
+use std::{cell::RefCell, error::Error, rc::Rc};
 
 mod support;
 
@@ -57,13 +54,12 @@ impl ExternalFunction for MultiplyExternal {
 
 #[test]
 fn external_function() -> Result<(), Box<dyn Error>> {
-    let json_string = common::get_json_string("runtime_api/external-function-2-arg.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("runtime_api/external-function-2-arg.ink");
     let mut text: Vec<String> = Vec::new();
 
     story.bind_external_function(
         "game::externalFunction",
-        Arc::new(Mutex::new(ExtFunc1 {})),
+        Rc::new(RefCell::new(ExtFunc1 {})),
         true,
     );
 
@@ -76,13 +72,12 @@ fn external_function() -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn external_function_zero_arguments() -> Result<(), Box<dyn Error>> {
-    let json_string = common::get_json_string("runtime_api/external-function-0-arg.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("runtime_api/external-function-0-arg.ink");
     let mut text: Vec<String> = Vec::new();
 
     story.bind_external_function(
         "game::externalFunction",
-        Arc::new(Mutex::new(ExtFunc2 {})),
+        Rc::new(RefCell::new(ExtFunc2 {})),
         true,
     );
 
@@ -95,13 +90,12 @@ fn external_function_zero_arguments() -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn external_function_one_arguments() -> Result<(), Box<dyn Error>> {
-    let json_string = common::get_json_string("runtime_api/external-function-1-arg.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("runtime_api/external-function-1-arg.ink");
     let mut text: Vec<String> = Vec::new();
 
     story.bind_external_function(
         "game::externalFunction",
-        Arc::new(Mutex::new(ExtFunc3 {})),
+        Rc::new(RefCell::new(ExtFunc3 {})),
         true,
     );
 
@@ -114,13 +108,12 @@ fn external_function_one_arguments() -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn external_function_coerce_test() -> Result<(), Box<dyn Error>> {
-    let json_string = common::get_json_string("runtime_api/external-function-1-arg.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("runtime_api/external-function-1-arg.ink");
     let mut text: Vec<String> = Vec::new();
 
     story.bind_external_function(
         "game::externalFunction",
-        Arc::new(Mutex::new(ExtFunc4 {})),
+        Rc::new(RefCell::new(ExtFunc4 {})),
         true,
     );
 
@@ -137,7 +130,7 @@ struct VObserver {
 
 impl VariableObserver for VObserver {
     fn changed(&mut self, variable_name: &str, new_value: &ValueType) {
-        if !"x".eq(variable_name) {
+        if !"game::x".eq(variable_name) {
             panic!();
         }
 
@@ -153,36 +146,43 @@ impl VariableObserver for VObserver {
 
 #[test]
 fn variable_observers_test() -> Result<(), Box<dyn Error>> {
-    let json_string = common::get_json_string("runtime_api/variable-observers.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("runtime_api/variable-observers.ink");
     let mut text: Vec<String> = Vec::new();
 
-    let observer = Arc::new(Mutex::new(VObserver { expected_value: 5 }));
-    story.observe_variable("x", observer.clone());
+    let observer = Rc::new(RefCell::new(VObserver { expected_value: 10 }));
+    story.observe_variable("game::x", observer.clone());
 
     common::next_all(&mut story, &mut text);
     story.choose_choice_index(0);
     common::next_all(&mut story, &mut text);
-    assert_eq!(10, story.get_variable("x").unwrap().get::<i32>().unwrap());
+    assert_eq!(
+        10,
+        story.get_variable("game::x").unwrap().get::<i32>().unwrap()
+    );
 
     // Check that the observer's expected_value is now 10
-    assert_eq!(observer.lock().unwrap().expected_value, 10);
+    assert_eq!(observer.borrow().expected_value, 10);
 
     Ok(())
 }
 
 #[test]
 fn set_and_get_variable_test() -> Result<(), Box<dyn Error>> {
-    let json_string = common::get_json_string("runtime_api/set-get-variables.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("runtime_api/set-get-variables.ink");
     let mut text: Vec<String> = Vec::new();
 
     common::next_all(&mut story, &mut text);
-    assert_eq!(10, story.get_variable("x").unwrap().get::<i32>().unwrap());
+    assert_eq!(
+        10,
+        story.get_variable("game::x").unwrap().get::<i32>().unwrap()
+    );
 
-    let _ = story.set_variable("x", &ValueType::Int(15));
+    let _ = story.set_variable("game::x", &ValueType::Int(15));
 
-    assert_eq!(15, story.get_variable("x").unwrap().get::<i32>().unwrap());
+    assert_eq!(
+        15,
+        story.get_variable("game::x").unwrap().get::<i32>().unwrap()
+    );
 
     story.choose_choice_index(0);
 
@@ -197,8 +197,7 @@ fn set_and_get_variable_test() -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn set_non_existant_variable_test() -> Result<(), Box<dyn Error>> {
-    let json_string = common::get_json_string("runtime_api/set-get-variables.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("runtime_api/set-get-variables.ink");
     let mut text: Vec<String> = Vec::new();
 
     common::next_all(&mut story, &mut text);
@@ -206,11 +205,17 @@ fn set_non_existant_variable_test() -> Result<(), Box<dyn Error>> {
     let result = story.set_variable("y", &ValueType::new::<&str>("earth"));
     assert!(result.is_err());
 
-    assert_eq!(10, story.get_variable("x").unwrap().get::<i32>().unwrap());
+    assert_eq!(
+        10,
+        story.get_variable("game::x").unwrap().get::<i32>().unwrap()
+    );
 
-    let _ = story.set_variable("x", &ValueType::Int(15));
+    let _ = story.set_variable("game::x", &ValueType::Int(15));
 
-    assert_eq!(15, story.get_variable("x").unwrap().get::<i32>().unwrap());
+    assert_eq!(
+        15,
+        story.get_variable("game::x").unwrap().get::<i32>().unwrap()
+    );
 
     story.choose_choice_index(0);
 
@@ -225,8 +230,7 @@ fn set_non_existant_variable_test() -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn jump_knot_test() -> Result<(), Box<dyn Error>> {
-    let json_string = common::get_json_string("runtime_api/jump-knot.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("runtime_api/jump-knot.ink");
     let mut text: Vec<String> = Vec::new();
 
     story.choose_path_string("game.two", true, None);
@@ -253,8 +257,7 @@ fn jump_knot_test() -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn jump_stitch_test() -> Result<(), Box<dyn Error>> {
-    let json_string = common::get_json_string("runtime_api/jump-stitch.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("runtime_api/jump-stitch.ink");
     let mut text: Vec<String> = Vec::new();
 
     story.choose_path_string("game.two.sthree", true, None);
@@ -281,8 +284,7 @@ fn jump_stitch_test() -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn load_save_test() -> Result<(), Box<dyn Error>> {
-    let json_string = common::get_json_string("runtime_api/load-save.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("runtime_api/load-save.ink");
     let mut text: Vec<String> = Vec::new();
 
     common::next_all(&mut story, &mut text);
@@ -298,7 +300,7 @@ fn load_save_test() -> Result<(), Box<dyn Error>> {
     println!("{}", save_string);
 
     // recreate game and load state
-    Story::new(&json_string);
+    let mut story = common::story_from_fixture("runtime_api/load-save.ink");
     story.load_state(&save_string);
 
     story.choose_choice_index(0);
@@ -327,7 +329,7 @@ fn external_binding_fixture_runs() {
 
     story.bind_external_function(
         "game::multiply",
-        Arc::new(Mutex::new(MultiplyExternal)),
+        Rc::new(RefCell::new(MultiplyExternal)),
         true,
     );
 

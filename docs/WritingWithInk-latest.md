@@ -53,6 +53,7 @@ stitches still use `=`. Exactly one module in a compilation must define
 `== main ==`, which is the story entry point.
 
 Story content and tags belong inside knots or stitches, not at module level.
+The first non-blank line of each source file must be a module declaration.
 Source files are passed to the compiler explicitly; `INCLUDE` is removed. A
 module can use another module's knots, functions, constants, globals, structs,
 or externals only after an explicit `IMPORT`, and cross-module references use

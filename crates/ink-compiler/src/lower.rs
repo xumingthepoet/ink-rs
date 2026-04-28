@@ -20,7 +20,9 @@ use ink_story_json_format::{
 use crate::{
     analysis::CheckedStory,
     compiler::StageOutput,
+    diagnostic::Diagnostic,
     parsed::{Choice, Object},
+    source::SourceSpan,
 };
 
 use assignment::{
@@ -32,7 +34,7 @@ use divert::{
     lower_tail_recursive_return_into, lower_tunnel_onwards_into, push_divert_with_context,
 };
 use expression::{lower_expression_into, lower_logic_line_into, lower_output_expression_into};
-use flow::{lower_flow, lower_module_flow, lower_root_weave};
+use flow::lower_module_flow;
 use indexes::{ConstantValues, LoweringIndexes, RuntimeLenEstimator, StructDefinitions};
 use path::{compact_path_strings_in_container, LabelIndex};
 use sequence::lower_sequence;
@@ -46,40 +48,17 @@ pub(crate) fn lower(story: &CheckedStory, count_all_visits: bool) -> StageOutput
             object_len: estimated_runtime_len_for_label_collection,
         },
     );
-    if !story.parsed.modules().is_empty() {
-        return lower_module_story(story, &indexes, count_all_visits);
+    if story.parsed.modules().is_empty() {
+        return StageOutput {
+            artifact: None,
+            diagnostics: vec![Diagnostic::error(
+                SourceSpan::new(None, 1, 1),
+                "Cannot lower a story without explicit modules",
+            )],
+        };
     }
 
-    let root_weave = story.parsed.root_weave();
-    let main_container = lower_root_weave(root_weave, &indexes, count_all_visits);
-
-    let root_content = vec![
-        RuntimeObject::Container(main_container),
-        RuntimeObject::ControlCommand(ControlCommand::Done),
-    ];
-
-    let mut named_containers = story
-        .parsed
-        .flows()
-        .iter()
-        .map(|flow| named_container(lower_flow(flow, &indexes, count_all_visits)))
-        .collect::<Vec<_>>();
-    if let Some(global_declarations) = lower_global_declarations(&indexes, None) {
-        named_containers.push(named_container(global_declarations));
-    }
-
-    let mut root = Container {
-        content: root_content,
-        named_content: named_containers,
-        name: None,
-        flags: count_all_visits.then_some(1),
-    };
-    compact_path_strings_in_container(&mut root);
-
-    StageOutput {
-        artifact: Some(RuntimeProgram::new(root)),
-        diagnostics: Vec::new(),
-    }
+    lower_module_story(story, &indexes, count_all_visits)
 }
 
 fn lower_module_story(

@@ -939,7 +939,7 @@ mod tests {
     }
 
     #[test]
-    fn legacy_sources_do_not_require_module_main_until_root_migration() {
+    fn root_weave_sources_have_no_module_entry_point() {
         let story = parse_story("Line.");
 
         assert!(entry_point_diagnostics(&story).is_empty());

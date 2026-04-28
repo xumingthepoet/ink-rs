@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex};
+use std::{cell::RefCell, rc::Rc};
 
 mod support;
 
@@ -29,7 +29,7 @@ fn qualified_function_and_external_calls_run() {
     let compiled = compile_fixture("modules/module-qualified-calls.ink");
 
     let mut story = Story::new(&compiled.json);
-    story.bind_external_function("audio::play", Arc::new(Mutex::new(ModuleExternal)), true);
+    story.bind_external_function("audio::play", Rc::new(RefCell::new(ModuleExternal)), true);
     let output = story.continue_maximally();
 
     assert_eq!(output, "5\n7\n");
@@ -77,7 +77,7 @@ fn globals_and_externals_use_module_qualified_runtime_names() {
 
     let mut story = Story::new(&compiled.json);
     for name in ["audio::play", "video::play"] {
-        story.bind_external_function(name, Arc::new(Mutex::new(ModuleExternal)), true);
+        story.bind_external_function(name, Rc::new(RefCell::new(ModuleExternal)), true);
     }
     let output = story.continue_maximally();
 
@@ -110,7 +110,7 @@ fn globals_and_externals_use_module_qualified_runtime_names() {
 
     let mut reloaded = Story::new(&compiled.json);
     for name in ["audio::play", "video::play"] {
-        reloaded.bind_external_function(name, Arc::new(Mutex::new(ModuleExternal)), true);
+        reloaded.bind_external_function(name, Rc::new(RefCell::new(ModuleExternal)), true);
     }
     reloaded.load_state(&save_string);
     reloaded.choose_choice_index(0);

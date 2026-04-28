@@ -8,60 +8,9 @@ use super::context::{ChoicePathMode, LoweringContext};
 use super::indexes::LoweringIndexes;
 use super::path::LabelIndex;
 use super::weave::{
-    lower_choice_weave, lower_linear_weave, lower_linear_weave_into_context, weave_has_choice,
-    weave_has_weave_points,
+    lower_choice_weave, lower_linear_weave_into_context, weave_has_choice, weave_has_weave_points,
 };
-use super::{done_container, ends_with_flow_terminator, named_container};
-
-pub(super) fn lower_root_weave(
-    weave: &Weave,
-    indexes: &LoweringIndexes<'_>,
-    count_all_visits: bool,
-) -> Container {
-    if weave_has_weave_points(weave) {
-        let choice_labels = LabelIndex::new();
-        let context = LoweringContext::new(
-            ChoicePathMode::Root,
-            &choice_labels,
-            &indexes.global_labels,
-            &indexes.global_variables,
-            &indexes.external_signatures,
-            &indexes.constants,
-            &indexes.struct_definitions,
-        );
-        lower_choice_weave(weave, &context, count_all_visits)
-    } else {
-        let choice_labels = LabelIndex::new();
-        let context = LoweringContext::new(
-            ChoicePathMode::Root,
-            &choice_labels,
-            &indexes.global_labels,
-            &indexes.global_variables,
-            &indexes.external_signatures,
-            &indexes.constants,
-            &indexes.struct_definitions,
-        );
-        let mut content = lower_linear_weave(weave, &context);
-        content.push(RuntimeObject::Container(done_container(
-            "g-0",
-            count_all_visits,
-        )));
-        Container {
-            content,
-            named_content: Vec::new(),
-            name: None,
-            flags: None,
-        }
-    }
-}
-
-pub(super) fn lower_flow(
-    flow: &Flow,
-    indexes: &LoweringIndexes<'_>,
-    count_all_visits: bool,
-) -> Container {
-    lower_flow_in_module(None, flow, indexes, count_all_visits)
-}
+use super::{ends_with_flow_terminator, named_container};
 
 pub(super) fn lower_module_flow(
     module_name: &str,

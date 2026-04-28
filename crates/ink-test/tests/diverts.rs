@@ -1,15 +1,11 @@
 mod support;
 
 use support::compiler::{assert_story_output, compile_fixture};
-use support::{
-    runtime::{Story, StoryError},
-    story_runner as common,
-};
+use support::{runtime::StoryError, story_runner as common};
 
 #[test]
 fn simple_divert_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("diverts/simple-divert.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("diverts/simple-divert.ink");
 
     let mut text: Vec<String> = Vec::new();
     common::next_all(&mut story, &mut text);
@@ -25,8 +21,7 @@ fn simple_divert_test() -> Result<(), StoryError> {
 
 #[test]
 fn invisible_divert_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("diverts/invisible-divert.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("diverts/invisible-divert.ink");
 
     let mut text: Vec<String> = Vec::new();
     common::next_all(&mut story, &mut text);
@@ -41,8 +36,7 @@ fn invisible_divert_test() -> Result<(), StoryError> {
 
 #[test]
 fn divert_on_choice_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("diverts/divert-on-choice.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("diverts/divert-on-choice.ink");
 
     let mut text: Vec<String> = Vec::new();
     common::next_all(&mut story, &mut text);
@@ -59,8 +53,7 @@ fn divert_on_choice_test() -> Result<(), StoryError> {
 
 #[test]
 fn complex_branching1_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("diverts/complex-branching.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("diverts/complex-branching.ink");
     let mut text: Vec<String> = Vec::new();
 
     common::next_all(&mut story, &mut text);
@@ -81,8 +74,7 @@ fn complex_branching1_test() -> Result<(), StoryError> {
 
 #[test]
 fn complex_branching2_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("diverts/complex-branching.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("diverts/complex-branching.ink");
     let mut text: Vec<String> = Vec::new();
 
     common::next_all(&mut story, &mut text);

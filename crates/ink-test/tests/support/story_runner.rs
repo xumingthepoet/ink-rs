@@ -1,5 +1,4 @@
-use std::fs;
-
+use crate::support::compiler::compile_fixture_to_story;
 use crate::support::runtime::Story;
 
 pub fn next_all(story: &mut Story, text: &mut Vec<String>) {
@@ -30,8 +29,7 @@ pub fn run_story(
     choice_list: Option<Vec<usize>>,
     errors: &mut Vec<String>,
 ) -> Vec<String> {
-    let json = get_json_string(filename);
-    let mut story = Story::new(&json);
+    let mut story = story_from_fixture(filename);
     let mut text = Vec::new();
     let mut choice_list_index = 0;
 
@@ -74,7 +72,10 @@ pub fn run_story(
     text
 }
 
-pub fn get_json_string(filename: &str) -> String {
-    let path = ink_test::fixture_root().join(filename);
-    fs::read_to_string(path).expect("fixture json must exist")
+pub fn story_from_fixture(filename: &str) -> Story {
+    assert!(
+        filename.ends_with(".ink"),
+        "runtime integration tests must compile .ink fixtures, got {filename}"
+    );
+    compile_fixture_to_story(filename)
 }

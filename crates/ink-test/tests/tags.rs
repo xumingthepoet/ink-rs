@@ -1,15 +1,11 @@
 mod support;
 
 use support::compiler::compile_fixture_to_story;
-use support::{
-    runtime::{Story, StoryError},
-    story_runner as common,
-};
+use support::{runtime::StoryError, story_runner as common};
 
 #[test]
 fn tags_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("tags/tags.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("tags/tags.ink");
 
     let global_tags = story.get_global_tags();
     assert_eq!(0, global_tags.len());
@@ -44,8 +40,7 @@ fn tags_test() -> Result<(), StoryError> {
 
 #[test]
 fn tags_in_choice_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("tags/tagsInChoice.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("tags/tagsInChoice.ink");
 
     story.cont();
     let current_tags = story.get_current_tags();
@@ -57,7 +52,7 @@ fn tags_in_choice_test() -> Result<(), StoryError> {
 
     story.choose_choice_index(0);
 
-    assert_eq!("one three", story.cont());
+    assert_eq!("one three\n", story.cont());
     let current_tags = story.get_current_tags();
     assert_eq!(2, current_tags.len());
     assert_eq!("one", current_tags[0]);
@@ -68,8 +63,7 @@ fn tags_in_choice_test() -> Result<(), StoryError> {
 
 #[test]
 fn tags_in_choice_dynamic_content_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("tags/tagsInChoiceDynamic.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("tags/tagsInChoiceDynamic.ink");
 
     story.cont(); // Avanzar una vez
     let current_tags = story.get_current_tags();

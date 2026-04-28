@@ -1,14 +1,10 @@
 mod support;
 
-use support::{
-    runtime::{Story, StoryError},
-    story_runner as common,
-};
+use support::{runtime::StoryError, story_runner as common};
 
 #[test]
 fn fun_basic_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("functions/func-basic.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("functions/func-basic.ink");
     let mut text: Vec<String> = Vec::new();
     common::next_all(&mut story, &mut text);
 
@@ -20,8 +16,7 @@ fn fun_basic_test() -> Result<(), StoryError> {
 
 #[test]
 fn fun_none_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("functions/func-none.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("functions/func-none.ink");
     let mut text: Vec<String> = Vec::new();
     common::next_all(&mut story, &mut text);
 
@@ -33,8 +28,7 @@ fn fun_none_test() -> Result<(), StoryError> {
 
 #[test]
 fn fun_inline_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("functions/func-inline.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("functions/func-inline.ink");
     let mut text: Vec<String> = Vec::new();
     common::next_all(&mut story, &mut text);
 
@@ -46,8 +40,7 @@ fn fun_inline_test() -> Result<(), StoryError> {
 
 #[test]
 fn setvar_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("functions/setvar-func.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("functions/setvar-func.ink");
     let mut text: Vec<String> = Vec::new();
     common::next_all(&mut story, &mut text);
 
@@ -59,8 +52,7 @@ fn setvar_test() -> Result<(), StoryError> {
 
 #[test]
 fn complex_func1_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("functions/complex-func1.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("functions/complex-func1.ink");
     let mut text: Vec<String> = Vec::new();
     common::next_all(&mut story, &mut text);
 
@@ -72,8 +64,7 @@ fn complex_func1_test() -> Result<(), StoryError> {
 
 #[test]
 fn complex_func2_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("functions/complex-func2.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("functions/complex-func2.ink");
     let mut text: Vec<String> = Vec::new();
     common::next_all(&mut story, &mut text);
 
@@ -85,8 +76,7 @@ fn complex_func2_test() -> Result<(), StoryError> {
 
 #[test]
 fn complex_func3_test() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("functions/complex-func3.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("functions/complex-func3.ink");
     let mut text: Vec<String> = Vec::new();
     common::next_all(&mut story, &mut text);
 
@@ -99,8 +89,7 @@ fn complex_func3_test() -> Result<(), StoryError> {
 
 #[test]
 fn rnd() -> Result<(), StoryError> {
-    let json_string = common::get_json_string("functions/rnd-func.ink.json");
-    let mut story = Story::new(&json_string);
+    let mut story = common::story_from_fixture("functions/rnd-func.ink");
     let mut text: Vec<String> = Vec::new();
     common::next_all(&mut story, &mut text);
 

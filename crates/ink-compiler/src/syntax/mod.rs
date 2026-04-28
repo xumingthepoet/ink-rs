@@ -21,6 +21,7 @@ mod weave;
 
 mod parser;
 
+pub(crate) use module::is_module_like_declaration_line;
 #[cfg(test)]
 pub(crate) use parser::parse;
 pub(crate) use parser::parse_source;
