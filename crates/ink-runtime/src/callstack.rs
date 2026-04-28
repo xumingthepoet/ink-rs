@@ -63,68 +63,69 @@ impl Thread {
     ) -> Result<Thread, StoryError> {
         let mut thread = Thread::new();
 
-        thread.thread_index = j_obj
+        let thread_index = j_obj
             .get("threadIndex")
             .and_then(|i| i.as_i64())
-            .ok_or(StoryError::BadJson("Invalid thread index".to_owned()))?
-            as usize;
+            .ok_or(StoryError::BadJson("Invalid thread index".to_owned()))?;
+        thread.thread_index = usize::try_from(thread_index).map_err(|_| {
+            StoryError::BadJson("thread index must be a non-negative integer".to_owned())
+        })?;
 
-        if let Some(j_thread_callstack) = j_obj
+        let j_thread_callstack = j_obj
             .get("callstack")
             .and_then(|callstack| callstack.as_array())
-        {
-            for j_el_tok in j_thread_callstack.iter() {
-                if let Some(j_element_obj) = j_el_tok.as_object() {
-                    let push_pop_type = PushPopType::from_value(
-                        j_element_obj
-                            .get("type")
-                            .and_then(|t| t.as_i64())
-                            .ok_or(StoryError::BadJson("Invalid push/pop type".to_owned()))?
-                            as usize,
-                    )?;
+            .ok_or_else(|| StoryError::BadJson("thread callstack must be an array".to_owned()))?;
 
-                    let mut pointer = pointer::NULL.clone();
+        for (index, j_el_tok) in j_thread_callstack.iter().enumerate() {
+            let j_element_obj = j_el_tok.as_object().ok_or_else(|| {
+                StoryError::BadJson(format!("thread callstack[{index}] must be an object"))
+            })?;
+            let push_pop_type = PushPopType::from_value(
+                j_element_obj
+                    .get("type")
+                    .and_then(|t| t.as_i64())
+                    .ok_or(StoryError::BadJson("Invalid push/pop type".to_owned()))?
+                    as usize,
+            )?;
 
-                    let current_container_path_str =
-                        j_element_obj.get("cPath").and_then(|c| c.as_str());
-                    if current_container_path_str.is_some() {
-                        let thread_pointer_result = main_content_container.content_at_path(
-                            &Path::new_with_components_string(current_container_path_str),
-                            0,
-                            -1,
-                        );
+            let mut pointer = pointer::NULL.clone();
 
-                        pointer.container = thread_pointer_result.container();
-                        let pointer_index = j_element_obj
-                            .get("idx")
-                            .and_then(|i| i.as_i64())
-                            .ok_or(StoryError::BadJson("Invalid pointer index".to_owned()))?
-                            as i32;
-                        pointer.index = pointer_index;
+            let current_container_path_str = j_element_obj.get("cPath").and_then(|c| c.as_str());
+            if current_container_path_str.is_some() {
+                let thread_pointer_result = main_content_container.content_at_path(
+                    &Path::new_with_components_string(current_container_path_str),
+                    0,
+                    -1,
+                );
 
-                        if thread_pointer_result.approximate {
-                            // TODO warning not accessible from here
-                            // story_context.warning(format!("When loading state, exact internal story location couldn't be found: '{}', so it was approximated to '{}' to recover. Has the story changed since this save data was created?", current_container_path_str, pointer_container.get_path().to_string()));
-                        }
-                    }
+                pointer.container = thread_pointer_result.container();
+                let pointer_index = j_element_obj
+                    .get("idx")
+                    .and_then(|i| i.as_i64())
+                    .ok_or(StoryError::BadJson("Invalid pointer index".to_owned()))?
+                    as i32;
+                pointer.index = pointer_index;
 
-                    let in_expression_evaluation = j_element_obj
-                        .get("exp")
-                        .and_then(|exp| exp.as_bool())
-                        .unwrap_or(false);
-
-                    let mut el = Element::new(push_pop_type, pointer, in_expression_evaluation);
-
-                    if let Some(temps) = j_element_obj.get("temp").and_then(|temp| temp.as_object())
-                    {
-                        el.temporary_variables = json_read::jobject_to_hashmap_values(temps)?;
-                    } else {
-                        el.temporary_variables.clear();
-                    }
-
-                    thread.callstack.push(el);
+                if thread_pointer_result.approximate {
+                    // TODO warning not accessible from here
+                    // story_context.warning(format!("When loading state, exact internal story location couldn't be found: '{}', so it was approximated to '{}' to recover. Has the story changed since this save data was created?", current_container_path_str, pointer_container.get_path().to_string()));
                 }
             }
+
+            let in_expression_evaluation = j_element_obj
+                .get("exp")
+                .and_then(|exp| exp.as_bool())
+                .unwrap_or(false);
+
+            let mut el = Element::new(push_pop_type, pointer, in_expression_evaluation);
+
+            if let Some(temps) = j_element_obj.get("temp").and_then(|temp| temp.as_object()) {
+                el.temporary_variables = json_read::jobject_to_hashmap_values(temps)?;
+            } else {
+                el.temporary_variables.clear();
+            }
+
+            thread.callstack.push(el);
         }
 
         if let Some(prev_content_obj_path) =
@@ -421,15 +422,34 @@ impl CallStack {
     ) -> Result<(), StoryError> {
         self.threads.clear();
 
-        let j_threads = j_obj.get("threads").unwrap();
+        let j_threads = j_obj
+            .get("threads")
+            .ok_or_else(|| StoryError::BadJson("Missing callstack threads".to_owned()))?
+            .as_array()
+            .ok_or_else(|| StoryError::BadJson("callstack threads must be an array".to_owned()))?;
 
-        for j_thread_tok in j_threads.as_array().unwrap().iter() {
-            let j_thread_obj = j_thread_tok.as_object().unwrap();
+        for (index, j_thread_tok) in j_threads.iter().enumerate() {
+            let j_thread_obj = j_thread_tok.as_object().ok_or_else(|| {
+                StoryError::BadJson(format!("callstack threads[{index}] must be an object"))
+            })?;
             let thread = Thread::from_json(main_content_container, j_thread_obj)?;
             self.threads.push(thread);
         }
 
-        self.thread_counter = j_obj.get("threadCounter").unwrap().as_i64().unwrap() as usize;
+        if self.threads.is_empty() {
+            return Err(StoryError::BadJson(
+                "callstack threads must not be empty".to_owned(),
+            ));
+        }
+
+        let thread_counter = j_obj
+            .get("threadCounter")
+            .ok_or_else(|| StoryError::BadJson("Missing threadCounter".to_owned()))?
+            .as_i64()
+            .ok_or_else(|| StoryError::BadJson("threadCounter must be an integer".to_owned()))?;
+        self.thread_counter = usize::try_from(thread_counter).map_err(|_| {
+            StoryError::BadJson("threadCounter must be a non-negative integer".to_owned())
+        })?;
         self.start_of_root = Pointer::start_of(main_content_container.clone()).clone();
 
         Ok(())

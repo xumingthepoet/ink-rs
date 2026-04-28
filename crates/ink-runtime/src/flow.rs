@@ -34,31 +34,36 @@ impl Flow {
         main_content_container: Rc<Container>,
         j_obj: &Map<String, serde_json::Value>,
     ) -> Result<Flow, StoryError> {
+        let current_choices = j_obj
+            .get("currentChoices")
+            .ok_or_else(|| StoryError::BadJson("currentChoices not found.".to_owned()))?
+            .as_array()
+            .ok_or_else(|| StoryError::BadJson("currentChoices must be an array".to_owned()))?;
+        let current_choices = json_read::jarray_to_runtime_obj_list(current_choices, false)?
+            .into_iter()
+            .enumerate()
+            .map(|(index, object)| {
+                object.into_any().downcast::<Choice>().map_err(|_| {
+                    StoryError::BadJson(format!("currentChoices[{index}] must be a choice"))
+                })
+            })
+            .collect::<Result<Vec<Rc<Choice>>, StoryError>>()?;
+
         let mut flow = Self {
             name: name.to_string(),
             callstack: Rc::new(RefCell::new(CallStack::new(main_content_container.clone()))),
             output_stream: Vec::new(),
-            current_choices: json_read::jarray_to_runtime_obj_list(
-                j_obj
-                    .get("currentChoices")
-                    .ok_or(StoryError::BadJson("currentChoices not found.".to_owned()))?
-                    .as_array()
-                    .unwrap(),
-                false,
-            )?
-            .iter()
-            .map(|o| o.clone().into_any().downcast::<Choice>().unwrap())
-            .collect::<Vec<Rc<Choice>>>(),
+            current_choices,
         };
 
-        flow.callstack.borrow_mut().load_json(
-            &main_content_container,
-            j_obj
-                .get("callstack")
-                .ok_or(StoryError::BadJson("loading callstack".to_owned()))?
-                .as_object()
-                .unwrap(),
-        )?;
+        let callstack = j_obj
+            .get("callstack")
+            .ok_or_else(|| StoryError::BadJson("loading callstack".to_owned()))?
+            .as_object()
+            .ok_or_else(|| StoryError::BadJson("callstack must be an object".to_owned()))?;
+        flow.callstack
+            .borrow_mut()
+            .load_json(&main_content_container, callstack)?;
         let j_choice_threads = j_obj.get("choiceThreads");
 
         flow.load_flow_choice_threads(j_choice_threads, main_content_container)?;
@@ -122,25 +127,44 @@ impl Flow {
         j_choice_threads: Option<&serde_json::Value>,
         main_content_container: Rc<Container>,
     ) -> Result<(), StoryError> {
+        let choice_threads = j_choice_threads
+            .map(|value| {
+                value.as_object().ok_or_else(|| {
+                    StoryError::BadJson("choiceThreads must be an object".to_owned())
+                })
+            })
+            .transpose()?;
+
         for choice in self.current_choices.iter_mut() {
-            self.callstack
+            let original_thread_index = *choice.original_thread_index.borrow();
+            let existing_thread = self
+                .callstack
                 .borrow()
-                .get_thread_with_index(*choice.original_thread_index.borrow())
-                .map(|o| choice.set_thread_at_generation(o.clone()))
-                .or_else(|| {
-                    let j_saved_choice_thread = j_choice_threads
-                        .and_then(|c| c.get(choice.original_thread_index.borrow().to_string()))
-                        .ok_or("loading choice threads")
-                        .unwrap();
-                    choice.set_thread_at_generation(
-                        Thread::from_json(
-                            &main_content_container,
-                            j_saved_choice_thread.as_object().unwrap(),
-                        )
-                        .unwrap(),
-                    );
-                    Some(())
-                });
+                .get_thread_with_index(original_thread_index)
+                .cloned();
+
+            if let Some(thread) = existing_thread {
+                choice.set_thread_at_generation(thread);
+                continue;
+            }
+
+            let original_thread_key = original_thread_index.to_string();
+            let j_saved_choice_thread = choice_threads
+                .and_then(|threads| threads.get(&original_thread_key))
+                .ok_or_else(|| {
+                    StoryError::BadJson(format!(
+                        "Missing choiceThreads entry for original thread {original_thread_index}"
+                    ))
+                })?;
+            let j_saved_choice_thread = j_saved_choice_thread.as_object().ok_or_else(|| {
+                StoryError::BadJson(format!(
+                    "choiceThreads['{original_thread_index}'] must be an object"
+                ))
+            })?;
+            choice.set_thread_at_generation(Thread::from_json(
+                &main_content_container,
+                j_saved_choice_thread,
+            )?);
         }
 
         Ok(())

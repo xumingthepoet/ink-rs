@@ -1111,9 +1111,48 @@ mod tests {
 
     use serde_json::json;
 
-    use crate::{story::Story, value_type::ValueType};
+    use crate::{story::Story, story_error::StoryError, value_type::ValueType};
 
     const SIMPLE_STORY_JSON: &str = r#"{"inkVersion":1,"root":["done",null]}"#;
+
+    fn simple_save_json() -> serde_json::Value {
+        let story = Story::new(SIMPLE_STORY_JSON).expect("valid story");
+        serde_json::from_str(&story.save_state().expect("save state")).expect("valid save")
+    }
+
+    fn assert_save_load_bad_json(save: serde_json::Value, expected_message: &str) {
+        let mut story = Story::new(SIMPLE_STORY_JSON).expect("valid story");
+        let error = story
+            .load_state(&save.to_string())
+            .expect_err("malformed save should be rejected");
+
+        match error {
+            StoryError::BadJson(message) => assert!(
+                message.contains(expected_message),
+                "expected BadJson containing {expected_message:?}, got {message:?}"
+            ),
+            other => panic!("expected BadJson, got {other:?}"),
+        }
+    }
+
+    fn choice_save_with_original_thread(
+        original_thread_index: usize,
+        choice_threads: Option<serde_json::Value>,
+    ) -> serde_json::Value {
+        let mut save = simple_save_json();
+        save["currentChoices"] = json!([{
+            "text": "Choice",
+            "index": 0,
+            "originalChoicePath": "0",
+            "originalThreadIndex": original_thread_index,
+            "targetPath": "0",
+            "tags": []
+        }]);
+        if let Some(choice_threads) = choice_threads {
+            save["choiceThreads"] = choice_threads;
+        }
+        save
+    }
 
     #[test]
     fn rejects_non_current_save_state_version() {
@@ -1145,6 +1184,37 @@ mod tests {
             .expect_err("expected missing callstack error");
 
         assert!(error.to_string().contains("loading callstack"));
+    }
+
+    #[test]
+    fn rejects_malformed_flow_save_json_without_panicking() {
+        let mut save = simple_save_json();
+        save["callstack"] = json!([]);
+        assert_save_load_bad_json(save, "callstack must be an object");
+
+        let mut save = simple_save_json();
+        save["currentChoices"] = json!({});
+        assert_save_load_bad_json(save, "currentChoices must be an array");
+
+        let mut save = simple_save_json();
+        save["callstack"]["threads"] = json!({});
+        assert_save_load_bad_json(save, "callstack threads must be an array");
+
+        let mut save = simple_save_json();
+        save["callstack"]["threadCounter"] = json!("bad");
+        assert_save_load_bad_json(save, "threadCounter must be an integer");
+
+        let save = choice_save_with_original_thread(9, Some(json!([])));
+        assert_save_load_bad_json(save, "choiceThreads must be an object");
+
+        let save = choice_save_with_original_thread(9, None);
+        assert_save_load_bad_json(save, "Missing choiceThreads entry for original thread 9");
+
+        let save = choice_save_with_original_thread(9, Some(json!({ "9": [] })));
+        assert_save_load_bad_json(save, "choiceThreads['9'] must be an object");
+
+        let save = choice_save_with_original_thread(9, Some(json!({ "9": { "callstack": [] } })));
+        assert_save_load_bad_json(save, "Invalid thread index");
     }
 
     #[test]
