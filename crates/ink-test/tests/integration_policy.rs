@@ -53,13 +53,13 @@ const ALLOWED_LEGACY_INK_FIXTURES: &[&str] = &[
     "conformance/inkfiles/typed/struct-literals.ink",
     "conformance/inkfiles/variable/varcalc.ink",
     "conformance/inkfiles/variable/variable-declaration.ink",
+    "language/diagnostics/root-content-before-module.ink",
 ];
 
 const ALLOWED_SOURCE_CONSTRUCTION_TESTS: &[&str] = &[
     "compiler_api.rs",
     "csharp_tests/mod.rs",
     "inkling_examples.rs",
-    "language.rs",
 ];
 
 const SOURCE_CONSTRUCTION_PATTERNS: &[&str] = &[
