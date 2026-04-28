@@ -17,14 +17,6 @@ fn tags_test() -> Result<(), StoryError> {
     assert_eq!("author: Joe", current_tags[0]);
     assert_eq!("title: My Great Story", current_tags[1]);
 
-    let current_tags = story.tags_for_content_at_path("game.knot");
-    assert_eq!(1, current_tags.len());
-    assert_eq!("knot tag", current_tags[0]);
-
-    let current_tags = story.tags_for_content_at_path("game.knot.stitch");
-    assert_eq!(1, current_tags.len());
-    assert_eq!("stitch tag", current_tags[0]);
-
     story.choose_path_string("game.knot", false, None);
     assert_eq!("Knot content\n", story.cont());
     let current_tags = story.get_current_tags();

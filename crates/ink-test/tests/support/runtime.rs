@@ -83,12 +83,6 @@ impl Story {
             .expect("expected global tags to load")
     }
 
-    pub fn tags_for_content_at_path(&self, path: &str) -> Vec<String> {
-        self.inner
-            .tags_for_content_at_path(path)
-            .expect("expected tags to load for path")
-    }
-
     pub fn get_variable(&self, name: &str) -> Option<ValueType> {
         self.inner.get_variable(name)
     }

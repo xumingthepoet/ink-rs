@@ -17,13 +17,6 @@ impl Story {
         self.tags_at_start_of_flow_container_with_path_string("")
     }
 
-    /// Gets any tags associated with a particular knot or knot.stitch.
-    /// These are defined as hash tags defined at the very top of a
-    /// knot or stitch.
-    pub fn tags_for_content_at_path(&self, path: &str) -> Result<Vec<String>, StoryError> {
-        self.tags_at_start_of_flow_container_with_path_string(path)
-    }
-
     pub(crate) fn tags_at_start_of_flow_container_with_path_string(
         &self,
         path_string: &str,
@@ -61,7 +54,7 @@ impl Story {
                             tags.push(string_value.string.clone());
                         } else {
                             return Err(
-                                StoryError::InvalidStoryState("Tag contained non-text content. Only plain text is allowed when using globalTags or TagsAtContentPath. If you want to evaluate dynamic content, you need to use story.Continue()".to_owned()),
+                                StoryError::InvalidStoryState("Tag contained non-text content. Only plain text is allowed when using get_global_tags. If you want to evaluate dynamic content, you need to use story.cont()".to_owned()),
                             );
                         }
                     } else {
