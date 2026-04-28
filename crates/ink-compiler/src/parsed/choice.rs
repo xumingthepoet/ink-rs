@@ -8,7 +8,6 @@ pub struct Choice {
     inner_content: ContentList,
     span: SourceSpan,
     identifier: Option<String>,
-    once_only: bool,
     is_invisible_default: bool,
     indentation_depth: usize,
     condition: Option<Expression>,
@@ -25,7 +24,6 @@ impl Choice {
             inner_content,
             span,
             identifier: None,
-            once_only: true,
             is_invisible_default: false,
             indentation_depth: 1,
             condition: None,
@@ -50,14 +48,6 @@ impl Choice {
 
     pub fn set_identifier(&mut self, identifier: Option<String>) {
         self.identifier = identifier;
-    }
-
-    pub fn once_only(&self) -> bool {
-        self.once_only
-    }
-
-    pub fn set_once_only(&mut self, once_only: bool) {
-        self.once_only = once_only;
     }
 
     pub fn has_start_content(&self) -> bool {
@@ -99,9 +89,6 @@ impl Choice {
         if self.is_invisible_default {
             flags |= 8;
         }
-        if self.once_only {
-            flags |= 16;
-        }
         flags
     }
 
@@ -117,8 +104,6 @@ impl Choice {
             }
             None => out.push_str("null"),
         }
-        out.push_str(", once=");
-        out.push_str(if self.once_only { "true" } else { "false" });
         out.push_str(", invisible=");
         out.push_str(if self.is_invisible_default {
             "true"

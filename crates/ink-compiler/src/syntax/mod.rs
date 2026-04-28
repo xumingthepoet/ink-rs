@@ -403,7 +403,7 @@ mod tests {
     }
 
     #[test]
-    fn parses_sticky_choice() {
+    fn parses_plus_choice() {
         let output = parse(SourceInput::new("+ Choice"));
         assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
         let story = output.artifact.unwrap();
@@ -411,6 +411,6 @@ mod tests {
         let Object::Choice(choice) = &story.root_weave().content()[0] else {
             panic!("expected choice");
         };
-        assert!(!choice.once_only());
+        assert_eq!(choice.indentation_depth(), 1);
     }
 }

@@ -12,7 +12,6 @@ pub struct ChoicePoint {
     has_choice_only_content: bool,
     has_start_content: bool,
     is_invisible_default: bool,
-    once_only: bool,
     has_condition: bool,
     path_on_choice: RefCell<Path>,
 }
@@ -24,7 +23,6 @@ impl ChoicePoint {
             has_choice_only_content: (flags & 4) > 0,
             has_start_content: (flags & 2) > 0,
             is_invisible_default: (flags & 8) > 0,
-            once_only: false,
             has_condition: (flags & 1) > 0,
             path_on_choice: RefCell::new(Path::new_with_components_string(Some(
                 path_string_on_choice,
@@ -50,9 +48,6 @@ impl ChoicePoint {
         if self.is_invisible_default() {
             flags |= 8;
         }
-        if self.once_only() {
-            flags |= 16;
-        }
         flags
     }
 
@@ -70,10 +65,6 @@ impl ChoicePoint {
 
     pub fn is_invisible_default(&self) -> bool {
         self.is_invisible_default
-    }
-
-    pub fn once_only(&self) -> bool {
-        self.once_only
     }
 
     pub fn get_path_on_choice(self: &Rc<Self>) -> Path {

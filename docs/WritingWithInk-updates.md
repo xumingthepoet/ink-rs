@@ -51,6 +51,28 @@ Each entry should include:
   and compiler snapshot fixtures cover the removed syntax and retained dynamic
   tag interpolation behavior.
 
+## 2026-04-29: Choice Repeatability Documentation
+
+- status: removed/supported
+- upstream behavior: upstream Ink treats `*` choices as once-only by default
+  and uses `+` for sticky/repeatable choices.
+- ink-rs behavior: both `*` and `+` choices are repeatable. A choice only
+  disappears when the author hides it with an explicit condition or changes
+  control flow. The compiler and runtime no longer carry once-only choice flags
+  for source-authored choices.
+- documentation effect: `WritingWithInk-latest.md` rewrites the old
+  once-only-choice section to describe repeatable choices, explicit
+  variable-based hiding, and fallback choices for the case where all visible
+  choices are conditionally hidden.
+- rationale: implicit once-only choices depended on removed visit-count state.
+  Keeping the old tutorial and unused flags made the current repeatable choice
+  model look inconsistent.
+- migration guidance: replace reliance on implicit `*` disappearance with a
+  typed variable and a choice condition such as `* { not asked } Ask`.
+- tests: `star_and_plus_choices_are_repeatable`,
+  `choice_conditions_still_control_visibility`, compiler choice parser tests,
+  and full compiler/runtime gates.
+
 ## 2026-04-28: Choice Condition Boundary And Multiline Declarations
 
 - status: supported

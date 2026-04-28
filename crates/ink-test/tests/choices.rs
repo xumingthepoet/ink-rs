@@ -129,8 +129,8 @@ fn mixed_choice_test() -> Result<(), StoryError> {
 }
 
 #[test]
-fn sticky_choice_test() -> Result<(), StoryError> {
-    let mut story = common::story_from_fixture("choices/sticky-choice.ink");
+fn plus_choices_repeat() -> Result<(), StoryError> {
+    let mut story = common::story_from_fixture("choices/plus-choices-repeat.ink");
     let mut text: Vec<String> = Vec::new();
 
     common::next_all(&mut story, &mut text);

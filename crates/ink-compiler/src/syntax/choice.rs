@@ -52,7 +52,6 @@ pub(super) fn parse_choice(parser: &mut RuleParser<'_>) -> Option<Choice> {
         let inner = append_newline(ContentList::new(vec![]), span.clone());
         let mut choice = Choice::new(None, inner, span);
         choice.set_identifier(identifier);
-        choice.set_once_only(false);
         choice.set_is_invisible_default(true);
         choice.set_condition(condition);
         choice.set_indentation_depth(indentation_depth);
@@ -81,7 +80,6 @@ pub(super) fn parse_choice(parser: &mut RuleParser<'_>) -> Option<Choice> {
         span,
     );
     choice.set_identifier(identifier);
-    choice.set_once_only(false);
     choice.set_condition(condition);
     choice.set_indentation_depth(indentation_depth);
 

@@ -496,44 +496,30 @@ you pass to the compiler, then import the specific symbols you use:
 
 ## 7) Varying Choices
 
-### Choices can only be used once
+### Choices repeat unless conditions hide them
 
-By default, every choice in the game can only be chosen once. If you don't have loops in your story, you'll never notice this behaviour. But if you do use loops, you'll quickly notice your options disappearing...
+In ink-rs, both `*` and `+` choices are repeatable. If a loop returns to the
+same choice point, the same authored choices can appear again. When a choice
+should disappear, track that state explicitly and put a condition on the choice:
+
+	VAR asked_hat: bool = false
+	VAR asked_briefcase: bool = false
 
 	=== find_help ===
 
 		You search desperately for a friendly face in the crowd.
-		*	The woman in the hat? pushes you roughly aside. -> find_help
-		*	The man with the briefcase? looks disgusted as you stumble past him. -> find_help
-
-produces:
-
-	You search desperately for a friendly face in the crowd.
-
-	1: The woman in the hat?
-	2: The man with the briefcase?
-
-	> 1
-	The woman in the hat pushes you roughly aside.
-	You search desperately for a friendly face in the crowd.
-
-	1: The man with the briefcase?
-
-	>
-
-... and on the next loop you'll have no options left.
+		*	{ not asked_hat } The woman in the hat?
+			~ asked_hat = true
+			The woman in the hat pushes you roughly aside. -> find_help
+		*	{ not asked_briefcase } The man with the briefcase?
+			~ asked_briefcase = true
+			The man with the briefcase looks disgusted as you stumble past him. -> find_help
 
 #### Fallback choices
 
-The above example stops where it does, because the next choice ends up in an "out of content" run-time error.
-
-	> 1
-	The man with the briefcase looks disgusted as you stumble past him.
-	You search desperately for a friendly face in the crowd.
-
-	Runtime error in tests/test.ink line 6: ran out of content. Do you need a '-> DONE' or '-> END'?
-
-We can resolve this with a 'fallback choice'. Fallback choices are never displayed to the player, but are 'chosen' by the game if no other options exist.
+Fallback choices are useful when every visible choice can be hidden by
+conditions. They are never displayed to the player, but are chosen by the game
+if no other options exist.
 
 A fallback choice is simply a "choice without choice text":
 
@@ -546,34 +532,21 @@ And, in a slight abuse of syntax, we can make a default choice with content in i
 
 #### Example of a fallback choice
 
-Adding this into the previous example gives us:
+Adding this into the previous example gives the story an explicit route when
+both visible options have been hidden:
 
 	=== find_help ===
 
 		You search desperately for a friendly face in the crowd.
-		*	The woman in the hat? pushes you roughly aside. -> find_help
-		*	The man with the briefcase? looks disgusted as you stumble past him. -> find_help
+		*	{ not asked_hat } The woman in the hat?
+			~ asked_hat = true
+			The woman in the hat pushes you roughly aside. -> find_help
+		*	{ not asked_briefcase } The man with the briefcase?
+			~ asked_briefcase = true
+			The man with the briefcase looks disgusted as you stumble past him. -> find_help
 		*	->
 			But it is too late: you collapse onto the station platform. This is the end.
 			-> END
-
-and produces:
-
-	You search desperately for a friendly face in the crowd.
-
-	1: The woman in the hat?
-	2: The man with the briefcase?
-
-	> 1
-	The woman in the hat pushes you roughly aside.
-	You search desperately for a friendly face in the crowd.
-
-	1: The man with the briefcase?
-
-	> 1
-	The man with the briefcase looks disgusted as you stumble past him.
-	You search desperately for a friendly face in the crowd.
-	But it is too late: you collapse onto the station platform. This is the end.
 
 
 ### Repeatable choices
