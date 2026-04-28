@@ -56,13 +56,6 @@ pub(super) fn weave_has_weave_points(weave: &Weave) -> bool {
         .any(|object| matches!(object, Object::Choice(_) | Object::Gather(_)))
 }
 
-pub(super) fn content_list_has_choice(content_list: &ContentList) -> bool {
-    content_list
-        .objects()
-        .iter()
-        .any(|object| matches!(object, Object::Choice(_)))
-}
-
 pub(super) fn lower_linear_weave_into_context(
     content: &mut Vec<RuntimeObject>,
     weave: &Weave,
@@ -112,7 +105,6 @@ pub(super) fn lower_choice_weave_with_initial_content(
             | Object::Divert(_)
             | Object::TunnelOnwards(_)
             | Object::Tag(_)
-            | Object::Sequence(_)
             | Object::IncDec(_)
             | Object::VariableAssignment(_)
             | Object::ExternalDeclaration(_)
@@ -284,7 +276,6 @@ fn lower_weave_section(
             | Object::Divert(_)
             | Object::TunnelOnwards(_)
             | Object::Tag(_)
-            | Object::Sequence(_)
             | Object::IncDec(_)
             | Object::VariableAssignment(_)
             | Object::ExternalDeclaration(_)

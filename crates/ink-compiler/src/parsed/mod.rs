@@ -13,7 +13,6 @@ mod inc_dec;
 mod module;
 mod qualified_name;
 mod return_node;
-mod sequence;
 mod story;
 mod struct_declaration;
 mod tag;
@@ -39,7 +38,6 @@ pub use inc_dec::IncDec;
 pub use module::{ImportDeclaration, ImportedName, Module};
 pub use qualified_name::QualifiedName;
 pub use return_node::Return;
-pub use sequence::{Sequence, SequenceType};
 pub use story::Story;
 pub use struct_declaration::{StructDeclaration, StructField};
 pub use tag::Tag;
@@ -64,7 +62,6 @@ pub enum Object {
     Divert(Divert),
     Gather(Gather),
     Tag(Tag),
-    Sequence(Sequence),
     Return(Return),
     StructDeclaration(StructDeclaration),
     TunnelOnwards(TunnelOnwards),
@@ -114,7 +111,6 @@ impl Object {
             Object::Divert(divert) => divert.write_parse_snapshot(out, indent),
             Object::Gather(gather) => gather.write_parse_snapshot(out, indent),
             Object::Tag(tag) => tag.write_parse_snapshot(out, indent),
-            Object::Sequence(sequence) => sequence.write_parse_snapshot(out, indent),
             Object::VariableAssignment(assignment) => assignment.write_parse_snapshot(out, indent),
             Object::ExternalDeclaration(external) => external.write_parse_snapshot(out, indent),
             Object::TunnelOnwards(tunnel_onwards) => {

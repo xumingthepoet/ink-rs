@@ -1,5 +1,5 @@
 # Source Sequences Use Disabled Visit Counts
-Status: found
+Status: solved
 Found while: deep library-readiness and legacy-residue review
 Scope: crates/ink-compiler/src/lower/sequence.rs, crates/ink-runtime/src/story/progress.rs, crates/ink-runtime/src/story_state.rs, crates/ink-test/tests/compiler_snapshots/fixtures.rs
 Problem: Compiler-lowered source sequences still depend on the legacy `"visit"` control command and visit-count container flags, but the current runtime no longer records visits. `StoryState::visit_count_for_container` always returns `0`, and `Story::visit_container` is a no-op.
@@ -7,3 +7,5 @@ Why it matters: Authored sequences compile successfully but do not output their 
 Suggested fix: Remove source-level sequence support instead of adding save-state fields. Emit a clear removed-feature diagnostic for sequence syntax, remove sequence lowering paths and sequence-specific legacy runtime hooks that become unused, and update tests, fixtures, editor assets, and maintained docs to stop presenting sequences as supported.
 Evidence: `crates/ink-compiler/src/lower/sequence.rs:18` emits `ControlCommand::VisitIndex` and `flags: Some(5)`. `crates/ink-runtime/src/story/progress.rs:681` discards visit updates. `crates/ink-runtime/src/story_state.rs:357` returns `0` for every container visit count. A temporary runner using `First {one|two|three}. -> main` printed `sequence-0="First .\n"`, `sequence-1="First .\n"`, and `sequence-2="First .\n"`.
 Owner decision: Do not add sequence save-state fields; delete the feature from the source language.
+Resolution: Removed the source sequence parsed model, parser support, lowering code, sequence-specific snapshot fixtures, and no-op runtime visit-count hooks. Source alternatives now emit a removed-feature diagnostic, while legacy compiled-story `visit`/`seq` tokens remain documented as JSON compatibility behavior.
+Validation: `cargo fmt --all --check`; `cargo check --workspace`; `cargo test -p ink-compiler`; `cargo test -p ink-runtime`; `cargo test -p ink-test --test diagnostics`; `cargo test -p ink-test --test compiler_snapshots`; `cargo test -p ink-test --test integration_policy`; `cargo test -p ink-test`; `make gate TIMEOUT='f(){ shift; "$$@"; }; f'`.

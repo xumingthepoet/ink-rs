@@ -240,8 +240,8 @@ Important files:
 - `text.rs`: text lines, inline content, glue, tags, inline diverts, braced
   content.
 - `choice.rs`, `gather.rs`, `weave.rs`: weave-point syntax.
-- `conditional.rs`, `sequence.rs`, `structure.rs`: braced structures and
-  structured literals.
+- `conditional.rs`, `structure.rs`: braced conditionals and structured
+  literals.
 - `knot.rs`, `module.rs`, `import.rs`: story structure.
 - `declaration.rs`, `variable.rs`, `logic.rs`, `divert.rs`, `type_name.rs`:
   statement families.
@@ -268,7 +268,7 @@ Key files:
   structure.
 - `choice.rs`, `gather.rs`, `divert.rs`, `tunnel_onwards.rs`: flow and weave
   control.
-- `expression.rs`, `type_name.rs`, `struct_declaration.rs`, `sequence.rs`,
+- `expression.rs`, `type_name.rs`, `struct_declaration.rs`,
   `conditional.rs`: typed values and expressions.
 - `variable_assignment.rs`, `constant_declaration.rs`,
   `external_declaration.rs`, `return_node.rs`, `inc_dec.rs`: logic statements.
@@ -336,7 +336,7 @@ Important files:
 - `expression.rs`: expression, command, string-expression, and logic lowering.
 - `assignment.rs`: global/temp/field/index assignment lowering.
 - `divert.rs`: diverts, tunnels, function calls, external calls, tail recursion.
-- `conditional.rs`, `sequence.rs`: conditional and sequence lowering.
+- `conditional.rs`: conditional lowering.
 - `value.rs`: compile-time values used by constants/defaults/composites.
 
 For explicit module stories, lowering emits a root container that auto-diverts

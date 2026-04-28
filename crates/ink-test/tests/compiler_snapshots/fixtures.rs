@@ -85,5 +85,4 @@ fixture!(
     tunnels_tunnel_onwards_divert_override,
     "tunnels/tunnel-onwards-divert-override.ink"
 );
-fixture!(tags_tags_in_seq, "tags/tagsInSeq.ink");
 fixture!(misc_i18n, "misc/i18n.ink");

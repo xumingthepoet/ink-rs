@@ -115,8 +115,8 @@ Control commands are special instructions to the text engine to perform various 
 * `"choiceCnt"` - Legacy compiled-story command that pushes the current generated choice count. ink-rs source no longer emits `CHOICE_COUNT`.
 * `"turn"` - Legacy compiled-story command. The current runtime keeps no turn counter and pushes `0`.
 * `"turns"` - Legacy compiled-story command. The current runtime keeps no turn index state and pushes `-1` for known divert targets.
-* `"visit"` - Legacy compiled-story command. The current runtime keeps no visit-count state and pushes `-1` as a sequence index fallback.
-* `"seq"` - Pops an integer, expected to be the number of elements in a sequence that's being entered. In return, it pushes an integer with the next sequence shuffle index to the evaluation stack. This shuffle index is derived from the number of elements in the sequence, the number of elements in it, and the story's random seed from when it was first begun.
+* `"visit"` - Legacy compiled-story command. The current runtime keeps no visit-count state and pushes `-1` as a sequence index fallback. ink-rs source no longer emits source sequence JSON.
+* `"seq"` - Legacy compiled-story command for old shuffle sequence JSON. Pops an integer, expected to be the number of elements in a sequence that's being entered. In return, it pushes an integer with the next sequence shuffle index to the evaluation stack. This shuffle index is derived from the element count, the sequence path, and the story's random seed from when it was first begun.
 * `"thread"` - Clones/starts a new thread, as used with the `<- knot` syntax in ink. This essentially clones the entire callstack, branching it.
 * `"done"` - Tries to close/pop the active thread, otherwise marks the story flow safe to exit without a loose end warning.
 * `"end"` - Ends the story flow immediately, closes all active threads, unwinds the callstack, and removes any choices that were previously created.

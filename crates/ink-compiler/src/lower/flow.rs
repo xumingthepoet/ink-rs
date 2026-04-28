@@ -220,11 +220,6 @@ fn collect_local_variables_in_object(object: &Object, local_variables: &mut Hash
             }
             collect_local_variables_in_content_list(choice.inner_content(), local_variables);
         }
-        Object::Sequence(sequence) => {
-            for element in sequence.elements() {
-                collect_local_variables_in_content_list(element, local_variables);
-            }
-        }
         Object::Weave(weave) => collect_local_variables_in_weave(weave, local_variables),
         _ => {}
     }

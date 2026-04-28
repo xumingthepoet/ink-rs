@@ -25,6 +25,32 @@ Each entry should include:
 - migration guidance
 - tests
 
+## 2026-04-29: Source Sequences Removed
+
+- status: removed
+- upstream behavior: upstream Ink supports source-level alternatives inside
+  braces, including stopping sequences, cycles, once-only alternatives, and
+  shuffles, with inline forms such as `{one|two}`, `{&one|two}`,
+  `{!one|two}`, `{~one|two}`, and multiline forms such as `{ cycle: ... }`.
+- ink-rs behavior: source sequences, cycles, shuffles, and once-only
+  alternatives are no longer part of the source language. The compiler reports
+  a removed-feature diagnostic instead of lowering them to visit-count-based
+  JSON. Conditional text such as `{condition: true text | false text}` remains
+  supported.
+- documentation effect: `WritingWithInk-latest.md` removes the alternatives
+  tutorial and multiline sequence examples, and documents explicit variables
+  plus conditional text as the replacement.
+- rationale: sequence lowering depended on implicit visit counts, but the
+  current runtime intentionally no longer stores visit-count state in saves.
+  Keeping the syntax would compile broken stories or require new save-state
+  fields for a feature the project owner chose to delete.
+- migration guidance: model progression explicitly with typed variables and
+  conditionals. For random variation, use `RANDOM`, `SEED_RANDOM`, host state,
+  or explicit story variables rather than source shuffles.
+- tests: compiler parser/lowering unit tests, `diagnostics/removed-sequence.ink`,
+  and compiler snapshot fixtures cover the removed syntax and retained dynamic
+  tag interpolation behavior.
+
 ## 2026-04-28: Choice Condition Boundary And Multiline Declarations
 
 - status: supported
@@ -233,9 +259,9 @@ Each entry should include:
 - status: removed
 - upstream behavior: upstream Ink allows global variables to be introduced with
   `VAR` anywhere in the parsed story, including inside knots, stitches,
-  functions, choices, conditionals, and sequences.
+  functions, choices, and conditionals.
 - ink-rs behavior: `VAR` declarations are only accepted at module top level,
-  outside knots, stitches, functions, choices, conditionals, and sequences.
+  outside knots, stitches, functions, choices, and conditionals.
   Local executable state should use typed `temp` declarations instead.
 - documentation effect: `WritingWithInk-latest.md` records the scope
   restriction in "Changed from upstream Ink" and in the global variable
@@ -244,8 +270,8 @@ Each entry should include:
   source organization rules ambiguous. Keeping globals in module-level
   declaration areas makes global state explicit before flow execution.
 - migration guidance: move nested `VAR` declarations to module top level. If
-  the value is only needed inside a knot, stitch, function, choice, conditional,
-  or sequence, replace it with a typed `temp` declaration.
+  the value is only needed inside a knot, stitch, function, choice, or
+  conditional, replace it with a typed `temp` declaration.
 - tests: `nested_global_var_declarations_report_current_syntax_error` in
   the behavior-focused files under `crates/ink-test/tests/`,
   `global_var_declarations_inside_flows_report_removed_feature` in

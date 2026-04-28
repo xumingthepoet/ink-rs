@@ -99,10 +99,6 @@ fn object_contains_function_call(object: &Object) -> bool {
                     .iter()
                     .any(object_contains_function_call)
         }
-        Object::Sequence(sequence) => sequence
-            .elements()
-            .iter()
-            .any(|content| content.objects().iter().any(object_contains_function_call)),
         Object::VariableAssignment(assignment) => assignment
             .expression()
             .is_some_and(expression_contains_function_call),

@@ -654,137 +654,29 @@ Conditions use explicit variables or expressions:
 
 So far, all the content we've seen has been static, fixed pieces of text. But content can also vary at the moment of being printed.
 
-### Sequences, cycles and other alternatives
+### Removed: sequences, cycles, shuffles, and once-only alternatives
 
-The simplest variations of text are provided by alternatives, which are selected from depending on some kind of rule. **ink** supports several types. Alternatives are written inside `{`...`}` curly brackets, with elements separated by `|` symbols (vertical divider lines).
+Upstream Ink supports stateful text alternatives such as `{one|two}`,
+`{&one|two}`, `{!one|two}`, `{~one|two}`, and multiline `{ cycle: ... }`
+blocks. ink-rs no longer supports those source forms. The compiler reports a
+removed-feature diagnostic because the current runtime intentionally does not
+store implicit visit-count state in saves.
 
-These are only useful if a piece of content is visited more than once!
+Use typed variables and conditional text to model progression explicitly:
 
-#### Types of alternatives
+	VAR radio_step: int = 0
 
-**Sequences** (the default):
+	{ radio_step == 0:
+	    Three!
+	- radio_step == 1:
+	    Two!
+	- else:
+	    One!
+	}
+	~ radio_step = radio_step + 1
 
-A sequence (or a "stopping block") is a set of alternatives that tracks how many times its been seen, and each time, shows the next element along. When it runs out of new content it continues the show the final element.
-
-	The radio hissed into life. {"Three!"|"Two!"|"One!"|There was the white noise racket of an explosion.|But it was just static.}
-
-	{I bought a coffee with my five-pound note.|I bought a second coffee for my friend.|I didn't have enough money to buy any more coffee.}
-
-**Cycles** (marked with a `&`):
-
-Cycles are like sequences, but they loop their content.
-
-	It was {&Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday} today.
-
-
-**Once-only alternatives** (marked with a `!`):
-
-Once-only alternatives step through their listed content and then produce blank output after the final element.
-
-	He told me a joke. {!I laughed politely.|I smiled.|I grimaced.|I promised myself to not react again.}
-
-**Shuffles** (marked with a `~`):
-
-Shuffles produce randomised output.
-
-	I tossed the coin. {~Heads|Tails}.
-
-#### Features of Alternatives
-
-Alternatives can contain blank elements.
-
-	I took a step forward. {!||||Then the lights went out. -> eek}
-
-Alternatives can be nested.
-
-	The Ratbear {&{wastes no time and |}swipes|scratches} {&at you|into your {&leg|arm|cheek}}.
-
-Alternatives can include divert statements.
-
-	I {waited.|waited some more.|snoozed.|woke up and waited more.|gave up and left. -> leave_post_office}
-
-They can also be used inside choice text:
-
-	+ 	"Hello, {&Master|Monsieur Fogg|you|brown-eyes}!" I declared.
-
-(...with one caveat; you can't start an option's text with a `{`, as it'll look like a conditional. If the choice has conditions, end the condition prefix with `:` before the dynamic text, as in `* {ready}: {label}`.)
-
-(...but the caveat has a caveat, if you escape a whitespace `\ ` before your `{` ink will recognise it as text.)
-
-	+\	{&They headed towards the Sandlands|They set off for the desert|The party followed the old road South}
-
-#### Examples
-
-Alternatives can be used inside loops to create the appearance of intelligent, state-tracking gameplay without particular effort.
-
-Here's a one-knot version of whack-a-mole. It uses explicit fallback flow to ensure the game can end.
-
-	=== whack_a_mole ===
-		{I heft the hammer.|{~Missed!|Nothing!|No good. Where is he?|Ah-ha! Got him! -> END}}
-		The {&mole|{&nasty|blasted|foul} {&creature|rodent}} is {in here somewhere|hiding somewhere|still at large|laughing at me|still unwhacked|doomed}. <>
-		{!I'll show him!|But this time he won't escape!}
-		* 	{&Hit|Smash|Try} top-left 	-> whack_a_mole
-		*  {&Whallop|Splat|Whack} top-right -> whack_a_mole
-		*  {&Blast|Hammer} middle -> whack_a_mole
-		*  {&Clobber|Bosh} bottom-left 	-> whack_a_mole
-		*  {&Nail|Thump} bottom-right 	-> whack_a_mole
-		*   ->
-	    Then you collapse from hunger. The mole has defeated you!
-	            -> END
-
-
-produces the following 'game':
-
-	I heft the hammer.
-	The mole is in here somewhere. I'll show him!
-
-	1: Hit top-left
-	2: Whallop top-right
-	3: Blast middle
-	4: Clobber bottom-left
-	5: Nail bottom-right
-
-	> 1
-	Missed!
-	The nasty creature is hiding somewhere. But this time he won't escape!
-
-	1: Splat top-right
-	2: Hammer middle
-	3: Bosh bottom-left
-	4: Thump bottom-right
-
-	> 4
-	Nothing!
-	The mole is still at large.
-	1: Whack top-right
-	2: Blast middle
-	3: Clobber bottom-left
-
-	> 2
-	Where is he?
-	The blasted rodent is laughing at me.
-	1: Whallop top-right
-	2: Bosh bottom-left
-
-	> 1
-	Ah-ha! Got him!
-
-
-And here's a bit of lifestyle advice. Both `+` and `*` choices are repeatable in ink-rs, so the lure of the television will never fade unless a condition hides it:
-
-	=== turn_on_television ===
-	I turned on the television {for the first time|for the second time|again|once more}, but there was {nothing good on, so I turned it off again|still nothing worth watching|even less to hold my interest than before|nothing but rubbish|a program about sharks and I don't like sharks|nothing on}.
-	+	Try it again	 		-> turn_on_television
-	*	Go outside instead	-> go_outside_instead
-
-    === go_outside_instead ===
-    -> END
-
-
-
-#### Sneak Preview: Multiline alternatives
-**ink** has another format for making alternatives of varying content blocks, too. See the section on [multiline blocks](#multiline-blocks) for details.
-
+For random variation, keep the random choice in explicit story or host state
+using `RANDOM`, `SEED_RANDOM`, or a typed variable.
 
 
 ### Conditional Text
@@ -1259,8 +1151,8 @@ qualified form, such as `state::gold`.
 ### Defining Global Variables
 
 Global variables are defined with `VAR` at module top level, after the module
-header and imports and outside knots, stitches, functions, choices,
-conditionals, and sequences. Every `VAR` declaration must include an explicit
+header and imports and outside knots, stitches, functions, choices, and
+conditionals. Every `VAR` declaration must include an explicit
 type using `name: Type`. A declaration may include an initializer, or omit it to
 use the type's default value.
 
@@ -1343,7 +1235,7 @@ The **ink** layer is often be a good place to store gameplay-variables; there's 
 
 ### Printing variables
 
-The value of a variable can be printed as content using an inline syntax similar to sequences, and conditional text:
+The value of a variable can be printed as content using the same braced inline syntax used by conditional text:
 
 	VAR friendly_name_of_player: string = "Jackie"
 	VAR age: int = 23
@@ -1358,11 +1250,11 @@ It might be noticed that above we refered to variables as being able to contain 
 
 	VAR a_colour: string = ""
 
-	~ a_colour = "{~red|blue|green|yellow}"
+	~ a_colour = "red"
 
 	{a_colour}
 
-... produces one of red, blue, green or yellow.
+... produces `red`.
 
 Note that once a piece of content like this is evaluated, its value is "sticky". (The quantum state collapses.) So the following:
 
@@ -1370,11 +1262,7 @@ Note that once a piece of content like this is evaluated, its value is "sticky".
 
 ... won't produce a very interesting effect. (If you really want this to work, use a text function to print the colour!)
 
-This is also why
-
-	VAR a_colour: string = "{~red|blue|green|yellow}"
-
-is explicitly disallowed; it would be evaluated on the construction of the story, which probably isn't what you want.
+Source shuffles inside strings, such as `{~red|blue}`, are no longer supported.
 
 
 ## 2) Logic
@@ -1584,30 +1472,9 @@ You can even put options inside conditional blocks:
 
 ### Multiline blocks
 
-There's one other class of multiline block, which expands on the alternatives system from above. The following are all valid and do what you might expect:
-
-	// Sequence: go through the alternatives, and stick on last
-	{ stopping:
-		-	I entered the casino.
-		-  I entered the casino again.
-		-  Once more, I went inside.
-	}
-
-	// Shuffle: show one at random
-	At the table, I drew a card. <>
-	{ shuffle:
-		- 	Ace of Hearts.
-		- 	King of Spades.
-		- 	2 of Diamonds.
-			'You lose this time!' crowed the croupier.
-	}
-
-	// Cycle: show each in turn, and then cycle
-	{ cycle:
-		- I held my breath.
-		- I waited impatiently.
-		- I paused.
-	}
+Multiline sequence, cycle, shuffle, and once-only blocks from upstream Ink are
+removed in ink-rs. Use explicit variables, conditionals, and ordinary knots or
+stitches for varying blocks of content.
 
 	// Once: show each, once, in turn, until all have been shown
 	{ once:
@@ -2323,7 +2190,7 @@ Threads can be used to add the same choice into lots of different places. When u
 		Review my case notes
 		// the explicit variable controls whether this option repeats immediately
 		~ reviewed_notes_recently = true
-		{I|Once again, I} flicked through the notes I'd made so far. Still not obvious suspects.
+		I flicked through the notes I'd made so far. Still not obvious suspects.
 	- 	(done) -> {go_back_to}
 
 Note this is different than a tunnel, which runs the same block of content but doesn't give a player a choice. So a layout like:

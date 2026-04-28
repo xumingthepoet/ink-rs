@@ -45,6 +45,17 @@ fn removed_list_declaration_reports_removed_feature_diagnostic() {
 }
 
 #[test]
+fn removed_source_sequences_report_removed_feature_diagnostic() {
+    let diagnostics = diagnostics_for_fixture("diagnostics/removed-sequence.ink");
+
+    assert_diagnostic(
+        &diagnostics,
+        DiagnosticSeverity::Error,
+        "Source sequences, cycles, shuffles, and once-only alternatives are no longer supported",
+    );
+}
+
+#[test]
 fn diagnostic_helper_asserts_error_messages() {
     let diagnostics = diagnostics_for_fixture("diagnostics/diagnostic-smoke.ink");
     assert_diagnostic(&diagnostics, DiagnosticSeverity::Error, "target not found");
@@ -212,11 +223,6 @@ fn address_validation_reports_unknown_relative_stitch() {
 #[test]
 fn address_validation_reports_choice_text_divert_target_errors() {
     assert_fixture_compile_errors("diagnostics/addresses/choice-text-divert-target-errors.ink");
-}
-
-#[test]
-fn address_validation_reports_alternative_sequence_divert_errors() {
-    assert_fixture_compile_errors("diagnostics/addresses/alternative-sequence-divert-errors.ink");
 }
 
 #[test]

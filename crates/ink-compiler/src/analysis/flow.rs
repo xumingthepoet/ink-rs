@@ -109,11 +109,6 @@ fn check_global_var_declaration_scope_in_object(
                 }
             }
         }
-        Object::Sequence(sequence) => {
-            for element in sequence.elements() {
-                check_global_var_declaration_scope_in_content_list(element, diagnostics);
-            }
-        }
         Object::Weave(weave) => {
             for object in weave.content() {
                 check_global_var_declaration_scope_in_object(object, false, diagnostics);
@@ -149,7 +144,7 @@ fn check_global_var_declaration_scope_in_content_list(
 fn nested_global_var_declaration_diagnostic(span: SourceSpan) -> Diagnostic {
     Diagnostic::error(
         span,
-        "Global VAR declarations must appear at the story top level, outside knots, stitches, functions, choices, conditionals, and sequences.",
+        "Global VAR declarations must appear at the story top level, outside knots, stitches, functions, choices, and conditionals.",
     )
 }
 
@@ -403,7 +398,7 @@ fn check_nested_choice_termination_in_weave(
                 if inside_sealed_content && !choice_flow_terminates(choice, &objects[index + 1..]) {
                     diagnostics.push(Diagnostic::error(
                         choice.span().clone(),
-                        "Choices nested in conditionals or sequences need to explicitly divert afterwards.",
+                        "Choices nested in conditionals need to explicitly divert afterwards.",
                     ));
                 }
                 if let Some(content) = choice.start_content() {
@@ -427,11 +422,6 @@ fn check_nested_choice_termination_in_weave(
             Object::Conditional(conditional) => {
                 for branch in conditional.branches() {
                     check_nested_choice_termination_in_weave(branch.content(), true, diagnostics);
-                }
-            }
-            Object::Sequence(sequence) => {
-                for element in sequence.elements() {
-                    check_nested_choice_termination_in_content_list(element, true, diagnostics);
                 }
             }
             Object::Weave(weave) => {
@@ -466,11 +456,6 @@ fn check_nested_choice_termination_in_content_list(
             Object::Conditional(conditional) => {
                 for branch in conditional.branches() {
                     check_nested_choice_termination_in_weave(branch.content(), true, diagnostics);
-                }
-            }
-            Object::Sequence(sequence) => {
-                for element in sequence.elements() {
-                    check_nested_choice_termination_in_content_list(element, true, diagnostics);
                 }
             }
             Object::ContentList(content) => check_nested_choice_termination_in_content_list(
@@ -673,10 +658,6 @@ fn find_return_in_object(object: &Object) -> Option<&Return> {
             .branches()
             .iter()
             .find_map(|branch| find_return_in_weave(branch.content())),
-        Object::Sequence(sequence) => sequence
-            .elements()
-            .iter()
-            .find_map(find_return_in_content_list),
         Object::Weave(weave) => find_return_in_weave(weave),
         Object::Choice(choice) => choice
             .start_content()
@@ -742,9 +723,6 @@ fn object_terminates_flow(object: &Object) -> bool {
                         .is_some_and(object_terminates_flow)
                 })
         }
-        Object::Sequence(sequence) => sequence.elements().iter().all(|element| {
-            last_significant_object(element.objects()).is_some_and(object_terminates_flow)
-        }),
         Object::AuthorWarning(_)
         | Object::ConstantDeclaration(_)
         | Object::Expression(_)
@@ -797,16 +775,10 @@ mod tests {
 
     #[test]
     fn reports_global_var_declarations_outside_story_top_level() {
-        let cases = [
-            "{ true:\n\
+        let cases = ["{ true:\n\
                VAR score: int = 0\n\
              }\n\
-             -> DONE",
-            "{ cycle:\n\
-             - VAR score: int = 0\n\
-             }\n\
-             -> DONE",
-        ];
+             -> DONE"];
 
         for source in cases {
             let story = parse_story(source);
@@ -815,7 +787,7 @@ mod tests {
             assert_single_diagnostic(
                 &diagnostics,
                 DiagnosticSeverity::Error,
-                "Global VAR declarations must appear at the story top level, outside knots, stitches, functions, choices, conditionals, and sequences.",
+                "Global VAR declarations must appear at the story top level, outside knots, stitches, functions, choices, and conditionals.",
             );
         }
     }

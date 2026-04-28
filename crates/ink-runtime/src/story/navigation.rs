@@ -232,10 +232,6 @@ impl Story {
                     all_children_entered_at_start = false;
                 }
 
-                // Legacy navigation hook. Visit and turn counts are no longer
-                // persisted by the current runtime.
-                self.visit_container(&current_container, entering_at_start);
-
                 current_child_of_container = current_container.clone();
                 current_container_ancestor = current_container.get_object().get_parent();
             } else {

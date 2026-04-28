@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
     diagnostic::Diagnostic,
-    parsed::{ContentList, Flow, Object, Sequence, Story, StructDeclaration, TypeName, Weave},
+    parsed::{ContentList, Flow, Object, Story, StructDeclaration, TypeName, Weave},
 };
 
 use super::context::{StructTypeIndex, StructTypeSymbol};
@@ -274,9 +274,6 @@ fn collect_struct_declarations_in_object<'a>(
                 collect_struct_declarations_in_weave(module, branch.content(), declarations);
             }
         }
-        Object::Sequence(sequence) => {
-            collect_struct_declarations_in_sequence(module, sequence, declarations)
-        }
         Object::Weave(weave) => collect_struct_declarations_in_weave(module, weave, declarations),
         Object::AuthorWarning(_)
         | Object::Choice(_)
@@ -293,16 +290,6 @@ fn collect_struct_declarations_in_object<'a>(
         | Object::Text(_)
         | Object::TunnelOnwards(_)
         | Object::VariableAssignment(_) => {}
-    }
-}
-
-fn collect_struct_declarations_in_sequence<'a>(
-    module: Option<&'a str>,
-    sequence: &'a Sequence,
-    declarations: &mut Vec<StructDeclarationRecord<'a>>,
-) {
-    for content in sequence.elements() {
-        collect_struct_declarations_in_content_list(module, content, declarations);
     }
 }
 

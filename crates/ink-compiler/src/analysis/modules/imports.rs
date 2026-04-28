@@ -339,11 +339,6 @@ fn collect_qualified_uses_in_object(
                 collect_qualified_uses_in_objects(current_module, branch.content().content(), uses);
             }
         }
-        Object::Sequence(sequence) => {
-            for element in sequence.elements() {
-                collect_qualified_uses_in_content_list(current_module, element, uses);
-            }
-        }
         Object::Choice(choice) => {
             if let Some(condition) = choice.condition() {
                 collect_qualified_uses_in_expression(current_module, condition, uses);

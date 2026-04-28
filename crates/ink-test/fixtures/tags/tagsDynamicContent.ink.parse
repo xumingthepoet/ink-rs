@@ -3,6 +3,9 @@ Story
     Gather(name=null, depth=1)
     Divert(target="-> DONE", empty=false, tunnel=false, thread=false)
   Module(name="game")
+    Weave(baseIndent=0)
+      VariableAssignment(name="colour", global=true, temp=false, type=string)
+        String("red")
     Flow(level=Knot, name="main", function=false)
       Weave(baseIndent=0)
         Text("tag ")
@@ -11,11 +14,7 @@ Story
         ContentList
           Binary(+, Number(5), Number(3))
         ContentList
-          Sequence(type=Stopping)
-            Weave(baseIndent=0)
-              Text("red")
-            Weave(baseIndent=0)
-              Text("blue")
+          VariableReference(colour)
         Text(".jpg")
         Tag(start=false, inChoice=false)
         Text("\n")

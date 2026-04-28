@@ -185,11 +185,6 @@ fn collect_variable_declarations_in_object<'a>(
                 declarations,
             );
         }
-        Object::Sequence(sequence) => {
-            for element in sequence.elements() {
-                collect_variable_declarations_in_content_list(element, module_name, declarations);
-            }
-        }
         Object::Weave(weave) => {
             collect_variable_declarations_in_objects(weave.content(), module_name, declarations);
         }
@@ -294,11 +289,6 @@ fn collect_struct_definitions_in_object(
                 module_name,
                 definitions,
             );
-        }
-        Object::Sequence(sequence) => {
-            for element in sequence.elements() {
-                collect_struct_definitions_in_content_list(element, module_name, definitions);
-            }
         }
         Object::Weave(weave) => {
             collect_struct_definitions_in_objects(weave.content(), module_name, definitions)
@@ -420,11 +410,6 @@ fn collect_constant_values_in_object(
                 collect_constant_values_in_content_list(content, module_name, constants);
             }
             collect_constant_values_in_content_list(choice.inner_content(), module_name, constants);
-        }
-        Object::Sequence(sequence) => {
-            for element in sequence.elements() {
-                collect_constant_values_in_content_list(element, module_name, constants);
-            }
         }
         Object::Weave(weave) => {
             collect_constant_values_in_objects(weave.content(), module_name, constants)
@@ -556,11 +541,6 @@ fn collect_external_signatures_in_object(
                 module_name,
                 signatures,
             );
-        }
-        Object::Sequence(sequence) => {
-            for element in sequence.elements() {
-                collect_external_signatures_in_content_list(element, module_name, signatures);
-            }
         }
         Object::Weave(weave) => {
             collect_external_signatures_in_objects(weave.content(), module_name, signatures);

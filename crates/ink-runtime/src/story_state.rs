@@ -354,10 +354,6 @@ impl StoryState {
         self.push_to_output_stream_individual(obj);
     }
 
-    pub fn visit_count_for_container(&mut self, _container: &Rc<Container>) -> i32 {
-        0
-    }
-
     fn try_splitting_head_tail_whitespace(text: &str) -> Option<Vec<Value>> {
         let mut head_first_newline_idx = -1;
         let mut head_last_newline_idx = -1;

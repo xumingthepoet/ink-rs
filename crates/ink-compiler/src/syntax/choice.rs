@@ -64,6 +64,12 @@ pub(super) fn parse_choice(parser: &mut RuleParser<'_>) -> Option<Choice> {
 
     let segments = parse_choice_segments(&choice_body);
 
+    if let Some(diagnostic) = text::removed_sequence_diagnostic_for_inline_text(&choice_body, &span)
+    {
+        parser.diagnostic(diagnostic);
+        return None;
+    }
+
     let start_content = content_list_from_segment(segments.start, span.clone(), false, false);
 
     let mut choice = Choice::new(

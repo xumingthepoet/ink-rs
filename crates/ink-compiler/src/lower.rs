@@ -9,7 +9,6 @@ mod flow;
 mod indexes;
 mod labels;
 mod path;
-mod sequence;
 mod value;
 mod weave;
 
@@ -37,7 +36,6 @@ use expression::{lower_expression_into, lower_logic_line_into, lower_output_expr
 use flow::lower_module_flow;
 use indexes::{ConstantValues, LoweringIndexes, RuntimeLenEstimator, StructDefinitions};
 use path::{compact_path_strings_in_container, LabelIndex};
-use sequence::lower_sequence;
 use weave::{lower_choice_weave, lower_content_list_into_context};
 
 pub(crate) fn lower(story: &CheckedStory) -> StageOutput<RuntimeProgram> {
@@ -313,11 +311,6 @@ fn lower_object_into_with_context_count(
         Object::Tag(tag) => content.push(RuntimeObject::Tag {
             is_start: tag.is_start(),
         }),
-        Object::Sequence(sequence) => content.push(RuntimeObject::Container(lower_sequence(
-            sequence,
-            context,
-            &path_mode.sequence_container_path(content.len()),
-        ))),
         Object::Weave(weave) => {
             let nested_context = context.with_path_mode(path_mode.for_nested_weave(content.len()));
             content.push(RuntimeObject::Container(lower_choice_weave(
@@ -838,7 +831,7 @@ mod tests {
     }
 
     #[test]
-    fn structured_weave_context_preserves_choice_sequence_and_conditional_json() {
+    fn structured_weave_context_preserves_choice_and_conditional_json() {
         let source = concat!(
             "=== module game ===\n",
             "VAR ready: bool = true\n",
@@ -848,15 +841,12 @@ mod tests {
             "- else:\n",
             "    Not ready.\n",
             "}\n",
-            "{ cycle:\n",
-            "- one\n",
-            "- two\n",
-            "}\n",
             "* [Take]\n",
             "    Took.\n",
-            "    { cycle:\n",
-            "    - inner one\n",
-            "    - inner two\n",
+            "    { ready:\n",
+            "        Still ready.\n",
+            "    - else:\n",
+            "        Not ready.\n",
             "    }\n",
             "- (after)\n",
             "After.\n",
@@ -883,13 +873,8 @@ mod tests {
             &json,
             &json!({"->": ".^.b", "c": true})
         ));
-        assert!(json_contains_sequence(
-            &json,
-            &[json!("visit"), json!(2), json!("%")]
-        ));
         assert!(json_contains_object_key(&json, "c-0"), "{json:#}");
         assert!(json_contains_object_key(&json, "after"), "{json:#}");
-        assert!(json_contains_object_key(&json, "s0"), "{json:#}");
     }
 
     fn container_json_has_named_content(container: &Value, name: &str) -> bool {

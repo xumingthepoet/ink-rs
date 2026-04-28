@@ -1,13 +1,13 @@
 use crate::{
     diagnostic::{Diagnostic, DiagnosticCode},
-    parsed::{
-        Conditional, ConditionalBranch, ContentList, Glue, Object, Sequence, SequenceType, Tag,
-        Text, Weave,
-    },
+    parsed::{Conditional, ConditionalBranch, ContentList, Glue, Object, Tag, Text, Weave},
     source::SourceSpan,
 };
 
 use super::{rule::RuleParser, scan};
+
+pub(super) const REMOVED_SEQUENCE_MESSAGE: &str =
+    "Source sequences, cycles, shuffles, and once-only alternatives are no longer supported; use explicit variables and conditionals instead.";
 
 pub(super) fn parse_text_line(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
     let span = parser.current_span();
@@ -26,18 +26,29 @@ pub(super) fn parse_text_line(parser: &mut RuleParser<'_>) -> Option<Vec<Object>
         return None;
     }
 
+    let text_span = SourceSpan::new(
+        span.source_name.clone(),
+        span.line,
+        span.column + leading_whitespace,
+    );
+
     if let Some(char_offset) = find_unmatched_open_brace_char_offset(&text) {
         parser.diagnostic(
             Diagnostic::error(
                 SourceSpan::new(
-                    span.source_name.clone(),
-                    span.line,
-                    span.column + leading_whitespace + char_offset,
+                    text_span.source_name.clone(),
+                    text_span.line,
+                    text_span.column + char_offset,
                 ),
                 "expected closing `}` for inline expression before end of line",
             )
             .with_code(DiagnosticCode::InvalidInlineSyntax),
         );
+        return None;
+    }
+
+    if let Some(diagnostic) = removed_sequence_diagnostic_for_inline_text(&text, &text_span) {
+        parser.diagnostic(diagnostic);
         return None;
     }
 
@@ -88,6 +99,61 @@ fn find_unmatched_open_brace_char_offset(text: &str) -> Option<usize> {
         byte_offset = open_index + '{'.len_utf8() + close_index + '}'.len_utf8();
     }
     None
+}
+
+pub(super) fn removed_sequence_diagnostic_for_inline_text(
+    text: &str,
+    span: &SourceSpan,
+) -> Option<Diagnostic> {
+    let char_offset = find_removed_inline_sequence_char_offset(text)?;
+    Some(
+        Diagnostic::error(
+            SourceSpan::new(
+                span.source_name.clone(),
+                span.line,
+                span.column + char_offset,
+            ),
+            REMOVED_SEQUENCE_MESSAGE,
+        )
+        .with_code(DiagnosticCode::InvalidInlineSyntax),
+    )
+}
+
+fn find_removed_inline_sequence_char_offset(text: &str) -> Option<usize> {
+    let mut byte_offset = 0;
+    while let Some(relative_open) = text[byte_offset..].find('{') {
+        let open_index = byte_offset + relative_open;
+        if is_escaped(text, open_index) {
+            byte_offset = open_index + '{'.len_utf8();
+            continue;
+        }
+
+        let rest = &text[open_index + '{'.len_utf8()..];
+        let Some(close_index) = scan::find_matching_delimiter(rest, '{', '}') else {
+            return None;
+        };
+        let inner = &rest[..close_index];
+        if is_removed_inline_sequence(inner) {
+            return Some(text[..open_index].chars().count());
+        }
+        byte_offset = open_index + '{'.len_utf8() + close_index + '}'.len_utf8();
+    }
+
+    None
+}
+
+fn is_removed_inline_sequence(source: &str) -> bool {
+    let trimmed = source.trim();
+    if removed_sequence_type_annotation_rest(trimmed).is_some() {
+        return true;
+    }
+
+    if split_inline_conditional(source).is_some() {
+        return false;
+    }
+
+    scan::split_top_level_once_with_options(trimmed, '|', scan::ScanOptions::inline_text())
+        .is_some()
 }
 
 fn is_escaped(source: &str, byte_index: usize) -> bool {
@@ -267,14 +333,9 @@ fn parse_inline_braced_objects(
 fn parse_inline_braced_object(
     source: &str,
     span: &SourceSpan,
-    tag_state: &mut InlineTagState,
+    _tag_state: &mut InlineTagState,
 ) -> Option<Object> {
     let trimmed = source.trim();
-    if parse_sequence_type_annotation(trimmed).is_some() {
-        return Some(Object::Sequence(parse_inline_sequence(
-            trimmed, span, tag_state,
-        )?));
-    }
 
     if let Some((condition_source, branch_source)) = split_inline_conditional(source) {
         let condition = super::parse_initial_expression(condition_source.trim())?;
@@ -314,14 +375,6 @@ fn parse_inline_braced_object(
         )));
     }
 
-    if scan::split_top_level_once_with_options(trimmed, '|', scan::ScanOptions::inline_text())
-        .is_some()
-    {
-        return Some(Object::Sequence(parse_inline_sequence(
-            trimmed, span, tag_state,
-        )?));
-    }
-
     Some(Object::Expression(super::parse_initial_expression(
         trimmed,
     )?))
@@ -342,69 +395,36 @@ fn split_inline_conditional(source: &str) -> Option<(&str, &str)> {
     Some((&source[..index], &source[index + ':'.len_utf8()..]))
 }
 
-fn parse_inline_sequence(
-    source: &str,
-    span: &SourceSpan,
-    tag_state: &mut InlineTagState,
-) -> Option<Sequence> {
-    let (sequence_type, elements_source) = parse_sequence_type(source.trim_start());
-    let elements = scan::split_top_level_preserving_whitespace_with_options(
-        elements_source,
-        '|',
-        scan::ScanOptions::inline_text(),
-    )
-    .into_iter()
-    .map(|element| {
-        let objects = parse_inline_content_inner(element.trim(), span, true, false, tag_state)
-            .unwrap_or_default();
-        ContentList::new(objects)
-    })
-    .collect::<Vec<_>>();
-
-    Some(Sequence::new(sequence_type, elements))
-}
-
-pub(super) fn parse_sequence_type_annotation(source: &str) -> Option<(SequenceType, &str)> {
+pub(super) fn removed_sequence_type_annotation_rest(source: &str) -> Option<&str> {
     let source = source.trim_start();
     let first = source.chars().next()?;
 
     if matches!(first, '&' | '!' | '$' | '~') {
-        let mut sequence_type: Option<SequenceType> = None;
+        let mut saw_flag = false;
         let mut rest_start = 0;
         for (index, ch) in source.char_indices() {
-            let flag = match ch {
-                '&' => Some(SequenceType::CYCLE),
-                '!' => Some(SequenceType::ONCE),
-                '$' => Some(SequenceType::STOPPING),
-                '~' => Some(SequenceType::SHUFFLE),
-                ' ' | '\t' => None,
+            let is_flag = match ch {
+                '&' | '!' | '$' | '~' => Some(true),
+                ' ' | '\t' => Some(false),
                 _ => break,
             };
             rest_start = index + ch.len_utf8();
-            if let Some(flag) = flag {
-                sequence_type = Some(sequence_type.map_or(flag, |current| current.union(flag)));
+            if is_flag == Some(true) {
+                saw_flag = true;
             }
         }
-        return sequence_type.map(|sequence_type| (sequence_type, &source[rest_start..]));
+        return saw_flag.then_some(&source[rest_start..]);
     }
 
     let (words, rest) = source.split_once(':')?;
-    let mut sequence_type: Option<SequenceType> = None;
+    let mut saw_word = false;
     for word in words.split_whitespace() {
-        let flag = match word {
-            "stopping" => SequenceType::STOPPING,
-            "cycle" => SequenceType::CYCLE,
-            "shuffle" => SequenceType::SHUFFLE,
-            "once" => SequenceType::ONCE,
+        match word {
+            "stopping" | "cycle" | "shuffle" | "once" => saw_word = true,
             _ => return None,
-        };
-        sequence_type = Some(sequence_type.map_or(flag, |current| current.union(flag)));
+        }
     }
-    sequence_type.map(|sequence_type| (sequence_type, rest))
-}
-
-fn parse_sequence_type(source: &str) -> (SequenceType, &str) {
-    parse_sequence_type_annotation(source).unwrap_or((SequenceType::STOPPING, source))
+    saw_word.then_some(rest)
 }
 
 fn normalize_divert_separator_whitespace(text: &str) -> String {
@@ -460,5 +480,19 @@ mod tests {
         };
 
         assert!(matches!(content.objects(), [Object::Conditional(_)]));
+    }
+
+    #[test]
+    fn removed_inline_sequence_reports_specific_error_span() {
+        let diagnostic = removed_sequence_diagnostic_for_inline_text(
+            "Line {one|two}",
+            &SourceSpan::new(Some("sequence.ink".to_string()), 4, 3),
+        )
+        .expect("expected removed sequence diagnostic");
+
+        assert_eq!(diagnostic.code, Some(DiagnosticCode::InvalidInlineSyntax));
+        assert_eq!(diagnostic.line, 4);
+        assert_eq!(diagnostic.column, 8);
+        assert_eq!(diagnostic.message, REMOVED_SEQUENCE_MESSAGE);
     }
 }

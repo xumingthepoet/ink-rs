@@ -11,7 +11,6 @@ mod logic;
 mod module;
 mod rule;
 mod scan;
-mod sequence;
 mod state;
 mod structure;
 mod text;

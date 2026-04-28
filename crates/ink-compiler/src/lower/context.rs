@@ -305,46 +305,6 @@ impl ChoicePathMode {
         }
     }
 
-    pub(super) fn for_sequence_branch(
-        &self,
-        sequence_container_path: &str,
-        branch_name: &str,
-    ) -> Self {
-        let container_path = format!("{sequence_container_path}.{branch_name}");
-        match self {
-            ChoicePathMode::Root
-            | ChoicePathMode::Module { .. }
-            | ChoicePathMode::RootGather { .. } => ChoicePathMode::NestedRoot {
-                container_path,
-                gather_target: "0.g-0".to_string(),
-                allow_ancestor_fallback: false,
-            },
-            ChoicePathMode::NestedRoot { gather_target, .. } => ChoicePathMode::NestedRoot {
-                container_path,
-                gather_target: gather_target.clone(),
-                allow_ancestor_fallback: false,
-            },
-            ChoicePathMode::Flow {
-                module_name,
-                flow_name,
-                parent_flow_name,
-                sibling_stitch_names,
-                local_variables,
-                self_target_relative,
-                ..
-            } => ChoicePathMode::Flow {
-                module_name: module_name.clone(),
-                flow_name: flow_name.clone(),
-                container_path,
-                parent_flow_name: parent_flow_name.clone(),
-                sibling_stitch_names: sibling_stitch_names.clone(),
-                local_variables: local_variables.clone(),
-                self_target_relative: *self_target_relative,
-                fallback_gather_target: None,
-            },
-        }
-    }
-
     pub(super) fn fallback_gather_target(&self) -> Option<String> {
         match self {
             ChoicePathMode::NestedRoot {
@@ -416,10 +376,6 @@ impl ChoicePathMode {
             ChoicePathMode::NestedRoot { container_path, .. }
             | ChoicePathMode::Flow { container_path, .. } => format!("{container_path}.{index}"),
         }
-    }
-
-    pub(super) fn sequence_container_path(&self, content_index: usize) -> String {
-        self.runtime_index_path(content_index)
     }
 
     pub(super) fn absolute_child_path(&self, child: &str) -> String {

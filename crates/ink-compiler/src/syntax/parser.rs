@@ -13,7 +13,7 @@ use super::weave::group_weave_content;
 use super::{
     author_warning_statement, choice_statement, declaration, divert_statement, gather, import,
     is_choice_continuation_boundary, knot, leading_whitespace_count, logic, module,
-    parse_choice_from_line, structure, text_statement, variable,
+    parse_choice_from_line, structure, text, text_statement, variable,
 };
 
 type StatementRuleFn = for<'source> fn(&mut RuleParser<'source>) -> Option<Vec<Object>>;
@@ -577,7 +577,7 @@ impl Parser {
         }
 
         if let Some(parsed) = self.parse_multiline_rule(index, |parser, index| {
-            parser.parse_multiline_sequence(lines, index)
+            parser.reject_removed_multiline_sequence(lines, index)
         }) {
             return Some(parsed);
         }
@@ -654,6 +654,36 @@ impl Parser {
         *index = next_index;
         Some(vec![Object::Choice(combined_choice)])
     }
+
+    fn reject_removed_multiline_sequence(
+        &mut self,
+        lines: &[SourceLine],
+        index: &mut usize,
+    ) -> Option<Vec<Object>> {
+        let line = &lines[*index];
+        let trimmed = line.text.trim();
+        let after_open = trimmed.strip_prefix('{')?.trim();
+        let rest = text::removed_sequence_type_annotation_rest(after_open)?;
+        if !rest.trim().is_empty() {
+            return None;
+        }
+
+        self.diagnostics.push(
+            Diagnostic::error(line.span.clone(), text::REMOVED_SEQUENCE_MESSAGE)
+                .with_code(crate::diagnostic::DiagnosticCode::InvalidInlineSyntax),
+        );
+
+        *index += 1;
+        while *index < lines.len() {
+            let current_trimmed = lines[*index].text.trim();
+            *index += 1;
+            if current_trimmed.starts_with('}') {
+                break;
+            }
+        }
+
+        Some(Vec::new())
+    }
 }
 
 pub(super) fn is_global_var_declaration_line(trimmed: &str) -> bool {
@@ -666,7 +696,7 @@ pub(super) fn is_global_var_declaration_line(trimmed: &str) -> bool {
 pub(super) fn nested_global_var_declaration_diagnostic(line: &SourceLine) -> Diagnostic {
     Diagnostic::error(
         line.span.clone(),
-        "Global VAR declarations must appear at the story top level, outside knots, stitches, functions, choices, conditionals, and sequences.",
+        "Global VAR declarations must appear at the story top level, outside knots, stitches, functions, choices, and conditionals.",
     )
 }
 
@@ -1130,7 +1160,7 @@ mod tests {
             );
             assert_eq!(
                 output.diagnostics[0].message,
-                "Global VAR declarations must appear at the story top level, outside knots, stitches, functions, choices, conditionals, and sequences."
+                "Global VAR declarations must appear at the story top level, outside knots, stitches, functions, choices, and conditionals."
             );
         }
     }

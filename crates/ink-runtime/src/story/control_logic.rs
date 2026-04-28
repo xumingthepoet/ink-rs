@@ -315,11 +315,11 @@ impl Story {
                     };
                     let either_count: i32;
                     match container {
-                        Some(container) => {
+                        Some(_) => {
                             either_count = if eval_command.command_type == CommandType::TurnsSince {
                                 -1
                             } else {
-                                self.get_state_mut().visit_count_for_container(&container)
+                                0
                             };
                         }
                         None => {
@@ -410,9 +410,9 @@ impl Story {
                         .push_evaluation_stack(Rc::new(Void::new()));
                 }
                 CommandType::VisitIndex => {
-                    let cpc = self.get_state().get_current_pointer().container.unwrap();
-                    let count = self.get_state_mut().visit_count_for_container(&cpc) - 1; // index
-                                                                                          // not count
+                    // Legacy compiled-story fallback. Source sequences are
+                    // removed and the runtime no longer tracks visits.
+                    let count = -1;
                     self.get_state_mut()
                         .push_evaluation_stack(Rc::new(Value::new::<i32>(count)));
                 }
@@ -545,11 +545,7 @@ impl Story {
         {
             let found_value: Rc<Value>; // Explicit read count value
             if var_ref.path_for_count.is_some() {
-                let container = var_ref.get_container_for_count();
-                let count = self
-                    .get_state_mut()
-                    .visit_count_for_container(container.as_ref().unwrap());
-                found_value = Rc::new(Value::new::<i32>(count));
+                found_value = Rc::new(Value::new::<i32>(0));
             }
             // Normal variable reference
             else {

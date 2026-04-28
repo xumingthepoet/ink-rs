@@ -301,7 +301,6 @@ fn object_display(object: &Object) -> String {
         Object::IncDec(_) => "IncDec".to_string(),
         Object::Choice(_) => "Choice".to_string(),
         Object::Gather(_) => "Gather".to_string(),
-        Object::Sequence(_) => "Sequence".to_string(),
         Object::StructDeclaration(declaration) => declaration.name().to_string(),
         Object::TunnelOnwards(_) => "TunnelOnwards".to_string(),
         Object::ConstantDeclaration(declaration) => declaration.name().to_string(),

@@ -759,7 +759,6 @@ impl ParsedVisitor for CallTargetChecker<'_> {
             | Object::ExternalDeclaration(_)
             | Object::Gather(_)
             | Object::Glue(_)
-            | Object::Sequence(_)
             | Object::StructDeclaration(_)
             | Object::Tag(_)
             | Object::Text(_)

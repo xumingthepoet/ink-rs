@@ -350,9 +350,6 @@ impl Story {
         };
 
         while let Some(cte) = container_to_enter.as_ref() {
-            // Mark container as being entered
-            self.visit_container(cte, true);
-
             // No content? the most we can do is step past it
             if cte.content.is_empty() {
                 break;
@@ -655,10 +652,6 @@ impl Story {
         // potential
         // for glue to kill the newline.
         OutputStateChange::NoChange
-    }
-
-    pub(crate) fn visit_container(&mut self, container: &Rc<Container>, at_start: bool) {
-        let _ = (container, at_start);
     }
 
     /// The vector of [`Choice`](crate::choice::Choice) objects available at

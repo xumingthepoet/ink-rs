@@ -1,6 +1,6 @@
 use super::{
-    Choice, Conditional, ContentList, Expression, Flow, ImportDeclaration, Module, Object,
-    Sequence, Story, Weave,
+    Choice, Conditional, ContentList, Expression, Flow, ImportDeclaration, Module, Object, Story,
+    Weave,
 };
 
 pub(crate) trait ParsedVisitor {
@@ -150,7 +150,6 @@ where
                 walk_expression(argument, visitor, context);
             }
         }
-        Object::Sequence(sequence) => walk_sequence(sequence, visitor, context),
         Object::Return(ret) => {
             if let Some(expression) = ret.returned_expression() {
                 walk_expression(expression, visitor, context);
@@ -203,15 +202,6 @@ where
             walk_expression(condition, visitor, context);
         }
         walk_weave(branch.content(), visitor, context);
-    }
-}
-
-fn walk_sequence<V>(sequence: &Sequence, visitor: &mut V, context: &VisitContext)
-where
-    V: ParsedVisitor + ?Sized,
-{
-    for element in sequence.elements() {
-        walk_content_list(element, visitor, context);
     }
 }
 
@@ -271,8 +261,7 @@ where
 mod tests {
     use crate::{
         parsed::{
-            BinaryOperator, ConditionalBranch, FlowLevel, FlowParts, Gather, SequenceType, Text,
-            UnaryOperator,
+            BinaryOperator, ConditionalBranch, FlowLevel, FlowParts, Gather, Text, UnaryOperator,
         },
         source::SourceSpan,
     };
@@ -350,7 +339,6 @@ mod tests {
                 Object::Choice(_) => "choice",
                 Object::Conditional(_) => "conditional",
                 Object::Gather(_) => "gather",
-                Object::Sequence(_) => "sequence",
                 Object::Weave(_) => "weave",
                 Object::Expression(_) => "expression",
                 Object::Text(_) => "text",
@@ -382,15 +370,6 @@ mod tests {
             vec![
                 Object::Choice(choice_with_all_content()),
                 Object::Conditional(conditional_with_branch_content()),
-                Object::Sequence(Sequence::new(
-                    SequenceType::CYCLE,
-                    vec![ContentList::new(vec![Object::Expression(
-                        Expression::FunctionCall {
-                            name: "seen_in_sequence".to_string(),
-                            args: vec![Expression::NumberInt(1)],
-                        },
-                    )])],
-                )),
                 Object::Expression(Expression::StringContent(ContentList::new(vec![
                     Object::Expression(Expression::Unary {
                         operator: UnaryOperator::Not,
@@ -471,11 +450,11 @@ mod tests {
             "root, conditional branch, nested object weave, knot, and stitch weaves should be visited"
         );
         assert!(
-            visitor.content_list_count >= 4,
-            "choice content, sequence elements, and string expression content should be visited"
+            visitor.content_list_count >= 3,
+            "choice content and string expression content should be visited"
         );
 
-        for expected in ["choice", "conditional", "gather", "sequence", "weave"] {
+        for expected in ["choice", "conditional", "gather", "weave"] {
             assert!(
                 visitor.objects.contains(&expected),
                 "missing visited object kind: {expected}"

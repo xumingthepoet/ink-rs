@@ -100,11 +100,12 @@ instructions, merge it into another note, or delete it.
   Content after gathers stays in that gather, and named metadata remains the
   container tail.
 
-- [N005] [created:2026-04-24] [helps:7] [hurts:0]
-  [last_helped:unknown] [last_hurt:never] [scope:braced-content/parser]
-  Braced inline or multiline content is not always a sequence. Try sequence
-  annotations, then `condition: content` conditionals, then expression/default
-  sequences. Multiline suffix content after `}` must still be parsed.
+- [N005] [created:2026-04-24] [helps:7] [hurts:1]
+  [last_helped:unknown] [last_hurt:2026-04-29] [scope:braced-content/parser]
+  Source sequences are removed. Braced inline or multiline content should parse
+  conditionals and expressions, but top-level source alternatives such as
+  `{one|two}`, `{~one|two}`, or `{ cycle: ... }` must emit the removed-feature
+  diagnostic instead of creating parsed sequence nodes.
 
 - [N006] [created:2026-04-25] [helps:15] [hurts:0]
   [last_helped:unknown] [last_hurt:never] [scope:diagnostics/constants/diverts]
