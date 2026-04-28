@@ -98,7 +98,7 @@ fn choose(story: &mut Story, index: usize) -> String {
 }
 
 fn inkling_fixture(filename: &str) -> String {
-    ink_test::load_fixture_text(&format!("inkling_examples/{filename}"))
+    ink_test::load_fixture_text(&format!("language/inkling_examples/{filename}"))
 }
 
 // The tests below are ports of scenarios from pjohansson/inkling's `tests/`

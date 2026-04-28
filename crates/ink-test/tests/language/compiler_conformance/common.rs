@@ -70,7 +70,10 @@ fn assert_json_matches_fixture_with_options(filename: &str, options: CompilerOpt
 }
 
 fn get_fixture_text(filename: &str) -> String {
-    let path = ink_test::fixture_root().join("conformance").join(filename);
+    let path = ink_test::fixture_root()
+        .join("language")
+        .join("conformance")
+        .join(filename);
     let text = fs::read_to_string(&path)
         .unwrap_or_else(|error| panic!("failed to read fixture {}: {error}", path.display()));
     strip_utf8_bom(text)

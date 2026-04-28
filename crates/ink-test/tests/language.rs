@@ -7,6 +7,17 @@ use ink_runtime::{
 };
 use serde_json::{json, Value};
 
+#[path = "language/compiler_api.rs"]
+mod compiler_api;
+#[path = "language/compiler_conformance/mod.rs"]
+mod compiler_conformance;
+#[path = "language/conformance/mod.rs"]
+mod conformance;
+#[path = "language/csharp_compatibility.rs"]
+mod csharp_compatibility;
+#[path = "language/inkling_examples.rs"]
+mod inkling_examples;
+
 fn language_fixture_text(filename: &str) -> String {
     ink_test::load_fixture_text(&format!("language/{filename}"))
 }
@@ -400,16 +411,7 @@ fn choice_conditions_still_control_visibility() {
 
 #[test]
 fn choice_condition_colon_boundary_allows_dynamic_choice_text() {
-    let compiled = compile_language_source(
-        "choice-condition-colon-boundary.ink",
-        concat!(
-            "VAR enabled: bool = true\n",
-            "VAR label: string = \"Open path\"\n",
-            "* {enabled}: {label}\n",
-            "    Done.\n",
-            "    -> DONE",
-        ),
-    );
+    let compiled = compile_language_fixture("choices/choice-condition-colon-boundary.ink");
     let mut story = Story::new(&compiled.json).expect("compiled JSON should load");
 
     assert_eq!(story.continue_maximally().unwrap(), "");
@@ -610,36 +612,7 @@ fn typed_constants_support_struct_and_array_values() {
 
 #[test]
 fn multiline_var_and_const_composite_literals_run_at_runtime() {
-    let compiled = compile_language_source(
-        "multiline-composite-literals.ink",
-        concat!(
-            "=== module game ===\n",
-            "STRUCT Stats {\n",
-            "hp: int\n",
-            "ready: bool\n",
-            "}\n",
-            "STRUCT Player {\n",
-            "name: string\n",
-            "stats: Stats\n",
-            "tags: string[]\n",
-            "}\n",
-            "VAR party: Player[] = [\n",
-            "{ name: \"Ada\", stats: { hp: 10, ready: true }, tags: [\"scout\"] },\n",
-            "{ name: \"Bea\", stats: { hp: 8 }, tags: [] }\n",
-            "]\n",
-            "CONST fallback: Stats = {\n",
-            "hp: 3,\n",
-            "ready: true\n",
-            "}\n",
-            "CONST backups: Stats[] = [\n",
-            "{ hp: 1 },\n",
-            "{ hp: 2, ready: true }\n",
-            "]\n",
-            "== main ==\n",
-            "{party[0].name}|{party[1].stats.hp}|{fallback.ready}|{backups[1].hp}|{LEN(party)}\n",
-            "-> DONE",
-        ),
-    );
+    let compiled = compile_language_fixture("typed/multiline-composite-literals.ink");
 
     assert_story_output(&compiled, "Ada|8|true|2|2\n");
 }
@@ -925,18 +898,8 @@ fn untyped_temp_declaration_reports_missing_type() {
 
 #[test]
 fn multiline_temp_initializer_remains_single_line_syntax() {
-    let diagnostics = diagnostics_for_language_source(
-        "multiline-temp-initializer.ink",
-        concat!(
-            "=== module game ===\n",
-            "== main ==\n",
-            "~ temp values: int[] = [\n",
-            "1,\n",
-            "2\n",
-            "]\n",
-            "-> DONE",
-        ),
-    );
+    let diagnostics =
+        diagnostics_for_language_fixture("diagnostics/multiline-temp-initializer.ink");
 
     assert_diagnostic(
         &diagnostics,

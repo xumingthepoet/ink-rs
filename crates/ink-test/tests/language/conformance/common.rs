@@ -75,6 +75,9 @@ pub fn run_story(
 }
 
 pub fn get_json_string(filename: &str) -> String {
-    let path = ink_test::fixture_root().join("conformance").join(filename);
+    let path = ink_test::fixture_root()
+        .join("language")
+        .join("conformance")
+        .join(filename);
     fs::read_to_string(path).expect("fixture json must exist")
 }

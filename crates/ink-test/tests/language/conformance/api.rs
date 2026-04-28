@@ -6,8 +6,6 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-#[cfg(feature = "csharp-tests")]
-use ink_runtime::story::errors::ErrorHandler as RuntimeErrorHandler;
 use ink_runtime::{
     choice::Choice, story::external_functions::ExternalFunction as RuntimeExternalFunction,
     story::variable_observer::VariableObserver as RuntimeVariableObserver,
@@ -68,7 +66,6 @@ impl FromValueType for String {
 }
 
 impl ValueType {
-    #[cfg(not(feature = "csharp-tests"))]
     pub fn new<T: Into<ValueType>>(value: T) -> Self {
         value.into()
     }
@@ -208,7 +205,6 @@ impl Story {
         }
     }
 
-    #[cfg(not(feature = "csharp-tests"))]
     pub fn can_continue(&self) -> bool {
         self.inner.can_continue()
     }
@@ -261,21 +257,8 @@ impl Story {
             .expect("expected current tags to load")
     }
 
-    #[cfg(not(feature = "csharp-tests"))]
     pub fn get_current_errors(&self) -> Vec<String> {
         self.inner.get_current_errors().clone()
-    }
-
-    #[cfg(feature = "csharp-tests")]
-    pub fn get_current_warnings(&self) -> Vec<String> {
-        self.inner.get_current_warnings().clone()
-    }
-
-    #[cfg(feature = "csharp-tests")]
-    pub fn get_current_text(&mut self) -> String {
-        self.inner
-            .get_current_text()
-            .expect("expected current text")
     }
 
     pub fn get_global_tags(&self) -> Vec<String> {
@@ -290,7 +273,6 @@ impl Story {
             .expect("expected tags to load for path")
     }
 
-    #[cfg(not(feature = "csharp-tests"))]
     pub fn get_variable(&self, name: &str) -> Option<ValueType> {
         self.inner
             .get_variable(name)
@@ -301,11 +283,6 @@ impl Story {
         self.inner
             .set_variable(name, &value.clone().into_runtime_value())
             .map_err(StoryError::from)
-    }
-
-    #[cfg(feature = "csharp-tests")]
-    pub fn set_error_handler(&mut self, err_handler: Rc<RefCell<dyn RuntimeErrorHandler>>) {
-        self.inner.set_error_handler(err_handler);
     }
 
     pub fn bind_external_function(
@@ -341,25 +318,7 @@ impl Story {
         self.inner.load_state(json).expect("expected state to load")
     }
 
-    #[cfg(not(feature = "csharp-tests"))]
     pub fn build_string_of_hierarchy(&self) -> String {
         self.inner.build_string_of_hierarchy()
-    }
-
-    #[cfg(feature = "csharp-tests")]
-    pub fn reset_state(&mut self) {
-        self.inner.reset_state().expect("expected state to reset")
-    }
-
-    #[cfg(feature = "csharp-tests")]
-    pub fn unbind_external_function(&mut self, func_name: &str) {
-        self.inner
-            .unbind_external_function(func_name)
-            .expect("expected external function to unbind")
-    }
-
-    #[cfg(feature = "csharp-tests")]
-    pub fn get_has_warning(&self) -> bool {
-        !self.get_current_warnings().is_empty()
     }
 }

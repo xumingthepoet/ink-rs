@@ -225,7 +225,7 @@ fn public_diagnostics_expose_codes() {
 }
 
 fn compiler_api_fixture(filename: &str) -> String {
-    ink_test::load_fixture_text(&format!("compiler_api/{filename}"))
+    ink_test::load_fixture_text(&format!("language/compiler_api/{filename}"))
 }
 
 fn named_fixture(fixture_filename: &str, source_filename: &str) -> SourceInput {

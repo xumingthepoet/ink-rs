@@ -10,10 +10,7 @@ check:
 
 test:
 	$(TIMEOUT) 30s cargo test --workspace --exclude ink-test
-	$(TIMEOUT) 30s cargo test -p ink-test --test conformance
-	$(TIMEOUT) 30s cargo test -p ink-test --test compiler_conformance
+	$(TIMEOUT) 30s cargo test -p ink-test --test integration_policy
 	$(TIMEOUT) 30s cargo test -p ink-test --test language
-	$(TIMEOUT) 30s cargo test -p ink-test --test inkling_examples
-	$(TIMEOUT) 30s cargo test -p ink-test --features csharp-tests --test csharp_tests
 
 gate: fmt check test
