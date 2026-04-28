@@ -303,33 +303,9 @@ impl Story {
             .map_err(StoryError::from)
     }
 
-    pub fn set_allow_external_function_fallbacks(&mut self, value: bool) {
-        self.inner.set_allow_external_function_fallbacks(value);
-    }
-
     #[cfg(feature = "csharp-tests")]
     pub fn set_error_handler(&mut self, err_handler: Rc<RefCell<dyn RuntimeErrorHandler>>) {
         self.inner.set_error_handler(err_handler);
-    }
-
-    pub fn evaluate_function(
-        &mut self,
-        function_name: &str,
-        arguments: Option<Vec<ValueType>>,
-        text_output: &mut String,
-    ) -> Option<ValueType> {
-        let runtime_args = arguments.map(|values| {
-            values
-                .into_iter()
-                .map(ValueType::into_runtime_value)
-                .collect::<Vec<_>>()
-        });
-
-        self.inner
-            .evaluate_function(function_name, runtime_args.as_ref(), text_output)
-            .ok()
-            .flatten()
-            .map(ValueType::from_runtime_value)
     }
 
     pub fn bind_external_function(

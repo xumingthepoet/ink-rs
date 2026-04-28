@@ -1,40 +1,43 @@
 Story
   Weave(baseIndent=0)
-    Text("Start")
-    Text("\n")
-    Divert(target="-> tunnel", empty=false, tunnel=true, thread=false)
-    Text("End")
-    Text("\n")
-    Divert(target="-> END", empty=false, tunnel=false, thread=false)
     Gather(name=null, depth=1)
     Divert(target="-> DONE", empty=false, tunnel=false, thread=false)
-  Flow(level=Knot, name="tunnel", function=false)
-    Weave(baseIndent=0)
-      Text("In tunnel.")
-      Text("\n")
-      TunnelOnwards
-  Flow(level=Knot, name="function_to_evaluate", function=true)
-    Weave(baseIndent=0)
-      ContentList
-        Conditional
-          FunctionCall(zero_equals_, args=1)
-          ConditionalBranch(true=true, else=false, inline=false)
-            Weave(baseIndent=0)
-              Return
-                String("WRONG")
-          ConditionalBranch(true=false, else=true, inline=false)
-            Weave(baseIndent=0)
-              Return
-                String("RIGHT")
-      Text("\n")
-  Flow(level=Knot, name="zero_equals_", function=true)
-    Weave(baseIndent=0)
-      ContentList
-        FunctionCall(do_nothing, args=1)
+  Module(name="game")
+    Flow(level=Knot, name="main", function=false)
+      Weave(baseIndent=0)
+        Text("Start")
         Text("\n")
-      Return
-        Binary(==, Number(0), VariableReference(k))
-  Flow(level=Knot, name="do_nothing", function=true)
-    Weave(baseIndent=0)
-      Return
-        Number(0)
+        Divert(target="-> tunnel", empty=false, tunnel=true, thread=false)
+        Text("End")
+        Text("\n")
+        Divert(target="-> END", empty=false, tunnel=false, thread=false)
+    Flow(level=Knot, name="tunnel", function=false)
+      Weave(baseIndent=0)
+        Text("In tunnel.")
+        Text("\n")
+        TunnelOnwards
+    Flow(level=Knot, name="function_to_evaluate", function=true)
+      Weave(baseIndent=0)
+        ContentList
+          Conditional
+            FunctionCall(zero_equals_, args=1)
+            ConditionalBranch(true=true, else=false, inline=false)
+              Weave(baseIndent=0)
+                Return
+                  String("WRONG")
+            ConditionalBranch(true=false, else=true, inline=false)
+              Weave(baseIndent=0)
+                Return
+                  String("RIGHT")
+        Text("\n")
+    Flow(level=Knot, name="zero_equals_", function=true)
+      Weave(baseIndent=0)
+        ContentList
+          FunctionCall(do_nothing, args=1)
+          Text("\n")
+        Return
+          Binary(==, Number(0), VariableReference(k))
+    Flow(level=Knot, name="do_nothing", function=true)
+      Weave(baseIndent=0)
+        Return
+          Number(0)

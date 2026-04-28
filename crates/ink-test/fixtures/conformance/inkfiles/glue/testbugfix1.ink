@@ -1,8 +1,13 @@
+=== module game ===
+
+== main ==
 A
 {f():X}
 C
 
-=== function f() => bool
-{ true: 
+-> END
+
+== function f() => bool ==
+{ true:
     ~ return false
 }

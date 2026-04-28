@@ -1,15 +1,18 @@
+=== module game ===
 VAR x: int = 0
 
+== main ==
 -> one
 
-=== one ===
+
+== one ==
 { x < 4:
  -> two.s2
 - else:
  -> two
 }
 
-=== two ===
+== two ==
 -> END
 
 = s2

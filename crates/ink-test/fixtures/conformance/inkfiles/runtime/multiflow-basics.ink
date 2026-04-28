@@ -1,9 +1,14 @@
-=== knot1
+=== module game ===
+
+== main ==
+-> knot1
+
+== knot1 ==
 knot 1 line 1
 knot 1 line 2
--> END 
+-> END
 
-=== knot2
+== knot2 ==
 knot 2 line 1
 knot 2 line 2
--> END 
+-> END

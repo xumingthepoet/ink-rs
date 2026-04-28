@@ -1,9 +1,11 @@
+=== module game ===
+VAR x: string = ""
+
+== main ==
 // Issue reported here: original upstream issue 15
 // The correct output has to be:
 // This is a test
 // X is set
-
-VAR x: string = ""
 
 This is a test
 SET_X:
