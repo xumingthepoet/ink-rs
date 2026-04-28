@@ -101,7 +101,6 @@ pub(super) fn lower_sequence(
                     let lowered_branch = lower_choice_weave_with_initial_content(
                         &element_weave,
                         &branch_context,
-                        false,
                         branch_content,
                     );
                     branch_content = lowered_branch.content;

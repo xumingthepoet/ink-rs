@@ -16,16 +16,14 @@ pub(super) fn lower_module_flow(
     module_name: &str,
     flow: &Flow,
     indexes: &LoweringIndexes<'_>,
-    count_all_visits: bool,
 ) -> Container {
-    lower_flow_in_module(Some(module_name), flow, indexes, count_all_visits)
+    lower_flow_in_module(Some(module_name), flow, indexes)
 }
 
 fn lower_flow_in_module(
     module_name: Option<&str>,
     flow: &Flow,
     indexes: &LoweringIndexes<'_>,
-    count_all_visits: bool,
 ) -> Container {
     let child_stitch_names: Vec<String> = flow
         .child_flows()
@@ -37,7 +35,6 @@ fn lower_flow_in_module(
         parent_knot_name: None,
         sibling_stitch_names: &child_stitch_names,
         indexes,
-        count_all_visits,
     };
     lower_flow_with_context(flow, &context)
 }
@@ -47,7 +44,6 @@ struct FlowLoweringContext<'a, 'idx> {
     parent_knot_name: Option<&'a str>,
     sibling_stitch_names: &'a [String],
     indexes: &'a LoweringIndexes<'idx>,
-    count_all_visits: bool,
 }
 
 fn lower_flow_with_context(flow: &Flow, context: &FlowLoweringContext<'_, '_>) -> Container {
@@ -102,7 +98,6 @@ fn lower_flow_with_context(flow: &Flow, context: &FlowLoweringContext<'_, '_>) -
         content.push(RuntimeObject::Container(lower_choice_weave(
             flow.weave(),
             &lowering_context,
-            context.count_all_visits,
         )));
     } else if !flow.weave().content().is_empty() {
         let path_mode = ChoicePathMode::Flow {
@@ -152,7 +147,6 @@ fn lower_flow_with_context(flow: &Flow, context: &FlowLoweringContext<'_, '_>) -
                     parent_knot_name: Some(flow.name()),
                     sibling_stitch_names: &child_stitch_names,
                     indexes: context.indexes,
-                    count_all_visits: context.count_all_visits,
                 };
                 named_container(lower_flow_with_context(child, &child_context))
             })
@@ -162,7 +156,7 @@ fn lower_flow_with_context(flow: &Flow, context: &FlowLoweringContext<'_, '_>) -
             content,
             named_content: child_containers,
             name: Some(flow.name().to_string()),
-            flags: flow_container_flags(context.count_all_visits),
+            flags: None,
         };
     }
 
@@ -170,12 +164,8 @@ fn lower_flow_with_context(flow: &Flow, context: &FlowLoweringContext<'_, '_>) -
         content,
         named_content: Vec::new(),
         name: Some(flow.name().to_string()),
-        flags: flow_container_flags(context.count_all_visits),
+        flags: None,
     }
-}
-
-fn flow_container_flags(count_visits: bool) -> Option<i32> {
-    count_visits.then_some(1)
 }
 
 fn lower_flow_arguments_into(content: &mut Vec<RuntimeObject>, flow: &Flow) {

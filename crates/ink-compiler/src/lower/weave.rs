@@ -38,16 +38,8 @@ impl GatherLocation {
     }
 }
 
-fn named_container_flags(count_visits: bool, force_named_flag: bool) -> Option<i32> {
-    let mut flags = 0;
-    if count_visits {
-        flags |= 1;
-    }
-    if force_named_flag || count_visits {
-        flags |= 4;
-    }
-
-    (flags != 0).then_some(flags)
+fn named_container_flags(force_named_flag: bool) -> Option<i32> {
+    force_named_flag.then_some(4)
 }
 
 pub(super) fn weave_has_choice(weave: &Weave) -> bool {
@@ -83,18 +75,13 @@ pub(super) fn lower_linear_weave_into_context(
     }
 }
 
-pub(super) fn lower_choice_weave(
-    weave: &Weave,
-    context: &LoweringContext<'_>,
-    count_all_visits: bool,
-) -> Container {
-    lower_choice_weave_with_initial_content(weave, context, count_all_visits, Vec::new())
+pub(super) fn lower_choice_weave(weave: &Weave, context: &LoweringContext<'_>) -> Container {
+    lower_choice_weave_with_initial_content(weave, context, Vec::new())
 }
 
 pub(super) fn lower_choice_weave_with_initial_content(
     weave: &Weave,
     context: &LoweringContext<'_>,
-    count_all_visits: bool,
     initial_content: Vec<RuntimeObject>,
 ) -> Container {
     let mut main_content = initial_content;
@@ -142,7 +129,6 @@ pub(super) fn lower_choice_weave_with_initial_content(
                     path_mode: &current_path_mode,
                     weave_path_mode: &path_mode,
                     has_explicit_gather,
-                    count_all_visits,
                 };
                 last_section_had_choice =
                     lower_weave_section(objects, &mut index, &mut main_content, &mut section);
@@ -184,7 +170,6 @@ pub(super) fn lower_choice_weave_with_initial_content(
                     path_mode: &gather_path_mode,
                     weave_path_mode: &path_mode,
                     has_explicit_gather,
-                    count_all_visits,
                 };
                 let gather_has_choice =
                     lower_weave_section(objects, &mut index, &mut gather_content, &mut section);
@@ -201,10 +186,7 @@ pub(super) fn lower_choice_weave_with_initial_content(
                     content: gather_content,
                     named_content: gather_named_content,
                     name: Some(gather_name),
-                    flags: named_container_flags(
-                        count_all_visits || gather.identifier().is_some(),
-                        gather.identifier().is_some(),
-                    ),
+                    flags: named_container_flags(gather.identifier().is_some()),
                 };
                 if auto_enter_gather {
                     if let Some(location) = last_gather_location.clone() {
@@ -244,7 +226,6 @@ pub(super) fn lower_choice_weave_with_initial_content(
                     path_mode: &current_path_mode,
                     weave_path_mode: &path_mode,
                     has_explicit_gather,
-                    count_all_visits,
                 };
                 last_section_had_choice =
                     lower_weave_section(objects, &mut index, &mut main_content, &mut section);
@@ -259,10 +240,9 @@ pub(super) fn lower_choice_weave_with_initial_content(
             {
                 container
                     .content
-                    .push(RuntimeObject::Container(done_container(
-                        &format!("g-{gather_count}"),
-                        count_all_visits,
-                    )));
+                    .push(RuntimeObject::Container(done_container(&format!(
+                        "g-{gather_count}"
+                    ))));
             }
         }
     } else if !path_mode.is_nested_root()
@@ -270,10 +250,9 @@ pub(super) fn lower_choice_weave_with_initial_content(
         && needs_terminal_gather
         && path_mode.fallback_gather_target().is_none()
     {
-        named_content.push(named_container(done_container(
-            &format!("g-{gather_count}"),
-            count_all_visits,
-        )));
+        named_content.push(named_container(done_container(&format!(
+            "g-{gather_count}"
+        ))));
     }
 
     Container {
@@ -315,12 +294,7 @@ fn lower_weave_section(
                 let object_context = section
                     .context
                     .scoped((*section.path_mode).clone(), section.choice_labels);
-                lower_object_into_with_context_count(
-                    content,
-                    &objects[*index],
-                    &object_context,
-                    section.count_all_visits,
-                );
+                lower_object_into_with_context_count(content, &objects[*index], &object_context);
                 *index += 1;
             }
             Object::Choice(_) => {
@@ -342,7 +316,6 @@ struct WeaveSectionLowering<'a, 'ctx> {
     path_mode: &'a ChoicePathMode,
     weave_path_mode: &'a ChoicePathMode,
     has_explicit_gather: bool,
-    count_all_visits: bool,
 }
 
 fn section_contains_choice(objects: &[Object], start: usize, end: usize) -> bool {
@@ -465,7 +438,6 @@ fn lower_choice_in_section(
             &mut choice_content,
             &objects[*index],
             &nested_context,
-            section.count_all_visits,
         );
         *index += 1;
     }
@@ -491,7 +463,7 @@ fn lower_choice_in_section(
         .push(named_container(Container::named_with_flags(
             choice_container_name,
             choice_content,
-            named_container_flags(section.count_all_visits, false),
+            named_container_flags(false),
         )));
     if let Some(identifier) = choice.identifier() {
         section.choice_labels.insert(

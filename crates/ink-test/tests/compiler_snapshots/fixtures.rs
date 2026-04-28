@@ -9,15 +9,6 @@ macro_rules! fixture {
     };
 }
 
-macro_rules! fixture_count_all_visits {
-    ($name:ident, $path:literal) => {
-        #[test]
-        fn $name() {
-            common::assert_parse_and_json_match_count_all_visits_fixture($path);
-        }
-    };
-}
-
 fixture!(text_oneline, "text/oneline.ink");
 fixture!(text_twolines, "text/twolines.ink");
 fixture!(knot_multi_line, "knots/multi-line.ink");
@@ -41,12 +32,12 @@ fixture!(variable_varcalc, "variables/varcalc.ink");
 fixture!(typed_array_literals, "typed/array-literals.ink");
 fixture!(typed_struct_literals, "typed/struct-literals.ink");
 fixture!(function_rnd_func, "functions/rnd-func.ink");
-fixture_count_all_visits!(misc_operations, "misc/operations.ink");
+fixture!(misc_operations, "misc/operations.ink");
 fixture!(conditional_ifelse, "conditionals/ifelse.ink");
 fixture!(conditional_iffalse, "conditionals/iffalse.ink");
 fixture!(conditional_iftrue, "conditionals/iftrue.ink");
 fixture!(function_test_error, "functions/test-error.ink");
-fixture_count_all_visits!(
+fixture!(
     runtime_read_visit_counts,
     "runtime_api/read-visit-counts.ink"
 );
@@ -61,7 +52,7 @@ fixture!(
 );
 fixture!(glue_testbugfix1, "glue/testbugfix1.ink");
 fixture!(glue_testbugfix2, "glue/testbugfix2.ink");
-fixture_count_all_visits!(
+fixture!(
     misc_newlines_with_string_eval,
     "misc/newlines_with_string_eval.ink"
 );
@@ -95,4 +86,4 @@ fixture!(
     "tunnels/tunnel-onwards-divert-override.ink"
 );
 fixture!(tags_tags_in_seq, "tags/tagsInSeq.ink");
-fixture_count_all_visits!(misc_i18n, "misc/i18n.ink");
+fixture!(misc_i18n, "misc/i18n.ink");

@@ -89,7 +89,6 @@ pub(super) fn lower_conditional_into(
             let lowered_branch = lower_choice_weave_with_initial_content(
                 branch.content(),
                 &context.with_path_mode(branch_path_mode.clone()),
-                false,
                 initial_content,
             );
             let mut content_container = lowered_branch.content;

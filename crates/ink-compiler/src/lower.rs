@@ -40,7 +40,7 @@ use path::{compact_path_strings_in_container, LabelIndex};
 use sequence::lower_sequence;
 use weave::{lower_choice_weave, lower_content_list_into_context};
 
-pub(crate) fn lower(story: &CheckedStory, count_all_visits: bool) -> StageOutput<RuntimeProgram> {
+pub(crate) fn lower(story: &CheckedStory) -> StageOutput<RuntimeProgram> {
     let indexes = LoweringIndexes::build(
         &story.parsed,
         RuntimeLenEstimator {
@@ -58,20 +58,19 @@ pub(crate) fn lower(story: &CheckedStory, count_all_visits: bool) -> StageOutput
         };
     }
 
-    lower_module_story(story, &indexes, count_all_visits)
+    lower_module_story(story, &indexes)
 }
 
 fn lower_module_story(
     story: &CheckedStory,
     indexes: &LoweringIndexes<'_>,
-    count_all_visits: bool,
 ) -> StageOutput<RuntimeProgram> {
     let mut named_containers = story
         .parsed
         .modules()
         .iter()
         .filter(|module| story.module_reachability.is_reachable(module.name()))
-        .map(|module| named_container(lower_module(module, indexes, count_all_visits)))
+        .map(|module| named_container(lower_module(module, indexes)))
         .collect::<Vec<_>>();
     if let Some(global_declarations) =
         lower_global_declarations(indexes, Some(&story.module_reachability))
@@ -95,7 +94,7 @@ fn lower_module_story(
         content: root_content,
         named_content: named_containers,
         name: None,
-        flags: count_all_visits.then_some(1),
+        flags: None,
     };
     compact_path_strings_in_container(&mut root);
 
@@ -105,29 +104,18 @@ fn lower_module_story(
     }
 }
 
-fn lower_module(
-    module: &crate::parsed::Module,
-    indexes: &LoweringIndexes<'_>,
-    count_all_visits: bool,
-) -> Container {
+fn lower_module(module: &crate::parsed::Module, indexes: &LoweringIndexes<'_>) -> Container {
     let named_content = module
         .flows()
         .iter()
-        .map(|flow| {
-            named_container(lower_module_flow(
-                module.name(),
-                flow,
-                indexes,
-                count_all_visits,
-            ))
-        })
+        .map(|flow| named_container(lower_module_flow(module.name(), flow, indexes)))
         .collect::<Vec<_>>();
 
     Container {
         content: Vec::new(),
         named_content,
         name: Some(module.name().to_string()),
-        flags: count_all_visits.then_some(1),
+        flags: None,
     }
 }
 
@@ -263,7 +251,7 @@ fn estimated_runtime_len_for_label_collection(
         constants,
         struct_definitions,
     );
-    lower_object_into_with_context_count(&mut content, object, &context, false);
+    lower_object_into_with_context_count(&mut content, object, &context);
     content.len()
 }
 
@@ -272,14 +260,13 @@ fn lower_object_into_with_context(
     object: &Object,
     context: &LoweringContext<'_>,
 ) {
-    lower_object_into_with_context_count(content, object, context, false);
+    lower_object_into_with_context_count(content, object, context);
 }
 
 fn lower_object_into_with_context_count(
     content: &mut Vec<RuntimeObject>,
     object: &Object,
     context: &LoweringContext<'_>,
-    count_all_visits: bool,
 ) {
     let path_mode = context.path_mode();
     match object {
@@ -336,7 +323,6 @@ fn lower_object_into_with_context_count(
             content.push(RuntimeObject::Container(lower_choice_weave(
                 weave,
                 &nested_context,
-                count_all_visits,
             )));
         }
         Object::ExternalDeclaration(_) => {}
@@ -370,12 +356,12 @@ fn ends_with_end_or_done(content: &[RuntimeObject]) -> bool {
         })
 }
 
-fn done_container(name: &str, count_all_visits: bool) -> Container {
+fn done_container(name: &str) -> Container {
     Container {
         content: vec![RuntimeObject::ControlCommand(ControlCommand::Done)],
         named_content: Vec::new(),
         name: Some(name.to_string()),
-        flags: count_all_visits.then_some(5),
+        flags: None,
     }
 }
 
@@ -415,7 +401,7 @@ mod tests {
         assert!(checked.module_reachability.is_reachable("support"));
         assert!(!checked.module_reachability.is_reachable("unused"));
 
-        let program = lower(&checked, false)
+        let program = lower(&checked)
             .artifact
             .expect("lowering should produce program");
 

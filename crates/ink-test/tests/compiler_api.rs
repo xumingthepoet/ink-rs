@@ -32,7 +32,6 @@ fn public_compiler_api_exposes_pipeline_artifacts() {
 fn public_compiler_options_are_constructible() {
     let compiler = Compiler::with_options(CompilerOptions {
         source_filename: Some("api-options.ink".to_string()),
-        count_all_visits: true,
     });
 
     let output = compiler.compile(unnamed_fixture("basic.ink"));

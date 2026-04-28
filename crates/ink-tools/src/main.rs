@@ -25,7 +25,6 @@ fn run() -> Result<(), String> {
 
     let compiler = Compiler::with_options(CompilerOptions {
         source_filename: Some(source_filename.clone()),
-        count_all_visits: false,
     });
 
     let result = compiler.compile_sources(vec![SourceInput::named(

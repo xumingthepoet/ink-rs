@@ -12,7 +12,6 @@ use crate::{
 #[derive(Clone, Default)]
 pub struct CompilerOptions {
     pub source_filename: Option<String>,
-    pub count_all_visits: bool,
 }
 
 #[derive(Default)]
@@ -133,7 +132,7 @@ impl Compiler {
     }
 
     pub fn lower(&self, checked: &CheckedStory) -> StageOutput<RuntimeProgram> {
-        lower::lower(checked, self.options.count_all_visits)
+        lower::lower(checked)
     }
 
     pub fn emit_json(&self, program: RuntimeProgram) -> StageOutput<String> {
