@@ -8,6 +8,16 @@ const ALLOWED_LEGACY_INK_FIXTURES: &[&str] = &[];
 
 const ALLOWED_SOURCE_CONSTRUCTION_TESTS: &[&str] = &[];
 
+const BANNED_ORIGIN_LABELS: &[&str] = &[
+    "language",
+    "conformance",
+    "compiler_conformance",
+    "csharp",
+    "csharp_compatibility",
+    "inkling",
+    "inkfiles",
+];
+
 const SOURCE_CONSTRUCTION_PATTERNS: &[&str] = &[
     "explicit_game_module",
     "compile_language_source(",
@@ -77,6 +87,22 @@ fn source_construction_policy_tracks_inline_ink_helpers() {
     );
 }
 
+#[test]
+fn origin_label_policy_tracks_test_and_fixture_names() {
+    let tests_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests");
+    let fixture_root = ink_test::fixture_root();
+    let offenders = files_under(&tests_root, |_| true)
+        .into_iter()
+        .chain(files_under(&fixture_root, |_| true))
+        .filter_map(|path| origin_label_offender(&tests_root, &fixture_root, &path))
+        .collect::<Vec<_>>();
+
+    assert!(
+        offenders.is_empty(),
+        "origin/example-suite labels must not appear in test targets, helper module paths, fixture paths, or test names: {offenders:#?}"
+    );
+}
+
 fn legacy_fixture_path(root: &Path, path: &Path) -> Option<String> {
     let text = fs::read_to_string(path)
         .unwrap_or_else(|error| panic!("failed to read fixture {}: {error}", path.display()));
@@ -91,6 +117,43 @@ fn legacy_fixture_path(root: &Path, path: &Path) -> Option<String> {
     }
 
     Some(relative_path(root, path))
+}
+
+fn origin_label_offender(tests_root: &Path, fixture_root: &Path, path: &Path) -> Option<String> {
+    if path
+        .file_name()
+        .is_some_and(|name| name == "integration_policy.rs")
+    {
+        return None;
+    }
+
+    let relative = if let Ok(path) = path.strip_prefix(tests_root) {
+        format!("tests/{}", relative_path(Path::new(""), path))
+    } else if let Ok(path) = path.strip_prefix(fixture_root) {
+        format!("fixtures/{}", relative_path(Path::new(""), path))
+    } else {
+        relative_path(Path::new(""), path)
+    };
+
+    if BANNED_ORIGIN_LABELS
+        .iter()
+        .any(|label| relative.split('/').any(|segment| segment.contains(label)))
+    {
+        return Some(relative);
+    }
+
+    if path.extension().is_some_and(|extension| extension == "rs") {
+        let text = fs::read_to_string(path)
+            .unwrap_or_else(|error| panic!("failed to read test {}: {error}", path.display()));
+        if BANNED_ORIGIN_LABELS
+            .iter()
+            .any(|label| text.contains(label))
+        {
+            return Some(relative);
+        }
+    }
+
+    None
 }
 
 fn source_construction_file(root: &Path, path: &Path) -> Option<String> {
