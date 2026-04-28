@@ -13,7 +13,7 @@ complete, `[!]` blocked.
 
 ## Milestone 1: Test Policy And Harness
 
-### [~] Task 01: Add integration fixture policy checks
+### [>] Task 01: Add integration fixture policy checks
 
 Goal: make unsupported test shapes visible before large fixture migration starts.
 
@@ -36,7 +36,12 @@ Modification boundaries: `crates/ink-test/tests`, `crates/ink-test/src`, and
 
 Validation commands: `cargo test -p ink-test --test language fixture_policy`.
 
-Commit record: pending.
+Validation:
+
+- `cargo test -p ink-test --test integration_policy` passed.
+- `make gate` passed.
+
+Commit record: implementation commit `2c1625af` (`Add integration test policy checks`).
 
 ### [ ] Task 02: Remove module-wrapping from language helpers
 
