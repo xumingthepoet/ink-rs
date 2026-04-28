@@ -127,7 +127,7 @@ The simplest mark-up is a comment. **ink** supports two kinds of comment. There'
 and there's the kind used for reminding the author what they need to do, that the compiler prints out during compilation:
 
 
-	TODO: Write this section properly!
+	TODO: Confirm the arrival time.
 
 ### Tags
 
@@ -214,40 +214,46 @@ These sections are called "knots" and they're the fundamental structural unit of
 
 ### Writing a knot
 
-The start of a knot is indicated by two or more equals signs, as follows.
+Inside a module, the start of a knot is indicated by two equals signs:
 
-	=== top_knot ===
+	== top_knot ==
 
 (The equals signs on the end are optional; and the name needs to be a single word with no spaces.)
 
 The start of a knot is a header; the content that follows will be inside that knot.
 
-	=== back_in_london ===
+	== back_in_london ==
 
 	We arrived into London at 9.45pm exactly.
 
 #### Advanced: a knottier "hello world"
 
-When you start an ink file, content outside of knots will be run automatically. But knots won't. So if you start using knots to hold your content, you'll need to tell the game where to go. We do this with a divert arrow `->`, which is covered properly in the next section.
+Every runnable ink-rs file starts with an explicit module, and the story starts
+at that module's `main` knot. If you want `main` to hand off to another knot,
+use a divert arrow `->`, which is covered properly in the next section.
 
 The simplest knotty script is:
 
+	=== module game ===
+
+	== main ==
 	-> top_knot
 
-	=== top_knot ===
+	== top_knot ==
 	Hello world!
 
-However, **ink** doesn't like loose ends, and produces a warning on compilation and/or run-time when it thinks this has happened. The script above produces this on compilation:
-
-	WARNING: Apparent loose end exists where the flow runs out. Do you need a '-> END' statement, choice or divert? on line 3 of tests/test.ink
-
-and this on running:
-
-	Runtime error in tests/test.ink line 3: ran out of content. Do you need a '-> DONE' or '-> END'?
+However, **ink** doesn't like loose ends, and produces diagnostics or runtime
+errors when it thinks this has happened. The `top_knot` above has no choice,
+divert, `-> DONE`, or `-> END` after its content, so the flow can run out.
 
 The following plays and compiles without error:
 
-	=== top_knot ===
+	=== module game ===
+
+	== main ==
+	-> top_knot
+
+	== top_knot ==
 	Hello world!
 	-> END
 
@@ -259,22 +265,22 @@ The following plays and compiles without error:
 
 You can tell the story to move from one knot to another using `->`, a "divert arrow". Diverts happen immediately without any user input.
 
-	=== back_in_london ===
+	== back_in_london ==
 
 	We arrived into London at 9.45pm exactly.
 	-> hurry_home
 
-	=== hurry_home ===
+	== hurry_home ==
 	We hurried home to Savile Row as fast as we could.
 
 #### Diverts are invisible
 
 Diverts are intended to be seamless and can even happen mid-sentence:
 
-	=== hurry_home ===
+	== hurry_home ==
 	We hurried home to Savile Row -> as_fast_as_we_could
 
-	=== as_fast_as_we_could ===
+	== as_fast_as_we_could ==
 	as fast as we could.
 
 produces the same line as above:
@@ -285,15 +291,15 @@ produces the same line as above:
 
 The default behaviour inserts line-breaks before every new line of content. In some cases, however, content must insist on not having a line-break, and it can do so using `<>`, or "glue".
 
-	=== hurry_home ===
+	== hurry_home ==
 	We hurried home <>
 	-> to_savile_row
 
-	=== to_savile_row ===
+	== to_savile_row ==
 	to Savile Row
 	-> as_fast_as_we_could
 
-	=== as_fast_as_we_could ===
+	== as_fast_as_we_could ==
 	<> as fast as we could.
 
 also produces:
@@ -309,13 +315,13 @@ You can't use too much glue: multiple glues next to each other have no additiona
 
 Combining knots, options and diverts gives us the basic structure of a choose-your-own game.
 
-	=== paragraph_1 ===
+	== paragraph_1 ==
 	You stand by the wall of Analand, sword in hand.
 	* Open the gate -> paragraph_2
 	* Smash down the gate -> paragraph_3
 	* Turn back and go home -> paragraph_4
 
-	=== paragraph_2 ===
+	== paragraph_2 ==
 	You open the gate, and step out onto the path.
 
 	...
@@ -324,7 +330,7 @@ Combining knots, options and diverts gives us the basic structure of a choose-yo
 
 Using diverts, the writer can branch the flow, and join it back up again, without showing the player that the flow has rejoined.
 
-	=== back_in_london ===
+	== back_in_london ==
 
 	We arrived into London at 9.45pm exactly.
 
@@ -338,16 +344,16 @@ Using diverts, the writer can branch the flow, and join it back up again, withou
 	*	We hurried home -> hurry_outside
 
 
-	=== hurry_outside ===
+	== hurry_outside ==
 	We hurried home to Savile Row -> as_fast_as_we_could
 
 
-	=== dragged_outside ===
+	== dragged_outside ==
 	He insisted that we hurried home to Savile Row
 	-> as_fast_as_we_could
 
 
-	=== as_fast_as_we_could ===
+	== as_fast_as_we_could ==
 	<> as fast as we could.
 
 
@@ -355,19 +361,22 @@ Using diverts, the writer can branch the flow, and join it back up again, withou
 
 Knots and diverts combine to create the basic story flow of the game. This flow is "flat" - there's no call-stack, and diverts aren't "returned" from.
 
-In most ink scripts, the story flow starts at the top, bounces around in a spaghetti-like mess, and eventually, hopefully, reaches a `-> END`.
+In ink-rs, the story flow starts at the unique `main` knot, bounces around in a
+spaghetti-like mess, and eventually, hopefully, reaches a `-> END`.
 
 The very loose structure means writers can get on and write, branching and rejoining without worrying about the structure that they're creating as they go. There's no boiler-plate to creating new branches or diversions, and no need to track any state.
 
 #### Advanced: Loops
 
-You absolutely can use diverts to create looped content, and **ink** has several features to exploit this, including ways to make the content vary itself, and ways to control how often options can be chosen.
+You absolutely can use diverts to create looped content. In ink-rs, use
+explicit variables, conditions, and functions to vary content or hide choices
+inside those loops.
 
 See the sections on [Varying Text](#8-variable-text) and [Conditional Choices](#conditional-choices) for more information.
 
 Oh, and the following is legal and not a great idea:
 
-	=== round ===
+	== round ==
 	and
 	-> round
 
@@ -505,7 +514,7 @@ should disappear, track that state explicitly and put a condition on the choice:
 	VAR asked_hat: bool = false
 	VAR asked_briefcase: bool = false
 
-	=== find_help ===
+	== find_help ==
 
 		You search desperately for a friendly face in the crowd.
 		*	{ not asked_hat } The woman in the hat?
@@ -535,7 +544,7 @@ And, in a slight abuse of syntax, we can make a default choice with content in i
 Adding this into the previous example gives the story an explicit route when
 both visible options have been hidden:
 
-	=== find_help ===
+	== find_help ==
 
 		You search desperately for a friendly face in the crowd.
 		*	{ not asked_hat } The woman in the hat?
@@ -553,7 +562,7 @@ both visible options have been hidden:
 
 In ink-rs, both `*` and `+` choices are repeatable. Revisiting the same choice point can show the same authored choices again. Use conditions or explicit variables when a choice should disappear.
 
-	=== homers_couch ===
+	== homers_couch ==
 		+	Eat another donut
 			You eat another donut. -> homers_couch
 		*	Get off the couch
@@ -562,7 +571,7 @@ In ink-rs, both `*` and `+` choices are repeatable. Revisiting the same choice p
 
 Fallback choices can repeat too.
 
-	=== conversation_loop
+	== conversation_loop ==
 		*	Talk about the weather -> chat_weather
 		*	Talk about the children -> chat_children
 		+	-> sit_in_silence_again
@@ -627,13 +636,12 @@ Conditions use explicit variables or expressions:
 
 So far, all the content we've seen has been static, fixed pieces of text. But content can also vary at the moment of being printed.
 
-### Removed: sequences, cycles, shuffles, and once-only alternatives
+### Removed: stateful text alternatives
 
-Upstream Ink supports stateful text alternatives such as `{one|two}`,
-`{&one|two}`, `{!one|two}`, `{~one|two}`, and multiline `{ cycle: ... }`
-blocks. ink-rs no longer supports those source forms. The compiler reports a
-removed-feature diagnostic because the current runtime intentionally does not
-store implicit visit-count state in saves.
+Upstream Ink supports several source forms for implicit stateful text
+alternatives. ink-rs no longer supports those source forms. The compiler
+reports a removed-feature diagnostic because the current runtime intentionally
+does not store implicit visit-count state in saves.
 
 Use typed variables and conditional text to model progression explicitly:
 
@@ -761,7 +769,7 @@ This produces the following playthrough:
 
 We can string these gather-and-branch sections together to make branchy sequences that always run forwards.
 
-	=== escape ===
+	== escape ==
 	I ran through the forest, the dogs snapping at my heels.
 
 		* 	I checked the jewels were still in my pocket, and the feel of them brought a spring to my step. <>
@@ -978,7 +986,7 @@ Options can also be labelled, just like gather points, using brackets. Label bra
 
 These addresses can be used in conditional tests, which can be useful for creating options unlocked by other options.
 
-	=== meet_guard ===
+	== meet_guard ==
 	The guard frowns at you.
 
 	* 	(greet) Greet him
@@ -1002,7 +1010,7 @@ These addresses can be used in conditional tests, which can be useful for creati
 
 Inside the same block of weave, you can simply use the label name; from outside the block you need a path, either to a different stitch within the same knot:
 
-	=== knot ===
+	== knot ==
 	= stitch_one
 		- (gatherpoint) Some content.
 	= stitch_two
@@ -1010,11 +1018,11 @@ Inside the same block of weave, you can simply use the label name; from outside 
 
 or pointing into another knot:
 
-	=== knot_one ===
+	== knot_one ==
 	-	(gather_one)
 		* {knot_two.stitch_two.gather_two} Option
 
-	=== knot_two ===
+	== knot_two ==
 	= stitch_two
 		- (gather_two)
 			*	{knot_one.gather_one} Option
@@ -1024,7 +1032,7 @@ or pointing into another knot:
 
 In truth, all content in ink is a weave, even if there are no gathers in sight. That means you can label *any* option in the game with a bracket label, and then reference it using the addressing syntax. In particular, this means you can test *which* option a player took to reach a particular outcome.
 
-	=== fight_guard ===
+	== fight_guard ==
 	...
 	= throw_something
 	*	(rock) Throw rock at guard -> throw
@@ -1038,6 +1046,8 @@ In truth, all content in ink is a weave, even if there are no gathers in sight. 
 
 Labelling allows us to create loops inside weaves. Here's a standard pattern for asking questions of an NPC.
 
+	VAR guard_question_loops: int = 0
+
 	- (opts)
 		*	'Can I get a uniform from somewhere?' you ask the cheerful guard.
 			'Sure. In the locker.' He grins. 'Don't think it'll fit you, though.'
@@ -1049,10 +1059,13 @@ Labelling allows us to create loops inside weaves. Here's a standard pattern for
 		*	{loop} Enough talking
 			-> done
 	- (loop)
-		// loop a few times before the guard gets bored
-		{ -> opts | -> opts | }
-		He scratches his head.
-		'Well, can't stand around talking all day,' he declares.
+		~ guard_question_loops = guard_question_loops + 1
+		{ guard_question_loops < 3:
+			-> opts
+		- else:
+			He scratches his head.
+			'Well, can't stand around talking all day,' he declares.
+		}
 	- (done)
 		You thank the guard, and move away.
 
@@ -1107,7 +1120,8 @@ Note the level 2 gather point directly below the first option: there's nothing t
 
 # Part 3: Variables and Logic
 
-So far we've made conditional text, and conditional choices, using tests based on what content the player has seen so far.
+So far we've made conditional text and conditional choices using explicit
+variables, labels, and expressions.
 
 **ink** also supports variables, both temporary and global, storing typed values such as numbers, booleans, strings, structs, and arrays. It is fully-featured in terms of logic, and contains a few additional structures to help keep the often complex logic of a branching story better organised.
 
@@ -1180,7 +1194,7 @@ Struct literals can omit fields whose type has a default value; fields of type `
 
 We can test global variables to control options, and provide conditional text, in a similar way to what we have previously seen.
 
-	=== the_train ===
+	== the_train ==
 		The train jolted and rattled. { mood > 0:I was feeling positive enough, however, and did not mind the odd bump|It was more than I could bear}.
 		*	{ not knows_about_wager } 'But, Monsieur, why are we travelling?' I asked.
 		* 	{ knows_about_wager} I contemplated our strange adventure. Would it be possible?
@@ -1191,7 +1205,7 @@ Divert targets are typed values in ink-rs. They can be stored in globals, temps,
 
 Static diverts use a literal path: `-> retreat`. Dynamic diverts use braces around an expression typed as `->`: `-> {next}`, `-> {route.next}`, `-> {targets[0]}`, or `-> {pick(flag)}`.
 
-	=== continue_or_quit ===
+	== continue_or_quit ==
 	Give up now, or keep trying to save your Kingdom?
 	~ temp next: -> = -> more_hopeless_introspection
 	*  Keep trying! 	-> {next}
@@ -1229,13 +1243,15 @@ It might be noticed that above we refered to variables as being able to contain 
 
 ... produces `red`.
 
-Note that once a piece of content like this is evaluated, its value is "sticky". (The quantum state collapses.) So the following:
+Note that a string variable stores its current string value. Reusing the same
+variable prints the same value unless the story assigns a new one, so the
+following:
 
 	The goon hits you, and sparks fly before you eyes, {a_colour} and {a_colour}.
 
 ... won't produce a very interesting effect. (If you really want this to work, use a text function to print the colour!)
 
-Source shuffles inside strings, such as `{~red|blue}`, are no longer supported.
+Source-level random text alternatives inside strings are no longer supported.
 
 
 ## 2) Logic
@@ -1247,7 +1263,7 @@ Since by default, any text in an **ink** script is printed out directly to the s
 The following statements all assign values to variables:
 
 
-	=== set_some_variables ===
+	== set_some_variables ==
 		~ knows_about_wager = true
 		~ x = (x * x) - (y * y) + c
 		~ y = 2 * x * y
@@ -1401,7 +1417,7 @@ And there's also an actual switch statement:
 
 These tests should use explicit variables. The following construction is a common way of saying "do some content which is relevant to the current game state":
 
-	=== dream ===
+	== dream ==
 		{
 			- visited_snakes && not dream_about_snakes:
 				~ fear++
@@ -1445,35 +1461,18 @@ You can even put options inside conditional blocks:
 
 ### Multiline blocks
 
-Multiline sequence, cycle, shuffle, and once-only blocks from upstream Ink are
-removed in ink-rs. Use explicit variables, conditionals, and ordinary knots or
-stitches for varying blocks of content.
+Multiline conditionals are the supported multiline brace block form in ink-rs.
+Upstream stateful alternative blocks are removed; model that state with
+variables and ordinary conditionals instead.
 
-	// Once: show each, once, in turn, until all have been shown
-	{ once:
-		- Would my luck hold?
-		- Could I win the hand?
-	}
+	VAR luck_step: int = 0
 
-#### Advanced: modified shuffles
-
-The shuffle block above is really a "shuffled cycle"; in that it'll shuffle the content, play through it, then reshuffle and go again.
-
-There are two other versions of shuffle:
-
-`shuffle once` which will shuffle the content, play through it, and then do nothing.
-
-	{ shuffle once:
-	-	The sun was hot.
-	- 	It was a hot day.
-	}
-
-`shuffle stopping` will shuffle all the content (except the last entry), and once its been played, it'll stick on the last entry.
-
-	{ shuffle stopping:
-	- 	A silver BMW roars past.
-	-	A bright yellow Mustang takes the turn.
-	- 	There are like, cars, here.
+	{
+	- luck_step == 0:
+		Would my luck hold?
+		~ luck_step = 1
+	- else:
+		Could I win the hand?
 	}
 
 
@@ -1483,7 +1482,7 @@ There are two other versions of shuffle:
 
 Sometimes, a global variable is unwieldy. **ink** provides temporary variables for quick calculations of things.
 
-	=== near_north_pole ===
+	== near_north_pole ==
 		~ temp number_of_warm_things: int = 0
 		{ blanket:
 			~ number_of_warm_things++
@@ -1513,7 +1512,7 @@ A particularly useful form of temporary variable is a parameter. Any knot or sti
 	*	Accuse myself
 			-> accuse("myself")
 
-	=== accuse(who) ===
+	== accuse(who) ==
 		"I accuse {who}!" Poirot declared.
 		"Really?" Japp replied. "{who == "myself":You did it?|{who}?}"
 		"And why not?" Poirot shot back.
@@ -1527,7 +1526,7 @@ Temporary variables are safe to use in recursion (unlike globals), so the follow
 
 	-> add_one_to_one_hundred(0, 1)
 
-	=== add_one_to_one_hundred(total, x) ===
+	== add_one_to_one_hundred(total, x) ==
 		~ total = total + x
 		{ x == 100:
 			-> finished(total)
@@ -1535,7 +1534,7 @@ Temporary variables are safe to use in recursion (unlike globals), so the follow
 			-> add_one_to_one_hundred(total, x + 1)
 		}
 
-	=== finished(total) ===
+	== finished(total) ==
 		"The result is {total}!" you announce.
 		Gauss stares at you in horror.
 		-> END
@@ -1548,20 +1547,20 @@ Temporary variables are safe to use in recursion (unlike globals), so the follow
 
 Knot/stitch addresses can be passed to knot and stitch parameters as divert targets. Declare the parameter type as `name: ->`, and construct target values with `-> target`:
 
-	=== sleeping_in_hut ===
+	== sleeping_in_hut ==
 		You lie down and close your eyes.
 		-> generic_sleep (-> waking_in_the_hut)
 
-	===	 generic_sleep (waking: ->)
+	== generic_sleep(waking: ->) ==
 		You sleep perchance to dream etc. etc.
 		-> {waking}
 
-	=== waking_in_the_hut
+	== waking_in_the_hut ==
 		You get back to your feet, ready to continue your journey.
 
 The `->` argument in the call constructs a divert target value. Passing a bare target name as a value is not the same thing as a target value and will not satisfy a `->` parameter:
 
-	=== sleeping_in_hut ===
+	== sleeping_in_hut ==
 		You lie down and close your eyes.
 		-> generic_sleep (waking_in_the_hut)
 
@@ -1593,10 +1592,10 @@ Function parameters must be declared with explicit types, and every function mus
 
 To define a function, simply declare a knot to be one:
 
-	=== function say_yes_to_everything() => bool ===
+	== function say_yes_to_everything() => bool ==
 		~ return true
 
-	=== function lerp(a: float, b: float, k: float) => float ===
+	== function lerp(a: float, b: float, k: float) => float ==
 		~ return ((b - a) * k) + a
 
 Functions are called by name, and with brackets, even if they have no parameters:
@@ -1607,14 +1606,14 @@ Functions are called by name, and with brackets, even if they have no parameters
 
 As in any other language, a function, once done, returns the flow to wherever it was called from - and despite not being allowed to divert the flow, functions can still call other functions.
 
-	=== function say_no_to_nothing() => bool ===
+	== function say_no_to_nothing() => bool ==
 		~ return say_yes_to_everything()
 
 ### Functions don't have to return anything
 
 A function does not need to have a return value, and can simply do something that is worth packaging up:
 
-	=== function harm(x: int) => void ===
+	== function harm(x: int) => void ==
 		{ stamina < x:
 			~ stamina = 0
 		- else:
@@ -1631,7 +1630,7 @@ Content is, by default, 'glued in', so the following:
 
 	Monsieur Fogg was looking {describe_health(health)}.
 
-	=== function describe_health(x: int) => string ===
+	== function describe_health(x: int) => string ==
 	{
 	- x == 100:
 		~ return "spritely"
@@ -1651,14 +1650,14 @@ produces:
 
 For instance, you might include:
 
-	=== function max(a: int, b: int) => int ===
+	== function max(a: int, b: int) => int ==
 		{ a < b:
 			~ return b
 		- else:
 			~ return a
 		}
 
-	=== function exp(x: int, e: int) => int ===
+	== function exp(x: int, e: int) => int ==
 		// returns x to the power e where e is an integer
 		{ e <= 0:
 			~ return 1
@@ -1679,7 +1678,7 @@ produces:
 
 The following example is long, but appears in pretty much every inkle game to date. (Recall that a hyphenated line inside multiline curly braces indicates either "a condition to test" or, if the curly brace began with a variable, "a value to compare against".)
 
-    === function print_num(x: int) => void ===
+    == function print_num(x: int) => void ==
     {
         - x >= 1000:
             {print_num(x / 1000)} thousand { x mod 1000 > 0:{print_num(x mod 1000)}}
@@ -1744,7 +1743,7 @@ Function parameters can also be passed 'by reference', meaning that the function
 
 For instance, most **inkle** stories include the following:
 
-	=== function alter(ref x: int, k: int) => void ===
+	== function alter(ref x: int, k: int) => void ==
 		~ x = x + k
 
 Lines such as:
@@ -1785,7 +1784,7 @@ Sometimes, it's convenient to define constants to be strings, so you can print t
 
 	VAR current_chief_suspect: string = HASTINGS
 
-	=== review_evidence ===
+	== review_evidence ==
 		{ found_japps_bloodied_glove:
 			~ current_chief_suspect = POIROT
 		}
@@ -1807,7 +1806,7 @@ And sometimes the numbers are useful in other ways:
 	VAR secret_agent_location: int = LOBBY
 	VAR suitcase_location: int = HALLWAY
 
-	=== report_progress ===
+	== report_progress ==
 	{
         -  secret_agent_location == suitcase_location:
 		The secret agent grabs the suitcase!
@@ -1852,7 +1851,7 @@ The default structure for **ink** stories is a "flat" tree of choices, branching
 
 But this flat structure makes certain things difficult: for example, imagine a game in which the following interaction can happen:
 
-	=== crossing_the_date_line ===
+	== crossing_the_date_line ==
 	*	"Monsieur!" I declared with sudden horror. "I have just realised. We have crossed the international date line!"
 	-	Monsieur Fogg barely lifted an eyebrow. "I have adjusted for it."
 	*	I mopped the sweat from my brow. A relief!
@@ -1861,13 +1860,13 @@ But this flat structure makes certain things difficult: for example, imagine a g
 
 ...but it can happen at several different places in the story. We don't want to have to write copies of the content for each different place, but when the content is finished it needs to know where to return to. We can do this using parameters:
 
-	=== crossing_the_date_line(-> return_to) ===
+	== crossing_the_date_line(return_to: ->) ==
 	...
-	-	-> return_to
+	-	-> {return_to}
 
 	...
 
-	=== outside_honolulu ===
+	== outside_honolulu ==
 	We arrived at the large island of Honolulu.
 	- (postscript)
 		-> crossing_the_date_line(-> done)
@@ -1876,7 +1875,7 @@ But this flat structure makes certain things difficult: for example, imagine a g
 
 	...
 
-	=== outside_pitcairn_island ===
+	== outside_pitcairn_island ==
 	The boat sailed along the water towards the tiny island.
 	- (postscript)
 		-> crossing_the_date_line(-> done)
@@ -1899,7 +1898,7 @@ This means "do the crossing_the_date_line story, then continue from here".
 
 Inside the tunnel itself, the syntax is simplified from the parameterised example: all we do is end the tunnel using the `->->` statement which means, essentially, "go on".
 
-	=== crossing_the_date_line ===
+	== crossing_the_date_line ==
 	// this is a tunnel!
 	...
 	- 	->->
@@ -1920,7 +1919,7 @@ Tunnels can also be chained together, or finish on a normal divert:
 
 Tunnels can be nested, so the following is valid:
 
-	=== plains ===
+	== plains ==
 	= night_time
 		The dark grass is soft under your feet.
 		+	Sleep
@@ -1928,14 +1927,14 @@ Tunnels can be nested, so the following is valid:
 	= day_time
 		It is time to move on.
 
-	=== wake_here ===
+	== wake_here ==
 		You wake as the sun rises.
 		+	Eat something
 			-> eat_something ->
 		+	Make a move
 		-	->->
 
-	=== sleep_here ===
+	== sleep_here ==
 		You lie down and try to close your eyes.
 		-> monster_attacks ->
 		Then it is time to sleep.
@@ -1951,24 +1950,24 @@ Sometimes, in a story, things happen. So sometimes a tunnel can't guarantee that
 
 Still, there are cases where it's indispensable:
 
-	=== fall_down_cliff
+	== fall_down_cliff ==
 	-> hurt(5) ->
 	You're still alive! You pick yourself up and walk on.
 
-	=== hurt(x)
+	== hurt(x) ==
 		~ stamina -= x
 		{ stamina <= 0:
 			->-> youre_dead
 		}
 
-	=== youre_dead
+	== youre_dead ==
 	Suddenly, there is a white light all around you. Fingers lift an eyepiece from your forehead. 'You lost, buddy. Out of the chair.'
 
 And even in less drastic situations, we might want to break up the structure:
 
 	-> talk_to_jim ->
 
-	 === talk_to_jim
+	== talk_to_jim ==
 	 - (opts)
 		*	 Ask about the warp lacelles
 			-> warp_lacells ->
@@ -2010,7 +2009,9 @@ Note that this is definitely an advanced feature: the engineering stories become
 
 Threads allow you to compose sections of content from multiple sources in one go. For example:
 
-    == thread_example ==
+    === module game ===
+
+    == main ==
     I had a headache; threading is hard to get your head around.
     <- conversation
     <- walking
@@ -2054,6 +2055,8 @@ In a normal story, threads might never be needed.
 
 But for games with lots of independent moving parts, threads quickly become essential. Imagine a game in which characters move independently around a map: the main story hub for a room might look like the following:
 
+	=== module game ===
+
 	CONST HALLWAY: int = 1
 	CONST OFFICE: int = 2
 
@@ -2061,7 +2064,10 @@ But for games with lots of independent moving parts, threads quickly become esse
 	VAR generals_location: int = HALLWAY
 	VAR doctors_location: int = OFFICE
 
-	== run_player_location
+	== main ==
+	-> run_player_location
+
+	== run_player_location ==
 		{
 			- player_location == HALLWAY: -> hallway
 		}
@@ -2077,7 +2083,7 @@ But for games with lots of independent moving parts, threads quickly become esse
 
 	// Here's the thread, which mixes in dialogue for characters you share the room with at the moment.
 
-	== characters_present(room)
+	== characters_present(room) ==
 		{ generals_location == room:
 			<- general_conversation
 		}
@@ -2086,12 +2092,12 @@ But for games with lots of independent moving parts, threads quickly become esse
 		}
 		-> DONE
 
-	== general_conversation
+	== general_conversation ==
 		*	Ask the General about the bloodied knife
 			"It's a bad business, I can tell you."
 		-	-> run_player_location
 
-	== doctor_conversation
+	== doctor_conversation ==
 		*	Ask the Doctor about the bloodied knife
 			"There's nothing strange about blood, is there?"
 		-	-> run_player_location
@@ -2115,7 +2121,7 @@ In cases where we want to mark the end of a thread, we use `-> DONE`: meaning "t
 
 The example at the start of this section will generate a warning; it can be fixed as follows:
 
-    == thread_example ==
+    == main ==
     I had a headache; threading is hard to get your head around.
     <- conversation
     <- walking
@@ -2136,7 +2142,7 @@ Threads can be used to add the same choice into lots of different places. When u
 
 	VAR reviewed_notes_recently: bool = false
 
-	=== outside_the_house
+	== outside_the_house ==
 	The front step. The house smells. Of murder. And lavender.
 	- (top)
 		<- review_case_notes(-> top)
@@ -2147,7 +2153,7 @@ Threads can be used to add the same choice into lots of different places. When u
 			I hate lavender. It makes me think of soap, and soap makes me think about my marriage.
 			-> top
 
-	=== the_hallway
+	== the_hallway ==
 	The hallway. Front door open to the street. Little bureau.
 	- (top)
 		<- review_case_notes(-> top)
@@ -2158,7 +2164,7 @@ Threads can be used to add the same choice into lots of different places. When u
 			Keys. More keys. Even more keys. How many locks do these people need?
 			-> top
 
-	=== review_case_notes(-> go_back_to)
+	== review_case_notes(go_back_to: ->) ==
 	+	{not reviewed_notes_recently}
 		Review my case notes
 		// the explicit variable controls whether this option repeats immediately
@@ -2189,15 +2195,20 @@ but as soon as the option being threaded in includes multiple choices, or condit
 A game which uses ink as a script rather than a literal output might often generate very large numbers of parallel choices, intended to be filtered by the player via some other in-game interaction - such as walking around an environment. Threads can be useful in these cases simply to divide up choices.
 
 ```
-=== the_kitchen
+=== module game ===
+
+== main ==
+-> the_kitchen
+
+== the_kitchen ==
 - (top)
 	<- drawers(-> top)
 	<- cupboards(-> top)
 	<- room_exits
-= drawers (-> goback)
+= drawers(goback: ->)
 	// choices about the drawers...
 	...
-= cupboards(-> goback)
+= cupboards(goback: ->)
 	// choices about cupboards
 	...
 = room_exits

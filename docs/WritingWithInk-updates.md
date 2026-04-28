@@ -25,6 +25,28 @@ Each entry should include:
 - migration guidance
 - tests
 
+## 2026-04-29: Module-First Writing Guide Rewrite
+
+- status: supported
+- upstream behavior: upstream Ink examples use root-level knots declared with
+  `=== knot ===`, optional top-level story content before knots, and root-level
+  function declarations.
+- ink-rs behavior: runnable sources are module-first. Source files start with
+  `=== module name ===`; knots and functions inside modules use `==`; exactly
+  one reachable module defines `== main ==`; and source files are supplied
+  explicitly instead of through `INCLUDE`.
+- documentation effect: `WritingWithInk-latest.md` rewrites the basics,
+  diverts, functions, tunnels, threads, and advanced examples to use
+  module-first syntax or clearly act as fragments inside a module. It also
+  removes stale sequence/shuffle tutorial examples from the maintained guide.
+- rationale: the maintained writing guide should be directly usable by authors
+  and library consumers without teaching obsolete root-knot syntax.
+- migration guidance: wrap runnable examples in an explicit module, rename
+  root `=== knot ===` headers to module-owned `== knot ==`, and move story
+  entry flow into `== main ==`.
+- tests: documentation-only rewrite validated by stale-syntax searches and the
+  full project gate.
+
 ## 2026-04-29: Source Sequences Removed
 
 - status: removed
