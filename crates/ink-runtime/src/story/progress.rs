@@ -83,13 +83,6 @@ impl Story {
             self.get_state_mut().set_did_safe_exit(false);
 
             self.get_state_mut().reset_output(None);
-
-            // It's possible for ink to call game to call ink to call game etc
-            // In this case, we only want to batch observe variable changes
-            // for the outermost call.
-            if self.recursive_continue_count == 1 {
-                self.state.variables_state.start_variable_observation();
-            }
         } else if self.async_continue_active && !is_async_time_limited {
             self.async_continue_active = false;
         }
@@ -128,8 +121,6 @@ impl Story {
                 break;
             }
         }
-
-        let mut changed_variables_to_observe = None;
 
         // 4 outcomes:
         // - got newline (so finished this line of text)
@@ -183,11 +174,6 @@ impl Story {
             }
             self.get_state_mut().set_did_safe_exit(false);
             self.saw_lookahead_unsafe_function_after_new_line = false;
-
-            if self.recursive_continue_count == 1 {
-                changed_variables_to_observe =
-                    Some(self.state.variables_state.complete_variable_observation());
-            }
 
             self.async_continue_active = false;
         }
@@ -262,13 +248,6 @@ impl Story {
 
                     return Err(StoryError::InvalidStoryState(sb));
                 }
-            }
-        }
-
-        // Send out variable observation events at the last second, since it might trigger new ink to be run
-        if let Some(changed) = changed_variables_to_observe {
-            for (variable_name, value) in changed {
-                self.notify_variable_changed(&variable_name, &value);
             }
         }
 

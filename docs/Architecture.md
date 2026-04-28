@@ -47,8 +47,7 @@ Ownership rules:
   semantic analysis, lowering into the format crate model, and compile-time
   diagnostics.
 - `crates/ink-runtime` owns runtime execution objects, story state, public
-  runtime APIs, external functions, variable observers, and runtime save-state
-  JSON.
+  runtime APIs, external functions, and runtime save-state JSON.
 - Runtime execution objects are not the shared wire model. The runtime loads
   compiled story JSON through the format crate, then builds runtime-owned
   containers and objects.
@@ -398,7 +397,6 @@ Key areas:
 - `story/flow.rs`: flow-level runtime behavior.
 - `story/errors.rs`: runtime error handling.
 - `story/external_functions.rs`: host function binding and fallback behavior.
-- `story/variable_observer.rs`: variable observer API.
 - `story_state.rs`: callstack, output stream, generated choices, globals,
   evaluation stack, random state, current errors/warnings, and v2 save/load.
 - `callstack.rs`, `flow.rs`, `variables_state.rs`, `state_patch.rs`: mutable
@@ -578,7 +576,7 @@ Use this table to decide where to start.
 | Tags wrong on lines or choices | `story/tags.rs`, `tag.rs`, `control_command.rs` | `tests/tags.rs` |
 | External function behavior | `story/external_functions.rs`, `divert.rs` | runtime API fixtures |
 | Native operation or typed runtime value wrong | `native_function_call/`, `value_type.rs`, `value.rs` | typed value tests |
-| Variable get/set or observers wrong | `variables_state.rs`, `story/state.rs`, `story/variable_observer.rs` | runtime API and variables tests |
+| Variable get/set wrong | `variables_state.rs`, `story/state.rs` | runtime API and variables tests |
 | Save/load bug | `story_state.rs`, `json/json_write.rs`, `flow.rs`, `callstack.rs` | choices/runtime save-load tests |
 | CLI compile behavior | `crates/ink-tools/src/main.rs` | compiler API tests |
 | Test harness or fixture policy | `crates/ink-test/tests/support/`, `integration_policy.rs` | `cargo test -p ink-test --test integration_policy` |

@@ -50,14 +50,9 @@ impl Story {
         variable_name: &str,
         value_type: &ValueType,
     ) -> Result<(), StoryError> {
-        let notify_observers = self
-            .get_state_mut()
+        self.get_state_mut()
             .variables_state
             .set(variable_name, value_type.clone())?;
-
-        if notify_observers {
-            self.notify_variable_changed(variable_name, value_type);
-        }
 
         Ok(())
     }

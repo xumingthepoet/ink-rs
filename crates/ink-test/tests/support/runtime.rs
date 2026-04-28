@@ -3,8 +3,7 @@ use std::{cell::RefCell, rc::Rc};
 use ink_runtime::{choice::Choice, story::Story as RuntimeStory};
 
 pub use ink_runtime::{
-    story::external_functions::ExternalFunction, story::variable_observer::VariableObserver,
-    story_error::StoryError, value_type::ValueType,
+    story::external_functions::ExternalFunction, story_error::StoryError, value_type::ValueType,
 };
 
 pub struct Story {
@@ -107,16 +106,6 @@ impl Story {
         self.inner
             .bind_external_function(func_name, func, lookahead_safe)
             .expect("expected external function binding to succeed");
-    }
-
-    pub fn observe_variable(
-        &mut self,
-        variable_name: &str,
-        observer: Rc<RefCell<dyn VariableObserver>>,
-    ) {
-        self.inner
-            .observe_variable(variable_name, observer)
-            .expect("expected variable observer registration to succeed");
     }
 
     pub fn save_state(&self) -> String {

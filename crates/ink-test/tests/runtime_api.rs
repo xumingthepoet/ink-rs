@@ -1,11 +1,10 @@
-use core::panic;
 use std::{cell::RefCell, error::Error, rc::Rc};
 
 mod support;
 
 use support::{
     compiler::compile_fixture,
-    runtime::{ExternalFunction, Story, ValueType, VariableObserver},
+    runtime::{ExternalFunction, Story, ValueType},
     story_runner as common,
 };
 
@@ -120,48 +119,6 @@ fn external_function_coerce_test() -> Result<(), Box<dyn Error>> {
     common::next_all(&mut story, &mut text);
     assert_eq!(1, text.len());
     assert_eq!("The value is false.", text[0]);
-
-    Ok(())
-}
-
-struct VObserver {
-    expected_value: i32,
-}
-
-impl VariableObserver for VObserver {
-    fn changed(&mut self, variable_name: &str, new_value: &ValueType) {
-        if !"game::x".eq(variable_name) {
-            panic!();
-        }
-
-        if let ValueType::Int(v) = new_value {
-            assert_eq!(self.expected_value, *v);
-        } else {
-            panic!();
-        }
-
-        self.expected_value = 10;
-    }
-}
-
-#[test]
-fn variable_observers_test() -> Result<(), Box<dyn Error>> {
-    let mut story = common::story_from_fixture("runtime_api/variable-observers.ink");
-    let mut text: Vec<String> = Vec::new();
-
-    let observer = Rc::new(RefCell::new(VObserver { expected_value: 10 }));
-    story.observe_variable("game::x", observer.clone());
-
-    common::next_all(&mut story, &mut text);
-    story.choose_choice_index(0);
-    common::next_all(&mut story, &mut text);
-    assert_eq!(
-        10,
-        story.get_variable("game::x").unwrap().get::<i32>().unwrap()
-    );
-
-    // Check that the observer's expected_value is now 10
-    assert_eq!(observer.borrow().expected_value, 10);
 
     Ok(())
 }

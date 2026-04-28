@@ -40,7 +40,7 @@
 //! ```
 //!
 //! The `ink_runtime` library supports the maintained ink-rs runtime features,
-//! including threads, variable set/get from code, variable observing, external
+//! including threads, variable set/get from code, external
 //! functions, tags on choices, and v2 minimal save/load state. Upstream
 //! multi-flow APIs and visit/turn-count state are intentionally not part of the
 //! current runtime API.

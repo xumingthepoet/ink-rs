@@ -1,10 +1,7 @@
 //! [`Story`] is the entry point to load and run an Ink story.
 use crate::{
     container::Container,
-    story::{
-        errors::ErrorHandler, external_functions::ExternalFunctionDef,
-        variable_observer::VariableObserver,
-    },
+    story::{errors::ErrorHandler, external_functions::ExternalFunctionDef},
     story_state::StoryState,
 };
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
@@ -31,7 +28,6 @@ pub struct Story {
     prev_containers: Vec<Rc<Container>>,
     pub(crate) on_error: Option<Rc<RefCell<dyn ErrorHandler>>>,
     pub(crate) state_snapshot_at_last_new_line: Option<StoryState>,
-    pub(crate) variable_observers: HashMap<String, Vec<Rc<RefCell<dyn VariableObserver>>>>,
     pub(crate) has_validated_externals: bool,
     pub(crate) allow_external_function_fallbacks: bool,
     pub(crate) saw_lookahead_unsafe_function_after_new_line: bool,
@@ -142,7 +138,6 @@ mod misc {
                 state_snapshot_at_last_new_line: None,
                 on_error: None,
                 prev_containers: Vec::new(),
-                variable_observers: HashMap::with_capacity(0),
                 has_validated_externals: false,
                 allow_external_function_fallbacks: false,
                 externals: HashMap::with_capacity(0),
@@ -247,4 +242,3 @@ mod navigation;
 mod progress;
 mod state;
 mod tags;
-pub mod variable_observer;
