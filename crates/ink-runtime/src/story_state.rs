@@ -1050,44 +1050,53 @@ impl StoryState {
         let root_obj = j_object
             .as_object()
             .ok_or_else(|| StoryError::BadJson("Invalid save state object".to_string()))?;
-        self.current_flow = Flow::from_json(
+        let mut loaded_flow = Flow::from_json(
             DEFAULT_FLOW_NAME,
             self.main_content_container.clone(),
             root_obj,
         )?;
-        self.output_stream_dirty();
 
-        let variables_state_obj = j_object
+        let variables_state_obj = root_obj
             .get("variablesState")
             .ok_or_else(|| StoryError::BadJson("Missing variables state object".to_string()))?;
-        self.variables_state.load_json(
-            variables_state_obj
-                .as_object()
-                .ok_or_else(|| StoryError::BadJson("Invalid variables state object".to_string()))?,
-        )?;
-        self.variables_state
-            .set_callstack(self.current_flow.callstack.clone());
+        let variables_state_obj = variables_state_obj
+            .as_object()
+            .ok_or_else(|| StoryError::BadJson("Invalid variables state object".to_string()))?;
+        let mut loaded_variables_state = self.variables_state.clone();
+        loaded_variables_state.load_json(variables_state_obj)?;
+        loaded_variables_state.set_callstack(loaded_flow.callstack.clone());
 
-        self.evaluation_stack.clear();
-        self.diverted_pointer = pointer::NULL.clone();
-        self.current_flow.output_stream.clear();
-        self.output_stream_dirty();
-
-        let story_seed = j_object
+        let story_seed = root_obj
             .get("storySeed")
             .ok_or_else(|| StoryError::BadJson("Missing story seed".to_string()))?;
-        self.story_seed = story_seed
+        let story_seed = story_seed
             .as_i64()
-            .ok_or_else(|| StoryError::BadJson("Invalid story seed".to_string()))?
-            as i32;
+            .ok_or_else(|| StoryError::BadJson("Invalid story seed".to_string()))
+            .and_then(|seed| {
+                i32::try_from(seed)
+                    .map_err(|_| StoryError::BadJson("Invalid story seed".to_string()))
+            })?;
 
-        let previous_random_obj = j_object
+        let previous_random_obj = root_obj
             .get("previousRandom")
             .ok_or_else(|| StoryError::BadJson("Missing previous random value".to_string()))?;
-        self.previous_random = previous_random_obj
+        let previous_random = previous_random_obj
             .as_i64()
-            .ok_or_else(|| StoryError::BadJson("Invalid previous random value".to_string()))?
-            as i32;
+            .ok_or_else(|| StoryError::BadJson("Invalid previous random value".to_string()))
+            .and_then(|random| {
+                i32::try_from(random)
+                    .map_err(|_| StoryError::BadJson("Invalid previous random value".to_string()))
+            })?;
+
+        loaded_flow.output_stream.clear();
+
+        self.current_flow = loaded_flow;
+        self.variables_state = loaded_variables_state;
+        self.evaluation_stack.clear();
+        self.diverted_pointer = pointer::NULL.clone();
+        self.story_seed = story_seed;
+        self.previous_random = previous_random;
+        self.output_stream_dirty();
 
         Ok(())
     }
@@ -1260,6 +1269,45 @@ mod tests {
             .expect_err("expected missing previous random error");
 
         assert!(error.to_string().contains("Missing previous random value"));
+    }
+
+    #[test]
+    fn failed_load_state_keeps_existing_story_state() {
+        let json = r#"{
+            "inkVersion": 1,
+            "root": [
+                "done",
+                {
+                    "global decl": [
+                        "ev", 0, {"VAR=": "score"}, "/ev",
+                        "end",
+                        null
+                    ]
+                }
+            ]
+        }"#;
+        let mut story = Story::new(json).expect("valid story");
+        assert!(matches!(
+            story.get_variable("score"),
+            Some(ValueType::Int(0))
+        ));
+
+        let mut save: serde_json::Value =
+            serde_json::from_str(&story.save_state().expect("save state")).expect("valid save");
+        save["variablesState"]["score"] = json!(7);
+        save.as_object_mut()
+            .expect("save object")
+            .remove("previousRandom");
+
+        let error = story
+            .load_state(&save.to_string())
+            .expect_err("expected missing previous random error");
+
+        assert!(error.to_string().contains("Missing previous random value"));
+        assert!(matches!(
+            story.get_variable("score"),
+            Some(ValueType::Int(0))
+        ));
     }
 
     #[test]

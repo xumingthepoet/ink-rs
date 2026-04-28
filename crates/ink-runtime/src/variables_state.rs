@@ -280,13 +280,15 @@ impl VariablesState {
             let loaded_token = jobj.get(k);
 
             if let Some(loaded_token) = loaded_token {
-                self.global_variables.insert(
-                    k.to_string(),
-                    json_read::jtoken_to_runtime_object(loaded_token, None)?
-                        .into_any()
-                        .downcast::<Value>()
-                        .unwrap(),
-                );
+                let loaded_value = json_read::jtoken_to_runtime_object(loaded_token, None)?
+                    .into_any()
+                    .downcast::<Value>()
+                    .map_err(|_| {
+                        StoryError::BadJson(format!(
+                            "Variable '{k}' must decode to a runtime value"
+                        ))
+                    })?;
+                self.global_variables.insert(k.to_string(), loaded_value);
             } else {
                 self.global_variables.insert(k.clone(), v.clone());
             }
