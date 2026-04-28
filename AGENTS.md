@@ -45,6 +45,8 @@ The upstream reference lives in `ink-csharp/`.
 - `ink-csharp/tests`: historical C# test corpus
 - `docs/active_plan`: active implementation plan workspace
 - `docs/finished_plans`: completed implementation plans
+- `docs/issues_found`: deferred issues discovered during implementation
+- `docs/issues_solved`: issue records moved here after their fixes land
 - `docs/WritingWithInk-updates.md`: ink-rs syntax and semantic change log
 - `docs/WritingWithInk-latest.md`: current maintained writing guide
 - `docs/WritingWithInk-origin.md`: upstream C# writing guide snapshot
@@ -256,6 +258,38 @@ before marking a change done is:
 - Keep diagnostics clear and actionable.
 - Prefer small, reviewable changes that isolate parser, parsed-model, format,
   compiler output, and runtime loading logic.
+
+## Deferred Issue Capture
+
+- During implementation, debugging, test repair, review, or validation, if you
+  discover a design bug, real defect, awkward API, unreasonable workflow,
+  missing test coverage, obsolete compatibility path, or clearly useful
+  improvement that is outside the current task scope, record it under
+  `docs/issues_found/`.
+- Do not derail the current task just to fix a deferred issue. If the issue
+  blocks the current task or invalidates the current approach, handle it as part
+  of the current work instead of filing it as deferred.
+- Keep one issue per Markdown file. Use a stable, descriptive file name such as
+  `YYYY-MM-DD-short-kebab-title.md`. Avoid generic names like `issue.md`.
+- Write issue records in English. Keep them concise but actionable enough that
+  a later prompt can fix the issue without rediscovering all context.
+- Each issue file should include:
+  - `# Short Title`
+  - `Status: found`
+  - `Found while: <task or command>`
+  - `Scope: <crate/module/files>`
+  - `Problem: <what is wrong or inconvenient>`
+  - `Why it matters: <risk, maintenance cost, or user impact>`
+  - `Suggested fix: <first plausible repair path>`
+  - `Evidence: <file paths, failing command, or observed behavior>`
+- Do not file speculative cleanups, personal style preferences, or issues that
+  are already fixed in the same change.
+- When an issue is fixed, move its Markdown file from `docs/issues_found/` to
+  `docs/issues_solved/`, change `Status: found` to `Status: solved`, and add
+  the fixing commit or validation evidence when available.
+- In the final response for a task, mention any new files added under
+  `docs/issues_found/` so the project owner can decide when to schedule a
+  separate fix prompt.
 
 ## Working Notes
 
