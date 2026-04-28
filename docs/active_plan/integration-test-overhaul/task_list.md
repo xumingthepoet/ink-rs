@@ -1,4 +1,4 @@
-Progress: 0/26
+Progress: 1/26
 
 # Integration Test Overhaul
 
@@ -13,7 +13,7 @@ complete, `[!]` blocked.
 
 ## Milestone 1: Test Policy And Harness
 
-### [>] Task 01: Add integration fixture policy checks
+### [x] Task 01: Add integration fixture policy checks
 
 Goal: make unsupported test shapes visible before large fixture migration starts.
 
@@ -42,6 +42,10 @@ Validation:
 - `make gate` passed.
 
 Commit record: implementation commit `2c1625af` (`Add integration test policy checks`).
+
+Review record: reviewed implementation commit `2c1625af` with `git show
+--check`; no follow-up fixes were needed. Re-ran `cargo test -p ink-test --test
+integration_policy` and `make gate`, both passed.
 
 ### [ ] Task 02: Remove module-wrapping from language helpers
 
