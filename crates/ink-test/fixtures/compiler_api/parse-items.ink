@@ -1,0 +1,3 @@
+=== module items ===
+== sword ==
+-> END

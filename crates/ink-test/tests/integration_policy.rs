@@ -5,6 +5,8 @@ use std::{
 };
 
 const ALLOWED_LEGACY_INK_FIXTURES: &[&str] = &[
+    "compiler_api/legacy-content.ink",
+    "compiler_api/legacy-flow.ink",
     "conformance/inkfiles/basictext/oneline.ink",
     "conformance/inkfiles/basictext/twolines.ink",
     "conformance/inkfiles/conditional/ifelse-ext.ink",
@@ -56,11 +58,7 @@ const ALLOWED_LEGACY_INK_FIXTURES: &[&str] = &[
     "language/diagnostics/root-content-before-module.ink",
 ];
 
-const ALLOWED_SOURCE_CONSTRUCTION_TESTS: &[&str] = &[
-    "compiler_api.rs",
-    "csharp_tests/mod.rs",
-    "inkling_examples.rs",
-];
+const ALLOWED_SOURCE_CONSTRUCTION_TESTS: &[&str] = &["csharp_tests/mod.rs", "inkling_examples.rs"];
 
 const SOURCE_CONSTRUCTION_PATTERNS: &[&str] = &[
     "explicit_game_module",

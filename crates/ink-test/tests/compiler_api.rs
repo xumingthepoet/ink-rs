@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 fn public_compiler_api_exposes_pipeline_artifacts() {
     let compiler = Compiler::new();
 
-    let parsed = compiler.parse(SourceInput::named("Line.", "api.ink"));
+    let parsed = compiler.parse(named_fixture("basic.ink", "api.ink"));
     assert!(!parsed.has_errors(), "{:#?}", parsed.diagnostics);
     let parsed_story: ParsedStory = parsed.artifact.expect("expected parsed story");
 
@@ -35,7 +35,7 @@ fn public_compiler_options_are_constructible() {
         count_all_visits: true,
     });
 
-    let output = compiler.compile(SourceInput::new("Line."));
+    let output = compiler.compile(unnamed_fixture("basic.ink"));
 
     assert!(!output.has_errors(), "{:#?}", output.diagnostics);
     assert!(output
@@ -48,7 +48,7 @@ fn public_compiler_options_are_constructible() {
 #[test]
 fn public_compile_sources_accepts_explicit_source_list() {
     let compiler = Compiler::default();
-    let source = SourceInput::new("Line.");
+    let source = unnamed_fixture("basic.ink");
 
     let single_output = compiler.compile(source.clone());
     let source_list_output = compiler.compile_sources(vec![source]);
@@ -72,8 +72,8 @@ fn public_compile_sources_accepts_explicit_source_list() {
 #[test]
 fn public_compile_sources_accepts_multiple_sources_in_any_order() {
     let compiler = Compiler::default();
-    let entry = SourceInput::named("-> start", "entry.ink");
-    let flow = SourceInput::named("=== start ===\nHello.\n-> END", "flow.ink");
+    let entry = named_fixture("multi-entry.ink", "entry.ink");
+    let flow = named_fixture("multi-flow.ink", "flow.ink");
 
     let entry_first = compiler.compile_sources(vec![entry.clone(), flow.clone()]);
     let flow_first = compiler.compile_sources(vec![flow, entry]);
@@ -102,8 +102,8 @@ fn public_compile_sources_rejects_empty_input() {
 #[test]
 fn public_compile_sources_preserves_source_filenames_in_diagnostics() {
     let output = Compiler::default().compile_sources(vec![
-        SourceInput::named("Line.", "ok.ink"),
-        SourceInput::named("VAR score = 1", "bad.ink"),
+        named_fixture("ok.ink", "ok.ink"),
+        named_fixture("bad-untyped-global.ink", "bad.ink"),
     ]);
 
     assert!(output.has_errors());
@@ -113,23 +113,18 @@ fn public_compile_sources_preserves_source_filenames_in_diagnostics() {
         .find(|diagnostic| diagnostic.severity == DiagnosticSeverity::Error)
         .expect("expected an error diagnostic");
     assert_eq!(diagnostic.source_filename.as_deref(), Some("bad.ink"));
-    assert_eq!(diagnostic.line, 1);
+    assert_eq!(diagnostic.line, 2);
 }
 
 #[test]
 fn public_compile_sources_rejects_mixed_root_and_module_inputs() {
-    let module_source = SourceInput::named(
-        "=== module game ===\n\
-         == main ==\n\
-         -> END",
-        "game.ink",
-    );
+    let module_source = named_fixture("game-empty.ink", "game.ink");
     let cases = [
-        (SourceInput::named("Line.", "legacy.ink"), "legacy.ink"),
         (
-            SourceInput::named("== start ==\n-> END", "flow.ink"),
-            "flow.ink",
+            named_fixture("legacy-content.ink", "legacy.ink"),
+            "legacy.ink",
         ),
+        (named_fixture("legacy-flow.ink", "flow.ink"), "flow.ink"),
     ];
 
     for (legacy_source, expected_filename) in cases {
@@ -157,19 +152,8 @@ fn public_compile_sources_rejects_mixed_root_and_module_inputs() {
 #[test]
 fn public_parse_sources_combines_modules_from_multiple_inputs() {
     let output = Compiler::default().parse_sources(vec![
-        SourceInput::named(
-            "=== module game ===\n\
-             IMPORT sword FROM items\n\
-             == main ==\n\
-             -> END",
-            "game.ink",
-        ),
-        SourceInput::named(
-            "=== module items ===\n\
-             == sword ==\n\
-             -> END",
-            "items.ink",
-        ),
+        named_fixture("parse-game-imports.ink", "game.ink"),
+        named_fixture("parse-items.ink", "items.ink"),
     ]);
 
     assert!(!output.has_errors(), "{:#?}", output.diagnostics);
@@ -196,8 +180,8 @@ fn public_parse_sources_combines_modules_from_multiple_inputs() {
 #[test]
 fn public_parse_sources_preserves_module_ownership_across_input_orders() {
     let compiler = Compiler::default();
-    let game = SourceInput::named("=== module game ===\n== main ==\n-> END", "game.ink");
-    let items = SourceInput::named("=== module items ===\n== sword ==\n-> END", "items.ink");
+    let game = named_fixture("game-empty.ink", "game.ink");
+    let items = named_fixture("parse-items.ink", "items.ink");
 
     let game_first = compiler.parse_sources(vec![game.clone(), items.clone()]);
     let items_first = compiler.parse_sources(vec![items, game]);
@@ -215,8 +199,8 @@ fn public_parse_sources_preserves_module_ownership_across_input_orders() {
 #[test]
 fn public_parse_sources_preserves_original_source_in_diagnostics() {
     let output = Compiler::default().parse_sources(vec![
-        SourceInput::named("=== module ok ===", "ok.ink"),
-        SourceInput::named("Line.\n=== module bad ===", "bad.ink"),
+        named_fixture("ok.ink", "ok.ink"),
+        named_fixture("bad-inline.ink", "bad.ink"),
     ]);
 
     assert!(output.has_errors());
@@ -226,19 +210,17 @@ fn public_parse_sources_preserves_original_source_in_diagnostics() {
         output.diagnostics[0].source_filename.as_deref(),
         Some("bad.ink")
     );
-    assert_eq!(output.diagnostics[0].line, 1);
+    assert_eq!(output.diagnostics[0].line, 3);
     assert_eq!(
         output.diagnostics[0].message,
-        "Content and module-scoped declarations must appear after an explicit module declaration"
+        "expected closing `}` for inline expression before end of line"
     );
 }
 
 #[test]
 fn public_parse_sources_keeps_declared_module_names_independent_from_filenames() {
-    let output = Compiler::default().parse_sources(vec![SourceInput::named(
-        "=== module declared ===\n\
-         == main ==\n\
-         -> END",
+    let output = Compiler::default().parse_sources(vec![named_fixture(
+        "declared-module.ink",
         "not_declared.ink",
     )]);
 
@@ -253,15 +235,7 @@ fn public_parse_sources_keeps_declared_module_names_independent_from_filenames()
 
 #[test]
 fn public_parse_sources_accepts_one_source_with_multiple_modules() {
-    let output = Compiler::default().parse_sources(vec![SourceInput::named(
-        "=== module game ===\n\
-         == main ==\n\
-         -> END\n\
-         === module items ===\n\
-         == sword ==\n\
-         -> END",
-        "bundle.ink",
-    )]);
+    let output = Compiler::default().parse_sources(vec![named_fixture("bundle.ink", "bundle.ink")]);
 
     assert!(!output.has_errors(), "{:#?}", output.diagnostics);
     let story = output.artifact.expect("expected parsed story");
@@ -274,13 +248,25 @@ fn public_parse_sources_accepts_one_source_with_multiple_modules() {
 
 #[test]
 fn public_diagnostics_expose_codes() {
-    let output = Compiler::default().compile(SourceInput::new("Line {x + 1"));
+    let output = Compiler::default().compile(unnamed_fixture("bad-inline.ink"));
 
     assert!(output.has_errors());
     assert!(output
         .diagnostics
         .iter()
         .any(|diagnostic| diagnostic.code == Some(DiagnosticCode::InvalidInlineSyntax)));
+}
+
+fn compiler_api_fixture(filename: &str) -> String {
+    ink_test::load_fixture_text(&format!("compiler_api/{filename}"))
+}
+
+fn named_fixture(fixture_filename: &str, source_filename: &str) -> SourceInput {
+    SourceInput::named(compiler_api_fixture(fixture_filename), source_filename)
+}
+
+fn unnamed_fixture(fixture_filename: &str) -> SourceInput {
+    SourceInput::new(compiler_api_fixture(fixture_filename))
 }
 
 fn module_names(story: &ParsedStory) -> Vec<&str> {
