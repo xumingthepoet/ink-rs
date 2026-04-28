@@ -49,6 +49,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ink-rs"
+version = "0.1.0"
+dependencies = [
+ "ink-compiler",
+ "ink-runtime",
+ "ink-story-json-format",
+]
+
+[[package]]
 name = "ink-runtime"
 version = "1.2.1"
 dependencies = [

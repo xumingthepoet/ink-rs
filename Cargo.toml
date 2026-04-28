@@ -1,5 +1,31 @@
+[package]
+name = "ink-rs"
+version = "0.1.0"
+edition.workspace = true
+description = "Rust implementation and language fork of Ink for interactive narratives."
+
+[features]
+default = ["runtime"]
+runtime = ["dep:ink-runtime"]
+compiler = ["dep:ink-compiler", "format"]
+format = ["dep:ink-story-json-format"]
+full = ["runtime", "compiler"]
+
+[dependencies]
+ink-runtime = { version = "1.2.1", path = "crates/ink-runtime", optional = true }
+ink-compiler = { version = "0.1.0", path = "crates/ink-compiler", optional = true }
+ink-story-json-format = { version = "0.1.0", path = "crates/ink-story-json-format", optional = true }
+
 [workspace]
 members = [
+    "crates/ink-compiler",
+    "crates/ink-story-json-format",
+    "crates/ink-runtime",
+    "crates/ink-test",
+    "crates/ink-tools",
+]
+default-members = [
+    ".",
     "crates/ink-compiler",
     "crates/ink-story-json-format",
     "crates/ink-runtime",
