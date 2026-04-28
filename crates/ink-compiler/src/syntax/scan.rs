@@ -103,6 +103,10 @@ impl ScanState {
     fn can_match_top_level(&self) -> bool {
         !self.escaped && self.is_top_level()
     }
+
+    fn has_unclosed_expression_delimiters(&self) -> bool {
+        self.in_string || self.paren_depth > 0 || self.brace_depth > 0 || self.bracket_depth > 0
+    }
 }
 
 pub(super) fn find_top_level_char_with_options(
@@ -200,6 +204,14 @@ pub(super) fn split_top_level_preserving_whitespace_with_options(
 
     parts.push(rest);
     parts
+}
+
+pub(super) fn has_unclosed_expression_delimiters(source: &str) -> bool {
+    let mut state = ScanState::default();
+    for ch in source.chars() {
+        state.advance(ch, ScanOptions::expression());
+    }
+    state.has_unclosed_expression_delimiters()
 }
 
 pub(super) fn find_matching_delimiter(

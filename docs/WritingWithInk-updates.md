@@ -25,6 +25,34 @@ Each entry should include:
 - migration guidance
 - tests
 
+## 2026-04-28: Choice Condition Boundary And Multiline Declarations
+
+- status: supported
+- upstream behavior: leading braced expressions on choice lines are parsed as
+  choice conditions, and declaration initializers in this fork were previously
+  parsed from one physical line.
+- ink-rs behavior: a colon after one or more leading choice conditions ends the
+  condition prefix, so `* {enabled}: {label}` means a conditional choice whose
+  visible text is the dynamic expression `{label}`. Module-level `VAR` and
+  `CONST` declarations may now write array and struct literal initializers
+  across multiple lines. Temporary declarations and other `~` logic lines
+  remain single-line syntax.
+- documentation effect: `WritingWithInk-latest.md` documents the explicit
+  choice boundary, shows multiline `VAR`/`CONST` composite declarations, and
+  updates the data-driven choice example to use
+  `* {option.enabled}: {option.text}` instead of invisible glue.
+- rationale: dynamic data-driven choices should not require incidental glue to
+  separate conditions from visible text, and long data declarations should be
+  readable without changing runtime data formats.
+- migration guidance: replace `* {condition}<>{dynamic_text}` or
+  `* <>{dynamic_text}` patterns with `* {condition}: {dynamic_text}` when a
+  condition is present. Keep `~ temp` initializers on one line, or initialize a
+  module-level `VAR`/`CONST` with the multiline value and copy from it.
+- tests: `choice_condition_colon_boundary_allows_dynamic_choice_text`,
+  `multiline_var_and_const_composite_literals_run_at_runtime`,
+  `multiline_temp_initializer_remains_single_line_syntax`, and choice parser
+  unit tests for colon boundaries, multiple conditions, and adjacent braces.
+
 ## 2026-04-27: Data-Driven Choice Generation With Threads
 
 - status: supported

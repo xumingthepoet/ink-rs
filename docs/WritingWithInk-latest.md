@@ -617,6 +617,12 @@ You can use several logical tests on an option; if you do, *all* the tests must 
 	+ 	{ has_visited_paris } { not bored_of_paris }
 		Return to Paris -> visit_paris
 
+When the visible choice text itself starts with a dynamic expression, put a
+colon after the condition prefix to make the boundary explicit:
+
+	*	{ has_key }: {locked_door_label} -> open_door
+	+	{ has_visited_paris } { not bored_of_paris }: {return_label} -> visit_paris
+
 #### Logical operators: AND and OR
 
 The above "multiple conditions" are really just conditions with an the usual programming AND operator. Ink supports `and` (also written as `&&`) and `or` (also written as `||`) in the usual way, as well as brackets.
@@ -700,7 +706,7 @@ They can also be used inside choice text:
 
 	+ 	"Hello, {&Master|Monsieur Fogg|you|brown-eyes}!" I declared.
 
-(...with one caveat; you can't start an option's text with a `{`, as it'll look like a conditional.)
+(...with one caveat; you can't start an option's text with a `{`, as it'll look like a conditional. If the choice has conditions, end the condition prefix with `:` before the dynamic text, as in `* {ready}: {label}`.)
 
 (...but the caveat has a caveat, if you escape a whitespace `\ ` before your `{` ink will recognise it as text.)
 
@@ -1268,6 +1274,18 @@ use the type's default value.
 	VAR checkpoints: ->[] = [-> the_train]
 
 The primitive source types are `int`, `float`, `bool`, `string`, and `->`. The `->` type stores a divert target value such as `-> knot` or `-> knot.stitch`. Array types are written as `T[]`, so `string[]` means an array of strings, `int[][]` means an array of integer arrays, and `->[]` means an array of divert targets. Empty array literals are valid when the expected type is known, such as in `VAR unopened_doors: int[] = []`.
+
+Long `VAR` and `CONST` initializers can spread array and struct literals across
+multiple lines:
+
+	VAR party: Player[] = [
+		{ name: "Ada", stats: { hp: 10, ready: true } },
+		{ name: "Bea", stats: { hp: 8, ready: false } }
+	]
+
+This multiline form is for module-level `VAR` and `CONST` declarations. Temporary
+declarations such as `~ temp player: Player = ...` are still single-line logic
+statements.
 
 ### Structs and object values
 
@@ -2365,7 +2383,12 @@ target: ->
 enabled: bool
 }
 
-VAR options: ChoiceOption[] = [{ text: "A", target: -> a, enabled: true }, { text: "B", target: -> b, enabled: true }, { text: "C", target: -> c, enabled: false }, { text: "D", target: -> d, enabled: true }]
+VAR options: ChoiceOption[] = [
+{ text: "A", target: -> a, enabled: true },
+{ text: "B", target: -> b, enabled: true },
+{ text: "C", target: -> c, enabled: false },
+{ text: "D", target: -> d, enabled: true }
+]
 
 == main ==
 <- emit_options(LEN(options) - 1)
@@ -2375,11 +2398,9 @@ VAR options: ChoiceOption[] = [{ text: "A", target: -> a, enabled: true }, { tex
 { i >= 0:
 	<- emit_options(i - 1)
 
-	{ options[i].enabled:
-		~ temp option: ChoiceOption = options[i]
-		* <>{option.text}
-			-> {option.target}
-	}
+	~ temp option: ChoiceOption = options[i]
+	* {option.enabled}: {option.text}
+		-> {option.target}
 }
 -> DONE
 
@@ -2414,10 +2435,10 @@ keeps the displayed text and selected target together. Without that temp, later
 changes to shared global data can make a pending generated choice run with data
 that no longer matches what the player saw.
 
-The `<>` before `{option.text}` is also deliberate. At the beginning of a choice
-line, braced expressions are parsed as choice conditions. Glue is invisible
-content, so it ends the condition area without adding visible text, allowing the
-choice display text to be completely dynamic.
+The colon after `{option.enabled}` is also deliberate. At the beginning of a
+choice line, braced expressions are parsed as choice conditions. The colon ends
+the condition prefix, so the following `{option.text}` is parsed as dynamic
+choice text instead of another condition.
 
 # Part 5: International character support in identifiers
 

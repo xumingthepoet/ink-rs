@@ -110,10 +110,14 @@ fn parse_choice_conditions(choice_body: &str) -> Option<(Option<Expression>, Str
     let mut conditions = Vec::new();
 
     while let Some(after_open) = remaining.strip_prefix('{') {
-        let close_index = after_open.find('}')?;
+        let close_index = scan::find_matching_delimiter(after_open, '{', '}')?;
         let condition = parse_condition_expression(&after_open[..close_index])?;
         conditions.push(condition);
         remaining = after_open[close_index + 1..].trim_start();
+        if let Some(after_boundary) = remaining.strip_prefix(':') {
+            remaining = after_boundary.trim_start();
+            break;
+        }
     }
 
     Some((
@@ -177,7 +181,40 @@ fn append_newline(mut content: ContentList, span: crate::source::SourceSpan) -> 
 
 #[cfg(test)]
 mod tests {
+    use crate::{
+        parsed::Object,
+        source::{SourceLine, SourceSpan},
+        syntax::rule::RuleParser,
+    };
+
     use super::*;
+
+    fn parse_choice_line(source: &str) -> Choice {
+        let line = SourceLine {
+            text: source.to_string(),
+            span: SourceSpan::new(None, 1, 1),
+        };
+        let mut parser = RuleParser::new(&line);
+        let choice = parse_choice(&mut parser).expect("expected choice");
+        assert!(!parser
+            .finish()
+            .iter()
+            .any(|diagnostic| diagnostic.severity == crate::diagnostic::DiagnosticSeverity::Error));
+        choice
+    }
+
+    fn assert_single_dynamic_text(choice: &Choice, expected_name: &str) {
+        let start_content = choice.start_content().expect("expected display text");
+        assert!(matches!(
+            start_content.objects(),
+            [Object::ContentList(content)]
+                if matches!(
+                    content.objects(),
+                    [Object::Expression(Expression::VariableReference(name))]
+                        if name == expected_name
+                )
+        ));
+    }
 
     #[test]
     fn top_level_divert_ignores_arrows_inside_braced_strings() {
@@ -186,5 +223,61 @@ mod tests {
             Some(15)
         );
         assert_eq!(find_top_level_divert(r#"visible {"->"}"#), None);
+    }
+
+    #[test]
+    fn colon_ends_choice_condition_before_dynamic_text() {
+        let choice = parse_choice_line("* {enabled}: {label}");
+
+        assert!(matches!(
+            choice.condition(),
+            Some(Expression::VariableReference(name)) if name == "enabled"
+        ));
+        assert_single_dynamic_text(&choice, "label");
+    }
+
+    #[test]
+    fn colon_ends_multiple_choice_conditions_before_dynamic_text() {
+        let choice = parse_choice_line("* {enabled} {visible}: {label}");
+
+        let Some(Expression::MultipleCondition(conditions)) = choice.condition() else {
+            panic!("expected multiple condition");
+        };
+        assert_eq!(conditions.len(), 2);
+        assert!(matches!(
+            &conditions[0],
+            Expression::VariableReference(name) if name == "enabled"
+        ));
+        assert!(matches!(
+            &conditions[1],
+            Expression::VariableReference(name) if name == "visible"
+        ));
+        assert_single_dynamic_text(&choice, "label");
+    }
+
+    #[test]
+    fn adjacent_leading_braces_remain_multiple_conditions() {
+        let choice = parse_choice_line("* {enabled}{label}");
+
+        let Some(Expression::MultipleCondition(conditions)) = choice.condition() else {
+            panic!("expected multiple condition");
+        };
+        assert_eq!(conditions.len(), 2);
+        assert!(choice.start_content().is_none());
+    }
+
+    #[test]
+    fn multiple_conditions_without_colon_keep_existing_text_boundary() {
+        let choice = parse_choice_line("* {enabled} {visible} Label");
+
+        let Some(Expression::MultipleCondition(conditions)) = choice.condition() else {
+            panic!("expected multiple condition");
+        };
+        assert_eq!(conditions.len(), 2);
+        let start_content = choice.start_content().expect("expected display text");
+        assert!(matches!(
+            start_content.objects(),
+            [Object::Text(text)] if text.text() == "Label"
+        ));
     }
 }

@@ -8,6 +8,7 @@ use crate::{
 };
 
 use super::rule::RuleParser;
+use super::scan;
 use super::weave::group_weave_content;
 use super::{
     author_warning_statement, choice_statement, declaration, divert_statement, gather, import,
@@ -181,11 +182,18 @@ impl Parser {
                 }
 
                 if is_module_scoped_statement_line(&line.text) {
-                    let parsed = self.parse_statement(line);
+                    let parsed = if let Some(parsed) =
+                        self.parse_multiline_module_scoped_statement(&lines, &mut index)
+                    {
+                        parsed
+                    } else {
+                        let parsed = self.parse_statement(line);
+                        index += 1;
+                        parsed
+                    };
                     if parsed.iter().all(is_module_scoped_object) {
                         modules[module_index].push_objects(parsed);
                     }
-                    index += 1;
                     continue;
                 }
 
@@ -215,6 +223,11 @@ impl Parser {
                     flows.push(flow);
                     continue;
                 }
+            }
+
+            if let Some(parsed) = self.parse_multiline_module_scoped_statement(&lines, &mut index) {
+                objects.extend(parsed);
+                continue;
             }
 
             if let Some(parsed) = self.parse_compound_statement(&lines, &mut index) {
@@ -264,6 +277,40 @@ impl Parser {
 
         self.diagnostics.extend(line_parser.finish());
         Vec::new()
+    }
+
+    fn parse_multiline_module_scoped_statement(
+        &mut self,
+        lines: &[SourceLine],
+        index: &mut usize,
+    ) -> Option<Vec<Object>> {
+        let line = &lines[*index];
+        let initializer = multiline_declaration_initializer(&line.text)?;
+        if !scan::has_unclosed_expression_delimiters(initializer) {
+            return None;
+        }
+
+        let mut combined = line.text.clone();
+        let mut combined_initializer = initializer.to_string();
+        let mut next_index = *index + 1;
+        while next_index < lines.len()
+            && scan::has_unclosed_expression_delimiters(&combined_initializer)
+        {
+            let next_line = &lines[next_index];
+            combined.push('\n');
+            combined.push_str(&next_line.text);
+            combined_initializer.push('\n');
+            combined_initializer.push_str(&next_line.text);
+            next_index += 1;
+        }
+
+        let combined_line = SourceLine {
+            text: combined,
+            span: line.span.clone(),
+        };
+        let parsed = self.parse_statement(&combined_line);
+        *index = next_index;
+        Some(parsed)
     }
 
     fn parse_gather_line(&mut self, line: &SourceLine) -> Option<Vec<Object>> {
@@ -628,6 +675,16 @@ fn is_module_scoped_statement_line(line: &str) -> bool {
     trimmed.starts_with("CONST ")
         || is_global_var_declaration_line(trimmed)
         || trimmed.starts_with("EXTERNAL ")
+}
+
+fn multiline_declaration_initializer(line: &str) -> Option<&str> {
+    let trimmed = line.trim_start();
+    if !trimmed.starts_with("CONST ") && !is_global_var_declaration_line(trimmed) {
+        return None;
+    }
+
+    let initializer_index = line.find('=')?;
+    Some(&line[initializer_index + '='.len_utf8()..])
 }
 
 fn is_module_scoped_object(object: &Object) -> bool {
