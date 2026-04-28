@@ -4,13 +4,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
-const ALLOWED_LEGACY_INK_FIXTURES: &[&str] = &[
-    "compiler_api/legacy-content.ink",
-    "compiler_api/legacy-flow.ink",
-    "language/diagnostics/root-content-before-module.ink",
-];
+const ALLOWED_LEGACY_INK_FIXTURES: &[&str] = &[];
 
-const ALLOWED_SOURCE_CONSTRUCTION_TESTS: &[&str] = &["csharp_tests/mod.rs"];
+const ALLOWED_SOURCE_CONSTRUCTION_TESTS: &[&str] = &[];
 
 const SOURCE_CONSTRUCTION_PATTERNS: &[&str] = &[
     "explicit_game_module",

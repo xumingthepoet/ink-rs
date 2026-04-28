@@ -51,16 +51,7 @@ fn assert_diagnostic(
 }
 
 #[test]
-fn explicit_module_removed_root_behaviors_emit_diagnostics() {
-    let root_diagnostics =
-        diagnostics_for_language_fixture("diagnostics/root-content-before-module.ink");
-
-    assert_diagnostic(
-        &root_diagnostics,
-        DiagnosticSeverity::Error,
-        "Content and module-scoped declarations must appear after an explicit module declaration",
-    );
-
+fn explicit_module_level_content_emits_diagnostics() {
     let module_diagnostics =
         diagnostics_for_language_fixture("diagnostics/module-level-content.ink");
 
