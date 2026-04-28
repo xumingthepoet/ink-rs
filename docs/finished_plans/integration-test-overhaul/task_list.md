@@ -1,12 +1,12 @@
-Progress: 1/26
+Progress: 26/26
 
 # Integration Test Overhaul
 
-This active plan makes integration tests exercise the current module-based
+This finished plan makes integration tests exercise the current module-based
 language directly. Test inputs must be repository `.ink` fixtures written in the
 current syntax. Integration helpers must not wrap legacy Ink snippets in modules
-or synthesize story source strings. Once the tests no longer depend on the
-legacy root-story path, remove the compiler code that still supports that path.
+or synthesize story source strings. The closeout audit removed the remaining
+legacy root-story production path.
 
 Status key: `[ ]` pending, `[~]` in progress, `[>]` waiting review, `[x]`
 complete, `[!]` blocked.
@@ -47,7 +47,7 @@ Review record: reviewed implementation commit `2c1625af` with `git show
 --check`; no follow-up fixes were needed. Re-ran `cargo test -p ink-test --test
 integration_policy` and `make gate`, both passed.
 
-### [ ] Task 02: Remove module-wrapping from language helpers
+### [x] Task 02: Remove module-wrapping from language helpers
 
 Goal: ensure language integration tests compile exactly the source stored in
 fixtures.
@@ -69,9 +69,9 @@ Modification boundaries: `crates/ink-test/tests/language.rs` and
 
 Validation commands: `cargo test -p ink-test --test language`.
 
-Commit record: pending.
+Commit record: completed during integration-test-overhaul implementation; audited and validated by implementation commit `6dd83974e4c7172f59fd1d695a318bbb33056b56`.
 
-### [ ] Task 03: Convert compiler API tests to fixture-backed sources
+### [x] Task 03: Convert compiler API tests to fixture-backed sources
 
 Goal: remove direct Ink source strings from public compiler API integration
 tests.
@@ -91,9 +91,9 @@ Modification boundaries: `crates/ink-test/tests/compiler_api.rs` and
 
 Validation commands: `cargo test -p ink-test --test compiler_api`.
 
-Commit record: pending.
+Commit record: completed during integration-test-overhaul implementation; audited and validated by implementation commit `6dd83974e4c7172f59fd1d695a318bbb33056b56`.
 
-### [ ] Task 04: Put compiler API tests into the gate
+### [x] Task 04: Put compiler API tests into the gate
 
 Goal: make the project gate cover all maintained `ink-test` integration tests.
 
@@ -111,11 +111,11 @@ Modification boundaries: `Makefile`.
 
 Validation commands: `make test`.
 
-Commit record: pending.
+Commit record: completed during integration-test-overhaul implementation; audited and validated by implementation commit `6dd83974e4c7172f59fd1d695a318bbb33056b56`.
 
 ## Milestone 2: Rust-First Language Fixtures
 
-### [ ] Task 05: Move module and import language cases to fixtures
+### [x] Task 05: Move module and import language cases to fixtures
 
 Goal: make module/import behavior tests read real `.ink` fixtures.
 
@@ -133,9 +133,9 @@ Modification boundaries: `tests/language.rs` and `fixtures/language/modules`.
 
 Validation commands: `cargo test -p ink-test --test language module`.
 
-Commit record: pending.
+Commit record: completed during integration-test-overhaul implementation; audited and validated by implementation commit `6dd83974e4c7172f59fd1d695a318bbb33056b56`.
 
-### [ ] Task 06: Move choice and save-load language cases to fixtures
+### [x] Task 06: Move choice and save-load language cases to fixtures
 
 Goal: make choice generation and save-load behavior tests fixture-backed.
 
@@ -153,9 +153,9 @@ Modification boundaries: `tests/language.rs` and `fixtures/language/choices`.
 
 Validation commands: `cargo test -p ink-test --test language choice save_load`.
 
-Commit record: pending.
+Commit record: completed during integration-test-overhaul implementation; audited and validated by implementation commit `6dd83974e4c7172f59fd1d695a318bbb33056b56`.
 
-### [ ] Task 07: Move dynamic divert and tunnel language cases to fixtures
+### [x] Task 07: Move dynamic divert and tunnel language cases to fixtures
 
 Goal: cover dynamic divert and tunnel behavior through current module syntax
 fixtures.
@@ -174,9 +174,9 @@ Modification boundaries: `tests/language.rs` and `fixtures/language/diverts`.
 
 Validation commands: `cargo test -p ink-test --test language divert tunnel`.
 
-Commit record: pending.
+Commit record: completed during integration-test-overhaul implementation; audited and validated by implementation commit `6dd83974e4c7172f59fd1d695a318bbb33056b56`.
 
-### [ ] Task 08: Move typed value mutation cases to fixtures
+### [x] Task 08: Move typed value mutation cases to fixtures
 
 Goal: make struct, array, assignment, indexing, and mutation tests real
 integration fixtures.
@@ -194,9 +194,9 @@ Modification boundaries: `tests/language.rs` and `fixtures/language/typed`.
 
 Validation commands: `cargo test -p ink-test --test language typed`.
 
-Commit record: pending.
+Commit record: completed during integration-test-overhaul implementation; audited and validated by implementation commit `6dd83974e4c7172f59fd1d695a318bbb33056b56`.
 
-### [ ] Task 09: Move diagnostics-only language cases to fixtures
+### [x] Task 09: Move diagnostics-only language cases to fixtures
 
 Goal: make syntax and type diagnostics test real invalid `.ink` files.
 
@@ -216,11 +216,11 @@ Modification boundaries: `tests/language.rs` and
 
 Validation commands: `cargo test -p ink-test --test language diagnostic`.
 
-Commit record: pending.
+Commit record: completed during integration-test-overhaul implementation; audited and validated by implementation commit `6dd83974e4c7172f59fd1d695a318bbb33056b56`.
 
 ## Milestone 3: Ported Inkling Examples
 
-### [ ] Task 10: Convert Inkling happy-path examples to module fixtures
+### [x] Task 10: Convert Inkling happy-path examples to module fixtures
 
 Goal: stop compiling ported Inkling examples from inline legacy snippets.
 
@@ -239,9 +239,9 @@ Modification boundaries: `tests/inkling_examples.rs` and
 
 Validation commands: `cargo test -p ink-test --test inkling_examples`.
 
-Commit record: pending.
+Commit record: completed during integration-test-overhaul implementation; audited and validated by implementation commit `6dd83974e4c7172f59fd1d695a318bbb33056b56`.
 
-### [ ] Task 11: Convert Inkling diagnostic examples to module fixtures
+### [x] Task 11: Convert Inkling diagnostic examples to module fixtures
 
 Goal: keep Inkling-derived error coverage while using real invalid module
 fixtures.
@@ -260,11 +260,11 @@ Modification boundaries: `tests/inkling_examples.rs` and
 
 Validation commands: `cargo test -p ink-test --test inkling_examples`.
 
-Commit record: pending.
+Commit record: completed during integration-test-overhaul implementation; audited and validated by implementation commit `6dd83974e4c7172f59fd1d695a318bbb33056b56`.
 
 ## Milestone 4: Compiler Conformance Fixtures
 
-### [ ] Task 12: Migrate basic text, knot, and divert compiler fixtures
+### [x] Task 12: Migrate basic text, knot, and divert compiler fixtures
 
 Goal: convert the first compiler conformance fixtures from root story syntax to
 explicit module syntax.
@@ -285,9 +285,9 @@ and matching `.parse`/`.json` files.
 Validation commands: `cargo test -p ink-test --test compiler_conformance
 basictext`, `cargo test -p ink-test --test compiler_conformance divert`.
 
-Commit record: pending.
+Commit record: completed during integration-test-overhaul implementation; audited and validated by implementation commit `6dd83974e4c7172f59fd1d695a318bbb33056b56`.
 
-### [ ] Task 13: Migrate glue and conditional compiler fixtures
+### [x] Task 13: Migrate glue and conditional compiler fixtures
 
 Goal: convert glue and conditional compiler fixtures to current module syntax.
 
@@ -306,9 +306,9 @@ Modification boundaries:
 Validation commands: `cargo test -p ink-test --test compiler_conformance glue`,
 `cargo test -p ink-test --test compiler_conformance conditional`.
 
-Commit record: pending.
+Commit record: completed during integration-test-overhaul implementation; audited and validated by implementation commit `6dd83974e4c7172f59fd1d695a318bbb33056b56`.
 
-### [ ] Task 14: Migrate function and variable compiler fixtures
+### [x] Task 14: Migrate function and variable compiler fixtures
 
 Goal: convert function and variable compiler conformance fixtures to current
 module syntax.
@@ -328,9 +328,9 @@ Modification boundaries:
 Validation commands: `cargo test -p ink-test --test compiler_conformance
 function`, `cargo test -p ink-test --test compiler_conformance variable`.
 
-Commit record: pending.
+Commit record: completed during integration-test-overhaul implementation; audited and validated by implementation commit `6dd83974e4c7172f59fd1d695a318bbb33056b56`.
 
-### [ ] Task 15: Migrate runtime, tags, misc, tunnels, and typed compiler fixtures
+### [x] Task 15: Migrate runtime, tags, misc, tunnels, and typed compiler fixtures
 
 Goal: finish converting compiler conformance `.ink` fixtures to explicit module
 syntax.
@@ -351,11 +351,11 @@ snapshots.
 
 Validation commands: `cargo test -p ink-test --test compiler_conformance`.
 
-Commit record: pending.
+Commit record: completed during integration-test-overhaul implementation; audited and validated by implementation commit `6dd83974e4c7172f59fd1d695a318bbb33056b56`.
 
 ## Milestone 5: Runtime Conformance From Source
 
-### [ ] Task 16: Add compile-then-run runtime conformance helper
+### [x] Task 16: Add compile-then-run runtime conformance helper
 
 Goal: make runtime conformance tests load compiled JSON produced from module
 fixtures.
@@ -375,9 +375,9 @@ Modification boundaries: `tests/conformance/common.rs`,
 
 Validation commands: `cargo test -p ink-test --test conformance`.
 
-Commit record: pending.
+Commit record: completed during integration-test-overhaul implementation; audited and validated by implementation commit `6dd83974e4c7172f59fd1d695a318bbb33056b56`.
 
-### [ ] Task 17: Add source fixtures for JSON-only choice and conditional cases
+### [x] Task 17: Add source fixtures for JSON-only choice and conditional cases
 
 Goal: replace choice and conditional JSON-only runtime coverage with source
 fixtures.
@@ -398,9 +398,9 @@ and related conformance tests.
 Validation commands: `cargo test -p ink-test --test conformance choice
 conditional`.
 
-Commit record: pending.
+Commit record: completed during integration-test-overhaul implementation; audited and validated by implementation commit `6dd83974e4c7172f59fd1d695a318bbb33056b56`.
 
-### [ ] Task 18: Add source fixtures for JSON-only gather, stitch, thread, and tags cases
+### [x] Task 18: Add source fixtures for JSON-only gather, stitch, thread, and tags cases
 
 Goal: replace structural runtime JSON-only cases with current source fixtures.
 
@@ -419,9 +419,9 @@ Modification boundaries:
 Validation commands: `cargo test -p ink-test --test conformance gather stitch
 thread tag`.
 
-Commit record: pending.
+Commit record: completed during integration-test-overhaul implementation; audited and validated by implementation commit `6dd83974e4c7172f59fd1d695a318bbb33056b56`.
 
-### [ ] Task 19: Add source fixtures for JSON-only runtime and variable API cases
+### [x] Task 19: Add source fixtures for JSON-only runtime and variable API cases
 
 Goal: replace runtime API JSON-only fixtures with current source fixtures.
 
@@ -441,9 +441,9 @@ Modification boundaries:
 Validation commands: `cargo test -p ink-test --test conformance runtime
 variable`.
 
-Commit record: pending.
+Commit record: completed during integration-test-overhaul implementation; audited and validated by implementation commit `6dd83974e4c7172f59fd1d695a318bbb33056b56`.
 
-### [ ] Task 20: Remove obsolete raw compiled JSON fixtures from integration coverage
+### [x] Task 20: Remove obsolete raw compiled JSON fixtures from integration coverage
 
 Goal: ensure integration tests no longer rely on checked-in compiled-story JSON
 as the primary story source.
@@ -464,11 +464,11 @@ format/runtime compatibility tests if needed.
 Validation commands: `cargo test -p ink-test --test conformance`, focused
 runtime JSON reader tests.
 
-Commit record: pending.
+Commit record: completed during integration-test-overhaul implementation; audited and validated by implementation commit `6dd83974e4c7172f59fd1d695a318bbb33056b56`.
 
 ## Milestone 6: C# Compatibility Suite Retirement
 
-### [ ] Task 21: Classify or migrate C# compatibility coverage
+### [x] Task 21: Classify or migrate C# compatibility coverage
 
 Goal: make the old C# compatibility test suite stop being an opaque legacy
 source dependency.
@@ -490,9 +490,9 @@ Modification boundaries: `tests/csharp_tests`, `fixtures/csharp_tests`, and
 Validation commands: `cargo test -p ink-test --features csharp-tests --test
 csharp_tests`.
 
-Commit record: pending.
+Commit record: completed during integration-test-overhaul implementation; audited and validated by implementation commit `6dd83974e4c7172f59fd1d695a318bbb33056b56`.
 
-### [ ] Task 22: Remove the `csharp-tests` feature and API cfg split
+### [x] Task 22: Remove the `csharp-tests` feature and API cfg split
 
 Goal: stop feature flags from changing the public test API shape.
 
@@ -512,11 +512,11 @@ Modification boundaries: `crates/ink-test/Cargo.toml`, `tests/conformance/api.rs
 Validation commands: `cargo test -p ink-test`, `cargo test -p ink-test
 --all-features`, `make gate`.
 
-Commit record: pending.
+Commit record: completed during integration-test-overhaul implementation; audited and validated by implementation commit `6dd83974e4c7172f59fd1d695a318bbb33056b56`.
 
 ## Milestone 7: Delete Legacy Compiler Source Support
 
-### [ ] Task 23: Reject non-module source at parser entry
+### [x] Task 23: Reject non-module source at parser entry
 
 Goal: make current syntax require explicit modules for compiler input.
 
@@ -535,9 +535,9 @@ Modification boundaries: `crates/ink-compiler/src/syntax`,
 
 Validation commands: `cargo test -p ink-compiler`, `cargo test -p ink-test`.
 
-Commit record: pending.
+Commit record: completed during integration-test-overhaul implementation; audited and validated by implementation commit `6dd83974e4c7172f59fd1d695a318bbb33056b56`.
 
-### [ ] Task 24: Remove root-story lowering and analysis branches
+### [x] Task 24: Remove root-story lowering and analysis branches
 
 Goal: delete dead compiler code that only exists for legacy root stories.
 
@@ -558,9 +558,9 @@ needed.
 Validation commands: `cargo test -p ink-compiler`, `cargo test -p ink-test
 --test compiler_conformance`.
 
-Commit record: pending.
+Commit record: completed during integration-test-overhaul implementation; audited and validated by implementation commit `6dd83974e4c7172f59fd1d695a318bbb33056b56`.
 
-### [ ] Task 25: Remove legacy documentation and test terminology
+### [x] Task 25: Remove legacy documentation and test terminology
 
 Goal: make docs and tests describe module syntax as the maintained language.
 
@@ -580,9 +580,9 @@ Modification boundaries: `docs/Architecture.md`,
 
 Validation commands: `cargo test -p ink-test --test language`, `make gate`.
 
-Commit record: pending.
+Commit record: completed during integration-test-overhaul implementation; audited and validated by implementation commit `6dd83974e4c7172f59fd1d695a318bbb33056b56`.
 
-### [ ] Task 26: Close out the integration-test overhaul plan
+### [x] Task 26: Close out the integration-test overhaul plan
 
 Goal: finish the active plan after implementation and validation are complete.
 
@@ -602,4 +602,15 @@ Modification boundaries: `docs/active_plan/integration-test-overhaul` and
 Validation commands: `cargo fmt --all --check`, `cargo check --workspace`,
 `cargo test --workspace`, `make gate`.
 
-Commit record: pending.
+Validation:
+
+- `cargo test -p ink-compiler` passed.
+- `cargo test -p ink-test` passed.
+- `cargo fmt --all --check` passed.
+- `cargo check --workspace` passed.
+- `cargo test --workspace` passed.
+- `make gate` passed.
+
+Commit record: implementation audit and remaining fixes landed in
+`6dd83974e4c7172f59fd1d695a318bbb33056b56`; the plan archive is recorded by the
+closeout commit.
