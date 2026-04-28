@@ -181,8 +181,6 @@ work. It intentionally omits build output and most upstream reference internals.
 |-- editor/
 |   `-- vscode-ink-rs/
 |       VS Code syntax/package assets and examples.
-|-- ink-csharp/
-|   Historical upstream reference implementation and tests.
 `-- target/
     Local Cargo build output. Never use it as source truth.
 ```
@@ -551,10 +549,10 @@ language syntax change should affect highlighting or editor examples.
 upstream. `docs/WritingWithInk-latest.md` is the maintained guide users should
 read. Do not edit `docs/WritingWithInk-origin.md`.
 
-`ink-csharp/` is a historical upstream reference. Use it for legacy-compatible
-behavior questions, especially parser trial order, weave grouping, path
-compaction, and upstream JSON shape. Do not copy C# class structure into Rust
-when the Rust module boundary already has a clearer owner.
+The upstream C# implementation remains an external reference for
+legacy-compatible behavior questions, especially parser trial order, weave
+grouping, path compaction, and upstream JSON shape. Do not copy C# class
+structure into Rust when the Rust module boundary already has a clearer owner.
 
 ## Change Routing
 

@@ -2,8 +2,7 @@
 /target/
 **/target/
 
-# Local reference implementations. Keep these on disk, but do not track them
-# in this repository.
+# Optional local reference checkouts. These are not part of this repository.
 /ink-csharp/
 /blade-ink-rs/
 /ink-tests-old/
@@ -18,4 +17,3 @@ obj/
 .vscode/
 *.swp
 *.swo
-

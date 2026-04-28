@@ -2,7 +2,8 @@
 
 This repository is a Rust implementation and language fork of Ink, originally
 ported from inkle's official C# implementation.
-The upstream reference lives in `ink-csharp/`.
+The upstream C# implementation is an external compatibility reference, not a
+tracked repository directory.
 
 ## Project Goal
 
@@ -40,9 +41,6 @@ The upstream reference lives in `ink-csharp/`.
 - `crates/ink-compiler`: parser, parsed model, and JSON export pipeline
 - `crates/ink-story-json-format`: shared compiled story JSON format crate
 - `crates/ink-test`: conformance and integration tests
-- `ink-csharp/compiler`: historical C# compiler reference
-- `ink-csharp/ink-engine-runtime`: historical C# runtime reference
-- `ink-csharp/tests`: historical C# test corpus
 - `docs/active_plan`: active implementation plan workspace
 - `docs/finished_plans`: completed implementation plans
 - `docs/issues_found`: deferred issues discovered during implementation
@@ -57,8 +55,8 @@ The upstream reference lives in `ink-csharp/`.
 ## Working Rules
 
 - Treat the project owner's requested language behavior as the source of truth.
-- Use `ink-csharp/` as a compatibility reference for legacy behavior, not as a
-  veto over intentional language changes.
+- Use the upstream C# implementation as a compatibility reference for legacy
+  behavior, not as a veto over intentional language changes.
 - Prefer design notes and tests before broad language changes; avoid speculative
   refactors that are not tied to a concrete language goal.
 - For the current format refactor, keep changes focused on the compiler JSON

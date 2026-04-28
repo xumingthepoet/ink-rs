@@ -137,7 +137,7 @@ Text content from the game will appear 'as is' when the engine runs. However, it
 
 	A line of normal game-text. # colour it blue
 
-These don't show up in the main text flow, but can be read off by the game and used as you see fit. See the [Running Your Ink](../ink-csharp/Documentation/RunningYourInk.md#marking-up-your-ink-content-with-tags) guide for more information.
+These don't show up in the main text flow, but can be read off by the game and used as you see fit. See the upstream [Running Your Ink](https://github.com/inkle/ink/blob/master/Documentation/RunningYourInk.md#marking-up-your-ink-content-with-tags) guide for more information.
 
 
 ## 2) Choices
@@ -1982,7 +1982,7 @@ Constants are simply a way to allow you to give story states easy-to-understand 
 
 ## 7) Advanced: Game-side logic
 
-There are two core ways to provide game hooks in the **ink** engine. External function declarations in ink allow you to directly call host functions in the game, and variable observers are callbacks that are fired in the game when ink variables are modified. The runtime integration guide describes these concepts in [Running your ink](../ink-csharp/Documentation/RunningYourInk.md).
+There are two core ways to provide game hooks in the **ink** engine. External function declarations in ink allow you to directly call host functions in the game, and variable observers are callbacks that are fired in the game when ink variables are modified. The upstream runtime integration guide describes these concepts in [Running your ink](https://github.com/inkle/ink/blob/master/Documentation/RunningYourInk.md).
 
 In ink-rs, every `EXTERNAL` declaration is module-level and needs a typed signature:
 

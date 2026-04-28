@@ -2,8 +2,8 @@
 
 VS Code syntax highlighting for ink-rs `.ink` and `.ink2` files.
 
-This is an independent TextMate grammar for ink-rs. It is intentionally kept
-outside `ink-csharp/` and covers the ink-rs language surface directly:
+This is an independent TextMate grammar for ink-rs. It covers the ink-rs
+language surface directly:
 
 - `STRUCT Name { field: Type }`
 - explicit `=== module name ===` declarations
