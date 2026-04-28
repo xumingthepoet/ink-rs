@@ -1,7 +1,12 @@
-A {f():B} 
+=== module game ===
+
+== main ==
+A {f():B}
 X
 
-=== function f() => bool ===
-{true: 
+-> END
+
+== function f() => bool ==
+{true:
     ~ return false
 }

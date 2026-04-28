@@ -29,7 +29,7 @@ fn issue15_test() -> Result<(), StoryError> {
         let line = &story.cont();
 
         if line.starts_with("SET_X:") {
-            let _ = story.set_variable("x", &ValueType::Int(100));
+            let _ = story.set_variable("game::x", &ValueType::String("set".to_string()));
         } else {
             assert_eq!("X is set\n", line);
         }

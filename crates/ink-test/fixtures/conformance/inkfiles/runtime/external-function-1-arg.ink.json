@@ -1,1 +1,1 @@
-{"inkVersion":1,"root":[["^The value is ","ev",1,{"exArgs":1,"x()":"externalFunction"},"out","/ev","^.","\n","end",["done",{"#n":"g-0"}],null],"done",{"externalFunction":[{"temp=":"integer"},"ev",false,"/ev","~ret",null]}]}
+{"inkVersion":1,"root":[{"->":"game.main"},"done",{"game":[{"main":["^The value is ","ev",1,{"exArgs":1,"x()":"game::externalFunction"},"out","/ev","^.","\n","end",null]}]}]}

@@ -12,107 +12,28 @@ fn language_fixture_text(filename: &str) -> String {
 }
 
 fn compile_language_fixture(filename: &str) -> ink_compiler::CompiledStory {
-    compile_language_source(filename, language_fixture_text(filename))
-}
-
-fn compile_language_source(name: &str, source: impl Into<String>) -> ink_compiler::CompiledStory {
     let output = Compiler::default().compile(SourceInput::named(
-        explicit_game_module(source.into()),
-        name,
+        language_fixture_text(filename),
+        filename,
     ));
     assert!(
         output.diagnostics.is_empty(),
-        "compile for {name} should not emit diagnostics: {:#?}",
+        "compile for {filename} should not emit diagnostics: {:#?}",
         output.diagnostics
     );
     output.artifact.expect("expected compiled story")
 }
 
-fn diagnostics_for_language_source(name: &str, source: impl Into<String>) -> Vec<Diagnostic> {
+fn diagnostics_for_language_fixture(filename: &str) -> Vec<Diagnostic> {
     let output = Compiler::default().compile(SourceInput::named(
-        explicit_game_module(source.into()),
-        name,
+        language_fixture_text(filename),
+        filename,
     ));
     assert!(
         output.artifact.is_none(),
-        "compile for {name} should fail when asserting diagnostics"
+        "compile for {filename} should fail when asserting diagnostics"
     );
     output.diagnostics
-}
-
-fn explicit_game_module(source: String) -> String {
-    let source = source.trim_matches('\n');
-    if source.contains("=== module ") {
-        return source.to_string();
-    }
-
-    let lines = source.lines().collect::<Vec<_>>();
-    let mut index = 0;
-    let mut declarations = Vec::new();
-    while index < lines.len() {
-        let trimmed = lines[index].trim_start();
-        if trimmed.is_empty() {
-            declarations.push(lines[index]);
-            index += 1;
-            continue;
-        }
-        if trimmed.starts_with("VAR ")
-            || trimmed.starts_with("CONST ")
-            || trimmed.starts_with("EXTERNAL ")
-        {
-            declarations.push(lines[index]);
-            index += 1;
-            continue;
-        }
-        if trimmed.starts_with("STRUCT ") {
-            declarations.push(lines[index]);
-            index += 1;
-            while index < lines.len() {
-                declarations.push(lines[index]);
-                let field_line = lines[index].trim();
-                index += 1;
-                if field_line == "}" {
-                    break;
-                }
-            }
-            continue;
-        }
-        break;
-    }
-
-    let body = lines[index..].join("\n");
-    let mut module = String::from("=== module game ===\n");
-    if !declarations.is_empty() {
-        module.push_str(&declarations.join("\n"));
-        module.push('\n');
-    }
-
-    match first_flow_name(&body) {
-        Some("main") => {}
-        Some(first_flow) => {
-            module.push_str("== main ==\n-> ");
-            module.push_str(first_flow);
-            module.push('\n');
-        }
-        None => {
-            module.push_str("== main ==\n");
-        }
-    }
-
-    module.push_str(&body);
-    if !body.contains("-> END") && !body.contains("-> DONE") {
-        module.push_str("\n-> END");
-    }
-    module
-}
-
-fn first_flow_name(source: &str) -> Option<&str> {
-    let first_content = source.lines().find(|line| !line.trim().is_empty())?.trim();
-    if !first_content.starts_with("==") || first_content.starts_with("== function ") {
-        return None;
-    }
-
-    first_content.trim_matches('=').split_whitespace().next()
 }
 
 fn assert_diagnostic(
@@ -130,37 +51,22 @@ fn assert_diagnostic(
 }
 
 #[test]
-fn explicit_module_removed_root_behaviors_emit_diagnostics() {
-    let root_output = Compiler::default().parse_sources(vec![SourceInput::named(
-        "Line before modules.\n=== module game ===\n== main ==\n-> END",
-        "root-content.ink",
-    )]);
+fn explicit_module_level_content_emits_diagnostics() {
+    let module_diagnostics =
+        diagnostics_for_language_fixture("diagnostics/module-level-content.ink");
 
-    assert!(root_output.has_errors());
     assert_diagnostic(
-        &root_output.diagnostics,
-        DiagnosticSeverity::Error,
-        "Content and module-scoped declarations must appear after an explicit module declaration",
-    );
-
-    let module_output = Compiler::default().parse(SourceInput::named(
-        "=== module game ===\nLine at module level.\n# module tag\n= stitch\n== main ==\n-> END",
-        "module-content.ink",
-    ));
-
-    assert!(module_output.has_errors());
-    assert_diagnostic(
-        &module_output.diagnostics,
+        &module_diagnostics,
         DiagnosticSeverity::Error,
         "Module-level story content is not allowed",
     );
     assert_diagnostic(
-        &module_output.diagnostics,
+        &module_diagnostics,
         DiagnosticSeverity::Error,
         "Module-level tags are not allowed",
     );
     assert_diagnostic(
-        &module_output.diagnostics,
+        &module_diagnostics,
         DiagnosticSeverity::Error,
         "Stitch declarations must appear inside a knot",
     );
@@ -253,49 +159,14 @@ fn typed_divert_target_fixture_runs() {
 
 #[test]
 fn module_imported_global_variable_reads_and_writes_run() {
-    let compiled = compile_language_source(
-        "module-imported-global-vars.ink",
-        concat!(
-            "=== module game ===\n",
-            "IMPORT score FROM state\n",
-            "== main ==\n",
-            "{state::score}\n",
-            "~ state::score += 2\n",
-            "{state::score}\n",
-            "~ state::score = state::score + 3\n",
-            "{state::score}\n",
-            "-> END\n",
-            "=== module state ===\n",
-            "VAR score: int = 1\n",
-            "== helper ==\n",
-            "-> END\n",
-        ),
-    );
+    let compiled = compile_language_fixture("modules/module-imported-global-vars.ink");
 
     assert_story_output(&compiled, "1\n3\n6\n");
 }
 
 #[test]
 fn docs_module_import_example_runs() {
-    let compiled = compile_language_source(
-        "docs-module-imports.ink",
-        concat!(
-            "=== module game ===\n",
-            "IMPORT price, describe FROM shop\n",
-            "VAR gold: int = 5\n",
-            "== main ==\n",
-            "{shop::describe()}\n",
-            "Gold: {gold}\n",
-            "Price: {shop::price}\n",
-            "~ shop::price += 2\n",
-            "Updated price: {shop::price}\n",
-            "-> END\n",
-            "=== module shop ===\n",
-            "VAR price: int = 3\n",
-            "== function describe() => string ==\n",
-            "~ return \"The shop is open.\"\n",
-        ),
-    );
+    let compiled = compile_language_fixture("modules/docs-module-imports.ink");
 
     assert_story_output(
         &compiled,
@@ -305,25 +176,7 @@ fn docs_module_import_example_runs() {
 
 #[test]
 fn module_qualified_function_and_external_calls_run() {
-    let compiled = compile_language_source(
-        "module-qualified-calls.ink",
-        concat!(
-            "=== module game ===\n",
-            "IMPORT add FROM math\n",
-            "IMPORT play FROM audio\n",
-            "== main ==\n",
-            "{math::add(2, 3)}\n",
-            "{audio::play(\"intro\")}\n",
-            "-> END\n",
-            "=== module math ===\n",
-            "== function add(left: int, right: int) => int ==\n",
-            "~ return left + right\n",
-            "=== module audio ===\n",
-            "EXTERNAL play(name: string) => int\n",
-            "== helper ==\n",
-            "-> END\n",
-        ),
-    );
+    let compiled = compile_language_fixture("modules/module-qualified-calls.ink");
 
     let mut story = Story::new(&compiled.json).expect("compiled JSON should load");
     story
@@ -343,27 +196,7 @@ fn module_qualified_function_and_external_calls_run() {
 
 #[test]
 fn module_qualified_flow_paths_run_without_runtime_colon_separator() {
-    let compiled = compile_language_source(
-        "module-qualified-flow-paths.ink",
-        concat!(
-            "=== module game ===\n",
-            "IMPORT target, tunnel, value FROM routes\n",
-            "== main ==\n",
-            "{routes::value()}\n",
-            "-> routes::tunnel ->\n",
-            "After tunnel.\n",
-            "-> routes::target\n",
-            "=== module routes ===\n",
-            "== function value() => int ==\n",
-            "~ return 9\n",
-            "== tunnel ==\n",
-            "Tunnel.\n",
-            "->->\n",
-            "== target ==\n",
-            "Target.\n",
-            "-> END\n",
-        ),
-    );
+    let compiled = compile_language_fixture("modules/module-qualified-flow-paths.ink");
 
     assert_story_output(&compiled, "9\nTunnel.\nAfter tunnel.\nTarget.\n");
     assert!(
@@ -375,20 +208,7 @@ fn module_qualified_flow_paths_run_without_runtime_colon_separator() {
 
 #[test]
 fn module_dynamic_qualified_divert_target_values_run() {
-    let compiled = compile_language_source(
-        "module-dynamic-qualified-divert-target.ink",
-        concat!(
-            "=== module game ===\n",
-            "IMPORT target FROM routes\n",
-            "== main ==\n",
-            "~ temp next: -> = -> routes::target\n",
-            "-> {next}\n",
-            "=== module routes ===\n",
-            "== target ==\n",
-            "Dynamic target.\n",
-            "-> END\n",
-        ),
-    );
+    let compiled = compile_language_fixture("modules/module-dynamic-qualified-divert-target.ink");
 
     assert_story_output(&compiled, "Dynamic target.\n");
     assert!(
@@ -400,61 +220,14 @@ fn module_dynamic_qualified_divert_target_values_run() {
 
 #[test]
 fn module_same_module_stitch_paths_run() {
-    let compiled = compile_language_source(
-        "module-same-module-stitch-paths.ink",
-        concat!(
-            "=== module game ===\n",
-            "== main ==\n",
-            "-> intro\n",
-            "= intro\n",
-            "Intro.\n",
-            "-> scene.open\n",
-            "== scene ==\n",
-            "= open\n",
-            "Open.\n",
-            "-> END\n",
-        ),
-    );
+    let compiled = compile_language_fixture("modules/module-same-module-stitch-paths.ink");
 
     assert_story_output(&compiled, "Intro.\nOpen.\n");
 }
 
 #[test]
 fn module_globals_and_externals_use_module_qualified_runtime_names() {
-    let compiled = compile_language_source(
-        "module-qualified-globals-and-externals.ink",
-        concat!(
-            "=== module game ===\n",
-            "IMPORT level FROM left\n",
-            "IMPORT level FROM right\n",
-            "IMPORT play FROM audio\n",
-            "IMPORT play FROM video\n",
-            "== main ==\n",
-            "{audio::play(\"intro\")}|{video::play(\"intro\")}\n",
-            "~ left::level += 10\n",
-            "~ right::level += 20\n",
-            "Ready.\n",
-            "* Continue\n",
-            "  {left::level}|{right::level}\n",
-            "  -> END\n",
-            "=== module left ===\n",
-            "VAR level: int = 1\n",
-            "== helper ==\n",
-            "-> END\n",
-            "=== module right ===\n",
-            "VAR level: int = 2\n",
-            "== helper ==\n",
-            "-> END\n",
-            "=== module audio ===\n",
-            "EXTERNAL play(name: string) => int\n",
-            "== helper ==\n",
-            "-> END\n",
-            "=== module video ===\n",
-            "EXTERNAL play(name: string) => int\n",
-            "== helper ==\n",
-            "-> END\n",
-        ),
-    );
+    let compiled = compile_language_fixture("modules/module-qualified-globals-and-externals.ink");
 
     let mut story = Story::new(&compiled.json).expect("compiled JSON should load");
     for name in ["audio::play", "video::play"] {
@@ -505,48 +278,7 @@ fn module_globals_and_externals_use_module_qualified_runtime_names() {
 
 #[test]
 fn explicit_dynamic_diverts_run_at_runtime() {
-    let compiled = compile_language_source(
-        "explicit-dynamic-diverts.ink",
-        concat!(
-            "VAR next: -> = -> first\n",
-            "CONST fallback: -> = -> const_target\n",
-            "CONST const_targets: ->[] = [-> const_array_target]\n",
-            "VAR targets: ->[] = [-> array_target]\n",
-            "STRUCT Route {\n",
-            "next: ->\n",
-            "}\n",
-            "VAR route: Route = { next: -> struct_target }\n",
-            "CONST const_route: Route = { next: -> const_struct_target }\n",
-            "-> {next}\n",
-            "== first ==\n",
-            "First.\n",
-            "-> {route.next}\n",
-            "== struct_target ==\n",
-            "Struct.\n",
-            "-> {targets[0]}\n",
-            "== array_target ==\n",
-            "Array.\n",
-            "-> {fallback}\n",
-            "== const_target ==\n",
-            "Const.\n",
-            "-> {const_route.next}\n",
-            "== const_struct_target ==\n",
-            "Const struct.\n",
-            "-> {const_targets[0]}\n",
-            "== const_array_target ==\n",
-            "Const array.\n",
-            "-> {pick(true)}\n",
-            "== function pick(flag: bool) => -> ==\n",
-            "{ flag:\n",
-            "    ~ return -> final\n",
-            "- else:\n",
-            "    ~ return -> first\n",
-            "}\n",
-            "== final ==\n",
-            "Final.\n",
-            "-> END",
-        ),
-    );
+    let compiled = compile_language_fixture("diverts/explicit-dynamic-diverts.ink");
 
     assert_story_output(
         &compiled,
@@ -556,35 +288,14 @@ fn explicit_dynamic_diverts_run_at_runtime() {
 
 #[test]
 fn explicit_dynamic_diverts_support_arguments() {
-    let compiled = compile_language_source(
-        "explicit-dynamic-divert-args.ink",
-        concat!(
-            "VAR next: -> = -> target\n",
-            "VAR value: int = 5\n",
-            "-> {next}(value)\n",
-            "== target(x: int) ==\n",
-            "Value {x}.\n",
-            "-> END",
-        ),
-    );
+    let compiled = compile_language_fixture("diverts/explicit-dynamic-divert-args.ink");
 
     assert_story_output(&compiled, "Value 5.\n");
 }
 
 #[test]
 fn explicit_dynamic_tunnels_run_at_runtime() {
-    let compiled = compile_language_source(
-        "explicit-dynamic-tunnel.ink",
-        concat!(
-            "VAR next: -> = -> tunnel\n",
-            "-> {next} ->\n",
-            "After.\n",
-            "-> DONE\n",
-            "== tunnel ==\n",
-            "Inside.\n",
-            "->->",
-        ),
-    );
+    let compiled = compile_language_fixture("diverts/explicit-dynamic-tunnel.ink");
 
     assert_story_output(&compiled, "Inside.\nAfter.\n");
 }
@@ -592,47 +303,14 @@ fn explicit_dynamic_tunnels_run_at_runtime() {
 #[test]
 fn static_diverts_to_variables_report_current_syntax_error() {
     let cases = [
-        (
-            "old-global-divert.ink",
-            concat!(
-                "VAR next: -> = -> target\n",
-                "-> next\n",
-                "== target ==\n",
-                "-> DONE"
-            ),
-        ),
-        (
-            "old-const-divert.ink",
-            concat!(
-                "CONST next: -> = -> target\n",
-                "-> next\n",
-                "== target ==\n",
-                "-> DONE"
-            ),
-        ),
-        (
-            "old-param-divert.ink",
-            concat!(
-                "-> start(-> target)\n",
-                "== start(next: ->) ==\n",
-                "-> next\n",
-                "== target ==\n",
-                "-> DONE"
-            ),
-        ),
-        (
-            "old-temp-divert.ink",
-            concat!(
-                "~ temp next: -> = -> target\n",
-                "-> next\n",
-                "== target ==\n",
-                "-> DONE"
-            ),
-        ),
+        "diagnostics/static-diverts/old-global-divert.ink",
+        "diagnostics/static-diverts/old-const-divert.ink",
+        "diagnostics/static-diverts/old-param-divert.ink",
+        "diagnostics/static-diverts/old-temp-divert.ink",
     ];
 
-    for (name, source) in cases {
-        let diagnostics = diagnostics_for_language_source(name, source);
+    for fixture in cases {
+        let diagnostics = diagnostics_for_language_fixture(fixture);
         assert_diagnostic(
             &diagnostics,
             DiagnosticSeverity::Error,
@@ -644,10 +322,8 @@ fn static_diverts_to_variables_report_current_syntax_error() {
 
 #[test]
 fn dynamic_divert_target_type_is_checked() {
-    let diagnostics = diagnostics_for_language_source(
-        "dynamic-divert-wrong-type.ink",
-        concat!("VAR value: int = 1\n", "-> {value}\n"),
-    );
+    let diagnostics =
+        diagnostics_for_language_fixture("diagnostics/dynamic-diverts/wrong-type.ink");
 
     assert_diagnostic(
         &diagnostics,
@@ -655,19 +331,8 @@ fn dynamic_divert_target_type_is_checked() {
         "Dynamic divert target has type int but expected ->",
     );
 
-    let diagnostics = diagnostics_for_language_source(
-        "dynamic-divert-wrong-field-type.ink",
-        concat!(
-            "STRUCT Player {\n",
-            "hp: int\n",
-            "}\n",
-            "VAR player: Player = { hp: 10 }\n",
-            "-> {player.hp}\n",
-            "== player ==\n",
-            "= hp\n",
-            "-> DONE",
-        ),
-    );
+    let diagnostics =
+        diagnostics_for_language_fixture("diagnostics/dynamic-diverts/wrong-field-type.ink");
 
     assert_diagnostic(
         &diagnostics,
@@ -678,14 +343,7 @@ fn dynamic_divert_target_type_is_checked() {
 
 #[test]
 fn square_brackets_in_choice_text_are_literal() {
-    let compiled = compile_language_source(
-        "literal-choice-brackets.ink",
-        concat!(
-            "* Display [selected output]\n",
-            "    Branch.\n",
-            "    -> DONE"
-        ),
-    );
+    let compiled = compile_language_fixture("choices/literal-choice-brackets.ink");
     let mut story = Story::new(&compiled.json).expect("compiled JSON should load");
 
     assert_eq!(story.continue_maximally().unwrap(), "");
@@ -699,19 +357,7 @@ fn square_brackets_in_choice_text_are_literal() {
 
 #[test]
 fn star_and_plus_choices_are_repeatable() {
-    let compiled = compile_language_source(
-        "repeatable-choices.ink",
-        concat!(
-            "-> menu\n",
-            "== menu ==\n",
-            "* Star choice\n",
-            "    Star branch.\n",
-            "    -> menu\n",
-            "+ Plus choice\n",
-            "    Plus branch.\n",
-            "    -> menu",
-        ),
-    );
+    let compiled = compile_language_fixture("choices/repeatable-choices.ink");
     let mut story = Story::new(&compiled.json).expect("compiled JSON should load");
 
     assert_eq!(story.continue_maximally().unwrap(), "");
@@ -726,10 +372,7 @@ fn star_and_plus_choices_are_repeatable() {
 
 #[test]
 fn selected_choice_text_is_not_echoed() {
-    let compiled = compile_language_source(
-        "choice-display-only.ink",
-        concat!("* Display text\n", "    Branch text.\n", "    -> DONE",),
-    );
+    let compiled = compile_language_fixture("choices/choice-display-only.ink");
     let mut story = Story::new(&compiled.json).expect("compiled JSON should load");
 
     assert_eq!(story.continue_maximally().unwrap(), "");
@@ -740,20 +383,7 @@ fn selected_choice_text_is_not_echoed() {
 
 #[test]
 fn choice_conditions_still_control_visibility() {
-    let compiled = compile_language_source(
-        "conditional-repeatable-choices.ink",
-        concat!(
-            "VAR open: bool = false\n",
-            "-> menu\n",
-            "== menu ==\n",
-            "* {open} Open path\n",
-            "    Done.\n",
-            "    -> DONE\n",
-            "* Toggle\n",
-            "    ~ open = true\n",
-            "    -> menu",
-        ),
-    );
+    let compiled = compile_language_fixture("choices/conditional-repeatable-choices.ink");
     let mut story = Story::new(&compiled.json).expect("compiled JSON should load");
 
     assert_eq!(story.continue_maximally().unwrap(), "");
@@ -792,20 +422,7 @@ fn choice_condition_colon_boundary_allows_dynamic_choice_text() {
 
 #[test]
 fn save_load_preserves_generated_choices_without_regeneration() {
-    let compiled = compile_language_source(
-        "choice-save-load.ink",
-        concat!(
-            "VAR picked: int = 0\n",
-            "* First\n",
-            "    ~ picked = 1\n",
-            "    Picked {picked}.\n",
-            "    -> DONE\n",
-            "* Second\n",
-            "    ~ picked = 2\n",
-            "    Picked {picked}.\n",
-            "    -> DONE",
-        ),
-    );
+    let compiled = compile_language_fixture("choices/choice-save-load.ink");
     let mut story = Story::new(&compiled.json).expect("compiled JSON should load");
 
     assert_eq!(story.continue_maximally().unwrap(), "");
@@ -834,19 +451,7 @@ fn save_load_preserves_generated_choices_without_regeneration() {
 
 #[test]
 fn save_load_preserves_thread_generated_choices() {
-    let compiled = compile_language_source(
-        "thread-choice-save-load.ink",
-        concat!(
-            "<- side\n",
-            "* Main\n",
-            "    Main branch.\n",
-            "    -> DONE\n",
-            "== side ==\n",
-            "* Thread\n",
-            "    Thread branch.\n",
-            "    -> DONE",
-        ),
-    );
+    let compiled = compile_language_fixture("choices/thread-choice-save-load.ink");
     let mut story = Story::new(&compiled.json).expect("compiled JSON should load");
 
     assert_eq!(story.continue_maximally().unwrap(), "");
@@ -869,16 +474,7 @@ fn save_load_preserves_thread_generated_choices() {
 
 #[test]
 fn save_load_preserves_deterministic_random_state() {
-    let compiled = compile_language_source(
-        "random-save-load.ink",
-        concat!(
-            "~ SEED_RANDOM(12)\n",
-            "{RANDOM(1, 100)}\n",
-            "* Continue\n",
-            "    {RANDOM(1, 100)}\n",
-            "    -> DONE",
-        ),
-    );
+    let compiled = compile_language_fixture("choices/random-save-load.ink");
     let mut uninterrupted = Story::new(&compiled.json).expect("compiled JSON should load");
     let uninterrupted_first_output = uninterrupted.continue_maximally().unwrap();
     uninterrupted.choose_choice_index(0).unwrap();
@@ -928,28 +524,7 @@ fn typed_tco_fixture_runs() {
 
 #[test]
 fn typed_default_initializers_run_at_runtime() {
-    let compiled = compile_language_source(
-        "typed-defaults.ink",
-        concat!(
-            "STRUCT Player {\n",
-            "hp: int\n",
-            "name: string\n",
-            "ready: bool\n",
-            "inventory: int[]\n",
-            "}\n",
-            "VAR global_score: int\n",
-            "VAR global_ready: bool\n",
-            "VAR global_label: string\n",
-            "VAR global_ratio: float\n",
-            "VAR global_values: int[]\n",
-            "VAR global_player: Player\n",
-            "~ temp temp_score: int\n",
-            "~ temp temp_values: int[]\n",
-            "~ temp temp_player: Player\n",
-            "{global_score}|{global_ready}|{global_label}|{global_ratio}|{global_values}|{global_player}|{temp_score}|{temp_values}|{temp_player}\n",
-            "-> DONE",
-        ),
-    );
+    let compiled = compile_language_fixture("typed/defaults.ink");
 
     assert_story_output(
         &compiled,
@@ -959,24 +534,7 @@ fn typed_default_initializers_run_at_runtime() {
 
 #[test]
 fn typed_default_initializers_are_lowered_to_json() {
-    let compiled = compile_language_source(
-        "typed-defaults-json.ink",
-        concat!(
-            "STRUCT Player {\n",
-            "hp: int\n",
-            "name: string\n",
-            "ready: bool\n",
-            "inventory: int[]\n",
-            "}\n",
-            "VAR global_score: int\n",
-            "VAR global_values: int[]\n",
-            "VAR global_player: Player\n",
-            "~ temp temp_score: int\n",
-            "~ temp temp_values: int[]\n",
-            "~ temp temp_player: Player\n",
-            "-> DONE",
-        ),
-    );
+    let compiled = compile_language_fixture("typed/defaults-json.ink");
     let json = compiled.program.to_json_value();
     let default_player = json!({
         "hp": 0,
@@ -1028,57 +586,21 @@ fn typed_default_initializers_are_lowered_to_json() {
 
 #[test]
 fn array_literals_run_at_runtime() {
-    let compiled = compile_language_source(
-        "array-literals.ink",
-        concat!(
-            "STRUCT Player {\n",
-            "hp: int\n",
-            "name: string\n",
-            "}\n",
-            "VAR numbers: int[] = [1, 2, 3]\n",
-            "VAR matrix: int[][] = [[1, 2], []]\n",
-            "VAR party: Player[] = [{ hp: 10, name: \"Ada\" }]\n",
-            "{numbers}|{matrix}|{party}\n",
-            "-> DONE",
-        ),
-    );
+    let compiled = compile_language_fixture("typed/array-literals-runtime.ink");
 
     assert_story_output(&compiled, "[1, 2, 3]|[[1, 2], []]|[{hp: 10, name: Ada}]\n");
 }
 
 #[test]
 fn empty_struct_arrays_load_as_values_at_runtime() {
-    let compiled = compile_language_source(
-        "empty-struct-array.ink",
-        concat!(
-            "STRUCT Marker {\n",
-            "}\n",
-            "VAR markers: Marker[] = [{}, {}]\n",
-            "{LEN(markers)}\n",
-            "-> DONE",
-        ),
-    );
+    let compiled = compile_language_fixture("typed/empty-struct-array.ink");
 
     assert_story_output(&compiled, "2\n");
 }
 
 #[test]
 fn typed_constants_support_struct_and_array_values() {
-    let compiled = compile_language_source(
-        "typed-constants.ink",
-        concat!(
-            "STRUCT Stats {\n",
-            "hp: int\n",
-            "ready: bool\n",
-            "}\n",
-            "CONST default_stats: Stats = { hp: 7 }\n",
-            "CONST party: Stats[] = [{ hp: 1 }, {}]\n",
-            "VAR copied_stats: Stats = default_stats\n",
-            "VAR copied_party: Stats[] = party\n",
-            "{default_stats}|{party}|{copied_stats}|{copied_party}\n",
-            "-> DONE",
-        ),
-    );
+    let compiled = compile_language_fixture("typed/constants.ink");
 
     assert_story_output(
         &compiled,
@@ -1124,25 +646,7 @@ fn multiline_var_and_const_composite_literals_run_at_runtime() {
 
 #[test]
 fn struct_literals_run_at_runtime() {
-    let compiled = compile_language_source(
-        "struct-literals.ink",
-        concat!(
-            "STRUCT Stats {\n",
-            "hp: int\n",
-            "ready: bool\n",
-            "}\n",
-            "STRUCT Player {\n",
-            "name: string\n",
-            "stats: Stats\n",
-            "tags: string[]\n",
-            "}\n",
-            "VAR full: Player = { name: \"Ada\", stats: { hp: 10, ready: true }, tags: [\"scout\"] }\n",
-            "VAR partial: Player = { name: \"Bea\" }\n",
-            "VAR nested: Stats = { hp: 3 }\n",
-            "{full}|{partial}|{nested}\n",
-            "-> DONE",
-        ),
-    );
+    let compiled = compile_language_fixture("typed/struct-literals-runtime.ink");
 
     assert_story_output(
         &compiled,
@@ -1152,18 +656,7 @@ fn struct_literals_run_at_runtime() {
 
 #[test]
 fn field_access_reads_struct_fields_at_runtime() {
-    let compiled = compile_language_source(
-        "field-access.ink",
-        concat!(
-            "STRUCT Stats {\n",
-            "hp: int\n",
-            "ready: bool\n",
-            "}\n",
-            "VAR state: Stats = { hp: 9, ready: true }\n",
-            "{state.hp}|{state.ready}\n",
-            "-> DONE",
-        ),
-    );
+    let compiled = compile_language_fixture("typed/field-access.ink");
 
     assert_story_output(&compiled, "9|true\n");
     assert_json_sequence(
@@ -1174,20 +667,7 @@ fn field_access_reads_struct_fields_at_runtime() {
 
 #[test]
 fn field_access_prefers_visible_variables_over_matching_story_paths() {
-    let compiled = compile_language_source(
-        "field-access-label-shadow.ink",
-        concat!(
-            "STRUCT Player {\n",
-            "hp: int\n",
-            "}\n",
-            "~ temp player: Player = { hp: 7 }\n",
-            "{player.hp}\n",
-            "-> DONE\n",
-            "== player ==\n",
-            "= hp\n",
-            "-> DONE",
-        ),
-    );
+    let compiled = compile_language_fixture("typed/field-access-label-shadow.ink");
 
     assert_story_output(&compiled, "7\n");
     assert_json_sequence(
@@ -1198,14 +678,7 @@ fn field_access_prefers_visible_variables_over_matching_story_paths() {
 
 #[test]
 fn index_access_reads_array_items_at_runtime() {
-    let compiled = compile_language_source(
-        "index-access.ink",
-        concat!(
-            "VAR items: int[] = [4, 9]\n",
-            "{items[0]}|{items[1]}\n",
-            "-> DONE",
-        ),
-    );
+    let compiled = compile_language_fixture("typed/index-access.ink");
 
     assert_story_output(&compiled, "4|9\n");
     assert_json_sequence(
@@ -1216,178 +689,63 @@ fn index_access_reads_array_items_at_runtime() {
 
 #[test]
 fn field_assignment_writes_struct_fields_at_runtime() {
-    let compiled = compile_language_source(
-        "field-assignment.ink",
-        concat!(
-            "STRUCT Stats {\n",
-            "hp: int\n",
-            "ready: bool\n",
-            "}\n",
-            "VAR state: Stats = { hp: 2, ready: false }\n",
-            "~ state.hp = 5\n",
-            "~ state.ready = true\n",
-            "{state.hp}|{state.ready}\n",
-            "-> DONE",
-        ),
-    );
+    let compiled = compile_language_fixture("typed/field-assignment.ink");
 
     assert_story_output(&compiled, "5|true\n");
 }
 
 #[test]
 fn field_assignment_copies_struct_values_at_runtime() {
-    let compiled = compile_language_source(
-        "field-assignment-copy.ink",
-        concat!(
-            "STRUCT Player {\n",
-            "hp: int\n",
-            "}\n",
-            "VAR p1: Player = { hp: 3 }\n",
-            "VAR p2: Player = p1\n",
-            "~ p2.hp = 1\n",
-            "{p1.hp}|{p2.hp}\n",
-            "-> DONE",
-        ),
-    );
+    let compiled = compile_language_fixture("typed/field-assignment-copy.ink");
 
     assert_story_output(&compiled, "3|1\n");
 }
 
 #[test]
 fn index_assignment_writes_array_items_at_runtime() {
-    let compiled = compile_language_source(
-        "index-assignment.ink",
-        concat!(
-            "VAR items: int[] = [1, 2, 3]\n",
-            "~ items[1] = 10\n",
-            "{items[0]}|{items[1]}|{items[2]}\n",
-            "-> DONE",
-        ),
-    );
+    let compiled = compile_language_fixture("typed/index-assignment.ink");
 
     assert_story_output(&compiled, "1|10|3\n");
 }
 
 #[test]
 fn index_assignment_copies_array_values_at_runtime() {
-    let compiled = compile_language_source(
-        "index-assignment-copy.ink",
-        concat!(
-            "VAR items1: int[] = [4, 5]\n",
-            "VAR items2: int[] = items1\n",
-            "~ items2[0] = 9\n",
-            "{items1[0]}|{items2[0]}\n",
-            "-> DONE",
-        ),
-    );
+    let compiled = compile_language_fixture("typed/index-assignment-copy.ink");
 
     assert_story_output(&compiled, "4|9\n");
 }
 
 #[test]
 fn compound_field_and_index_assignment_run_at_runtime() {
-    let compiled = compile_language_source(
-        "compound-field-index-assignment.ink",
-        concat!(
-            "STRUCT Player {\n",
-            "hp: int\n",
-            "name: string\n",
-            "}\n",
-            "VAR state: Player = { hp: 4, name: \"Ada\" }\n",
-            "VAR items: int[] = [1]\n",
-            "~ state.hp += 1\n",
-            "~ state.name += \"!\"\n",
-            "~ items[0] += 1\n",
-            "{state.hp}|{state.name}|{items[0]}\n",
-            "-> DONE",
-        ),
-    );
+    let compiled = compile_language_fixture("typed/compound-field-index-assignment.ink");
 
     assert_story_output(&compiled, "5|Ada!|2\n");
 }
 
 #[test]
 fn compound_index_assignment_evaluates_index_once() {
-    let compiled = compile_language_source(
-        "compound-index-single-eval.ink",
-        concat!(
-            "VAR calls: int = 0\n",
-            "VAR items: int[] = [1, 2]\n",
-            "~ items[idx()] += 1\n",
-            "{items[0]}|{calls}\n",
-            "-> DONE\n",
-            "=== function idx() => int ===\n",
-            "~ calls += 1\n",
-            "~ return 0",
-        ),
-    );
+    let compiled = compile_language_fixture("typed/compound-index-single-eval.ink");
 
     assert_story_output(&compiled, "2|1\n");
 }
 
 #[test]
 fn len_returns_array_length_at_runtime() {
-    let compiled = compile_language_source(
-        "len.ink",
-        concat!(
-            "STRUCT Player {\n",
-            "hp: int\n",
-            "}\n",
-            "VAR empty: int[] = []\n",
-            "VAR items: int[] = [1, 2, 3]\n",
-            "VAR players: Player[] = [{ hp: 1 }, { hp: 2 }]\n",
-            "{LEN(empty)}|{LEN(items)}|{LEN(players)}\n",
-            "-> DONE",
-        ),
-    );
+    let compiled = compile_language_fixture("typed/len.ink");
 
     assert_story_output(&compiled, "0|3|2\n");
 }
 
 #[test]
 fn array_remove_mutates_arrays_and_returns_void_at_runtime() {
-    let compiled = compile_language_source(
-        "array-remove.ink",
-        concat!(
-            "STRUCT Player {\n",
-            "hp: int\n",
-            "}\n",
-            "STRUCT Bag {\n",
-            "items: int[]\n",
-            "}\n",
-            "VAR items: int[] = [1, 2, 3, 4]\n",
-            "VAR players: Player[] = [{ hp: 1 }, { hp: 2 }]\n",
-            "VAR nested: int[][] = [[1], [2, 3]]\n",
-            "VAR bag: Bag = { items: [8, 9] }\n",
-            "before{ARRAY_REMOVE(items, 0)}after|{items[0]}|{LEN(items)}\n",
-            "~ ARRAY_REMOVE(items, 1)\n",
-            "{items[0]}|{items[1]}|{LEN(items)}\n",
-            "~ ARRAY_REMOVE(items, 1)\n",
-            "{items[0]}|{LEN(items)}\n",
-            "~ ARRAY_REMOVE(players, 0)\n",
-            "{players[0].hp}|{LEN(players)}\n",
-            "~ ARRAY_REMOVE(nested[1], 0)\n",
-            "{nested[1][0]}|{LEN(nested[1])}\n",
-            "~ ARRAY_REMOVE(bag.items, 0)\n",
-            "{bag.items[0]}|{LEN(bag.items)}\n",
-            "-> DONE",
-        ),
-    );
+    let compiled = compile_language_fixture("typed/array-remove.ink");
 
     assert_story_output(&compiled, "beforeafter|2|3\n2|4|2\n2|1\n2|1\n3|1\n9|1\n");
 }
 
 #[test]
 fn string_concatenation_runs_at_runtime() {
-    let compiled = compile_language_source(
-        "string-concat.ink",
-        concat!(
-            "VAR greeting: string = \"Hello\"\n",
-            "VAR name: string = \"Ada\"\n",
-            "{greeting + \", \" + name + \"!\"}\n",
-            "-> DONE",
-        ),
-    );
+    let compiled = compile_language_fixture("typed/string-concat.ink");
 
     assert_story_output(&compiled, "Hello, Ada!\n");
 }
@@ -1396,29 +754,17 @@ fn string_concatenation_runs_at_runtime() {
 fn mixed_string_addition_reports_diagnostics() {
     let cases = [
         (
-            "string-int.ink",
-            concat!(
-                "VAR text: string = \"Ada\"\n",
-                "VAR score: int = 1\n",
-                "VAR result: string = text + score\n",
-                "-> DONE",
-            ),
+            "diagnostics/typed/string-int.ink",
             "Operator '+' is not defined for types string and int",
         ),
         (
-            "int-string.ink",
-            concat!(
-                "VAR text: string = \"Ada\"\n",
-                "VAR score: int = 1\n",
-                "VAR result: string = score + text\n",
-                "-> DONE",
-            ),
+            "diagnostics/typed/int-string.ink",
             "Operator '+' is not defined for types int and string",
         ),
     ];
 
-    for (name, source, expected_message) in cases {
-        let diagnostics = diagnostics_for_language_source(name, source);
+    for (fixture, expected_message) in cases {
+        let diagnostics = diagnostics_for_language_fixture(fixture);
         assert_diagnostic(&diagnostics, DiagnosticSeverity::Error, expected_message);
     }
 }
@@ -1478,22 +824,7 @@ fn typed_external_fixture_runs() {
 
 #[test]
 fn typed_external_calls_keep_runtime_shape_and_return_values() {
-    let compiled = compile_language_source(
-        "typed-externals.ink",
-        concat!(
-            "STRUCT Player {\n",
-            "hp: int\n",
-            "}\n",
-            "EXTERNAL next_score(value: int) => int\n",
-            "EXTERNAL make_scores() => int[]\n",
-            "EXTERNAL make_player() => Player\n",
-            "~ temp score: int = next_score(4)\n",
-            "~ temp scores: int[] = make_scores()\n",
-            "~ temp player: Player = make_player()\n",
-            "{score}|{scores[1]}|{player.hp}\n",
-            "-> DONE",
-        ),
-    );
+    let compiled = compile_language_fixture("typed/externals-runtime-shape.ink");
 
     let json = compiled.program.to_json_value();
     assert_json_sequence(
@@ -1523,31 +854,7 @@ fn typed_external_calls_keep_runtime_shape_and_return_values() {
 
 #[test]
 fn tail_recursion_rewrites_parameters_and_preserves_other_recursion() {
-    let compiled = compile_language_source(
-        "tail-recursion.ink",
-        concat!(
-            "{count_down(1500, 0)}|{carry(3, 0)}|{fact(5)}\n",
-            "-> DONE\n",
-            "=== function count_down(n: int, acc: int) => int ===\n",
-            "{ n <= 0:\n",
-            "    ~ return acc\n",
-            "- else:\n",
-            "    ~ return count_down(n - 1, acc + 1)\n",
-            "}\n",
-            "=== function carry(n: int, seen: int) => int ===\n",
-            "{ n <= 0:\n",
-            "    ~ return seen\n",
-            "- else:\n",
-            "    ~ return carry(n - 1, n)\n",
-            "}\n",
-            "=== function fact(n: int) => int ===\n",
-            "{ n <= 1:\n",
-            "    ~ return 1\n",
-            "- else:\n",
-            "    ~ return n * fact(n - 1)\n",
-            "}",
-        ),
-    );
+    let compiled = compile_language_fixture("typed/tail-recursion-preserves.ink");
 
     let json = compiled.program.to_json_value();
     assert!(
@@ -1559,16 +866,13 @@ fn tail_recursion_rewrites_parameters_and_preserves_other_recursion() {
 
 #[test]
 fn language_diagnostic_helper_asserts_error_messages() {
-    let diagnostics = diagnostics_for_language_source("diagnostic-smoke.ink", "-> missing_target");
+    let diagnostics = diagnostics_for_language_fixture("diagnostics/diagnostic-smoke.ink");
     assert_diagnostic(&diagnostics, DiagnosticSeverity::Error, "target not found");
 }
 
 #[test]
 fn untyped_global_declaration_reports_missing_type() {
-    let diagnostics = diagnostics_for_language_source(
-        "untyped-global.ink",
-        concat!("VAR score = 1\n", "-> DONE"),
-    );
+    let diagnostics = diagnostics_for_language_fixture("diagnostics/untyped-global.ink");
 
     assert_diagnostic(
         &diagnostics,
@@ -1579,10 +883,7 @@ fn untyped_global_declaration_reports_missing_type() {
 
 #[test]
 fn untyped_constant_declaration_reports_missing_type() {
-    let diagnostics = diagnostics_for_language_source(
-        "untyped-constant.ink",
-        concat!("CONST score = 1\n", "-> DONE"),
-    );
+    let diagnostics = diagnostics_for_language_fixture("diagnostics/untyped-constant.ink");
 
     assert_diagnostic(
         &diagnostics,
@@ -1594,26 +895,14 @@ fn untyped_constant_declaration_reports_missing_type() {
 #[test]
 fn nested_global_var_declarations_report_current_syntax_error() {
     let cases = [
-        (
-            "nested-var-function.ink",
-            "== function setup() => void ==\nVAR score: int = 0",
-        ),
-        (
-            "nested-var-knot.ink",
-            "== knot ==\nVAR score: int = 0\n-> DONE",
-        ),
-        (
-            "nested-var-stitch.ink",
-            "== knot ==\n= stitch\nVAR score: int = 0\n-> DONE",
-        ),
-        (
-            "nested-var-conditional.ink",
-            "{ true:\nVAR score: int = 0\n}\n-> DONE",
-        ),
+        "diagnostics/nested-var-function.ink",
+        "diagnostics/nested-var-knot.ink",
+        "diagnostics/nested-var-stitch.ink",
+        "diagnostics/nested-var-conditional.ink",
     ];
 
-    for (name, source) in cases {
-        let diagnostics = diagnostics_for_language_source(name, source);
+    for fixture in cases {
+        let diagnostics = diagnostics_for_language_fixture(fixture);
 
         assert_diagnostic(
             &diagnostics,
@@ -1625,10 +914,7 @@ fn nested_global_var_declarations_report_current_syntax_error() {
 
 #[test]
 fn untyped_temp_declaration_reports_missing_type() {
-    let diagnostics = diagnostics_for_language_source(
-        "untyped-temp.ink",
-        concat!("~ temp score = 1\n", "-> DONE"),
-    );
+    let diagnostics = diagnostics_for_language_fixture("diagnostics/untyped-temp.ink");
 
     assert_diagnostic(
         &diagnostics,
@@ -1661,15 +947,7 @@ fn multiline_temp_initializer_remains_single_line_syntax() {
 
 #[test]
 fn untyped_function_parameter_reports_missing_type() {
-    let diagnostics = diagnostics_for_language_source(
-        "untyped-function-param.ink",
-        concat!(
-            "{add(1, 2)}\n",
-            "-> DONE\n",
-            "== function add(a, b: int) => int ==\n",
-            "~ return b"
-        ),
-    );
+    let diagnostics = diagnostics_for_language_fixture("diagnostics/untyped-function-param.ink");
 
     assert_diagnostic(
         &diagnostics,
@@ -1680,15 +958,7 @@ fn untyped_function_parameter_reports_missing_type() {
 
 #[test]
 fn missing_function_return_type_reports_missing_type() {
-    let diagnostics = diagnostics_for_language_source(
-        "missing-function-return.ink",
-        concat!(
-            "{add(1, 2)}\n",
-            "-> DONE\n",
-            "== function add(a: int, b: int) ==\n",
-            "~ return a + b"
-        ),
-    );
+    let diagnostics = diagnostics_for_language_fixture("diagnostics/missing-function-return.ink");
 
     assert_diagnostic(
         &diagnostics,
@@ -1699,14 +969,7 @@ fn missing_function_return_type_reports_missing_type() {
 
 #[test]
 fn untyped_external_parameter_reports_missing_type() {
-    let diagnostics = diagnostics_for_language_source(
-        "untyped-external-param.ink",
-        concat!(
-            "EXTERNAL ext(a, b: int) => int\n",
-            "{ext(1, 2)}\n",
-            "-> DONE"
-        ),
-    );
+    let diagnostics = diagnostics_for_language_fixture("diagnostics/untyped-external-param.ink");
 
     assert_diagnostic(
         &diagnostics,
@@ -1717,10 +980,7 @@ fn untyped_external_parameter_reports_missing_type() {
 
 #[test]
 fn missing_external_return_type_reports_missing_type() {
-    let diagnostics = diagnostics_for_language_source(
-        "missing-external-return.ink",
-        concat!("EXTERNAL ext(a: int)\n", "{ext(1)}\n", "-> DONE"),
-    );
+    let diagnostics = diagnostics_for_language_fixture("diagnostics/missing-external-return.ink");
 
     assert_diagnostic(
         &diagnostics,

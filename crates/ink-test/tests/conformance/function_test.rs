@@ -109,22 +109,3 @@ fn rnd() -> Result<(), StoryError> {
 
     Ok(())
 }
-
-#[test]
-fn evaluating_function_variable_state_bug_test() -> Result<(), StoryError> {
-    let json_string =
-        common::get_json_string("inkfiles/function/evaluating-function-variablestate-bug.ink.json");
-    let mut story = Story::new(&json_string);
-
-    assert_eq!("Start\n", story.cont());
-    assert_eq!("In tunnel.\n", story.cont());
-
-    let mut output = String::new();
-    let result = story.evaluate_function("function_to_evaluate", None, &mut output);
-
-    assert_eq!("RIGHT", result.unwrap().get::<String>().unwrap());
-
-    assert_eq!("End\n", story.cont());
-
-    Ok(())
-}

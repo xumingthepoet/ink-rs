@@ -1,7 +1,12 @@
+=== module game ===
 VAR x: int = 2
+
+== main ==
 # author: Joe
 # title: My Great Story
 This is the content
+
+-> END
 
 == knot ==
 # knot tag

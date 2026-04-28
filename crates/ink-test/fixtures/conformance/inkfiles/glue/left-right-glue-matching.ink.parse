@@ -1,25 +1,29 @@
 Story
   Weave(baseIndent=0)
-    Text("A line.")
-    Text("\n")
-    ContentList
-      Conditional
-        FunctionCall(f, args=0)
-        ConditionalBranch(true=true, else=false, inline=false)
-          Weave(baseIndent=0)
-            Text("Another line.")
-            Text("\n")
-    Text("\n")
     Gather(name=null, depth=1)
     Divert(target="-> DONE", empty=false, tunnel=false, thread=false)
-  Flow(level=Knot, name="f", function=true)
-    Weave(baseIndent=0)
-      ContentList
-        Conditional
-          Number(false)
-          ConditionalBranch(true=true, else=false, inline=true)
-            Weave(baseIndent=0)
-              Text("nothing")
-      Text("\n")
-      Return
-        Number(true)
+  Module(name="game")
+    Flow(level=Knot, name="main", function=false)
+      Weave(baseIndent=0)
+        Text("A line.")
+        Text("\n")
+        ContentList
+          Conditional
+            FunctionCall(f, args=0)
+            ConditionalBranch(true=true, else=false, inline=false)
+              Weave(baseIndent=0)
+                Text("Another line.")
+                Text("\n")
+        Text("\n")
+        Divert(target="-> END", empty=false, tunnel=false, thread=false)
+    Flow(level=Knot, name="f", function=true)
+      Weave(baseIndent=0)
+        ContentList
+          Conditional
+            Number(false)
+            ConditionalBranch(true=true, else=false, inline=true)
+              Weave(baseIndent=0)
+                Text("nothing")
+        Text("\n")
+        Return
+          Number(true)

@@ -1,11 +1,16 @@
-=== one ===
+=== module game ===
+
+== main ==
+-> one
+
+== one ==
 = sone
 One.1 -> end
 
 = stwo
 One.2 -> end
 
-=== two ===
+== two ==
 
 = sone
 Two.1 -> end
@@ -16,5 +21,5 @@ Two.2 -> end
 = sthree
 Two.3 -> end
 
-=== end ===
+== end ==
 -> END

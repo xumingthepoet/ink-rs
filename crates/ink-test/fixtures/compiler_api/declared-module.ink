@@ -1,0 +1,3 @@
+=== module declared ===
+== main ==
+-> END

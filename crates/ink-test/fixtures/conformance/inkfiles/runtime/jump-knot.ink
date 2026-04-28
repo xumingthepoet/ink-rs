@@ -1,12 +1,17 @@
-=== one ===
+=== module game ===
+
+== main ==
+-> one
+
+== one ==
 One -> end
 
-=== two ===
+== two ==
 Two -> end
 
-=== three ===
+== three ==
 Three -> end
 
 
-=== end ===
+== end ==
 -> END

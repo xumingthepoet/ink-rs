@@ -1,3 +1,4 @@
+=== module game ===
 STRUCT Stats {
 hp: int
 ready: bool
@@ -10,5 +11,7 @@ tags: string[]
 VAR full: Player = { name: "Ada", stats: { hp: 10, ready: true }, tags: ["scout"] }
 VAR partial: Player = { name: "Bea" }
 VAR nested: Stats = { hp: 3 }
+
+== main ==
 {full}|{partial}|{nested}
 -> DONE

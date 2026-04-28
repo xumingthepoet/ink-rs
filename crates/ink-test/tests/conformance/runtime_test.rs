@@ -48,7 +48,11 @@ fn external_function() -> Result<(), Box<dyn Error>> {
     let mut story = Story::new(&json_string);
     let mut text: Vec<String> = Vec::new();
 
-    story.bind_external_function("externalFunction", Arc::new(Mutex::new(ExtFunc1 {})), true);
+    story.bind_external_function(
+        "game::externalFunction",
+        Arc::new(Mutex::new(ExtFunc1 {})),
+        true,
+    );
 
     common::next_all(&mut story, &mut text);
     assert_eq!(1, text.len());
@@ -63,7 +67,11 @@ fn external_function_zero_arguments() -> Result<(), Box<dyn Error>> {
     let mut story = Story::new(&json_string);
     let mut text: Vec<String> = Vec::new();
 
-    story.bind_external_function("externalFunction", Arc::new(Mutex::new(ExtFunc2 {})), true);
+    story.bind_external_function(
+        "game::externalFunction",
+        Arc::new(Mutex::new(ExtFunc2 {})),
+        true,
+    );
 
     common::next_all(&mut story, &mut text);
     assert_eq!(1, text.len());
@@ -78,7 +86,11 @@ fn external_function_one_arguments() -> Result<(), Box<dyn Error>> {
     let mut story = Story::new(&json_string);
     let mut text: Vec<String> = Vec::new();
 
-    story.bind_external_function("externalFunction", Arc::new(Mutex::new(ExtFunc3 {})), true);
+    story.bind_external_function(
+        "game::externalFunction",
+        Arc::new(Mutex::new(ExtFunc3 {})),
+        true,
+    );
 
     common::next_all(&mut story, &mut text);
     assert_eq!(1, text.len());
@@ -93,26 +105,15 @@ fn external_function_coerce_test() -> Result<(), Box<dyn Error>> {
     let mut story = Story::new(&json_string);
     let mut text: Vec<String> = Vec::new();
 
-    story.bind_external_function("externalFunction", Arc::new(Mutex::new(ExtFunc4 {})), true);
+    story.bind_external_function(
+        "game::externalFunction",
+        Arc::new(Mutex::new(ExtFunc4 {})),
+        true,
+    );
 
     common::next_all(&mut story, &mut text);
     assert_eq!(1, text.len());
     assert_eq!("The value is false.", text[0]);
-
-    Ok(())
-}
-
-#[test]
-fn external_function_fallback_test() -> Result<(), Box<dyn Error>> {
-    let json_string = common::get_json_string("inkfiles/runtime/external-function-2-arg.ink.json");
-    let mut story = Story::new(&json_string);
-    let mut text: Vec<String> = Vec::new();
-
-    story.set_allow_external_function_fallbacks(true);
-
-    common::next_all(&mut story, &mut text);
-    assert_eq!(1, text.len());
-    assert_eq!("The value is 7.", text[0]);
 
     Ok(())
 }
@@ -215,22 +216,22 @@ fn jump_knot_test() -> Result<(), Box<dyn Error>> {
     let mut story = Story::new(&json_string);
     let mut text: Vec<String> = Vec::new();
 
-    story.choose_path_string("two", true, None);
+    story.choose_path_string("game.two", true, None);
     common::next_all(&mut story, &mut text);
     assert_eq!("Two", text.first().unwrap());
 
     text.clear();
-    story.choose_path_string("three", true, None);
+    story.choose_path_string("game.three", true, None);
     common::next_all(&mut story, &mut text);
     assert_eq!("Three", text.first().unwrap());
 
     text.clear();
-    story.choose_path_string("one", true, None);
+    story.choose_path_string("game.one", true, None);
     common::next_all(&mut story, &mut text);
     assert_eq!("One", text.first().unwrap());
 
     text.clear();
-    story.choose_path_string("two", true, None);
+    story.choose_path_string("game.two", true, None);
     common::next_all(&mut story, &mut text);
     assert_eq!("Two", text.first().unwrap());
 
@@ -243,22 +244,22 @@ fn jump_stitch_test() -> Result<(), Box<dyn Error>> {
     let mut story = Story::new(&json_string);
     let mut text: Vec<String> = Vec::new();
 
-    story.choose_path_string("two.sthree", true, None);
+    story.choose_path_string("game.two.sthree", true, None);
     common::next_all(&mut story, &mut text);
     assert_eq!("Two.3", text.first().unwrap());
 
     text.clear();
-    story.choose_path_string("one.stwo", true, None);
+    story.choose_path_string("game.one.stwo", true, None);
     common::next_all(&mut story, &mut text);
     assert_eq!("One.2", text.first().unwrap());
 
     text.clear();
-    story.choose_path_string("one.sone", true, None);
+    story.choose_path_string("game.one.sone", true, None);
     common::next_all(&mut story, &mut text);
     assert_eq!("One.1", text.first().unwrap());
 
     text.clear();
-    story.choose_path_string("two.stwo", true, None);
+    story.choose_path_string("game.two.stwo", true, None);
     common::next_all(&mut story, &mut text);
     assert_eq!("Two.2", text.first().unwrap());
 

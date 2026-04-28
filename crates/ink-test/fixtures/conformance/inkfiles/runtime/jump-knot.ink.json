@@ -1,1 +1,1 @@
-{"inkVersion":1,"root":[[["done",{"#n":"g-0"}],null],"done",{"one":["^One ",{"->":"end"},"\n",null],"two":["^Two ",{"->":"end"},"\n",null],"three":["^Three ",{"->":"end"},"\n",null],"end":["end",null]}]}
+{"inkVersion":1,"root":[{"->":"game.main"},"done",{"game":[{"end":["end",null],"main":[{"->":"game.one"},null],"one":["^One ",{"->":"game.end"},"\n",null],"three":["^Three ",{"->":"game.end"},"\n",null],"two":["^Two ",{"->":"game.end"},"\n",null]}]}]}
