@@ -58,7 +58,7 @@ const ALLOWED_LEGACY_INK_FIXTURES: &[&str] = &[
     "language/diagnostics/root-content-before-module.ink",
 ];
 
-const ALLOWED_SOURCE_CONSTRUCTION_TESTS: &[&str] = &["csharp_tests/mod.rs", "inkling_examples.rs"];
+const ALLOWED_SOURCE_CONSTRUCTION_TESTS: &[&str] = &["csharp_tests/mod.rs"];
 
 const SOURCE_CONSTRUCTION_PATTERNS: &[&str] = &[
     "explicit_game_module",
