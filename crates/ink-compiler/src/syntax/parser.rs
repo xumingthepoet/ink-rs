@@ -1137,7 +1137,7 @@ mod tests {
 
     #[test]
     fn invalid_logic_expression_reports_specific_error_and_recovers_next_line() {
-        let output = parse(SourceInput::new("~ x +\nLIST items = ()"));
+        let output = parse(SourceInput::new("~ x +\nRecovered line."));
 
         assert_eq!(output.diagnostics.len(), 1, "{:#?}", output.diagnostics);
         assert_eq!(

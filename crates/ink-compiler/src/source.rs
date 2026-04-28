@@ -70,7 +70,8 @@ pub(crate) fn prepare_source_input(
         })
         .collect();
     let source = SourceFile::from_lines(lines);
-    let diagnostics = diagnose_removed_includes(&source);
+    let mut diagnostics = diagnose_removed_includes(&source);
+    diagnostics.extend(diagnose_removed_list_declarations(&source));
     let source = diagnostics.is_empty().then_some(source);
 
     SourceLoadOutput {
@@ -84,7 +85,7 @@ impl SourceFile {
     pub fn from_input(input: SourceInput) -> Self {
         prepare_source_input(input, None)
             .source
-            .expect("test source should not contain removed INCLUDE syntax")
+            .expect("test source should not contain removed source syntax")
     }
 
     pub(crate) fn from_lines(lines: Vec<SourceLine>) -> Self {
@@ -114,6 +115,35 @@ fn diagnose_removed_includes(source: &SourceFile) -> Vec<Diagnostic> {
             })
         })
         .collect()
+}
+
+fn diagnose_removed_list_declarations(source: &SourceFile) -> Vec<Diagnostic> {
+    source
+        .lines
+        .iter()
+        .filter_map(|line| {
+            removed_list_declaration_column(&line.text).map(|column| {
+                Diagnostic::error(
+                    SourceSpan::new(line.span.source_name.clone(), line.span.line, column),
+                    "LIST declarations are no longer supported; use variables, functions, or host-side data instead",
+                )
+            })
+        })
+        .collect()
+}
+
+fn removed_list_declaration_column(text: &str) -> Option<usize> {
+    let leading_whitespace = text
+        .chars()
+        .take_while(|ch| matches!(ch, ' ' | '\t'))
+        .count();
+    let trimmed = text.trim_start_matches([' ', '\t']);
+    let rest = trimmed.strip_prefix("LIST")?;
+    if rest.starts_with(char::is_whitespace) && rest.contains('=') {
+        Some(leading_whitespace + 1)
+    } else {
+        None
+    }
 }
 
 fn removed_include_column(text: &str) -> Option<usize> {

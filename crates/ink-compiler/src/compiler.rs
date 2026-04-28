@@ -323,4 +323,46 @@ mod tests {
         );
         assert!(output.artifact.is_none());
     }
+
+    #[test]
+    fn list_declaration_is_removed_diagnostic_before_root_module_fallback() {
+        let compiler = Compiler::default();
+        let output = compiler.compile(SourceInput::named(
+            "  LIST colors = red, blue\n",
+            "main.ink",
+        ));
+
+        assert_eq!(output.diagnostics.len(), 1);
+        let diagnostic = &output.diagnostics[0];
+        assert_eq!(diagnostic.severity, DiagnosticSeverity::Error);
+        assert_eq!(diagnostic.code, None);
+        assert_eq!(diagnostic.source_filename.as_deref(), Some("main.ink"));
+        assert_eq!(diagnostic.line, 1);
+        assert_eq!(diagnostic.column, 3);
+        assert_eq!(
+            diagnostic.message,
+            "LIST declarations are no longer supported; use variables, functions, or host-side data instead"
+        );
+        assert!(output.artifact.is_none());
+    }
+
+    #[test]
+    fn list_declaration_is_removed_diagnostic_before_module_content_fallback() {
+        let compiler = Compiler::default();
+        let output = compiler.compile(SourceInput::named(
+            "=== module game ===\n  LIST colors = red, blue\n== main ==\n-> END",
+            "main.ink",
+        ));
+
+        assert_eq!(output.diagnostics.len(), 1);
+        let diagnostic = &output.diagnostics[0];
+        assert_eq!(diagnostic.severity, DiagnosticSeverity::Error);
+        assert_eq!(diagnostic.line, 2);
+        assert_eq!(diagnostic.column, 3);
+        assert_eq!(
+            diagnostic.message,
+            "LIST declarations are no longer supported; use variables, functions, or host-side data instead"
+        );
+        assert!(output.artifact.is_none());
+    }
 }

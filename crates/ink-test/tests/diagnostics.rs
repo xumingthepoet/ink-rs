@@ -28,6 +28,23 @@ fn module_level_content_is_rejected() {
 }
 
 #[test]
+fn removed_list_declaration_reports_removed_feature_diagnostic() {
+    let diagnostics = diagnostics_for_fixture("diagnostics/removed-list-module.ink");
+
+    assert_diagnostic(
+        &diagnostics,
+        DiagnosticSeverity::Error,
+        "LIST declarations are no longer supported",
+    );
+    assert!(
+        diagnostics.iter().all(|diagnostic| !diagnostic
+            .message
+            .contains("Module-level story content is not allowed")),
+        "LIST diagnostics should not fall back to module-level content errors: {diagnostics:#?}"
+    );
+}
+
+#[test]
 fn diagnostic_helper_asserts_error_messages() {
     let diagnostics = diagnostics_for_fixture("diagnostics/diagnostic-smoke.ink");
     assert_diagnostic(&diagnostics, DiagnosticSeverity::Error, "target not found");
