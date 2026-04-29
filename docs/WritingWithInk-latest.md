@@ -1165,8 +1165,20 @@ Long `VAR` and `CONST` initializers can spread array and struct literals across
 multiple lines:
 
 	VAR party: Player[] = [
-		{ name: "Ada", stats: { hp: 10, ready: true } },
-		{ name: "Bea", stats: { hp: 8, ready: false } }
+		{
+			name: "Ada",
+			stats: {
+				hp: 10,
+				ready: true
+			}
+		},
+		{
+			name: "Bea",
+			stats: {
+				hp: 8,
+				ready: false
+			}
+		}
 	]
 
 This multiline form is for module-level `VAR` and `CONST` declarations. Temporary
@@ -1187,10 +1199,32 @@ Story-specific value shapes can be declared with `STRUCT`. Struct fields also re
 		stats: Stats
 	}
 
-	VAR current_player: Player = { name: "Ada", stats: { hp: 10, ready: true } }
-	VAR party: Player[] = [{ name: "Ada", stats: { hp: 10, ready: true } }, { name: "Bea", stats: { hp: 8, ready: false } }]
+	VAR current_player: Player = {
+		name: "Ada",
+		stats: {
+			hp: 10,
+			ready: true
+		}
+	}
 
-Struct literals can omit fields whose type has a default value; fields of type `->` must be provided explicitly. Fields and array items can be read or assigned with normal logic lines:
+	VAR party: Player[] = [
+		{
+			name: "Ada",
+			stats: {
+				hp: 10,
+				ready: true
+			}
+		},
+		{
+			name: "Bea",
+			stats: {
+				hp: 8,
+				ready: false
+			}
+		}
+	]
+
+Struct literals can omit fields whose type has a default value; fields of type `->` must be provided explicitly. For multi-field object values, put each literal field on its own line and separate literal fields with commas. Struct declarations themselves stay one field per line without commas. Fields and array items can be read or assigned with normal logic lines:
 
 	{current_player.stats.hp}
 	~ current_player.stats.hp += 1
@@ -2252,16 +2286,32 @@ when a generated choice is selected.
 === module game ===
 
 STRUCT ChoiceOption {
-text: string
-target: ->
-enabled: bool
+	text: string
+	target: ->
+	enabled: bool
 }
 
 VAR options: ChoiceOption[] = [
-{ text: "A", target: -> a, enabled: true },
-{ text: "B", target: -> b, enabled: true },
-{ text: "C", target: -> c, enabled: false },
-{ text: "D", target: -> d, enabled: true }
+	{
+		text: "A",
+		target: -> a,
+		enabled: true
+	},
+	{
+		text: "B",
+		target: -> b,
+		enabled: true
+	},
+	{
+		text: "C",
+		target: -> c,
+		enabled: false
+	},
+	{
+		text: "D",
+		target: -> d,
+		enabled: true
+	}
 ]
 
 == main ==
