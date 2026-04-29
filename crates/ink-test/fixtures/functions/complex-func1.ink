@@ -10,7 +10,7 @@ VAR y: int = 3
 
    == function derp(a: int, b: int, c: int) => void ==
    ~ x = a + b
-   { x == 5:
+   { if x == 5:
       ~ x = 6
    }
    ~ y = x + c

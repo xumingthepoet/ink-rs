@@ -33,7 +33,7 @@ Story
     Flow(level=Knot, name="merchant_init", function=true)
       Weave(baseIndent=0)
         ContentList
-          Conditional
+          Conditional(kind=if)
             Binary(==, VariableReference(roll), Number(0))
             ConditionalBranch(true=true, else=false, inline=false)
               Weave(baseIndent=0)
@@ -41,7 +41,7 @@ Story
                   Number(2)
         Text("\n")
         ContentList
-          Conditional
+          Conditional(kind=if)
             Binary(==, VariableReference(mult), Number(2))
             ConditionalBranch(true=true, else=false, inline=false)
               Weave(baseIndent=0)
@@ -49,7 +49,7 @@ Story
                   Number(1)
         Text("\n")
         ContentList
-          Conditional
+          Conditional(kind=if)
             Binary(==, VariableReference(roll), Number(0))
             ConditionalBranch(true=true, else=false, inline=false)
               Weave(baseIndent=0)

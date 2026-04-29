@@ -8,7 +8,7 @@ Story
         Text("A line.")
         Text("\n")
         ContentList
-          Conditional
+          Conditional(kind=if)
             FunctionCall(f, args=0)
             ConditionalBranch(true=true, else=false, inline=false)
               Weave(baseIndent=0)
@@ -19,7 +19,7 @@ Story
     Flow(level=Knot, name="f", function=true)
       Weave(baseIndent=0)
         ContentList
-          Conditional
+          Conditional(kind=if)
             Number(false)
             ConditionalBranch(true=true, else=false, inline=true)
               Weave(baseIndent=0)

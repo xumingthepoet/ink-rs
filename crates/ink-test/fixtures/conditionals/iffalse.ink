@@ -3,7 +3,7 @@
         VAR y: int = 3
 
 == main ==
-        { x > 0:
+        { if x > 0:
             ~ y = x - 1
         }
         The value is {y}. -> END

@@ -369,7 +369,7 @@ fn parse_inline_braced_object(
             ));
         }
 
-        return Some(Object::Conditional(Conditional::new(
+        return Some(Object::Conditional(Conditional::if_block(
             Some(condition),
             branches,
         )));

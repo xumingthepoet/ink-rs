@@ -2,7 +2,7 @@
 
 == main ==
 A line.
-{ f():
+{ if f():
     Another line.
 }
 

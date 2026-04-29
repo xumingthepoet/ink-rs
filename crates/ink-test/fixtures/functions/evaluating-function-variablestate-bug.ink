@@ -12,7 +12,7 @@ Start
  ->->
 
  == function function_to_evaluate() => string ==
-     { zero_equals_(1):
+     { if zero_equals_(1):
          ~ return "WRONG"
      - else:
          ~ return "RIGHT"

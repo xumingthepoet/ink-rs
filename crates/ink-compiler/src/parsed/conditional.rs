@@ -1,17 +1,44 @@
 use super::{push_indent, Expression, Weave};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConditionalKind {
+    If,
+    Switch,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Conditional {
+    kind: ConditionalKind,
     initial_condition: Option<Expression>,
     branches: Vec<ConditionalBranch>,
 }
 
 impl Conditional {
-    pub fn new(initial_condition: Option<Expression>, branches: Vec<ConditionalBranch>) -> Self {
+    pub fn new(
+        kind: ConditionalKind,
+        initial_condition: Option<Expression>,
+        branches: Vec<ConditionalBranch>,
+    ) -> Self {
         Self {
+            kind,
             initial_condition,
             branches,
         }
+    }
+
+    pub fn if_block(
+        initial_condition: Option<Expression>,
+        branches: Vec<ConditionalBranch>,
+    ) -> Self {
+        Self::new(ConditionalKind::If, initial_condition, branches)
+    }
+
+    pub fn switch(selector: Expression, branches: Vec<ConditionalBranch>) -> Self {
+        Self::new(ConditionalKind::Switch, Some(selector), branches)
+    }
+
+    pub fn kind(&self) -> ConditionalKind {
+        self.kind
     }
 
     pub fn initial_condition(&self) -> Option<&Expression> {
@@ -25,6 +52,10 @@ impl Conditional {
     pub(crate) fn write_parse_snapshot(&self, out: &mut String, indent: usize) {
         push_indent(out, indent);
         out.push_str("Conditional");
+        out.push_str(match self.kind {
+            ConditionalKind::If => "(kind=if)",
+            ConditionalKind::Switch => "(kind=switch)",
+        });
         if let Some(condition) = &self.initial_condition {
             out.push('\n');
             condition.write_parse_snapshot(out, indent + 2);

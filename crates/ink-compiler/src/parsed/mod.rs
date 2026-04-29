@@ -25,7 +25,7 @@ mod weave;
 
 pub use author_warning::AuthorWarning;
 pub use choice::Choice;
-pub use conditional::{Conditional, ConditionalBranch};
+pub use conditional::{Conditional, ConditionalBranch, ConditionalKind};
 pub use constant_declaration::ConstantDeclaration;
 pub use content_list::ContentList;
 pub use divert::{Divert, DivertTarget};

@@ -2,8 +2,8 @@ use crate::{
     diagnostic::Diagnostic,
     parsed::{
         visit::{walk_story, walk_weave, ParsedVisitor, VisitContext},
-        BinaryOperator, Choice, Conditional, ContentList, DivertTarget, Expression, Flow,
-        FlowLevel, Object, Return, Story, TypeName, Weave,
+        BinaryOperator, Choice, Conditional, ConditionalKind, ContentList, DivertTarget,
+        Expression, Flow, FlowLevel, Object, Return, Story, TypeName, Weave,
     },
     source::SourceSpan,
 };
@@ -185,17 +185,44 @@ impl ConditionTypeChecker<'_> {
         span: &SourceSpan,
         context: &VisitContext,
     ) {
-        if conditional_is_switch_like(conditional) {
-            self.check_switch_conditional(conditional, span, context);
+        match conditional.kind() {
+            ConditionalKind::If => self.check_if_conditional(conditional, span, context),
+            ConditionalKind::Switch => self.check_switch_conditional(conditional, span, context),
+        }
+    }
+
+    fn check_if_conditional(
+        &mut self,
+        conditional: &Conditional,
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) {
+        if let Some(condition) = conditional.initial_condition() {
+            self.check_condition("Conditional", condition, span, context);
+            for branch in conditional.branches() {
+                if branch.own_condition().is_some() {
+                    self.diagnostics.push(Diagnostic::error(
+                        span.clone(),
+                        "If conditionals with an opening condition cannot include branch conditions. Use '{ if:' for else-if branches.",
+                    ));
+                } else if !branch.is_true_branch() && !branch.is_else() {
+                    self.diagnostics.push(Diagnostic::error(
+                        span.clone(),
+                        "If fallback branches must use '- else:'.",
+                    ));
+                }
+            }
             return;
         }
 
-        if let Some(condition) = conditional.initial_condition() {
-            self.check_condition("Conditional", condition, span, context);
-        }
         for branch in conditional.branches() {
             if let Some(condition) = branch.own_condition() {
                 self.check_condition("Conditional", condition, span, context);
+            } else if !branch.is_else() {
+                self.diagnostics.push(Diagnostic::error(
+                    span.clone(),
+                    "Extended if branches must use '- condition:' or '- else:'.",
+                ));
             }
         }
     }
@@ -209,11 +236,11 @@ impl ConditionTypeChecker<'_> {
         if conditional
             .branches()
             .iter()
-            .any(|branch| branch.is_true_branch())
+            .any(|branch| !branch.is_else() && branch.own_condition().is_none())
         {
             self.diagnostics.push(Diagnostic::error(
                 span.clone(),
-                "Switch conditionals cannot include content before the first case. Use '- else:' for fallback content.",
+                "Switch conditionals require case labels before branch content. Use '- else:' for fallback content.",
             ));
         }
 
@@ -325,14 +352,6 @@ impl ConditionTypeChecker<'_> {
         )
         .is_some_and(|signal| signal == ConditionTypeSignal::Typed)
     }
-}
-
-fn conditional_is_switch_like(conditional: &Conditional) -> bool {
-    conditional.initial_condition().is_some()
-        && conditional
-            .branches()
-            .iter()
-            .any(|branch| branch.own_condition().is_some())
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -852,7 +871,7 @@ fn conditional_is_exhaustive_for_flow(conditional: &Conditional) -> bool {
 }
 
 fn bool_switch_covers_true_and_false(conditional: &Conditional) -> bool {
-    if !conditional_is_switch_like(conditional) {
+    if conditional.kind() != ConditionalKind::Switch {
         return false;
     }
 
@@ -894,7 +913,7 @@ mod tests {
     fn accepts_bool_conditions() {
         let story = parse_story(
             "VAR ready: bool = true\n\
-             { ready:\n\
+             { if ready:\n\
                Conditional text.\n\
              }\n\
              * { ready } Choice text\n\
@@ -906,7 +925,7 @@ mod tests {
 
     #[test]
     fn reports_global_var_declarations_outside_story_top_level() {
-        let cases = ["{ true:\n\
+        let cases = ["{ if true:\n\
                VAR score: int = 0\n\
              }\n\
              -> DONE"];
@@ -928,14 +947,14 @@ mod tests {
         let cases = [
             (
                 "VAR value: int = 1\n\
-                 { value:\n\
+                 { if value:\n\
                    Text.\n\
                  }",
                 "Conditional condition has type int but expected bool",
             ),
             (
                 "VAR value: float = 1.0\n\
-                 { value:\n\
+                 { if value:\n\
                    Text.\n\
                  }",
                 "Conditional condition has type float but expected bool",
@@ -947,14 +966,14 @@ mod tests {
             ),
             (
                 "VAR values: int[] = [1]\n\
-                 { values:\n\
+                 { if values:\n\
                    Text.\n\
                  }",
                 "Conditional condition has type int[] but expected bool",
             ),
             (
                 "VAR value: int = 1\n\
-                 {\n\
+                 { if:\n\
                  - value:\n\
                    Text.\n\
                  }",
@@ -965,7 +984,7 @@ mod tests {
                  hp: int\n\
                  }\n\
                  VAR player: Player = { hp: 10 }\n\
-                 { player:\n\
+                 { if player:\n\
                    Text.\n\
                  }",
                 "Conditional condition has type Player but expected bool",
@@ -984,7 +1003,7 @@ mod tests {
     fn accepts_switch_conditions_with_non_bool_selectors() {
         let story = parse_story(
             "VAR quest_stage: int = 0\n\
-             { quest_stage:\n\
+             { switch quest_stage:\n\
              - 0:\n\
                stage zero\n\
              }\n\
@@ -998,7 +1017,7 @@ mod tests {
     fn reports_switch_case_values_not_comparable_with_selector() {
         let story = parse_story(
             "VAR quest_stage: int = 0\n\
-             { quest_stage:\n\
+             { switch quest_stage:\n\
              - \"zero\":\n\
                stage zero\n\
              }\n\
@@ -1017,7 +1036,7 @@ mod tests {
     fn reports_switch_content_before_first_case() {
         let story = parse_story(
             "VAR quest_stage: int = 0\n\
-             { quest_stage:\n\
+             { switch quest_stage:\n\
                fallback text\n\
              - 0:\n\
                stage zero\n\
@@ -1029,7 +1048,45 @@ mod tests {
         assert_single_diagnostic(
             &diagnostics,
             DiagnosticSeverity::Error,
-            "Switch conditionals cannot include content before the first case. Use '- else:' for fallback content.",
+            "Switch conditionals require case labels before branch content. Use '- else:' for fallback content.",
+        );
+    }
+
+    #[test]
+    fn reports_if_opening_condition_with_branch_condition() {
+        let story = parse_story(
+            "VAR quest_stage: int = 0\n\
+             { if quest_stage > 0:\n\
+             - quest_stage == 1:\n\
+               stage one\n\
+             }\n\
+             -> DONE",
+        );
+        let diagnostics = flow_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "If conditionals with an opening condition cannot include branch conditions. Use '{ if:' for else-if branches.",
+        );
+    }
+
+    #[test]
+    fn reports_extended_if_content_before_first_condition() {
+        let story = parse_story(
+            "{ if:\n\
+               fallback text\n\
+             - else:\n\
+               else text\n\
+             }\n\
+             -> DONE",
+        );
+        let diagnostics = flow_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Extended if branches must use '- condition:' or '- else:'.",
         );
     }
 
@@ -1039,7 +1096,7 @@ mod tests {
             "=== module game ===\n\
              VAR done: bool = true\n\
              == main ==\n\
-             { done:\n\
+             { switch done:\n\
              - true:\n\
                -> finish\n\
              - false:\n\
@@ -1058,7 +1115,7 @@ mod tests {
             "=== module game ===\n\
              VAR quest_stage: int = 0\n\
              == main ==\n\
-             { quest_stage:\n\
+             { switch quest_stage:\n\
              - 0:\n\
                -> finish\n\
              - 1:\n\
@@ -1082,7 +1139,7 @@ mod tests {
             "=== module game ===\n\
              VAR quest_stage: int = 0\n\
              == main ==\n\
-             { quest_stage:\n\
+             { switch quest_stage:\n\
              - 0:\n\
                -> finish\n\
              - else:\n\

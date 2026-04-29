@@ -11,7 +11,7 @@ VAR z: int = 1
 
     == function derp(a: int, b: int) => void ==
    ~ x = a - b
-    {
+    { if:
       - x == 0:
         ~ y = 0
       - x > 0:

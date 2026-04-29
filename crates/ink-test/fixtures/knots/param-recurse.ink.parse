@@ -11,7 +11,7 @@ Story
         VariableAssignment(name="total", global=false, temp=false)
           Binary(+, VariableReference(total), VariableReference(x))
         ContentList
-          Conditional
+          Conditional(kind=if)
             Binary(==, VariableReference(x), Number(15))
             ConditionalBranch(true=true, else=false, inline=false)
               Weave(baseIndent=0)

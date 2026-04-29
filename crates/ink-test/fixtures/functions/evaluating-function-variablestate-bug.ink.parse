@@ -19,7 +19,7 @@ Story
     Flow(level=Knot, name="function_to_evaluate", function=true)
       Weave(baseIndent=0)
         ContentList
-          Conditional
+          Conditional(kind=if)
             FunctionCall(zero_equals_, args=1)
             ConditionalBranch(true=true, else=false, inline=false)
               Weave(baseIndent=0)

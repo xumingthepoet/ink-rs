@@ -7,6 +7,6 @@ X
 -> END
 
 == function f() => bool ==
-{true:
+{ if true:
     ~ return false
 }

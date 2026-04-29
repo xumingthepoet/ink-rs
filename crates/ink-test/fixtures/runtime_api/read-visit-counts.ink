@@ -6,7 +6,7 @@ VAR x: int = 0
 
 
 == one ==
-{ x < 4:
+{ if x < 4:
  -> two.s2
 - else:
  -> two

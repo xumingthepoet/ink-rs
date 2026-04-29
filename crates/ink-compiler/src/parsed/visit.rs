@@ -548,7 +548,7 @@ mod tests {
     }
 
     fn conditional_with_branch_content() -> Conditional {
-        Conditional::new(
+        Conditional::if_block(
             Some(Expression::VariableReference("outer_condition".to_string())),
             vec![ConditionalBranch::new(
                 true,

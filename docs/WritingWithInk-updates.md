@@ -25,17 +25,41 @@ Each entry should include:
 - migration guidance
 - tests
 
+## 2026-04-29: Explicit Multiline If And Switch Blocks
+
+- status: removed
+- upstream behavior: upstream Ink and earlier ink-rs accepted multiline control
+  blocks whose meaning was inferred from brace shape, such as
+  `{ condition: ... }`, `{ - condition: ... }`, and `{ selector: - value: ... }`.
+- ink-rs behavior: multiline control blocks now require an explicit control
+  keyword. Use `{ if condition: ... }` for simple if/else, `{ if: - condition:
+  ... }` for extended if/else-if, and `{ switch selector: - value: ... }` for
+  switch comparisons. The old keywordless multiline forms are removed rather
+  than kept as compatibility aliases.
+- documentation effect: `WritingWithInk-latest.md` rewrites multiline control
+  examples to use explicit `if` and `switch`, and keeps inline conditional text,
+  choice conditions, and dynamic divert targets as separate braced forms.
+- rationale: keywordless multiline control coupled if and switch parsing to the
+  same branch shape, making bool switch and else-if forms visually ambiguous.
+  Explicit keywords make the grammar stable before further control-syntax work.
+- migration guidance: add `if` after the opening brace for boolean multiline
+  conditionals, add `if:` for extended else-if blocks, and add `switch` before
+  selector expressions for switch blocks.
+- tests: parser tests cover explicit if and switch parsing plus keywordless
+  multiline rejection. Flow tests cover if branch-shape diagnostics and switch
+  case checking. Runtime fixtures use the explicit syntax.
+
 ## 2026-04-29: Conditional Switch Type Checking And Exhaustive Flow
 
 - status: supported
 - upstream behavior: upstream Ink supports switch-style conditionals such as
   `{ x: - 0: ... }`, where branch values are compared against the selector.
-- ink-rs behavior: switch-style conditionals are supported. The selector does
-  not need to be `bool`; each case value must be comparable with it using the
-  same type rules as `==`. Ordinary `{ condition: ... }` and extended
-  `{ - condition: ... }` conditionals still require boolean conditions. A
-  conditional whose branches all terminate is treated as flow-ending when it has
-  an `else` branch, or when a bool switch covers both `true` and `false`.
+- ink-rs behavior: explicit `{ switch x: - 0: ... }` conditionals are
+  supported. The selector does not need to be `bool`; each case value must be
+  comparable with it using the same type rules as `==`. Explicit `{ if ... }`
+  conditionals still require boolean conditions. A conditional whose branches
+  all terminate is treated as flow-ending when it has an `else` branch, or when
+  a bool switch covers both `true` and `false`.
 - documentation effect: `WritingWithInk-latest.md` clarifies the difference
   between ordinary conditionals and switch conditionals, and documents when a
   conditional block closes flow without an extra `-> DONE`.

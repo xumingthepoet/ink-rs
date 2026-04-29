@@ -3,7 +3,7 @@
         VAR y: int = 3
 
 == main ==
-        {
+        { if:
             - x == 0:
                 ~ y = 0
             - x > 0:

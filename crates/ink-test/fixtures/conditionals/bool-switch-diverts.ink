@@ -2,7 +2,7 @@
 VAR done: bool = true
 
 == main ==
-{ done:
+{ switch done:
 - true:
     -> finish
 - false:

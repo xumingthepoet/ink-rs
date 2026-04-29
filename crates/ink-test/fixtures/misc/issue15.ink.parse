@@ -13,7 +13,7 @@ Story
         Text("SET_X:")
         Text("\n")
         ContentList
-          Conditional
+          Conditional(kind=if)
             ConditionalBranch(true=false, else=false, inline=false)
               Weave(baseIndent=0)
                 Divert(target="-> x_not_set", empty=false, tunnel=false, thread=false)

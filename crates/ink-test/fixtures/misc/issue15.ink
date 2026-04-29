@@ -9,7 +9,7 @@ VAR x: string = ""
 
 This is a test
 SET_X:
-{
+{ if:
   - x == "":
     -> x_not_set
   - else:

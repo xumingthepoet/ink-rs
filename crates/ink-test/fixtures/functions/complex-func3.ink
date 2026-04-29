@@ -14,15 +14,15 @@ VAR fee: int = 0
 
      == function merchant_init() => void ==
 
-     { roll == 0:
+     { if roll == 0:
         ~ mult = 2
      }
 
-     { mult == 2:
+     { if mult == 2:
         ~ roll = 1
      }
 
-     { roll == 0:
+     { if roll == 0:
         ~ mult = 3
      }
 

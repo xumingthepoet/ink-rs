@@ -37,7 +37,7 @@ Const array.
 -> {pick(true)}
 
 == function pick(flag: bool) => -> ==
-{ flag:
+{ if flag:
     ~ return -> final
 - else:
     ~ return -> first

@@ -32,7 +32,7 @@ Story
         VariableAssignment(name="x", global=false, temp=false)
           Binary(-, VariableReference(a), VariableReference(b))
         ContentList
-          Conditional
+          Conditional(kind=if)
             ConditionalBranch(true=false, else=false, inline=false)
               Weave(baseIndent=0)
                 VariableAssignment(name="y", global=false, temp=false)

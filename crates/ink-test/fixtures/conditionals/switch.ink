@@ -2,7 +2,7 @@
 VAR quest_stage: int = 1
 
 == main ==
-{ quest_stage:
+{ switch quest_stage:
 - 0:
     stage zero
 - 1:

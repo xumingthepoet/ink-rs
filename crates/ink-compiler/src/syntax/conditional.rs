@@ -1,5 +1,7 @@
 use crate::{
-    parsed::{Conditional, ConditionalBranch, ContentList, Expression, Object, Text},
+    parsed::{
+        Conditional, ConditionalBranch, ConditionalKind, ContentList, Expression, Object, Text,
+    },
     source::SourceLine,
 };
 
@@ -7,6 +9,9 @@ use super::{
     gather, is_identifier_continue, parse_initial_expression, parser::Parser, scan, text,
     weave::weave_from_objects,
 };
+
+mod if_block;
+mod switch_block;
 
 struct ConditionalBranchBuilder {
     is_true_branch: bool,
@@ -55,6 +60,16 @@ impl ConditionalBranchBuilder {
 struct ParsedConditionalBranchHeader<'a> {
     builder: ConditionalBranchBuilder,
     inline_content: Option<&'a str>,
+}
+
+struct ParsedConditionalHeader {
+    kind: ConditionalKind,
+    initial_condition: Option<Expression>,
+}
+
+fn parse_conditional_header(source: &str) -> Option<ParsedConditionalHeader> {
+    let header = source.strip_suffix(':')?.trim();
+    if_block::parse_header(header).or_else(|| switch_block::parse_header(header))
 }
 
 fn parse_branch_header(trimmed: &str) -> Option<ParsedConditionalBranchHeader<'_>> {
@@ -107,33 +122,20 @@ fn parse_default_branch_content(trimmed: &str) -> Option<&str> {
     Some(content)
 }
 
-fn classify_branches(has_initial_condition: bool, branches: &mut [ConditionalBranchBuilder]) {
-    if has_initial_condition {
-        let mut earlier_branches_have_own_condition = false;
-        let last_index = branches.len().saturating_sub(1);
+fn classify_branches(
+    kind: ConditionalKind,
+    has_initial_condition: bool,
+    branches: &mut [ConditionalBranchBuilder],
+) {
+    for branch in branches.iter_mut() {
+        branch.is_true_branch = false;
+        branch.is_else = branch.explicit_else;
+    }
 
-        for (index, branch) in branches.iter_mut().enumerate() {
-            let is_last = index == last_index;
-            branch.is_true_branch = false;
-
-            if branch.own_condition.is_some() {
-                branch.is_else = false;
-                earlier_branches_have_own_condition = true;
-            } else if branch.explicit_else || (earlier_branches_have_own_condition && is_last) {
-                branch.is_else = true;
-            } else if index == 0 {
-                branch.is_true_branch = true;
-                branch.is_else = false;
-            } else {
-                branch.is_else = true;
-            }
-        }
-    } else {
-        let last_index = branches.len().saturating_sub(1);
-        for (index, branch) in branches.iter_mut().enumerate() {
-            branch.is_true_branch = false;
-            if branch.explicit_else || (branch.own_condition.is_none() && index == last_index) {
-                branch.is_else = true;
+    if kind == ConditionalKind::If && has_initial_condition {
+        if let Some(first_branch) = branches.first_mut() {
+            if !first_branch.explicit_else {
+                first_branch.is_true_branch = true;
             }
         }
     }
@@ -158,12 +160,7 @@ impl Parser {
         }
 
         let after_open = trimmed.strip_prefix('{')?.trim();
-        let initial_condition = if after_open.is_empty() {
-            None
-        } else {
-            let condition_source = after_open.strip_suffix(':')?.trim();
-            Some(parse_initial_expression(condition_source)?)
-        };
+        let header = parse_conditional_header(after_open)?;
 
         *index += 1;
         let mut branches = Vec::new();
@@ -175,12 +172,16 @@ impl Parser {
 
             if let Some(after_close) = current_trimmed.strip_prefix('}') {
                 branches.push(current_branch);
-                classify_branches(initial_condition.is_some(), &mut branches);
+                classify_branches(
+                    header.kind,
+                    header.initial_condition.is_some(),
+                    &mut branches,
+                );
                 let branches = branches
                     .into_iter()
                     .map(ConditionalBranchBuilder::finish)
                     .collect();
-                let conditional = Conditional::new(initial_condition, branches);
+                let conditional = Conditional::new(header.kind, header.initial_condition, branches);
                 let mut objects = prefix;
                 objects.push(Object::ContentList(ContentList::new(vec![
                     Object::Conditional(conditional),
@@ -355,37 +356,80 @@ impl Parser {
 
 #[cfg(test)]
 mod tests {
-    use crate::{parsed::Object, source::SourceInput, syntax::parse};
+    use crate::{
+        parsed::{ConditionalKind, Object},
+        source::SourceInput,
+        syntax::parse,
+    };
 
     #[test]
     fn parses_multiline_conditional_into_content_list() {
-        let output = parse(SourceInput::new("{ true:\n- yes\n}"));
+        let output = parse(SourceInput::new("{ if true:\nyes\n}"));
 
         assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
         let story = output.artifact.expect("expected story");
-        let has_conditional = story.root_weave().content().iter().any(|object| {
+        let has_if = story.root_weave().content().iter().any(|object| {
             matches!(
                 object,
                 Object::ContentList(content)
-                    if matches!(content.objects().first(), Some(Object::Conditional(_)))
+                    if matches!(
+                        content.objects().first(),
+                        Some(Object::Conditional(conditional))
+                            if conditional.kind() == ConditionalKind::If
+                    )
             )
         });
-        assert!(has_conditional);
+        assert!(has_if);
     }
 
     #[test]
     fn parses_multiline_conditional_after_struct_literal_expression_support() {
-        let output = parse(SourceInput::new("{ score > 0:\n- yes\n- else: no\n}"));
+        let output = parse(SourceInput::new("{ if score > 0:\nyes\n- else: no\n}"));
 
         assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
         let story = output.artifact.expect("expected story");
-        let has_conditional = story.root_weave().content().iter().any(|object| {
+        let has_if = story.root_weave().content().iter().any(|object| {
             matches!(
                 object,
                 Object::ContentList(content)
-                    if matches!(content.objects().first(), Some(Object::Conditional(_)))
+                    if matches!(
+                        content.objects().first(),
+                        Some(Object::Conditional(conditional))
+                            if conditional.kind() == ConditionalKind::If
+                    )
             )
         });
-        assert!(has_conditional);
+        assert!(has_if);
+    }
+
+    #[test]
+    fn parses_explicit_switch_conditional() {
+        let output = parse(SourceInput::new(
+            "{ switch score:\n- 0: zero\n- else: many\n}",
+        ));
+
+        assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
+        let story = output.artifact.expect("expected story");
+        let has_switch = story.root_weave().content().iter().any(|object| {
+            matches!(
+                object,
+                Object::ContentList(content)
+                    if matches!(
+                        content.objects().first(),
+                        Some(Object::Conditional(conditional))
+                            if conditional.kind() == ConditionalKind::Switch
+                    )
+            )
+        });
+        assert!(has_switch);
+    }
+
+    #[test]
+    fn legacy_multiline_conditional_without_keyword_is_not_control_syntax() {
+        let output = parse(SourceInput::new("{ score > 0:\nyes\n}"));
+
+        assert!(output.diagnostics.iter().any(|diagnostic| diagnostic
+            .message
+            .contains("expected closing `}` for inline expression before end of line")));
     }
 }

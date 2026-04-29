@@ -652,7 +652,7 @@ Use typed variables and conditional text to model progression explicitly:
 
 	VAR radio_step: int = 0
 
-	{
+	{ if:
 	- radio_step == 0:
 	    Three!
 	- radio_step == 1:
@@ -1066,7 +1066,7 @@ Labelling allows us to create loops inside weaves. Here's a standard pattern for
 			-> done
 	- (loop)
 		~ guard_question_loops = guard_question_loops + 1
-		{ guard_question_loops < 3:
+		{ if guard_question_loops < 3:
 			-> opts
 		- else:
 			He scratches his head.
@@ -1393,7 +1393,7 @@ Arrays and structs compare by value, so equality checks recurse through nested a
 
 	VAR first_scores: int[] = [1, 2]
 	VAR second_scores: int[] = [1, 2]
-	{ first_scores == second_scores:
+	{ if first_scores == second_scores:
 		The scores match.
 	}
 
@@ -1404,15 +1404,16 @@ We've seen conditionals used to control options and story content; **ink** also 
 
 ### A simple 'if'
 
-The if syntax takes its cue from the other conditionals used so far, with the `{`...`}` syntax indicating that something is being tested.
+Multiline control blocks must name the control form after the opening brace.
+For a simple if, use `{ if condition:`:
 
-	{ x > 0:
+	{ if x > 0:
 		~ y = x - 1
 	}
 
 Else conditions can be provided:
 
-	{ x > 0:
+	{ if x > 0:
 		~ y = x - 1
 	- else:
 		~ y = x + 1
@@ -1420,9 +1421,10 @@ Else conditions can be provided:
 
 ### Extended if/else if/else blocks
 
-The above syntax is actually a specific case of a more general structure, something like a "switch" statement of another language:
+For else-if chains, start with `{ if:` and put every branch condition on a
+`- condition:` branch:
 
-	{
+	{ if:
 		- x > 0:
 			~ y = x - 1
 		- else:
@@ -1431,7 +1433,7 @@ The above syntax is actually a specific case of a more general structure, someth
 
 And using this form we can include 'else-if' conditions:
 
-	{
+	{ if:
 		- x == 0:
 			~ y = 0
 		- x > 0:
@@ -1442,9 +1444,8 @@ And using this form we can include 'else-if' conditions:
 
 (Note, as with everything else, the white-space is purely for readability and has no syntactic meaning.)
 
-When using `else-if` branch conditions, start the block with `{` and put every
-condition on a `- condition:` branch. If the opening line has a selector before
-the colon, as in `{ x:`, the block is a switch instead.
+An if block that starts with an opening condition, such as `{ if x > 0:`, may
+only add `- else:`. Use the `{ if:` form when you need else-if branches.
 
 ### Switch blocks
 
@@ -1452,7 +1453,7 @@ There is also a switch form. In this form, `x` is a selector value, not a
 boolean condition. Each branch value is compared with the selector using `==`,
 so the case values must be comparable with the selector's type:
 
-	{ x:
+	{ switch x:
 	- 0: 	zero
 	- 1: 	one
 	- 2: 	two
@@ -1461,6 +1462,9 @@ so the case values must be comparable with the selector's type:
 
 Use `- else:` for fallback content. Content before the first case is not a
 switch fallback.
+
+Keywordless multiline forms such as `{ x > 0:` and `{ x:` are not control
+blocks in ink-rs. Use `if` or `switch` explicitly.
 
 For flow checking, an `if`/`else` block or switch block closes the current flow
 when every branch ends in a divert, `-> DONE`, `-> END`, choice, or return and
@@ -1474,7 +1478,7 @@ divert after the block.
 These tests should use explicit variables. The following construction is a common way of saying "do some content which is relevant to the current game state":
 
 	== dream ==
-		{
+		{ if:
 			- visited_snakes && not dream_about_snakes:
 				~ fear++
 				-> dream_about_snakes
@@ -1497,7 +1501,7 @@ The syntax has the advantage of being easy to extend, and prioritise.
 Conditional blocks can be used to control story content as well as logic:
 
 	I stared at Monsieur Fogg.
-	{ know_about_wager:
+	{ if know_about_wager:
 		<> "But surely you are not serious?" I demanded.
 	- else:
 		<> "But there must be a reason for this trip," I observed.
@@ -1506,7 +1510,7 @@ Conditional blocks can be used to control story content as well as logic:
 
 You can even put options inside conditional blocks:
 
-	{ door_open:
+	{ if door_open:
 		* 	I strode out of the compartment and I fancied I heard my master quietly tutting to himself. 			-> go_outside
 	- else:
 		*	I asked permission to leave and Monsieur Fogg looked surprised. 	-> open_door
@@ -1518,12 +1522,13 @@ You can even put options inside conditional blocks:
 ### Multiline blocks
 
 Multiline conditionals are the supported multiline brace block form in ink-rs.
-Upstream stateful alternative blocks are removed; model that state with
-variables and ordinary conditionals instead.
+They must start with an explicit `{ if ...:`, `{ if:`, or `{ switch ...:`
+header. Upstream stateful alternative blocks are removed; model that state
+with variables and ordinary conditionals instead.
 
 	VAR luck_step: int = 0
 
-	{
+	{ if:
 	- luck_step == 0:
 		Would my luck hold?
 		~ luck_step = 1
@@ -1540,16 +1545,16 @@ Sometimes, a global variable is unwieldy. **ink** provides temporary variables f
 
 	== near_north_pole ==
 		~ temp number_of_warm_things: int = 0
-		{ blanket:
+		{ if blanket:
 			~ number_of_warm_things++
 		}
-		{ ear_muffs:
+		{ if ear_muffs:
 			~ number_of_warm_things++
 		}
-		{ gloves:
+		{ if gloves:
 			~ number_of_warm_things++
 		}
-		{ number_of_warm_things > 2:
+		{ if number_of_warm_things > 2:
 			Despite the snow, I felt incorrigibly snug.
 		- else:
 			That night I was colder than I have ever been.
@@ -1584,7 +1589,7 @@ Temporary variables are safe to use in recursion (unlike globals), so the follow
 
 	== add_one_to_one_hundred(total, x) ==
 		~ total = total + x
-		{ x == 100:
+		{ if x == 100:
 			-> finished(total)
 		- else:
 			-> add_one_to_one_hundred(total, x + 1)
@@ -1670,7 +1675,7 @@ As in any other language, a function, once done, returns the flow to wherever it
 A function does not need to have a return value, and can simply do something that is worth packaging up:
 
 	== function harm(x: int) => void ==
-		{ stamina < x:
+		{ if stamina < x:
 			~ stamina = 0
 		- else:
 			~ stamina = stamina - x
@@ -1687,7 +1692,7 @@ Content is, by default, 'glued in', so the following:
 	Monsieur Fogg was looking {describe_health(health)}.
 
 	== function describe_health(x: int) => string ==
-	{
+	{ if:
 	- x == 100:
 		~ return "spritely"
 	- x > 75:
@@ -1707,7 +1712,7 @@ produces:
 For instance, you might include:
 
 	== function max(a: int, b: int) => int ==
-		{ a < b:
+		{ if a < b:
 			~ return b
 		- else:
 			~ return a
@@ -1715,7 +1720,7 @@ For instance, you might include:
 
 	== function exp(x: int, e: int) => int ==
 		// returns x to the power e where e is an integer
-		{ e <= 0:
+		{ if e <= 0:
 			~ return 1
 		- else:
 			~ return x * exp(x, e - 1)
@@ -1732,10 +1737,10 @@ produces:
 
 #### Example: turning numbers into words
 
-The following example is long, but appears in pretty much every inkle game to date. (Recall that a hyphenated line inside multiline curly braces indicates either "a condition to test" or, if the curly brace began with a variable, "a value to compare against".)
+The following example is long, but appears in pretty much every inkle game to date. It uses explicit `{ if:` blocks for condition branches and `{ switch ...:` blocks when comparing one selector value against multiple cases.
 
     == function print_num(x: int) => void ==
-    {
+    { if:
         - x >= 1000:
             {print_num(x / 1000)} thousand { x mod 1000 > 0:{print_num(x mod 1000)}}
         - x >= 100:
@@ -1743,8 +1748,8 @@ The following example is long, but appears in pretty much every inkle game to da
         - x == 0:
             zero
         - else:
-            { x >= 20:
-                { x / 10:
+            { if x >= 20:
+                { switch x / 10:
                     - 2: twenty
                     - 3: thirty
                     - 4: forty
@@ -1756,8 +1761,8 @@ The following example is long, but appears in pretty much every inkle game to da
                 }
                 { x mod 10 > 0:<>-<>}
             }
-            { x < 10 || x > 20:
-                { x mod 10:
+            { if x < 10 || x > 20:
+                { switch x mod 10:
                     - 1: one
                     - 2: two
                     - 3: three
@@ -1769,7 +1774,7 @@ The following example is long, but appears in pretty much every inkle game to da
                     - 9: nine
                 }
             - else:
-                { x:
+                { switch x:
                     - 10: ten
                     - 11: eleven
                     - 12: twelve
@@ -1841,7 +1846,7 @@ Sometimes, it's convenient to define constants to be strings, so you can print t
 	VAR current_chief_suspect: string = HASTINGS
 
 	== review_evidence ==
-		{ found_japps_bloodied_glove:
+		{ if found_japps_bloodied_glove:
 			~ current_chief_suspect = POIROT
 		}
 		Current Suspect: {current_chief_suspect}
@@ -1863,7 +1868,7 @@ And sometimes the numbers are useful in other ways:
 	VAR suitcase_location: int = HALLWAY
 
 	== report_progress ==
-	{
+	{ if:
         -  secret_agent_location == suitcase_location:
 		The secret agent grabs the suitcase!
 		~ suitcase_location = HELD_BY_AGENT
@@ -2012,7 +2017,7 @@ Still, there are cases where it's indispensable:
 
 	== hurt(x) ==
 		~ stamina -= x
-		{ stamina <= 0:
+		{ if stamina <= 0:
 			->-> youre_dead
 		}
 
@@ -2124,7 +2129,7 @@ But for games with lots of independent moving parts, threads quickly become esse
 	-> run_player_location
 
 	== run_player_location ==
-		{
+		{ if:
 			- player_location == HALLWAY: -> hallway
 		}
 
@@ -2140,10 +2145,10 @@ But for games with lots of independent moving parts, threads quickly become esse
 	// Here's the thread, which mixes in dialogue for characters you share the room with at the moment.
 
 	== characters_present(room) ==
-		{ generals_location == room:
+		{ if generals_location == room:
 			<- general_conversation
 		}
-		{ doctors_location == room:
+		{ if doctors_location == room:
 			<- doctor_conversation
 		}
 		-> DONE
@@ -2319,7 +2324,7 @@ VAR options: ChoiceOption[] = [
 -> DONE
 
 == emit_options(i: int) ==
-{ i >= 0:
+{ if i >= 0:
 	<- emit_options(i - 1)
 
 	~ temp option: ChoiceOption = options[i]

@@ -1,6 +1,6 @@
 use ink_story_json_format::{Container, ControlCommand, NativeFunction, Object as RuntimeObject};
 
-use crate::parsed::Conditional;
+use crate::parsed::{Conditional, ConditionalKind};
 
 use super::context::LoweringContext;
 use super::expression::lower_expression_into;
@@ -20,12 +20,7 @@ pub(super) fn lower_conditional_into(
         content.push(RuntimeObject::ControlCommand(ControlCommand::EvalEnd));
     }
 
-    let has_initial_condition = conditional.initial_condition().is_some();
-    let switch_like = has_initial_condition
-        && conditional
-            .branches()
-            .iter()
-            .any(|branch| branch.own_condition().is_some());
+    let switch_like = conditional.kind() == ConditionalKind::Switch;
     let needs_fallthrough_pop = switch_like
         && !conditional
             .branches()

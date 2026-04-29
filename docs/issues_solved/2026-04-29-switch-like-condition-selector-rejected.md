@@ -20,6 +20,7 @@ VAR quest_stage: int = 0
 ```
 
 `cargo run -q -p ink-tools -- <repro>` exits with compilation failure and reports `/dev/fd/11:7:1: Conditional condition has type int but expected bool`. Existing analysis tests in `crates/ink-compiler/src/analysis/flow.rs` cover non-bool conditional rejection, while `crates/ink-compiler/src/lower/conditional.rs` contains `switch_like` lowering logic.
-Owner decision: Support official Ink-style switch conditionals in ink-rs.
+Owner decision: Support switch conditionals in ink-rs, now spelled with the explicit multiline form `{ switch selector: ... }`.
 Resolution: Flow analysis now distinguishes ordinary boolean conditionals from switch conditionals. Switch selectors may be non-bool, case values are checked for `==` comparability with the selector, and content before the first case is diagnosed as invalid switch fallback syntax.
+Follow-up: The keywordless `{selector: - value: ...}` spelling was later removed as part of the explicit multiline control syntax change. The current migration target for the repro is `{ switch quest_stage: - 0: ... }`.
 Validation: `cargo test -p ink-compiler analysis::flow -- --nocapture`; `cargo test -p ink-test --test conditionals -- --nocapture`; `cargo fmt --all --check`; `cargo test -p ink-test --test integration_policy`; `make gate TIMEOUT='f(){ shift; "$$@"; }; f'`.

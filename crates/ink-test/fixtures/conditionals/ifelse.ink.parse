@@ -11,7 +11,7 @@ Story
     Flow(level=Knot, name="main", function=false)
       Weave(baseIndent=0)
         ContentList
-          Conditional
+          Conditional(kind=if)
             Binary(>, VariableReference(x), Number(0))
             ConditionalBranch(true=true, else=false, inline=false)
               Weave(baseIndent=0)

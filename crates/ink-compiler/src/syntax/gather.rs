@@ -138,11 +138,11 @@ mod tests {
 
     #[test]
     fn parses_gather_prefixed_multiline_conditional() {
-        let line = line("- (again) { true:");
+        let line = line("- (again) { if true:");
         let (objects, rest) =
             parse_multiline_conditional_prefix(&line).expect("expected gather prefix");
 
-        assert_eq!(rest, "{ true:");
+        assert_eq!(rest, "{ if true:");
         let Object::Gather(gather) = &objects[0] else {
             panic!("expected gather");
         };

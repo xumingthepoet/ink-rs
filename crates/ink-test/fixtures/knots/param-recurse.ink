@@ -6,7 +6,7 @@
 
         == add_one_to_one_hundred(total, x) ==
             ~ total = total + x
-            { x == 15:
+            { if x == 15:
                 -> finished(total)
             - else:
                 -> add_one_to_one_hundred(total, x + 1)
