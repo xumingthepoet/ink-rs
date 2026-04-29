@@ -11,6 +11,8 @@ language surface directly:
 - typed `VAR` and `~ temp` declarations
 - typed `== function name(args) => Type ==` declarations
 - typed `EXTERNAL name(args) => Type` declarations
+- explicit multiline `{ if ...: }`, `{ switch ...: }`, and `- else:` control
+  blocks
 - `module::symbol` qualified names
 - divert target value types such as `: ->` and `: ->[]`
 - explicit dynamic diverts such as `-> {next}` and `-> {route.next}(arg)`

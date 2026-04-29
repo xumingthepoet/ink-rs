@@ -53,6 +53,9 @@
       "include": "#multiline-logic"
     },
     {
+      "include": "#multiline-control-keyword"
+    },
+    {
       "include": "#content"
     }
   ],
@@ -446,11 +449,26 @@
         }
       ]
     },
+    "multiline-control-keyword": {
+      "match": "(\\{)\\s*(if|switch)\\b",
+      "captures": {
+        "1": {
+          "name": "keyword.control.heading.ink"
+        },
+        "2": {
+          "name": "keyword.control.conditional.ink"
+        }
+      },
+      "name": "meta.logic.block.header.ink"
+    },
     "multiline-logic": {
-      "begin": "^\\s*(\\{)(?![^\\n{}]*\\})",
+      "begin": "^\\s*(\\{)\\s*(?:(if|switch)\\b)?(?![^\\n{}]*\\})",
       "beginCaptures": {
         "1": {
           "name": "keyword.control.heading.ink"
+        },
+        "2": {
+          "name": "keyword.control.conditional.ink"
         }
       },
       "end": "^\\s*(\\})",
@@ -465,7 +483,7 @@
           "include": "#comments"
         },
         {
-          "match": "^\\s*(-)\\s*(else)?([^:]*)(:)",
+          "match": "^\\s*(-)(?!>)\\s*(else\\b)?([^:]*)(:)",
           "captures": {
             "1": {
               "name": "keyword.control.heading.ink"
