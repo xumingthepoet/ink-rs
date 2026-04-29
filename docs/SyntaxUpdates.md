@@ -1,18 +1,17 @@
-# Writing with Ink Updates
+# Syntax Updates
 
 This file records intentional language documentation changes made by ink-rs.
 
-`WritingWithInk-origin.md` is the immutable upstream C# documentation snapshot.
+`WritingWithInk.md` is the immutable upstream C# documentation snapshot.
 Do not edit it for ink-rs language changes.
 
-`WritingWithInk-latest.md` is the current ink-rs documentation:
-
-```text
-WritingWithInk-latest.md = WritingWithInk-origin.md + WritingWithInk-updates.md
-```
+`SyntaxReference.md` is the current ink-rs syntax reference. It should teach
+only the current language syntax and should not include removed syntax,
+migration notes, or compatibility explanations. Keep those historical details
+in this file.
 
 When syntax or semantics change, update this file first, then apply the same
-change to `WritingWithInk-latest.md`.
+change to `SyntaxReference.md`.
 
 Each entry should include:
 
@@ -36,7 +35,7 @@ Each entry should include:
   ... }` for extended if/else-if, and `{ switch selector: - value: ... }` for
   switch comparisons. The old keywordless multiline forms are removed rather
   than kept as compatibility aliases.
-- documentation effect: `WritingWithInk-latest.md` rewrites multiline control
+- documentation effect: `SyntaxReference.md` rewrites multiline control
   examples to use explicit `if` and `switch`, and keeps inline conditional text,
   choice conditions, and dynamic divert targets as separate braced forms.
 - rationale: keywordless multiline control coupled if and switch parsing to the
@@ -60,7 +59,7 @@ Each entry should include:
   conditionals still require boolean conditions. A conditional whose branches
   all terminate is treated as flow-ending when it has an `else` branch, or when
   a bool switch covers both `true` and `false`.
-- documentation effect: `WritingWithInk-latest.md` clarifies the difference
+- documentation effect: `SyntaxReference.md` clarifies the difference
   between ordinary conditionals and switch conditionals, and documents when a
   conditional block closes flow without an extra `-> DONE`.
 - rationale: the parser and lowering already modeled switch conditionals, but
@@ -83,7 +82,7 @@ Each entry should include:
   `=== module name ===`; knots and functions inside modules use `==`; exactly
   one reachable module defines `== main ==`; and source files are supplied
   explicitly instead of through `INCLUDE`.
-- documentation effect: `WritingWithInk-latest.md` rewrites the basics,
+- documentation effect: `SyntaxReference.md` rewrites the basics,
   diverts, functions, tunnels, threads, and advanced examples to use
   module-first syntax or clearly act as fragments inside a module. It also
   removes stale sequence/shuffle tutorial examples from the maintained guide
@@ -109,7 +108,7 @@ Each entry should include:
   a removed-feature diagnostic instead of lowering them to visit-count-based
   JSON. Conditional text such as `{condition: true text | false text}` remains
   supported.
-- documentation effect: `WritingWithInk-latest.md` removes the alternatives
+- documentation effect: `SyntaxReference.md` removes the alternatives
   tutorial and multiline sequence examples, and documents explicit variables
   plus conditional text as the replacement.
 - rationale: sequence lowering depended on implicit visit counts, but the
@@ -132,7 +131,7 @@ Each entry should include:
   disappears when the author hides it with an explicit condition or changes
   control flow. The compiler and runtime no longer carry once-only choice flags
   for source-authored choices.
-- documentation effect: `WritingWithInk-latest.md` rewrites the old
+- documentation effect: `SyntaxReference.md` rewrites the old
   once-only-choice section to describe repeatable choices, explicit
   variable-based hiding, and fallback choices for the case where all visible
   choices are conditionally hidden.
@@ -157,7 +156,7 @@ Each entry should include:
   `CONST` declarations may now write array and struct literal initializers
   across multiple lines. Temporary declarations and other `~` logic lines
   remain single-line syntax.
-- documentation effect: `WritingWithInk-latest.md` documents the explicit
+- documentation effect: `SyntaxReference.md` documents the explicit
   choice boundary, shows multiline `VAR`/`CONST` composite declarations, and
   updates the data-driven choice example to use
   `* {option.enabled}: {option.text}` instead of invisible glue.
@@ -184,7 +183,7 @@ Each entry should include:
   of choices from data. A recursive thread can walk an array and offer one
   choice per enabled element. The selected branch can then use the element's
   stored `->` target.
-- documentation effect: `WritingWithInk-latest.md` now documents the recursive
+- documentation effect: `SyntaxReference.md` now documents the recursive
   thread pattern for dynamic data-driven choices, including why the recursion
   starts from the last index, why each element should be copied to a local temp
   before offering the choice, and why `<>` is needed when the displayed choice
@@ -216,7 +215,7 @@ Each entry should include:
   access requires an `IMPORT name FROM module` declaration and qualified source
   references such as `shop::price`. Module `VAR` and `EXTERNAL` runtime names
   are module-qualified, for example `shop::price` and `audio::play`.
-- documentation effect: `WritingWithInk-latest.md` documents explicit modules
+- documentation effect: `SyntaxReference.md` documents explicit modules
   as the current source shape, replaces the include section with module/import
   guidance, and describes module-scoped globals and host bindings.
 - rationale: modules make source ownership, dependency checks, namespace
@@ -242,7 +241,7 @@ Each entry should include:
   non-blank line is not `=== module name ===`. The parser still has internal
   root-weave structures for syntax tests and parsed-model bookkeeping, but
   user-authored compiled stories must enter through explicit modules.
-- documentation effect: `WritingWithInk-latest.md` now states that each source
+- documentation effect: `SyntaxReference.md` now states that each source
   file must begin with a module declaration.
 - rationale: accepting root stories in production kept a legacy path alive after
   maintained fixtures had moved to module syntax, making tests less faithful to
@@ -268,7 +267,7 @@ Each entry should include:
   `== function pick() => -> ==` and `EXTERNAL pick() => ->`. The old typed
   return marker `->` is rejected with a diagnostic. The upstream parameter
   shorthand `-> target` remains accepted and means `target: ->`.
-- documentation effect: `WritingWithInk-latest.md` documents `->` as a value
+- documentation effect: `SyntaxReference.md` documents `->` as a value
   type, updates function and external signatures to `=>`, and removes language
   that said divert target variables were unsupported.
 - rationale: `->` previously had two meanings: a flow operator and a typed
@@ -307,7 +306,7 @@ Each entry should include:
   `inkFormatVersion`. It no longer stores `flows`, `currentFlowName`,
   `evalStack`, `currentDivertTarget`, `visitCounts`, `turnIndices`, or
   `turnIdx`. Version 1 saves are rejected rather than migrated.
-- documentation effect: `WritingWithInk-latest.md` describes explicit dynamic
+- documentation effect: `SyntaxReference.md` describes explicit dynamic
   divert syntax, repeatable display-only choices, removed count/turn features,
   and minimal save-state semantics. Runtime and JSON format docs mark remaining
   count-related runtime tokens as legacy compiled-story compatibility rather
@@ -336,7 +335,7 @@ Each entry should include:
   `float`, `bool`, `string`, user `STRUCT` types, arrays written as `T[]`, and
   nested arrays. Constant initializers are checked against the declared type,
   and struct defaults are applied when typed struct constants omit fields.
-- documentation effect: `WritingWithInk-latest.md` updates the changed-from-
+- documentation effect: `SyntaxReference.md` updates the changed-from-
   upstream section and all constants examples to use explicit types.
 - rationale: constants participate in expression type checking and lowering.
   Requiring a declared type keeps composite constants unambiguous, especially
@@ -357,7 +356,7 @@ Each entry should include:
 - ink-rs behavior: `VAR` declarations are only accepted at module top level,
   outside knots, stitches, functions, choices, and conditionals.
   Local executable state should use typed `temp` declarations instead.
-- documentation effect: `WritingWithInk-latest.md` records the scope
+- documentation effect: `SyntaxReference.md` records the scope
   restriction in "Changed from upstream Ink" and in the global variable
   declaration section.
 - rationale: hidden global declarations inside executable flow content make
@@ -400,7 +399,7 @@ Each entry should include:
   jump back to the function body, avoiding growth of the Ink function callstack
   for that recursive step. Mutual recursion and non-tail recursion keep normal
   call behavior.
-- documentation effect: `WritingWithInk-latest.md` must replace the upstream
+- documentation effect: `SyntaxReference.md` must replace the upstream
   dynamic declaration examples with typed declarations, add struct and array
   syntax, document typed functions and externals, and document the array
   builtins and tail-call behavior as ink-rs language extensions.
@@ -434,7 +433,7 @@ Each entry should include:
 - ink-rs behavior: `LIST` declarations produce a removed-feature diagnostic.
   Compiled story JSON no longer serializes `listDefs`, list value objects, or
   list-specific runtime tokens.
-- documentation effect: `WritingWithInk-latest.md` removes the upstream list
+- documentation effect: `SyntaxReference.md` removes the upstream list
   documentation from the main table of contents and body, and records the
   divergence in "Changed from upstream Ink".
 - rationale: the Rust language surface is being reduced to features that are

@@ -291,8 +291,8 @@ still be stored dynamically in story JSON and save JSON.
    - runtime conformance
    - language tests for type errors
 7. Update documentation:
-   - `docs/WritingWithInk-updates.md`
-   - `docs/WritingWithInk-latest.md`
+   - `docs/SyntaxUpdates.md`
+   - `docs/SyntaxReference.md`
    - JSON runtime format docs if array/object value wire shape changes
 8. Validate:
    - focused compiler tests

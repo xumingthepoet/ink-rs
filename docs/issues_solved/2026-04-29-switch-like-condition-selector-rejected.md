@@ -1,7 +1,7 @@
 # Switch-Like Condition Selector Is Rejected As Non-Bool
 Status: solved
 Found while: tracking user bug reports from 2026-04-29
-Scope: crates/ink-compiler/src/analysis/flow.rs, crates/ink-compiler/src/lower/conditional.rs, docs/WritingWithInk-latest.md
+Scope: crates/ink-compiler/src/analysis/flow.rs, crates/ink-compiler/src/lower/conditional.rs, docs/SyntaxReference.md
 Problem: Authors migrating from official Ink may write switch-like conditional syntax such as `{quest_stage: - 0: ...}`. The current parser/lowering has switch-like conditional handling, but flow analysis still checks the initial conditional expression as a boolean condition and reports `Conditional condition has type int but expected bool`.
 Why it matters: The diagnostic makes the construct look like an invalid boolean conditional rather than a possibly unsupported or partially supported switch form. Migration is also easy to misunderstand because the maintained writing guide still contains upstream switch wording.
 Suggested fix: Decide whether ink-rs supports official Ink-style switch conditionals. If supported, update flow analysis and tests so selector expressions are type-checked against branch values instead of requiring `bool`. If unsupported, emit a clear unsupported/removed-feature diagnostic for switch-like conditional syntax and remove or rewrite maintained documentation that implies support.

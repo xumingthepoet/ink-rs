@@ -1,4 +1,4 @@
-# Writing with ink
+# Syntax Reference
 
 <details>
   <summary>Table of Contents</summary>
@@ -54,7 +54,7 @@ stitches still use `=`. Exactly one module in a compilation must define
 
 Story content and tags belong inside knots or stitches, not at module level.
 The first non-blank line of each source file must be a module declaration.
-Source files are passed to the compiler explicitly; `INCLUDE` is removed. Each
+The host compiler receives every source file as an explicit source input. Each
 module name may appear only once in a compilation, so repeating the same
 `=== module name ===` in another file is an error rather than a way to extend
 that module. A module can use another module's knots, functions, constants,
@@ -139,7 +139,7 @@ Text content from the game will appear 'as is' when the engine runs. However, it
 
 	A line of normal game-text. # colour it blue
 
-These don't show up in the main text flow, but can be read off by the game and used as you see fit. See the upstream [Running Your Ink](https://github.com/inkle/ink/blob/master/Documentation/RunningYourInk.md#marking-up-your-ink-content-with-tags) guide for more information.
+These don't show up in the main text flow, but can be read off by the game and used as you see fit.
 
 
 ## 2) Choices
@@ -390,9 +390,8 @@ Modules are the top-level namespace for ink-rs source. A compilation can use
 modules declared in one file or in multiple source inputs supplied by the host
 compiler API, but module names are unique per compilation. The compiler does
 not merge same-named modules across files; declaring `=== module travel ===` in
-two different source inputs is a duplicate-module error. The compiler does not
-scan directories or follow `INCLUDE`; the caller passes every source file
-explicitly.
+two different source inputs is a duplicate-module error. The caller passes
+every source file explicitly.
 
 	=== module travel ===
 	IMPORT ticket_price FROM shop
@@ -490,23 +489,6 @@ From inside a knot, you don't need to use the full address for a stitch.
 This means stitches and knots can't share names, but several knots can contain the same stitch name. (So both the Orient Express and the SS Mongolia can have first class.)
 
 The compiler will warn you if ambiguous names are used.
-
-### Replacing INCLUDE
-
-`INCLUDE` is removed in ink-rs. Split content by declaring distinct modules in
-the files you pass to the compiler, then import the specific symbols you use:
-
-	=== module game ===
-	IMPORT start FROM newspaper
-
-	== main ==
-	-> newspaper::start
-
-	=== module newspaper ===
-	== start ==
-	The headline was impossible to ignore.
-	-> END
-
 
 ## 7) Varying Choices
 
@@ -641,14 +623,9 @@ Conditions use explicit variables or expressions:
 
 So far, all the content we've seen has been static, fixed pieces of text. But content can also vary at the moment of being printed.
 
-### Removed: stateful text alternatives
+### Varying text with state
 
-Upstream Ink supports several source forms for implicit stateful text
-alternatives. ink-rs no longer supports those source forms. The compiler
-reports a removed-feature diagnostic because the current runtime intentionally
-does not store implicit visit-count state in saves.
-
-Use typed variables and conditional text to model progression explicitly:
+Use typed variables and conditional text to model text progression explicitly:
 
 	VAR radio_step: int = 0
 
@@ -903,7 +880,7 @@ But, in theory at least, you could write your entire story as a single weave.
 Here's a longer example:
 
 	- I looked at Monsieur Fogg
-	*	... and I could contain myself no longer.
+	*	... and I could not contain myself.
 		'What is the purpose of our journey, Monsieur?'
 		'A wager,' he replied.
 		* * 	'A wager!' I returned.
@@ -926,7 +903,7 @@ with a couple of possible playthroughs. A short one:
 
 	I looked at Monsieur Fogg
 
-	1: ... and I could contain myself no longer.
+	1: ... and I could not contain myself.
 	2: ... but I said nothing
 
 	> 2
@@ -936,11 +913,11 @@ and a longer one:
 
 	I looked at Monsieur Fogg
 
-	1: ... and I could contain myself no longer.
+	1: ... and I could not contain myself.
 	2: ... but I said nothing
 
 	> 1
-	... and I could contain myself no longer.
+	... and I could not contain myself.
 	'What is the purpose of our journey, Monsieur?'
 	'A wager,' he replied.
 
@@ -1291,8 +1268,6 @@ following:
 
 ... won't produce a very interesting effect. (If you really want this to work, use a text function to print the colour!)
 
-Source-level random text alternatives inside strings are no longer supported.
-
 
 ## 2) Logic
 
@@ -1523,8 +1498,7 @@ You can even put options inside conditional blocks:
 
 Multiline conditionals are the supported multiline brace block form in ink-rs.
 They must start with an explicit `{ if ...:`, `{ if:`, or `{ switch ...:`
-header. Upstream stateful alternative blocks are removed; model that state
-with variables and ordinary conditionals instead.
+header.
 
 	VAR luck_step: int = 0
 
@@ -1882,7 +1856,7 @@ Constants are simply a way to allow you to give story states easy-to-understand 
 
 ## 7) Advanced: Game-side logic
 
-External function declarations in ink allow you to directly call host functions in the game. The upstream runtime integration guide describes external calls and other host integration concepts in [Running your ink](https://github.com/inkle/ink/blob/master/Documentation/RunningYourInk.md).
+External function declarations in ink allow you to directly call host functions in the game.
 
 In ink-rs, every `EXTERNAL` declaration is module-level and needs a typed signature:
 
@@ -2192,7 +2166,7 @@ The extra DONE tells ink that the flow here has ended and it should rely on the 
 
 Note that we don't need a `-> DONE` if the flow ends with options that fail their conditions. The engine treats this as a valid, intentional, end of flow state.
 
-**You do not need a `-> DONE` after an option has been chosen**. Once an option is chosen, a thread is no longer a thread - it is simply the normal story flow once more.
+**You do not need a `-> DONE` after an option has been chosen**. Once an option is chosen, the thread rejoins normal story flow.
 
 Using `-> END` in this case will not end the thread, but the whole story flow. (And this is the real reason for having two different ways to end flow.)
 
@@ -2362,7 +2336,7 @@ The local `option` temp is deliberate. A generated choice captures the thread at
 the time the choice was created, so copying `options[i]` before the `*` line
 keeps the displayed text and selected target together. Without that temp, later
 changes to shared global data can make a pending generated choice run with data
-that no longer matches what the player saw.
+that contradicts what the player saw.
 
 The colon after `{option.enabled}` is also deliberate. At the beginning of a
 choice line, braced expressions are parsed as choice conditions. The colon ends

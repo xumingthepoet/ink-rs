@@ -147,7 +147,7 @@ Implementation note:
     should receive new field/index read/write operations.
 - Test and documentation files that must change across later steps include
   `crates/ink-test` fixtures/snapshots, compiler/runtime crate unit tests,
-  `docs/WritingWithInk-updates.md`, `docs/WritingWithInk-latest.md`, and any
+  `docs/SyntaxUpdates.md`, `docs/SyntaxReference.md`, and any
   JSON format docs added for dynamic arrays/objects.
 
 Acceptance method:
@@ -2032,11 +2032,11 @@ Checklist:
 
 ## Phase 7: Documentation And Final Validation
 
-### Step 60: Update WritingWithInk Updates
+### Step 60: Update Syntax Updates
 
 Implementation method:
 
-- Add a dated entry to `docs/WritingWithInk-updates.md` describing typed
+- Add a dated entry to `docs/SyntaxUpdates.md` describing typed
   variables, structs, arrays, typed functions, typed externals, and TCO.
 
 Acceptance method:
@@ -2047,7 +2047,7 @@ Acceptance method:
 
 Forbidden boundaries:
 
-- Do not edit `docs/WritingWithInk-origin.md`.
+- Do not edit `docs/WritingWithInk.md`.
 - Do not document behavior not implemented.
 
 Checklist:
@@ -2059,11 +2059,11 @@ Checklist:
 - [x] Committed immediately
 - Commit: 4ca1de0
 
-### Step 61: Update WritingWithInk Latest
+### Step 61: Update Syntax Reference
 
 Implementation method:
 
-- Apply the syntax and semantic changes to `docs/WritingWithInk-latest.md`.
+- Apply the syntax and semantic changes to `docs/SyntaxReference.md`.
 - Include examples for typed variables, structs, arrays, functions, externals,
   and array builtins.
 

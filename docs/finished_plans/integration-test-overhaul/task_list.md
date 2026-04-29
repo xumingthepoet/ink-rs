@@ -571,11 +571,11 @@ language from tests.
 Acceptance criteria: docs clearly state explicit modules are required for source
 compilation; upstream legacy behavior is framed only as historical context.
 
-Forbidden shortcuts: do not edit `docs/WritingWithInk-origin.md`; do not leave
+Forbidden shortcuts: do not edit `docs/WritingWithInk.md`; do not leave
 contradictory guidance in `Notes.md` or test README files.
 
 Modification boundaries: `docs/Architecture.md`,
-`docs/WritingWithInk-updates.md`, `docs/WritingWithInk-latest.md`,
+`docs/SyntaxUpdates.md`, `docs/SyntaxReference.md`,
 `crates/ink-test/fixtures/language/README.md`, and `Notes.md` if needed.
 
 Validation commands: `cargo test -p ink-test --test language`, `make gate`.

@@ -161,12 +161,12 @@ work. It intentionally omits build output and most upstream reference internals.
 |-- docs/
 |   |-- Architecture.md
 |   |   This repository map. Update it with structural changes.
-|   |-- WritingWithInk-origin.md
-|   |   Upstream C# guide snapshot. Do not edit.
-|   |-- WritingWithInk-updates.md
+|   |-- SyntaxUpdates.md
 |   |   Language and semantic changes from upstream.
-|   |-- WritingWithInk-latest.md
-|   |   Current maintained user-facing guide.
+|   |-- SyntaxReference.md
+|   |   Current supported syntax reference.
+|   |-- WritingWithInk.md
+|   |   Upstream C# guide snapshot. Do not edit.
 |   |-- ink_JSON_runtime_format.md
 |   |   Compiled story JSON notes.
 |   |-- active_plan/
@@ -543,9 +543,12 @@ or sibling files.
 `editor/vscode-ink-rs/` owns editor syntax/package assets. Update it when a
 language syntax change should affect highlighting or editor examples.
 
-`docs/WritingWithInk-updates.md` records language and semantic changes from
-upstream. `docs/WritingWithInk-latest.md` is the maintained guide users should
-read. Do not edit `docs/WritingWithInk-origin.md`.
+`docs/SyntaxUpdates.md` records language and semantic changes from
+upstream. `docs/SyntaxReference.md` is the maintained syntax reference users
+should read. Keep `SyntaxReference.md` focused on current supported syntax;
+removed syntax, migration notes, and compatibility explanations belong in
+`SyntaxUpdates.md`, issue records, diagnostics tests, or architecture notes. Do
+not edit `docs/WritingWithInk.md`.
 
 The upstream C# implementation remains an external reference for
 legacy-compatible behavior questions, especially parser trial order, weave
@@ -596,8 +599,8 @@ For language or runtime behavior changes:
 6. Change `ink-runtime` only when loading, execution, public runtime APIs, or
    save/load behavior changes.
 7. Add or update behavior-grouped fixtures and tests under `crates/ink-test`.
-8. Update `docs/WritingWithInk-updates.md` and
-   `docs/WritingWithInk-latest.md` for language or semantic changes.
+8. Update `docs/SyntaxUpdates.md` and
+   `docs/SyntaxReference.md` for language or semantic changes.
 9. Update this `docs/Architecture.md` in the same change when the file tree,
    module ownership, pipeline, routing table, or validation expectations change.
 

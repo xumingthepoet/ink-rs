@@ -257,8 +257,8 @@ not part of this closed first phase.
 - The compiled story JSON remains loadable by the existing runtime through
   `ink-story-json-format`.
 - Intentional divergence from upstream Ink behavior is documented in
-  `docs/WritingWithInk-updates.md` and reflected in
-  `docs/WritingWithInk-latest.md`.
+  `docs/SyntaxUpdates.md` and reflected in
+  `docs/SyntaxReference.md`.
 - Focused module tests pass before broad validation.
 - `make gate` passes before this plan is moved to `docs/finished_plans/`.
 

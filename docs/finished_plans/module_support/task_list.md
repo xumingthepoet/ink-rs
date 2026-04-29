@@ -1226,15 +1226,15 @@ language behavior, with examples backed by fixtures or tests.
 
 Implementation method:
 
-- Update `docs/WritingWithInk-updates.md` first with module/import behavior and
+- Update `docs/SyntaxUpdates.md` first with module/import behavior and
   intentional upstream divergence.
-- Apply the changes to `docs/WritingWithInk-latest.md`.
+- Apply the changes to `docs/SyntaxReference.md`.
 - Update `docs/Architecture.md` and `docs/ink_JSON_runtime_format.md` for
   source input, parsed modules, analysis, lowering, runtime path mapping, JSON
   compatibility, and save-state notes.
 - Add or update small docs-example fixtures/tests for the primary module/import
   examples so this is not a prose-only task.
-- Do not edit `WritingWithInk-origin.md`.
+- Do not edit `WritingWithInk.md`.
 
 Acceptance criteria:
 

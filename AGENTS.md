@@ -45,9 +45,9 @@ tracked repository directory.
 - `docs/finished_plans`: completed implementation plans
 - `docs/issues_found`: deferred issues discovered during implementation
 - `docs/issues_solved`: issue records moved here after their fixes land
-- `docs/WritingWithInk-updates.md`: ink-rs syntax and semantic change log
-- `docs/WritingWithInk-latest.md`: current maintained writing guide
-- `docs/WritingWithInk-origin.md`: upstream C# writing guide snapshot
+- `docs/SyntaxUpdates.md`: ink-rs syntax and semantic change log
+- `docs/SyntaxReference.md`: current syntax reference for the latest language
+- `docs/WritingWithInk.md`: upstream C# writing guide snapshot
 - `docs/Architecture.md`: ink-rs architecture notes
 - `docs/ink_JSON_runtime_format.md`: compiled story JSON format notes
 - `Notes.md`: durable working notes that change more often than this file
@@ -85,12 +85,16 @@ tracked repository directory.
   aliases for the active-plan directory or concept.
 - Keep active plan details in `docs/active_plan/`; do not add one-off plan file
   names to `AGENTS.md`.
-- Keep `docs/WritingWithInk-updates.md` synchronized with syntax and semantic
-  changes, then apply those updates to `docs/WritingWithInk-latest.md`.
+- Keep `docs/SyntaxUpdates.md` synchronized with syntax and semantic
+  changes, then apply those updates to `docs/SyntaxReference.md`.
+- Keep `docs/SyntaxReference.md` focused only on the latest supported ink-rs
+  syntax. Do not describe removed syntax, legacy migration paths, or
+  compatibility notes there; record those details in `docs/SyntaxUpdates.md`,
+  issue records, diagnostics tests, or architecture notes instead.
 - Store active implementation plans under `docs/active_plan/`. When a plan is
   complete, move it to `docs/finished_plans/`. Do not update `AGENTS.md` for
   each new plan unless the planning workflow itself changes.
-- Do not edit `docs/WritingWithInk-origin.md`; it is the upstream C# snapshot.
+- Do not edit `docs/WritingWithInk.md`; it is the upstream C# snapshot.
 
 ## Active Plan Task Lists
 
