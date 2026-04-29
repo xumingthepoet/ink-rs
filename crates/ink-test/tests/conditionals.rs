@@ -1,6 +1,10 @@
 mod support;
 
-use support::{runtime::StoryError, story_runner as common};
+use support::{
+    compiler::{assert_story_output, compile_fixture},
+    runtime::StoryError,
+    story_runner as common,
+};
 
 #[test]
 fn iftrue_test() -> Result<(), StoryError> {
@@ -152,4 +156,18 @@ fn cond_opt2_test() -> Result<(), StoryError> {
     assert_eq!(2, story.get_current_choices().len());
 
     Ok(())
+}
+
+#[test]
+fn switch_condition_selects_matching_case() {
+    let compiled = compile_fixture("conditionals/switch.ink");
+
+    assert_story_output(&compiled, "stage one\n");
+}
+
+#[test]
+fn bool_switch_with_divert_branches_closes_flow() {
+    let compiled = compile_fixture("conditionals/bool-switch-diverts.ink");
+
+    assert_story_output(&compiled, "Finished.\n");
 }

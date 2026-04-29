@@ -652,7 +652,8 @@ Use typed variables and conditional text to model progression explicitly:
 
 	VAR radio_step: int = 0
 
-	{ radio_step == 0:
+	{
+	- radio_step == 0:
 	    Three!
 	- radio_step == 1:
 	    Two!
@@ -1407,9 +1408,15 @@ And using this form we can include 'else-if' conditions:
 
 (Note, as with everything else, the white-space is purely for readability and has no syntactic meaning.)
 
+When using `else-if` branch conditions, start the block with `{` and put every
+condition on a `- condition:` branch. If the opening line has a selector before
+the colon, as in `{ x:`, the block is a switch instead.
+
 ### Switch blocks
 
-And there's also an actual switch statement:
+There is also a switch form. In this form, `x` is a selector value, not a
+boolean condition. Each branch value is compared with the selector using `==`,
+so the case values must be comparable with the selector's type:
 
 	{ x:
 	- 0: 	zero
@@ -1417,6 +1424,16 @@ And there's also an actual switch statement:
 	- 2: 	two
 	- else: lots
 	}
+
+Use `- else:` for fallback content. Content before the first case is not a
+switch fallback.
+
+For flow checking, an `if`/`else` block or switch block closes the current flow
+when every branch ends in a divert, `-> DONE`, `-> END`, choice, or return and
+the block has an `else` branch. A bool switch that explicitly covers both
+`true` and `false` is also exhaustive. Other switches are not assumed to cover
+every value; add `- else:` or put an explicit `-> DONE`, `-> END`, choice, or
+divert after the block.
 
 #### Example: context-relevant content
 

@@ -2,15 +2,17 @@ use crate::{
     diagnostic::Diagnostic,
     parsed::{
         visit::{walk_story, walk_weave, ParsedVisitor, VisitContext},
-        Choice, ContentList, DivertTarget, Expression, Flow, FlowLevel, Object, Return, Story,
-        TypeName, Weave,
+        BinaryOperator, Choice, Conditional, ContentList, DivertTarget, Expression, Flow,
+        FlowLevel, Object, Return, Story, TypeName, Weave,
     },
     source::SourceSpan,
 };
 
 use super::{
     context::{StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
-    expression_types::{infer_expression_type, typed_builtin_return_type},
+    expression_types::{
+        infer_binary_operator_type, infer_expression_type, typed_builtin_return_type,
+    },
     span::{first_span_in_weave, object_span},
     structs::build_struct_type_index,
     target_symbols::{build_target_symbol_index, resolve_target_symbol},
@@ -169,14 +171,7 @@ impl ParsedVisitor for ConditionTypeChecker<'_> {
             }
             Object::Conditional(conditional) => {
                 let span = object_span(object);
-                if let Some(condition) = conditional.initial_condition() {
-                    self.check_condition("Conditional", condition, &span, context);
-                }
-                for branch in conditional.branches() {
-                    if let Some(condition) = branch.own_condition() {
-                        self.check_condition("Conditional", condition, &span, context);
-                    }
-                }
+                self.check_conditional(conditional, &span, context);
             }
             _ => {}
         }
@@ -184,6 +179,107 @@ impl ParsedVisitor for ConditionTypeChecker<'_> {
 }
 
 impl ConditionTypeChecker<'_> {
+    fn check_conditional(
+        &mut self,
+        conditional: &Conditional,
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) {
+        if conditional_is_switch_like(conditional) {
+            self.check_switch_conditional(conditional, span, context);
+            return;
+        }
+
+        if let Some(condition) = conditional.initial_condition() {
+            self.check_condition("Conditional", condition, span, context);
+        }
+        for branch in conditional.branches() {
+            if let Some(condition) = branch.own_condition() {
+                self.check_condition("Conditional", condition, span, context);
+            }
+        }
+    }
+
+    fn check_switch_conditional(
+        &mut self,
+        conditional: &Conditional,
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) {
+        if conditional
+            .branches()
+            .iter()
+            .any(|branch| branch.is_true_branch())
+        {
+            self.diagnostics.push(Diagnostic::error(
+                span.clone(),
+                "Switch conditionals cannot include content before the first case. Use '- else:' for fallback content.",
+            ));
+        }
+
+        let Some(selector) = conditional.initial_condition() else {
+            return;
+        };
+        let Some(selector_type) =
+            self.switch_expression_type("switch selector", selector, span, context)
+        else {
+            return;
+        };
+
+        for branch in conditional.branches() {
+            let Some(case_value) = branch.own_condition() else {
+                continue;
+            };
+            let Some(case_type) =
+                self.switch_expression_type("switch case value", case_value, span, context)
+            else {
+                continue;
+            };
+
+            if let Err(error) =
+                infer_binary_operator_type(BinaryOperator::Equals, selector_type.clone(), case_type)
+            {
+                self.diagnostics.push(Diagnostic::error(
+                    span.clone(),
+                    format!(
+                        "Switch case value is not comparable with selector: {}",
+                        error.message()
+                    ),
+                ));
+            }
+        }
+    }
+
+    fn switch_expression_type(
+        &mut self,
+        label: &str,
+        expression: &Expression,
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) -> Option<TypeName> {
+        let current_flow_path = context.current_flow_path.as_deref();
+        let has_typed_signal = self.has_typed_signal(expression, context);
+
+        match infer_expression_type(
+            expression,
+            self.analysis.variable_scopes,
+            self.analysis.struct_types,
+            self.analysis.target_symbols,
+            context.current_module.as_deref(),
+            current_flow_path,
+        ) {
+            Ok(expression_type) => Some(expression_type),
+            Err(error) if has_typed_signal => {
+                self.diagnostics.push(Diagnostic::error(
+                    span.clone(),
+                    format!("Cannot type-check {label}: {}", error.message()),
+                ));
+                None
+            }
+            Err(_) => None,
+        }
+    }
+
     fn check_condition(
         &mut self,
         label: &str,
@@ -192,14 +288,7 @@ impl ConditionTypeChecker<'_> {
         context: &VisitContext,
     ) {
         let current_flow_path = context.current_flow_path.as_deref();
-        let has_typed_signal = condition_type_signal(
-            condition,
-            self.analysis.variable_scopes,
-            self.analysis.target_symbols,
-            context.current_module.as_deref(),
-            current_flow_path,
-        )
-        .is_some_and(|signal| signal == ConditionTypeSignal::Typed);
+        let has_typed_signal = self.has_typed_signal(condition, context);
 
         match infer_expression_type(
             condition,
@@ -225,6 +314,25 @@ impl ConditionTypeChecker<'_> {
             Err(_) => {}
         }
     }
+
+    fn has_typed_signal(&self, expression: &Expression, context: &VisitContext) -> bool {
+        condition_type_signal(
+            expression,
+            self.analysis.variable_scopes,
+            self.analysis.target_symbols,
+            context.current_module.as_deref(),
+            context.current_flow_path.as_deref(),
+        )
+        .is_some_and(|signal| signal == ConditionTypeSignal::Typed)
+    }
+}
+
+fn conditional_is_switch_like(conditional: &Conditional) -> bool {
+    conditional.initial_condition().is_some()
+        && conditional
+            .branches()
+            .iter()
+            .any(|branch| branch.own_condition().is_some())
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -714,10 +822,7 @@ fn object_terminates_flow(object: &Object) -> bool {
             last_significant_object(weave.content()).is_some_and(object_terminates_flow)
         }
         Object::Conditional(conditional) => {
-            conditional
-                .branches()
-                .last()
-                .is_some_and(|branch| branch.is_else())
+            conditional_is_exhaustive_for_flow(conditional)
                 && conditional.branches().iter().all(|branch| {
                     last_significant_object(branch.content().content())
                         .is_some_and(object_terminates_flow)
@@ -736,6 +841,32 @@ fn object_terminates_flow(object: &Object) -> bool {
         | Object::Text(_)
         | Object::VariableAssignment(_) => false,
     }
+}
+
+fn conditional_is_exhaustive_for_flow(conditional: &Conditional) -> bool {
+    conditional
+        .branches()
+        .last()
+        .is_some_and(|branch| branch.is_else())
+        || bool_switch_covers_true_and_false(conditional)
+}
+
+fn bool_switch_covers_true_and_false(conditional: &Conditional) -> bool {
+    if !conditional_is_switch_like(conditional) {
+        return false;
+    }
+
+    let mut covers_true = false;
+    let mut covers_false = false;
+    for branch in conditional.branches() {
+        match branch.own_condition() {
+            Some(Expression::NumberBool(true)) => covers_true = true,
+            Some(Expression::NumberBool(false)) => covers_false = true,
+            _ => {}
+        }
+    }
+
+    covers_true && covers_false
 }
 
 #[cfg(test)]
@@ -822,6 +953,14 @@ mod tests {
                 "Conditional condition has type int[] but expected bool",
             ),
             (
+                "VAR value: int = 1\n\
+                 {\n\
+                 - value:\n\
+                   Text.\n\
+                 }",
+                "Conditional condition has type int but expected bool",
+            ),
+            (
                 "STRUCT Player {\n\
                  hp: int\n\
                  }\n\
@@ -839,6 +978,121 @@ mod tests {
 
             assert_single_diagnostic(&diagnostics, DiagnosticSeverity::Error, expected_message);
         }
+    }
+
+    #[test]
+    fn accepts_switch_conditions_with_non_bool_selectors() {
+        let story = parse_story(
+            "VAR quest_stage: int = 0\n\
+             { quest_stage:\n\
+             - 0:\n\
+               stage zero\n\
+             }\n\
+             -> DONE",
+        );
+
+        assert_eq!(flow_diagnostics(&story), []);
+    }
+
+    #[test]
+    fn reports_switch_case_values_not_comparable_with_selector() {
+        let story = parse_story(
+            "VAR quest_stage: int = 0\n\
+             { quest_stage:\n\
+             - \"zero\":\n\
+               stage zero\n\
+             }\n\
+             -> DONE",
+        );
+        let diagnostics = flow_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Switch case value is not comparable with selector: Operator '==' is not defined for types int and string",
+        );
+    }
+
+    #[test]
+    fn reports_switch_content_before_first_case() {
+        let story = parse_story(
+            "VAR quest_stage: int = 0\n\
+             { quest_stage:\n\
+               fallback text\n\
+             - 0:\n\
+               stage zero\n\
+             }\n\
+             -> DONE",
+        );
+        let diagnostics = flow_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Switch conditionals cannot include content before the first case. Use '- else:' for fallback content.",
+        );
+    }
+
+    #[test]
+    fn bool_switch_covering_true_and_false_terminates_flow() {
+        let story = parse_story(
+            "=== module game ===\n\
+             VAR done: bool = true\n\
+             == main ==\n\
+             { done:\n\
+             - true:\n\
+               -> finish\n\
+             - false:\n\
+               -> finish\n\
+             }\n\
+             == finish ==\n\
+             -> END",
+        );
+
+        assert_eq!(flow_diagnostics(&story), []);
+    }
+
+    #[test]
+    fn non_exhaustive_int_switch_still_reports_loose_end() {
+        let story = parse_story(
+            "=== module game ===\n\
+             VAR quest_stage: int = 0\n\
+             == main ==\n\
+             { quest_stage:\n\
+             - 0:\n\
+               -> finish\n\
+             - 1:\n\
+               -> finish\n\
+             }\n\
+             == finish ==\n\
+             -> END",
+        );
+        let diagnostics = flow_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Warning,
+            "Apparent loose end exists where the flow runs out. Do you need a '-> DONE' statement, choice or divert?",
+        );
+    }
+
+    #[test]
+    fn switch_with_else_and_all_terminating_branches_closes_flow() {
+        let story = parse_story(
+            "=== module game ===\n\
+             VAR quest_stage: int = 0\n\
+             == main ==\n\
+             { quest_stage:\n\
+             - 0:\n\
+               -> finish\n\
+             - else:\n\
+               -> finish\n\
+             }\n\
+             == finish ==\n\
+             -> END",
+        );
+
+        assert_eq!(flow_diagnostics(&story), []);
     }
 
     #[test]

@@ -25,6 +25,30 @@ Each entry should include:
 - migration guidance
 - tests
 
+## 2026-04-29: Conditional Switch Type Checking And Exhaustive Flow
+
+- status: supported
+- upstream behavior: upstream Ink supports switch-style conditionals such as
+  `{ x: - 0: ... }`, where branch values are compared against the selector.
+- ink-rs behavior: switch-style conditionals are supported. The selector does
+  not need to be `bool`; each case value must be comparable with it using the
+  same type rules as `==`. Ordinary `{ condition: ... }` and extended
+  `{ - condition: ... }` conditionals still require boolean conditions. A
+  conditional whose branches all terminate is treated as flow-ending when it has
+  an `else` branch, or when a bool switch covers both `true` and `false`.
+- documentation effect: `WritingWithInk-latest.md` clarifies the difference
+  between ordinary conditionals and switch conditionals, and documents when a
+  conditional block closes flow without an extra `-> DONE`.
+- rationale: the parser and lowering already modeled switch conditionals, but
+  analysis incorrectly rejected typed non-bool selectors and emitted loose-end
+  warnings for exhaustive bool switch diverts.
+- migration guidance: use switch syntax for enumerated selector values. Add
+  `- else:` or an explicit post-block terminator for non-exhaustive switches.
+- tests: compiler flow-analysis tests cover switch selector typing, case type
+  mismatch diagnostics, content-before-case diagnostics, bool switch
+  exhaustiveness, and non-exhaustive int switch warnings. Conditionals fixtures
+  cover runtime switch selection and bool switch divert flow.
+
 ## 2026-04-29: Module-First Writing Guide Rewrite
 
 - status: supported

@@ -433,7 +433,7 @@ fn infer_binary_expression_type(
     infer_binary_operator_type(operator, left_type, right_type)
 }
 
-fn infer_binary_operator_type(
+pub(super) fn infer_binary_operator_type(
     operator: BinaryOperator,
     left_type: TypeName,
     right_type: TypeName,
