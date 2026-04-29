@@ -38,7 +38,9 @@ Each entry should include:
 - documentation effect: `WritingWithInk-latest.md` rewrites the basics,
   diverts, functions, tunnels, threads, and advanced examples to use
   module-first syntax or clearly act as fragments inside a module. It also
-  removes stale sequence/shuffle tutorial examples from the maintained guide.
+  removes stale sequence/shuffle tutorial examples from the maintained guide
+  and clarifies that module names are unique per compilation rather than merged
+  across source files.
 - rationale: the maintained writing guide should be directly usable by authors
   and library consumers without teaching obsolete root-knot syntax.
 - migration guidance: wrap runnable examples in an explicit module, rename

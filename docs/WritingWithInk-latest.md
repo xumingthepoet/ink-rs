@@ -54,10 +54,12 @@ stitches still use `=`. Exactly one module in a compilation must define
 
 Story content and tags belong inside knots or stitches, not at module level.
 The first non-blank line of each source file must be a module declaration.
-Source files are passed to the compiler explicitly; `INCLUDE` is removed. A
-module can use another module's knots, functions, constants, globals, structs,
-or externals only after an explicit `IMPORT`, and cross-module references use
-`module::symbol`.
+Source files are passed to the compiler explicitly; `INCLUDE` is removed. Each
+module name may appear only once in a compilation, so repeating the same
+`=== module name ===` in another file is an error rather than a way to extend
+that module. A module can use another module's knots, functions, constants,
+globals, structs, or externals only after an explicit `IMPORT`, and
+cross-module references use `module::symbol`.
 
 For example:
 
@@ -384,10 +386,13 @@ Oh, and the following is legal and not a great idea:
 
 ### Modules organize source files
 
-Modules are the top-level namespace for ink-rs source. They can live in one
-file or be spread across multiple source inputs supplied by the host compiler
-API. The compiler does not scan directories or follow `INCLUDE`; the caller
-passes every source file explicitly.
+Modules are the top-level namespace for ink-rs source. A compilation can use
+modules declared in one file or in multiple source inputs supplied by the host
+compiler API, but module names are unique per compilation. The compiler does
+not merge same-named modules across files; declaring `=== module travel ===` in
+two different source inputs is a duplicate-module error. The compiler does not
+scan directories or follow `INCLUDE`; the caller passes every source file
+explicitly.
 
 	=== module travel ===
 	IMPORT ticket_price FROM shop
@@ -488,8 +493,8 @@ The compiler will warn you if ambiguous names are used.
 
 ### Replacing INCLUDE
 
-`INCLUDE` is removed in ink-rs. Split content by declaring modules in the files
-you pass to the compiler, then import the specific symbols you use:
+`INCLUDE` is removed in ink-rs. Split content by declaring distinct modules in
+the files you pass to the compiler, then import the specific symbols you use:
 
 	=== module game ===
 	IMPORT start FROM newspaper
