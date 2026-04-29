@@ -12,8 +12,7 @@ include = [
     "/README.md",
     "/src/**",
     "/docs/Architecture.md",
-    "/docs/WritingWithInk-latest.md",
-    "/docs/WritingWithInk-updates.md",
+    "/docs/SyntaxReference.md",
     "/docs/ink_JSON_runtime_format.md",
 ]
 

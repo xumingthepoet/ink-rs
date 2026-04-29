@@ -1,9 +1,9 @@
 //! This is a Rust implementation of ink-rs, a language fork of inkle's
 //! [Ink](https://github.com/inkle/ink) for writing interactive narratives.
 //! It intentionally diverges from upstream Ink in a few language and save-state
-//! areas; see the repository documentation for the maintained language surface.
-//!
-//! To learn more about the Ink language, you can check [the official documentation](https://github.com/inkle/ink/blob/master/Documentation/WritingWithInk.md).
+//! areas; see the repository
+//! [`SyntaxReference.md`](https://github.com/xumingthepoet/ink-rs/blob/main/docs/SyntaxReference.md)
+//! for the maintained language surface.
 //!
 //! Here is a quick example that uses basic features to play an Ink story using
 //! the `ink_runtime` crate.

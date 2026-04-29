@@ -5,6 +5,9 @@
 //! use the default `runtime` feature to load compiled story JSON, and enable the
 //! `compiler` feature when a tool, editor, build script, or mod pipeline needs
 //! to compile Ink source.
+//!
+//! For current language syntax, see the repository
+//! [`SyntaxReference.md`](https://github.com/xumingthepoet/ink-rs/blob/main/docs/SyntaxReference.md).
 
 #[cfg(feature = "compiler")]
 pub use ink_compiler::{Compiler, CompilerOptions, SourceInput};

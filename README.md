@@ -76,8 +76,9 @@ Hello world.
 
 ## Documentation
 
-- `docs/WritingWithInk-latest.md`: maintained ink-rs writing guide.
-- `docs/WritingWithInk-updates.md`: syntax and semantic changes from upstream
-  Ink.
-- `docs/Architecture.md`: crate and data-flow architecture notes.
-- `docs/ink_JSON_runtime_format.md`: compiled story JSON format notes.
+- [SyntaxReference.md](docs/SyntaxReference.md): current ink-rs syntax
+  reference.
+- [Architecture.md](docs/Architecture.md): crate and data-flow architecture
+  notes.
+- [ink_JSON_runtime_format.md](docs/ink_JSON_runtime_format.md): compiled
+  story JSON format notes.
