@@ -32,7 +32,19 @@
       "include": "#external-declaration"
     },
     {
+      "include": "#multiline-variable-array-declaration"
+    },
+    {
+      "include": "#multiline-variable-struct-declaration"
+    },
+    {
       "include": "#variable-declaration"
+    },
+    {
+      "include": "#multiline-constant-array-declaration"
+    },
+    {
+      "include": "#multiline-constant-struct-declaration"
     },
     {
       "include": "#constant-declaration"
@@ -254,7 +266,7 @@
               "name": "keyword.control.import.from.ink"
             },
             "3": {
-              "name": "entity.name.namespace.import-source.ink"
+              "name": "entity.name.function.module.qualified.ink"
             }
           },
           "name": "meta.import.block.ink",
@@ -285,7 +297,7 @@
               "name": "keyword.control.import.from.ink"
             },
             "4": {
-              "name": "entity.name.namespace.import-source.ink"
+              "name": "entity.name.function.module.qualified.ink"
             }
           },
           "name": "meta.import.ink"
@@ -332,7 +344,7 @@
           "name": "storage.modifier.global.ink"
         },
         "2": {
-          "name": "entity.name.variable.ink"
+          "name": "variable.other.ink"
         },
         "3": {
           "name": "punctuation.separator.type.ink"
@@ -353,6 +365,76 @@
         }
       ]
     },
+    "multiline-variable-array-declaration": {
+      "begin": "^\\s*(VAR)\\s+([A-Za-z_][A-Za-z0-9_]*)(?:\\s*(:)\\s*((?:->|[A-Za-z_][A-Za-z0-9_]*(?:\\s*::\\s*[A-Za-z_][A-Za-z0-9_]*)?)(?:\\s*\\[\\])*))?\\s*(=)\\s*(\\[)\\s*$",
+      "beginCaptures": {
+        "1": {
+          "name": "storage.modifier.global.ink"
+        },
+        "2": {
+          "name": "variable.other.ink"
+        },
+        "3": {
+          "name": "punctuation.separator.type.ink"
+        },
+        "4": {
+          "name": "support.type.ink"
+        },
+        "5": {
+          "name": "keyword.operator.assignment.ink"
+        },
+        "6": {
+          "name": "keyword.control.heading.ink"
+        }
+      },
+      "end": "^\\s*(\\])\\s*$",
+      "endCaptures": {
+        "1": {
+          "name": "keyword.control.heading.ink"
+        }
+      },
+      "name": "meta.variable.declaration.multiline-array.ink",
+      "patterns": [
+        {
+          "include": "#multiline-composite-literal-content"
+        }
+      ]
+    },
+    "multiline-variable-struct-declaration": {
+      "begin": "^\\s*(VAR)\\s+([A-Za-z_][A-Za-z0-9_]*)(?:\\s*(:)\\s*((?:->|[A-Za-z_][A-Za-z0-9_]*(?:\\s*::\\s*[A-Za-z_][A-Za-z0-9_]*)?)(?:\\s*\\[\\])*))?\\s*(=)\\s*(\\{)\\s*$",
+      "beginCaptures": {
+        "1": {
+          "name": "storage.modifier.global.ink"
+        },
+        "2": {
+          "name": "variable.other.ink"
+        },
+        "3": {
+          "name": "punctuation.separator.type.ink"
+        },
+        "4": {
+          "name": "support.type.ink"
+        },
+        "5": {
+          "name": "keyword.operator.assignment.ink"
+        },
+        "6": {
+          "name": "keyword.control.heading.ink"
+        }
+      },
+      "end": "^\\s*(\\})\\s*$",
+      "endCaptures": {
+        "1": {
+          "name": "keyword.control.heading.ink"
+        }
+      },
+      "name": "meta.variable.declaration.multiline-struct.ink",
+      "patterns": [
+        {
+          "include": "#multiline-composite-literal-content"
+        }
+      ]
+    },
     "constant-declaration": {
       "begin": "^\\s*(CONST)\\s+([A-Za-z_][A-Za-z0-9_]*)(?:\\s*(:)\\s*((?:->|[A-Za-z_][A-Za-z0-9_]*(?:\\s*::\\s*[A-Za-z_][A-Za-z0-9_]*)?)(?:\\s*\\[\\])*))?",
       "beginCaptures": {
@@ -360,7 +442,7 @@
           "name": "storage.modifier.constant.ink"
         },
         "2": {
-          "name": "entity.name.variable.constant.ink"
+          "name": "variable.other.ink"
         },
         "3": {
           "name": "punctuation.separator.type.ink"
@@ -378,6 +460,76 @@
         },
         {
           "include": "#expression"
+        }
+      ]
+    },
+    "multiline-constant-array-declaration": {
+      "begin": "^\\s*(CONST)\\s+([A-Za-z_][A-Za-z0-9_]*)(?:\\s*(:)\\s*((?:->|[A-Za-z_][A-Za-z0-9_]*(?:\\s*::\\s*[A-Za-z_][A-Za-z0-9_]*)?)(?:\\s*\\[\\])*))?\\s*(=)\\s*(\\[)\\s*$",
+      "beginCaptures": {
+        "1": {
+          "name": "storage.modifier.constant.ink"
+        },
+        "2": {
+          "name": "variable.other.ink"
+        },
+        "3": {
+          "name": "punctuation.separator.type.ink"
+        },
+        "4": {
+          "name": "support.type.ink"
+        },
+        "5": {
+          "name": "keyword.operator.assignment.ink"
+        },
+        "6": {
+          "name": "keyword.control.heading.ink"
+        }
+      },
+      "end": "^\\s*(\\])\\s*$",
+      "endCaptures": {
+        "1": {
+          "name": "keyword.control.heading.ink"
+        }
+      },
+      "name": "meta.constant.declaration.multiline-array.ink",
+      "patterns": [
+        {
+          "include": "#multiline-composite-literal-content"
+        }
+      ]
+    },
+    "multiline-constant-struct-declaration": {
+      "begin": "^\\s*(CONST)\\s+([A-Za-z_][A-Za-z0-9_]*)(?:\\s*(:)\\s*((?:->|[A-Za-z_][A-Za-z0-9_]*(?:\\s*::\\s*[A-Za-z_][A-Za-z0-9_]*)?)(?:\\s*\\[\\])*))?\\s*(=)\\s*(\\{)\\s*$",
+      "beginCaptures": {
+        "1": {
+          "name": "storage.modifier.constant.ink"
+        },
+        "2": {
+          "name": "variable.other.ink"
+        },
+        "3": {
+          "name": "punctuation.separator.type.ink"
+        },
+        "4": {
+          "name": "support.type.ink"
+        },
+        "5": {
+          "name": "keyword.operator.assignment.ink"
+        },
+        "6": {
+          "name": "keyword.control.heading.ink"
+        }
+      },
+      "end": "^\\s*(\\})\\s*$",
+      "endCaptures": {
+        "1": {
+          "name": "keyword.control.heading.ink"
+        }
+      },
+      "name": "meta.constant.declaration.multiline-struct.ink",
+      "patterns": [
+        {
+          "include": "#multiline-composite-literal-content"
         }
       ]
     },
@@ -416,6 +568,9 @@
           "include": "#comments"
         },
         {
+          "include": "#choice-condition"
+        },
+        {
           "begin": "\\[",
           "beginCaptures": {
             "0": {
@@ -447,6 +602,26 @@
         },
         {
           "include": "#glue"
+        }
+      ]
+    },
+    "choice-condition": {
+      "begin": "\\{",
+      "beginCaptures": {
+        "0": {
+          "name": "keyword.control.heading.ink"
+        }
+      },
+      "end": "\\}",
+      "endCaptures": {
+        "0": {
+          "name": "keyword.control.heading.ink"
+        }
+      },
+      "name": "meta.choice.condition.ink",
+      "patterns": [
+        {
+          "include": "#expression"
         }
       ]
     },
@@ -489,7 +664,7 @@
               "name": "storage.modifier.local.ink"
             },
             "2": {
-              "name": "entity.name.variable.local.ink"
+              "name": "variable.other.ink"
             },
             "3": {
               "name": "punctuation.separator.type.ink"
@@ -539,22 +714,42 @@
           "include": "#comments"
         },
         {
-          "match": "^\\s*(-)(?!>)\\s*(else\\b)?([^:]*)(:)",
-          "captures": {
+          "begin": "(?:(?<=\\bif)|(?<=\\bswitch))\\s*",
+          "end": "(?<!:):(?!:)",
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.separator.key-value.ink"
+            }
+          },
+          "name": "meta.logic.header.condition.ink",
+          "patterns": [
+            {
+              "include": "#expression"
+            }
+          ]
+        },
+        {
+          "begin": "^\\s*(-)(?!>)\\s*(else\\b)?",
+          "beginCaptures": {
             "1": {
               "name": "keyword.control.heading.ink"
             },
             "2": {
               "name": "keyword.control.conditional.else.ink"
-            },
-            "3": {
-              "name": "meta.expression.condition.ink"
-            },
-            "4": {
+            }
+          },
+          "end": "(?<!:):(?!:)",
+          "endCaptures": {
+            "0": {
               "name": "punctuation.separator.key-value.ink"
             }
           },
-          "name": "meta.logic.branch.ink"
+          "name": "meta.logic.branch.ink",
+          "patterns": [
+            {
+              "include": "#expression"
+            }
+          ]
         },
         {
           "include": "#choice-line"
@@ -585,6 +780,9 @@
           "include": "#inline-logic"
         },
         {
+          "include": "#dynamic-divert"
+        },
+        {
           "include": "#divert"
         },
         {
@@ -612,31 +810,50 @@
       "name": "constant.language.glue.ink"
     },
     "divert": {
-      "match": "(->->|->t->|->|<-)\\s*((?:(DONE)|(END)|([A-Za-z_][A-Za-z0-9_]*))(?:\\s*(?:::|\\.)\\s*[A-Za-z_][A-Za-z0-9_]*)*)?(?:\\s*(\\()([^)]*)(\\)))?",
-      "captures": {
+      "begin": "(->->|->t->|->|<-)",
+      "beginCaptures": {
         "1": {
-          "name": "keyword.control.heading.ink"
-        },
-        "3": {
-          "name": "constant.language.done.ink"
-        },
-        "4": {
-          "name": "constant.language.end.ink"
-        },
-        "5": {
-          "name": "variable.other.divert-target.ink"
-        },
-        "6": {
-          "name": "keyword.control.heading.ink"
-        },
-        "7": {
-          "name": "meta.arguments.divert.ink"
-        },
-        "8": {
           "name": "keyword.control.heading.ink"
         }
       },
-      "name": "meta.divert.ink"
+      "end": "$",
+      "name": "meta.divert.ink",
+      "patterns": [
+        {
+          "include": "#qualified-name"
+        },
+        {
+          "match": "\\b(DONE)\\b",
+          "name": "constant.language.done.ink"
+        },
+        {
+          "match": "\\b(END)\\b",
+          "name": "constant.language.end.ink"
+        },
+        {
+          "match": "::|\\.",
+          "name": "punctuation.accessor.namespace.ink"
+        },
+        {
+          "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b",
+          "name": "variable.other.divert-target.ink"
+        },
+        {
+          "match": "->->|->t->|->|<-",
+          "name": "keyword.control.heading.ink"
+        },
+        {
+          "match": "[()]",
+          "name": "keyword.control.heading.ink"
+        },
+        {
+          "match": ",",
+          "name": "punctuation.separator.parameter.ink"
+        },
+        {
+          "include": "#expression"
+        }
+      ]
     },
     "dynamic-divert": {
       "begin": "(->->|->t->|->|<-)\\s*(\\{)",
@@ -698,7 +915,7 @@
       ]
     },
     "inline-conditional": {
-      "begin": "(\\{)(?=[^{}|]*:)",
+      "begin": "(\\{)(?=[^{}|]*(?<!:):(?!:))",
       "beginCaptures": {
         "1": {
           "name": "keyword.control.heading.ink"
@@ -713,7 +930,7 @@
       "name": "meta.conditional.inline.ink",
       "patterns": [
         {
-          "match": ":",
+          "match": "(?<!:):(?!:)",
           "name": "punctuation.separator.key-value.ink"
         },
         {
@@ -816,6 +1033,9 @@
           "include": "#comments"
         },
         {
+          "include": "#logical-operators"
+        },
+        {
           "include": "#strings"
         },
         {
@@ -835,6 +1055,9 @@
         },
         {
           "include": "#member-access"
+        },
+        {
+          "include": "#variable-reference"
         },
         {
           "include": "#brackets"
@@ -894,9 +1117,38 @@
       "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\b(?=\\s*:)",
       "captures": {
         "1": {
-          "name": "variable.other.member.key.ink"
+          "name": "variable.other.ink"
         }
       }
+    },
+    "multiline-composite-literal-content": {
+      "patterns": [
+        {
+          "include": "#comments"
+        },
+        {
+          "include": "#struct-literal-field-line"
+        },
+        {
+          "include": "#expression"
+        },
+        {
+          "match": ",",
+          "name": "punctuation.separator.comma.ink"
+        }
+      ]
+    },
+    "struct-literal-field-line": {
+      "match": "^\\s*([A-Za-z_][A-Za-z0-9_]*)(\\s*:)",
+      "captures": {
+        "1": {
+          "name": "variable.other.ink"
+        },
+        "2": {
+          "name": "punctuation.separator.key-value.ink"
+        }
+      },
+      "name": "meta.struct-literal.field.ink"
     },
     "member-access": {
       "match": "(\\.)([A-Za-z_][A-Za-z0-9_]*)",
@@ -913,7 +1165,7 @@
       "match": "\\b([A-Za-z_][A-Za-z0-9_]*)(::)([A-Za-z_][A-Za-z0-9_]*)\\b",
       "captures": {
         "1": {
-          "name": "entity.name.namespace.ink"
+          "name": "entity.name.function.module.qualified.ink"
         },
         "2": {
           "name": "punctuation.accessor.namespace.ink"
@@ -924,9 +1176,17 @@
       },
       "name": "meta.qualified-name.ink"
     },
+    "variable-reference": {
+      "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b",
+      "name": "variable.other.ink"
+    },
     "operators": {
       "match": "==|!=|<=|>=|&&|\\|\\||\\?|!?\\?|\\b(?:and|or|not|mod|has|hasnt)\\b|[+\\-*/%<>!=]",
       "name": "keyword.operator.ink"
+    },
+    "logical-operators": {
+      "match": "\\b(?:not|and|or)\\b|&&|\\|\\|",
+      "name": "keyword.operator.logical.ink"
     }
   }
 }

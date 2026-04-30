@@ -2,6 +2,18 @@
 IMPORT {
     price, describe, market_day,
 } FROM shop
+STRUCT VisitState {
+    gold: int
+    shop_open: bool
+}
+CONST default_state: VisitState = { gold: 1, shop_open: true }
+VAR visit_state: VisitState = { gold: 5, shop_open: true }
+CONST states: VisitState[] = [
+    {
+        gold: 1,
+        shop_open: true,
+    },
+]
 VAR gold: int = 5
 VAR day_stage: int = 1
 
@@ -9,7 +21,7 @@ VAR day_stage: int = 1
 {shop::describe()}
 Gold: {gold}
 Price: {shop::price}
-{ if gold > 0:
+{ if shop::price > 0 and gold > 0:
 The purse still has weight.
 - else:
 The purse is empty.
@@ -20,10 +32,12 @@ The purse is empty.
     -> shop::market_day ->
 - else: Night closes the shutters.
 }
+* {not shop::closed} Visit the market -> shop::market_day
 -> END
 
 === module shop ===
 VAR price: int = 3
+VAR closed: bool = false
 
 == function describe() => string ==
 ~ return "The shop is open."
