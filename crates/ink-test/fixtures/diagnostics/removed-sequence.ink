@@ -5,5 +5,5 @@ A {one|two} line.
 - one
 - two
 }
-+ Say {~hello|hi}
+* Say {~hello|hi}
 -> END

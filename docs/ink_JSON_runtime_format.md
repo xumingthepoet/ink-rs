@@ -205,7 +205,7 @@ The `flg` field is a bitfield of flags:
  * **0x2 - Has start content?** - Choice display text should be popped from the evaluation stack.
  * **0x4 - Has choice-only content?** - Legacy square-bracket choice text should be popped from the evaluation stack if present in compiled-story JSON. ink-rs source no longer accepts this syntax.
  * **0x8 - Is invisible default?** - When this is enabled, the choice isn't provided to the game (isn't presented to the player), and instead is automatically followed if there are no other choices generated.
- * **0x10 - Once only?** - Legacy flag retained in the compiled-story shape. The current runtime ignores it and treats `*` and `+` choices as repeatable.
+ * **0x10 - Once only?** - Legacy flag retained in the compiled-story shape. Current ink-rs source accepts only `*` choice markers, and the runtime ignores once-only flags when loading compiled stories.
 
 Example of the legacy full JSON output, including the ChoicePoint object, when generating an upstream-style ink choice from `* Hello[.], world.`. Current ink-rs source does not accept choice square brackets, but the runtime data shape can still describe older compiled content.
 

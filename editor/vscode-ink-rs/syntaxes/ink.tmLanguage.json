@@ -41,6 +41,9 @@
       "include": "#todo"
     },
     {
+      "include": "#removed-plus-choice-line"
+    },
+    {
       "include": "#choice-line"
     },
     {
@@ -231,22 +234,63 @@
       ]
     },
     "import-declaration": {
-      "match": "^\\s*(IMPORT)\\s+([A-Za-z_][A-Za-z0-9_]*(?:\\s*,\\s*[A-Za-z_][A-Za-z0-9_]*)*)\\s+(FROM)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*$",
-      "captures": {
-        "1": {
-          "name": "keyword.control.import.ink"
+      "patterns": [
+        {
+          "begin": "^\\s*(IMPORT)\\s*(\\{)\\s*$",
+          "beginCaptures": {
+            "1": {
+              "name": "keyword.control.import.ink"
+            },
+            "2": {
+              "name": "keyword.control.heading.ink"
+            }
+          },
+          "end": "^\\s*(\\})\\s*(FROM)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*$",
+          "endCaptures": {
+            "1": {
+              "name": "keyword.control.heading.ink"
+            },
+            "2": {
+              "name": "keyword.control.import.from.ink"
+            },
+            "3": {
+              "name": "entity.name.namespace.import-source.ink"
+            }
+          },
+          "name": "meta.import.block.ink",
+          "patterns": [
+            {
+              "include": "#comments"
+            },
+            {
+              "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b",
+              "name": "variable.other.imported-symbol.ink"
+            },
+            {
+              "match": ",",
+              "name": "punctuation.separator.import.ink"
+            }
+          ]
         },
-        "2": {
-          "name": "variable.other.imported-symbols.ink"
-        },
-        "3": {
-          "name": "keyword.control.import.from.ink"
-        },
-        "4": {
-          "name": "entity.name.namespace.import-source.ink"
+        {
+          "match": "^\\s*(IMPORT)\\s+([A-Za-z_][A-Za-z0-9_]*(?:\\s*,\\s*[A-Za-z_][A-Za-z0-9_]*)*)\\s+(FROM)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*$",
+          "captures": {
+            "1": {
+              "name": "keyword.control.import.ink"
+            },
+            "2": {
+              "name": "variable.other.imported-symbols.ink"
+            },
+            "3": {
+              "name": "keyword.control.import.from.ink"
+            },
+            "4": {
+              "name": "entity.name.namespace.import-source.ink"
+            }
+          },
+          "name": "meta.import.ink"
         }
-      },
-      "name": "meta.import.ink"
+      ]
     },
     "removed-include-declaration": {
       "match": "^\\s*(INCLUDE)\\s+(\\S+)\\s*$",
@@ -337,8 +381,20 @@
         }
       ]
     },
+    "removed-plus-choice-line": {
+      "match": "^\\s*(\\+\\s*)+(.*)$",
+      "captures": {
+        "1": {
+          "name": "invalid.deprecated.choice-marker.ink"
+        },
+        "2": {
+          "name": "invalid.deprecated.choice-text.ink"
+        }
+      },
+      "name": "invalid.deprecated.plus-choice.ink"
+    },
     "choice-line": {
-      "begin": "^\\s*((?:[+*]\\s*)+)(?:(\\()\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*(\\)))?",
+      "begin": "^\\s*((?:\\*\\s*)+)(?:(\\()\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*(\\)))?",
       "beginCaptures": {
         "1": {
           "name": "keyword.control.heading.ink"

@@ -149,10 +149,9 @@ impl Parser {
 
             if let Some(module_index) = active_module_index {
                 if import::is_import_like_declaration_line(&line.text) {
-                    if let Some(import) = self.parse_import_declaration(line) {
+                    if let Some(import) = self.parse_import_declaration(&lines, &mut index) {
                         modules[module_index].push_import(import);
                     }
-                    index += 1;
                     continue;
                 }
 
@@ -356,13 +355,16 @@ impl Parser {
         })
     }
 
-    fn parse_import_declaration(&mut self, line: &SourceLine) -> Option<ImportDeclaration> {
-        let mut line_parser = RuleParser::new(line);
-        let declaration = line_parser.parse_rule(import::parse_import_declaration);
-        let had_error = line_parser.had_error();
-        self.diagnostics.extend(line_parser.finish());
-
-        declaration.filter(|_| !had_error)
+    fn parse_import_declaration(
+        &mut self,
+        lines: &[SourceLine],
+        index: &mut usize,
+    ) -> Option<ImportDeclaration> {
+        let (declaration, diagnostics, next_index) =
+            import::parse_import_declaration_lines(lines, *index);
+        self.diagnostics.extend(diagnostics);
+        *index = next_index;
+        declaration
     }
 
     fn parse_flow(&mut self, lines: &[SourceLine], index: &mut usize) -> Option<Flow> {
@@ -610,7 +612,7 @@ impl Parser {
         index: &mut usize,
     ) -> Option<Vec<Object>> {
         let line = &lines[*index];
-        if !line.text.trim_start().starts_with(['*', '+']) {
+        if !line.text.trim_start().starts_with('*') {
             return None;
         }
 
@@ -864,6 +866,37 @@ mod tests {
     }
 
     #[test]
+    fn parses_multiline_module_import_declarations() {
+        let output = parse(SourceInput::new(
+            "=== module game ===\n\
+             IMPORT {\n\
+                 sword\n\
+                 heal,\n\
+                 shield, mend\n\
+             } FROM items",
+        ));
+
+        assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
+        let story = output.artifact.expect("story should parse");
+        assert_eq!(story.modules().len(), 1);
+        let imports = story.modules()[0].imports();
+        assert_eq!(imports.len(), 1);
+        assert_eq!(imports[0].source_module(), "items");
+        assert_eq!(
+            imports[0]
+                .imported_names()
+                .iter()
+                .map(|name| name.name())
+                .collect::<Vec<_>>(),
+            vec!["sword", "heal", "shield", "mend"]
+        );
+        assert_eq!(
+            story.to_parse_snapshot(),
+            "Story\n  Weave(baseIndent=0)\n    Gather(name=null, depth=1)\n    Divert(target=\"-> DONE\", empty=false, tunnel=false, thread=false)\n  Module(name=\"game\")\n    Import(from=\"items\", names=[\"sword\", \"heal\", \"shield\", \"mend\"])"
+        );
+    }
+
+    #[test]
     fn attaches_imports_to_active_module() {
         let output = parse(SourceInput::new(
             "=== module game ===\n\
@@ -954,6 +987,18 @@ mod tests {
             (
                 "=== module game ===\nIMPORT sword,",
                 "IMPORT declarations must include an imported symbol name after ','",
+            ),
+            (
+                "=== module game ===\nIMPORT {\n}",
+                "IMPORT declarations must include FROM moduleName",
+            ),
+            (
+                "=== module game ===\nIMPORT {\n  sword\n} from items",
+                "Import declarations must use uppercase `FROM`",
+            ),
+            (
+                "=== module game ===\nIMPORT {\n  sword blade\n} FROM items",
+                "Expected ',' or end of line after imported name but saw 'blade'",
             ),
         ];
 

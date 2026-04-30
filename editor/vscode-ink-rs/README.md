@@ -7,7 +7,7 @@ language surface directly:
 
 - `STRUCT Name { field: Type }`
 - explicit `=== module name ===` declarations
-- `IMPORT name FROM module` declarations
+- `IMPORT name FROM module` and `IMPORT { ... } FROM module` declarations
 - typed `VAR` and `~ temp` declarations
 - typed `== function name(args) => Type ==` declarations
 - typed `EXTERNAL name(args) => Type` declarations

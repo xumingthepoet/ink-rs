@@ -1,5 +1,9 @@
 === module game ===
-IMPORT price, describe, market_day FROM shop
+IMPORT {
+    price
+    describe
+    market_day
+} FROM shop
 VAR gold: int = 5
 VAR day_stage: int = 1
 

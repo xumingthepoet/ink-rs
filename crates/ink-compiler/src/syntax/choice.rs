@@ -1,4 +1,7 @@
-use crate::parsed::{Choice, ContentList, Expression};
+use crate::{
+    diagnostic::Diagnostic,
+    parsed::{Choice, ContentList, Expression},
+};
 
 use super::{is_identifier, rule::RuleParser, scan, text};
 
@@ -6,25 +9,22 @@ pub(super) fn parse_choice(parser: &mut RuleParser<'_>) -> Option<Choice> {
     parser.skip_horizontal_whitespace();
     let span = parser.current_span();
 
-    // `*` and `+` are both repeatable in ink-rs. The bullet still controls
-    // nesting style by repetition, but no longer changes runtime visibility.
-    let bullet = if parser.match_string("*").is_some() {
-        '*'
-    } else if parser.match_string("+").is_some() {
-        '+'
-    } else {
+    if parser.match_string("+").is_some() {
+        parser.diagnostic(Diagnostic::error(
+            span,
+            "`+` choices are not supported; use `*` for choices",
+        ));
         return None;
-    };
+    }
+
+    if parser.match_string("*").is_none() {
+        return None;
+    }
 
     let mut indentation_depth = 1;
     loop {
         parser.skip_horizontal_whitespace();
-        let matched = match bullet {
-            '*' => parser.match_string("*").is_some(),
-            '+' => parser.match_string("+").is_some(),
-            _ => false,
-        };
-        if !matched {
+        if parser.match_string("*").is_none() {
             break;
         }
         indentation_depth += 1;

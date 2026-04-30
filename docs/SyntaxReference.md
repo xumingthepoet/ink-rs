@@ -64,7 +64,10 @@ cross-module references use `module::symbol`.
 For example:
 
 	=== module game ===
-	IMPORT price, describe FROM shop
+	IMPORT {
+		price
+		describe
+	} FROM shop
 	VAR gold: int = 5
 
 	== main ==
@@ -144,7 +147,9 @@ These don't show up in the main text flow, but can be read off by the game and u
 
 ## 2) Choices
 
-Input is offered to the player via text choices. A text choice is indicated by an `*` or `+` character. In ink-rs both bullets are repeatable; they differ only in the visual source marker you choose to use.
+Input is offered to the player via text choices. A text choice is indicated by
+one or more `*` characters. Choices are repeatable unless an explicit condition
+hides them.
 
 Choice line text is display text. It is shown to the player as an option, but it is not printed again after the player selects it. Put selected response text in the indented body of the choice.
 
@@ -412,6 +417,14 @@ Imports are exact allow-lists. Importing `ticket_price` from `shop` permits
 `shop::ticket_price`; it does not make `ticket_price` visible unqualified, and
 it does not re-export anything imported by `shop`.
 
+An import list can use braces when a module exposes many names:
+
+	IMPORT {
+		ticket_price
+		route_name
+		describe_stop
+	} FROM shop
+
 ### Knots can be subdivided
 
 As stories get longer, they become more confusing to keep organised without some additional structure.
@@ -494,9 +507,9 @@ The compiler will warn you if ambiguous names are used.
 
 ### Choices repeat unless conditions hide them
 
-In ink-rs, both `*` and `+` choices are repeatable. If a loop returns to the
-same choice point, the same authored choices can appear again. When a choice
-should disappear, track that state explicitly and put a condition on the choice:
+In ink-rs, choices are repeatable. If a loop returns to the same choice point,
+the same authored choices can appear again. When a choice should disappear,
+track that state explicitly and put a condition on the choice:
 
 	VAR asked_hat: bool = false
 	VAR asked_briefcase: bool = false
@@ -547,10 +560,12 @@ both visible options have been hidden:
 
 ### Repeatable choices
 
-In ink-rs, both `*` and `+` choices are repeatable. Revisiting the same choice point can show the same authored choices again. Use conditions or explicit variables when a choice should disappear.
+In ink-rs, choices are repeatable. Revisiting the same choice point can show
+the same authored choices again. Use conditions or explicit variables when a
+choice should disappear.
 
 	== homers_couch ==
-		+	Eat another donut
+		*	Eat another donut
 			You eat another donut. -> homers_couch
 		*	Get off the couch
 			You struggle up off the couch to go and compose epic poetry.
@@ -561,7 +576,7 @@ Fallback choices can repeat too.
 	== conversation_loop ==
 		*	Talk about the weather -> chat_weather
 		*	Talk about the children -> chat_children
-		+	-> sit_in_silence_again
+		*	-> sit_in_silence_again
 
 ### Conditional Choices
 
@@ -573,7 +588,7 @@ For example:
 	VAR met_estelle: bool = false
 
 	*	{ not has_visited_paris } 	Go to Paris -> visit_paris
-	+ 	{ has_visited_paris } 		Return to Paris -> visit_paris
+	* 	{ has_visited_paris } 		Return to Paris -> visit_paris
 
 	*	{ met_estelle } Telephone Mme Estelle -> phone_estelle
 
@@ -584,14 +599,14 @@ Use explicit variables when a condition needs to remember authored state.
 You can use several logical tests on an option; if you do, *all* the tests must all be passed for the option to appear.
 
 	*	{ not has_visited_paris } 	Go to Paris -> visit_paris
-	+ 	{ has_visited_paris } { not bored_of_paris }
+	* 	{ has_visited_paris } { not bored_of_paris }
 		Return to Paris -> visit_paris
 
 When the visible choice text itself starts with a dynamic expression, put a
 colon after the condition prefix to make the boundary explicit:
 
 	*	{ has_key }: {locked_door_label} -> open_door
-	+	{ has_visited_paris } { not bored_of_paris }: {return_label} -> visit_paris
+	*	{ has_visited_paris } { not bored_of_paris }: {return_label} -> visit_paris
 
 #### Logical operators: AND and OR
 
@@ -1957,16 +1972,16 @@ Tunnels can be nested, so the following is valid:
 	== plains ==
 	= night_time
 		The dark grass is soft under your feet.
-		+	Sleep
+		*	Sleep
 			-> sleep_here -> wake_here -> day_time
 	= day_time
 		It is time to move on.
 
 	== wake_here ==
 		You wake as the sun rises.
-		+	Eat something
+		*	Eat something
 			-> eat_something ->
-		+	Make a move
+		*	Make a move
 		-	->->
 
 	== sleep_here ==
@@ -2200,7 +2215,7 @@ Threads can be used to add the same choice into lots of different places. When u
 			-> top
 
 	== review_case_notes(go_back_to: ->) ==
-	+	{not reviewed_notes_recently}
+	*	{not reviewed_notes_recently}
 		Review my case notes
 		// the explicit variable controls whether this option repeats immediately
 		~ reviewed_notes_recently = true

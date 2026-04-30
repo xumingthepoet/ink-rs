@@ -4,9 +4,9 @@
 -> menu
 
 == menu ==
-* Star choice
+* First choice
     Star branch.
     -> menu
-+ Plus choice
+* Second choice
     Plus branch.
     -> menu

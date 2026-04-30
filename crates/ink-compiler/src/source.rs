@@ -165,7 +165,7 @@ fn normalize_line_text(mut text: String, index: usize) -> String {
         text = text.trim_start_matches('\u{feff}').to_string();
     }
 
-    if text.trim_start().starts_with(['*', '+']) {
+    if text.trim_start().starts_with('*') {
         text
     } else {
         text.trim_end().to_string()

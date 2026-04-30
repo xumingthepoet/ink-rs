@@ -24,6 +24,42 @@ Each entry should include:
 - migration guidance
 - tests
 
+## 2026-04-30: Remove Plus Choice Marker
+
+- status: removed
+- upstream behavior: upstream Ink uses `+` as a sticky/repeatable choice
+  marker, distinct from once-only `*` choices.
+- ink-rs behavior: `*` is the only source-language choice marker. Repeating
+  `*` still controls choice nesting depth. Lines that start with `+` in a
+  statement position report a diagnostic telling authors to use `*`.
+- documentation effect: `SyntaxReference.md` describes only `*` choice syntax
+  and rewrites examples that previously used `+`.
+- rationale: once-only choice behavior was already removed, so keeping a second
+  choice marker with identical behavior added syntax surface without carrying
+  distinct semantics.
+- migration guidance: replace every leading choice marker `+` with `*`, keeping
+  the same indentation, condition, text, and divert body.
+- tests: compiler parser tests reject `+` choice markers, runtime choice
+  fixtures use only `*`, and the removed-sequence diagnostic fixture still
+  covers removed inline sequences from a `*` choice line.
+
+## 2026-04-30: Multiline Import Lists
+
+- status: supported
+- upstream behavior: upstream Ink uses source includes rather than explicit
+  module import allow-lists.
+- ink-rs behavior: `IMPORT name, name FROM module` remains supported, and
+  modules may now use `IMPORT { ... } FROM module` block imports for long
+  allow-lists. Names inside the block may be separated by newlines, commas, or
+  both.
+- documentation effect: `SyntaxReference.md` documents the block import form
+  as current syntax.
+- rationale: large modules can expose enough symbols that one-line import lists
+  become hard to read.
+- migration guidance: none; this is an additive current syntax form.
+- tests: parser tests cover multiline import parsing and diagnostics. The
+  module import fixture uses a multiline import list.
+
 ## 2026-04-29: Explicit Multiline If And Switch Blocks
 
 - status: removed

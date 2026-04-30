@@ -129,23 +129,6 @@ fn mixed_choice_test() -> Result<(), StoryError> {
 }
 
 #[test]
-fn plus_choices_repeat() -> Result<(), StoryError> {
-    let mut story = common::story_from_fixture("choices/plus-choices-repeat.ink");
-    let mut text: Vec<String> = Vec::new();
-
-    common::next_all(&mut story, &mut text);
-    assert_eq!(2, story.get_current_choices().len());
-    story.choose_choice_index(0);
-
-    text.clear();
-    common::next_all(&mut story, &mut text);
-
-    assert_eq!(2, story.get_current_choices().len());
-
-    Ok(())
-}
-
-#[test]
 fn fallback_choice_test() -> Result<(), StoryError> {
     let mut story = common::story_from_fixture("choices/fallback-choice.ink");
     let mut text: Vec<String> = Vec::new();
@@ -182,7 +165,7 @@ fn square_brackets_in_choice_text_are_literal() {
 }
 
 #[test]
-fn star_and_plus_choices_are_repeatable() {
+fn star_choices_are_repeatable() {
     let compiled = compile_fixture("choices/repeatable-choices.ink");
     let mut story = Story::new(&compiled.json);
 

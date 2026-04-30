@@ -72,6 +72,8 @@ fn leading_whitespace_count(source: &str) -> usize {
 
 fn is_choice_continuation_boundary(trimmed: &str) -> bool {
     trimmed.starts_with('*')
+        // Keep `+`-prefixed lines separate so the choice rule can report the
+        // current syntax diagnostic instead of folding them into continuation text.
         || trimmed.starts_with('+')
         || trimmed.starts_with('-')
         || trimmed.starts_with('=')
@@ -403,14 +405,15 @@ mod tests {
     }
 
     #[test]
-    fn parses_plus_choice() {
+    fn rejects_plus_choice_marker() {
         let output = parse(SourceInput::new("+ Choice"));
-        assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
         let story = output.artifact.unwrap();
 
-        let Object::Choice(choice) = &story.root_weave().content()[0] else {
-            panic!("expected choice");
-        };
-        assert_eq!(choice.indentation_depth(), 1);
+        assert_eq!(output.diagnostics.len(), 1, "{:#?}", output.diagnostics);
+        assert_eq!(
+            output.diagnostics[0].message,
+            "`+` choices are not supported; use `*` for choices"
+        );
+        assert!(story.root_weave().content().is_empty());
     }
 }

@@ -1,5 +1,8 @@
 === module game ===
-IMPORT price, describe FROM shop
+IMPORT {
+    price
+    describe
+} FROM shop
 VAR gold: int = 5
 
 == main ==

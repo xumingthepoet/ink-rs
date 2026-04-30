@@ -9,5 +9,5 @@ VAR unit: string = "Röntgen"
 == root ==
 The latest measurement is {value} {unit}. {value < threshold: Not terrible, not great. | Oh no.}
 
-+   Redo measurement -> root
+*   Redo measurement -> root
 -> END
