@@ -870,9 +870,8 @@ mod tests {
         let output = parse(SourceInput::new(
             "=== module game ===\n\
              IMPORT {\n\
-                 sword\n\
-                 heal,\n\
-                 shield, mend\n\
+                 sword, heal, shield,\n\
+                 mend,\n\
              } FROM items",
         ));
 

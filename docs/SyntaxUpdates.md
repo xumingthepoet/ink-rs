@@ -51,14 +51,15 @@ Each entry should include:
 - ink-rs behavior: `IMPORT name, name FROM module` remains supported, and
   modules may now use `IMPORT { ... } FROM module` block imports for long
   allow-lists. Names inside the block may be separated by newlines, commas, or
-  both.
+  both, and trailing commas are allowed.
 - documentation effect: `SyntaxReference.md` documents the block import form
-  as current syntax.
+  as current syntax and shows compact comma-wrapped import lists.
 - rationale: large modules can expose enough symbols that one-line import lists
   become hard to read.
 - migration guidance: none; this is an additive current syntax form.
-- tests: parser tests cover multiline import parsing and diagnostics. The
-  module import fixture uses a multiline import list.
+- tests: parser tests cover multiline import parsing, trailing commas, and
+  diagnostics. The module import fixture uses a comma-wrapped multiline import
+  list.
 
 ## 2026-04-29: Explicit Multiline If And Switch Blocks
 

@@ -65,8 +65,7 @@ For example:
 
 	=== module game ===
 	IMPORT {
-		price
-		describe
+		price, describe,
 	} FROM shop
 	VAR gold: int = 5
 
@@ -417,12 +416,13 @@ Imports are exact allow-lists. Importing `ticket_price` from `shop` permits
 `shop::ticket_price`; it does not make `ticket_price` visible unqualified, and
 it does not re-export anything imported by `shop`.
 
-An import list can use braces when a module exposes many names:
+An import list can use braces when a module exposes many names. Inside the
+braces, names may be separated by commas, newlines, or both. A trailing comma is
+allowed so the list can be edited without changing the previous line.
 
 	IMPORT {
-		ticket_price
-		route_name
-		describe_stop
+		ticket_price, route_name, describe_stop,
+		route_status, next_departure,
 	} FROM shop
 
 ### Knots can be subdivided
