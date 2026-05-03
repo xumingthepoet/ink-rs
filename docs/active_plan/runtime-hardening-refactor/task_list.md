@@ -1,4 +1,4 @@
-Progress: 1/7
+Progress: 2/7
 
 # Runtime Hardening And Lowering Refactor Plan
 
@@ -52,7 +52,7 @@ Commit record:
 - Review validation: `make gate`
 - Completion record commit: this commit
 
-### [>] Task 02: Return Errors For Invalid String Numeric Casts
+### [x] Task 02: Return Errors For Invalid String Numeric Casts
 
 Goal: Replace string-to-int and string-to-float `unwrap()` casts with `StoryError::InvalidStoryState` so malformed runtime string values cannot unwind the host process.
 
@@ -89,8 +89,9 @@ Commit record:
 - Implementation commit: `cf8bbb55` (`Return errors for invalid string casts`)
 - Focused validation: `cargo fmt --all --check`; `cargo test -p ink-runtime invalid_string_cast`; `cargo test -p ink-runtime`
 - Full validation: `make gate`
-- Review/fix commits: pending
-- Completion record commit: pending
+- Review/fix commits: none; review of `cf8bbb55` found no follow-up changes needed.
+- Review validation: `cargo test -p ink-runtime invalid_string_cast`; `make gate`
+- Completion record commit: this commit
 
 ## Milestone 2: Runtime JSON And State Hardening
 
