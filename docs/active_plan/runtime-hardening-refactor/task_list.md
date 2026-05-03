@@ -227,7 +227,7 @@ Commit record:
 
 ## Milestone 3: Compiler Lowering Structure
 
-### [ ] Task 06: Extract Typed Composite Expression Lowering
+### [>] Task 06: Extract Typed Composite Expression Lowering
 
 Goal: Move typed dynamic composite literal lowering out of the general expression lowering flow so later compiler changes can reason about primitive expressions and composite construction separately.
 
@@ -264,7 +264,9 @@ Validation commands:
 
 Commit record:
 
-- Implementation commit: pending
+- Implementation commit: `a53a8b95` (`Extract composite literal lowering`)
+- Focused validation: `cargo fmt --all --check`; `cargo test -p ink-test --test runtime_api`; `cargo test -p ink-test --test compiler_snapshots`; `cargo test -p ink-test --test typed_values`
+- Full validation: `make gate`
 - Review/fix commits: pending
 - Completion record commit: pending
 
