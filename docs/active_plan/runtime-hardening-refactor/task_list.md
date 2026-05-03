@@ -1,4 +1,4 @@
-Progress: 3/7
+Progress: 4/7
 
 # Runtime Hardening And Lowering Refactor Plan
 
@@ -138,7 +138,7 @@ Commit record:
 - Review validation: `cargo test -p ink-runtime malformed_json_write`; `make gate`
 - Completion record commit: this commit
 
-### [>] Task 04: Harden Path Object Helpers
+### [x] Task 04: Harden Path Object Helpers
 
 Goal: Remove avoidable panic points in runtime path/object helpers that can be reached by malformed runtime object graphs or malformed path math.
 
@@ -178,8 +178,9 @@ Commit record:
 - Implementation commit: `ac2b30c1` (`Harden runtime path object helpers`)
 - Focused validation: `cargo fmt --all --check`; `cargo test -p ink-runtime path_`; `cargo test -p ink-runtime divert_`; `cargo test -p ink-runtime`
 - Full validation: `make gate`
-- Review/fix commits: pending
-- Completion record commit: pending
+- Review/fix commits: none; review of `ac2b30c1` found no follow-up changes needed.
+- Review validation: `cargo fmt --all --check`; `cargo test -p ink-runtime path_`; `cargo test -p ink-runtime divert_`; `make gate`
+- Completion record commit: this commit
 
 ### [ ] Task 05: Harden CallStack Context Access
 
