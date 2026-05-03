@@ -1,4 +1,4 @@
-Progress: 6/7
+Progress: 7/7
 
 # Runtime Hardening And Lowering Refactor Plan
 
@@ -273,7 +273,7 @@ Commit record:
 
 ## Milestone 4: Closeout
 
-### [ ] Task 07: Archive The Completed Plan
+### [x] Task 07: Archive The Completed Plan
 
 Goal: Move this active plan to `docs/finished_plans/` after all implementation tasks are complete, reviewed, and validated.
 
@@ -306,4 +306,5 @@ Validation commands:
 
 Commit record:
 
-- Completion record commit: pending
+- Closeout validation: `test ! -e docs/active_plan/runtime-hardening-refactor`; `test -f docs/finished_plans/runtime-hardening-refactor/task_list.md`
+- Completion record commit: this commit
