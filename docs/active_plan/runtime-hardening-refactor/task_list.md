@@ -95,7 +95,7 @@ Commit record:
 
 ## Milestone 2: Runtime JSON And State Hardening
 
-### [ ] Task 03: Check Runtime JSON Write Preconditions
+### [>] Task 03: Check Runtime JSON Write Preconditions
 
 Goal: Replace save-state and runtime JSON writer `unwrap()` assumptions that can be reached from malformed runtime state with typed `StoryError` results.
 
@@ -131,7 +131,9 @@ Validation commands:
 
 Commit record:
 
-- Implementation commit: pending
+- Implementation commit: `02256130` (`Check runtime JSON write preconditions`)
+- Focused validation: `cargo fmt --all --check`; `cargo test -p ink-runtime malformed_json_write`; `cargo test -p ink-runtime json_write`; `cargo test -p ink-runtime`
+- Full validation: `make gate`
 - Review/fix commits: pending
 - Completion record commit: pending
 
