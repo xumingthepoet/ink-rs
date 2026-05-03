@@ -182,7 +182,7 @@ Commit record:
 - Review validation: `cargo fmt --all --check`; `cargo test -p ink-runtime path_`; `cargo test -p ink-runtime divert_`; `make gate`
 - Completion record commit: this commit
 
-### [ ] Task 05: Harden CallStack Context Access
+### [>] Task 05: Harden CallStack Context Access
 
 Goal: Convert callstack context lookups that depend on save-state/runtime stack integrity into checked errors where the caller can recover.
 
@@ -218,7 +218,9 @@ Validation commands:
 
 Commit record:
 
-- Implementation commit: pending
+- Implementation commit: `ae332429` (`Harden callstack temporary contexts`)
+- Focused validation: `cargo fmt --all --check`; `cargo test -p ink-runtime temporary_variable`; `cargo test -p ink-runtime`
+- Full validation: `make gate`
 - Review/fix commits: pending
 - Completion record commit: pending
 
