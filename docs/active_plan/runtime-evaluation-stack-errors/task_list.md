@@ -12,7 +12,7 @@ Progress: 0/2
 
 ## Milestone 1: Host-Callable Composite Values
 
-### [~] Task 01: Harden Evaluation-Stack Consumption
+### [>] Task 01: Harden Evaluation-Stack Consumption
 
 Goal: Fix the host-evaluated INTERNAL function panic recorded in `docs/issues_found/2026-05-03-host-evaluated-array-temp-panics.md` by returning `StoryError` for malformed evaluation-stack state and by allowing valid array/struct temp assignment inside host-called INTERNAL functions.
 
@@ -55,7 +55,10 @@ Validation commands:
 
 Commit record:
 
-- Implementation commit: pending
+- Implementation commit: `c6247aee` (`Handle dynamic composite temp evaluation`)
+- Focused validation: `cargo fmt --all --check`; `cargo test -p ink-test internal_host_calls_accept_typed_arguments_and_composite_returns -- --nocapture`; `cargo test -p ink-test --test runtime_api`; `cargo test -p ink-test --test compiler_snapshots`; `cargo test -p ink-runtime malformed_`; `cargo test -p ink-runtime`
+- Full validation: `make gate TIMEOUT='bash -lc '\''shift; exec "$$@"'\'' bash'`
+- Validation note: unmodified `make gate` cannot start in this macOS environment because the Makefile default `timeout` command is unavailable and `gtimeout` is not installed.
 - Review/fix commits: pending
 - Completion record commit: pending
 
