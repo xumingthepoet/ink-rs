@@ -138,7 +138,7 @@ Commit record:
 - Review validation: `cargo test -p ink-runtime malformed_json_write`; `make gate`
 - Completion record commit: this commit
 
-### [ ] Task 04: Harden Path Object Helpers
+### [>] Task 04: Harden Path Object Helpers
 
 Goal: Remove avoidable panic points in runtime path/object helpers that can be reached by malformed runtime object graphs or malformed path math.
 
@@ -175,7 +175,9 @@ Validation commands:
 
 Commit record:
 
-- Implementation commit: pending
+- Implementation commit: `ac2b30c1` (`Harden runtime path object helpers`)
+- Focused validation: `cargo fmt --all --check`; `cargo test -p ink-runtime path_`; `cargo test -p ink-runtime divert_`; `cargo test -p ink-runtime`
+- Full validation: `make gate`
 - Review/fix commits: pending
 - Completion record commit: pending
 
