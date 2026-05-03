@@ -64,14 +64,14 @@ impl VariablesState {
         // Constructing new variable pointer reference
         if var_ass.is_new_declaration {
             if let Some(var_pointer) = Value::get_value::<&VariablePointerValue>(value.as_ref()) {
-                value = self.resolve_variable_pointer(var_pointer);
+                value = self.resolve_variable_pointer(var_pointer)?;
             }
         } else {
             // Assign to an existing variable pointer
             // Then assign to the variable that the pointer is pointing to by name.
             // De-reference variable reference to point to
             loop {
-                let existing_pointer = self.get_raw_variable_with_name(&name, context_index);
+                let existing_pointer = self.try_get_raw_variable_with_name(&name, context_index)?;
 
                 match existing_pointer {
                     Some(existing_pointer) => {
@@ -112,14 +112,17 @@ impl VariablesState {
     // pointer that more specifically points to the exact instance: whether it's
     // global,
     // or the exact position of a temporary on the callstack.
-    fn resolve_variable_pointer(&self, var_pointer: &VariablePointerValue) -> Rc<Value> {
+    fn resolve_variable_pointer(
+        &self,
+        var_pointer: &VariablePointerValue,
+    ) -> Result<Rc<Value>, StoryError> {
         let mut context_index = var_pointer.context_index;
         if context_index == -1 {
             context_index = self.get_context_index_of_variable_named(&var_pointer.variable_name);
         }
 
         let value_of_variable_pointed_to =
-            self.get_raw_variable_with_name(&var_pointer.variable_name, context_index);
+            self.try_get_raw_variable_with_name(&var_pointer.variable_name, context_index)?;
         // Extra layer of indirection:
         // When accessing a pointer to a pointer (e.g. when calling nested or
         // recursive functions that take a variable references, ensure we don't
@@ -129,14 +132,14 @@ impl VariablesState {
             if Value::get_value::<&VariablePointerValue>(value_of_variable_pointed_to.as_ref())
                 .is_some()
             {
-                return value_of_variable_pointed_to;
+                return Ok(value_of_variable_pointed_to);
             }
         }
 
-        Rc::new(Value::new_variable_pointer(
+        Ok(Rc::new(Value::new_variable_pointer(
             &var_pointer.variable_name,
             context_index,
-        ))
+        )))
     }
 
     pub fn set(&mut self, variable_name: &str, value_type: ValueType) -> Result<(), StoryError> {
@@ -184,20 +187,30 @@ impl VariablesState {
             return 0;
         }
 
-        return self.callstack.borrow().get_current_element_index();
+        self.callstack.borrow().context_for_variable_named(var_name) as i32
     }
 
     fn get_raw_variable_with_name(&self, name: &str, context_index: i32) -> Option<Rc<Value>> {
+        self.try_get_raw_variable_with_name(name, context_index)
+            .ok()
+            .flatten()
+    }
+
+    fn try_get_raw_variable_with_name(
+        &self,
+        name: &str,
+        context_index: i32,
+    ) -> Result<Option<Rc<Value>>, StoryError> {
         // 0 context = global
         if context_index == 0 || context_index == -1 {
             if let Some(patch) = &self.patch {
                 if let Some(global) = patch.get_global(name) {
-                    return Some(global);
+                    return Ok(Some(global));
                 }
             }
 
             if let Some(global) = self.global_variables.get(name) {
-                return Some(global.clone());
+                return Ok(Some(global.clone()));
             }
 
             // Getting variables can happen during globals setup.
@@ -206,17 +219,14 @@ impl VariablesState {
             // been set.
 
             if let Some(default_global) = self.default_global_variables.get(name) {
-                return Some(default_global.clone());
+                return Ok(Some(default_global.clone()));
             }
         }
 
         // Temporary
-        let var_value = self
-            .callstack
+        self.callstack
             .borrow()
-            .get_temporary_variable_with_name(name, context_index);
-
-        var_value
+            .try_get_temporary_variable_with_name(name, context_index)
     }
 
     fn set_global(&mut self, name: &str, value: Rc<Value>) {

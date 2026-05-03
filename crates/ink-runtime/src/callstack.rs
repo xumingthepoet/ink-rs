@@ -211,6 +211,56 @@ mod tests {
                 if message.contains("previous pointer could not be resolved")
         ));
     }
+
+    #[test]
+    fn temporary_variable_invalid_set_context_returns_error() {
+        let root = Container::new(None, 0, Vec::new(), HashMap::new());
+        let mut callstack = CallStack::new(root);
+
+        let error = callstack
+            .set_temporary_variable("temp".to_owned(), Rc::new(Value::new(1)), true, 2)
+            .expect_err("invalid temporary context should fail");
+
+        assert!(matches!(
+            error,
+            StoryError::InvalidStoryState(message)
+                if message.contains("outside callstack length 1")
+        ));
+    }
+
+    #[test]
+    fn temporary_variable_invalid_get_context_returns_error() {
+        let root = Container::new(None, 0, Vec::new(), HashMap::new());
+        let callstack = CallStack::new(root);
+
+        let error = match callstack.try_get_temporary_variable_with_name("temp", 0) {
+            Ok(_) => panic!("invalid temporary context should fail"),
+            Err(error) => error,
+        };
+
+        assert!(matches!(
+            error,
+            StoryError::InvalidStoryState(message)
+                if message.contains("context index must be positive")
+        ));
+    }
+
+    #[test]
+    fn valid_temporary_variable_read_write_still_work() {
+        let root = Container::new(None, 0, Vec::new(), HashMap::new());
+        let mut callstack = CallStack::new(root);
+
+        callstack
+            .set_temporary_variable("temp".to_owned(), Rc::new(Value::new(42)), true, -1)
+            .expect("current temporary context should accept writes");
+
+        let value = callstack
+            .try_get_temporary_variable_with_name("temp", -1)
+            .expect("current temporary context should accept reads")
+            .expect("temporary variable should exist");
+
+        assert_eq!(Value::get_value::<i32>(value.as_ref()), Some(42));
+    }
 }
 
 #[derive(Clone)]
@@ -351,16 +401,14 @@ impl CallStack {
         name: String,
         value: Rc<Value>,
         declare_new: bool,
-        mut context_index: i32,
+        context_index: i32,
     ) -> Result<(), StoryError> {
-        if context_index == -1 {
-            context_index = self.get_current_element_index() + 1;
-        }
+        let callstack_index = self.resolve_temporary_context_index(context_index)?;
 
         let context_element = self
             .get_callstack_mut()
-            .get_mut((context_index - 1) as usize)
-            .unwrap();
+            .get_mut(callstack_index)
+            .expect("temporary context index was checked");
 
         if !declare_new && !context_element.temporary_variables.contains_key(&name) {
             return Err(StoryError::InvalidStoryState(format!(
@@ -389,21 +437,51 @@ impl CallStack {
     }
 
     // Get variable value, dereferencing a variable pointer if necessary
-    pub fn get_temporary_variable_with_name(
+    pub fn try_get_temporary_variable_with_name(
         &self,
         name: &str,
         context_index: i32,
-    ) -> Option<Rc<Value>> {
+    ) -> Result<Option<Rc<Value>>, StoryError> {
         let mut context_index = context_index;
         // contextIndex 0 means global, so index is actually 1-based
         if context_index == -1 {
             context_index = self.get_current_element_index() + 1;
         }
 
-        let context_element = self.get_callstack().get((context_index - 1) as usize);
-        let var_value = context_element.unwrap().temporary_variables.get(name);
+        let context_element = self
+            .get_callstack()
+            .get(self.resolve_temporary_context_index(context_index)?)
+            .expect("temporary context index was checked");
+        Ok(context_element.temporary_variables.get(name).cloned())
+    }
 
-        var_value.cloned()
+    fn resolve_temporary_context_index(&self, context_index: i32) -> Result<usize, StoryError> {
+        let context_index = if context_index == -1 {
+            self.get_current_element_index() + 1
+        } else {
+            context_index
+        };
+
+        if context_index <= 0 {
+            return Err(StoryError::InvalidStoryState(format!(
+                "Temporary variable context index must be positive, got {context_index}"
+            )));
+        }
+
+        let callstack_index = usize::try_from(context_index - 1).map_err(|_| {
+            StoryError::InvalidStoryState(format!(
+                "Temporary variable context index is out of range: {context_index}"
+            ))
+        })?;
+        let callstack_len = self.get_callstack().len();
+
+        if callstack_index >= callstack_len {
+            return Err(StoryError::InvalidStoryState(format!(
+                "Temporary variable context index {context_index} is outside callstack length {callstack_len}"
+            )));
+        }
+
+        Ok(callstack_index)
     }
 
     pub fn push(
