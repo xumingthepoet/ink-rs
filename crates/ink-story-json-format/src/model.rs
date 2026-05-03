@@ -8,6 +8,7 @@ use crate::{json, FormatError, INK_VERSION_CURRENT};
 pub struct Program {
     pub ink_version: i32,
     pub root: Container,
+    pub internal_functions: BTreeMap<String, InternalFunction>,
 }
 
 impl Program {
@@ -15,6 +16,7 @@ impl Program {
         Self {
             ink_version: INK_VERSION_CURRENT,
             root,
+            internal_functions: BTreeMap::new(),
         }
     }
 
@@ -32,6 +34,30 @@ impl Program {
 
     pub fn to_json_value(&self) -> JsonValue {
         json::program_to_value(self)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InternalFunction {
+    pub path: String,
+    pub args: usize,
+    pub arg_types: Vec<String>,
+    pub return_type: String,
+}
+
+impl InternalFunction {
+    pub fn new(
+        path: impl Into<String>,
+        arg_types: Vec<String>,
+        return_type: impl Into<String>,
+    ) -> Self {
+        let args = arg_types.len();
+        Self {
+            path: path.into(),
+            args,
+            arg_types,
+            return_type: return_type.into(),
+        }
     }
 }
 

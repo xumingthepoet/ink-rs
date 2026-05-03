@@ -8,7 +8,9 @@ mod json;
 mod model;
 
 pub use error::FormatError;
-pub use model::{Container, ControlCommand, NamedContainer, NativeFunction, Object, Program};
+pub use model::{
+    Container, ControlCommand, InternalFunction, NamedContainer, NativeFunction, Object, Program,
+};
 
 /// The current compiled story JSON format version.
 pub const INK_VERSION_CURRENT: i32 = 1;

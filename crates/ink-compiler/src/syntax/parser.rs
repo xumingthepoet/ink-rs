@@ -435,6 +435,7 @@ impl Parser {
             .arguments(declaration.arguments)
             .return_type(declaration.return_type)
             .function(declaration.is_function)
+            .internal(declaration.is_internal)
             .span(line.span.clone()),
         ))
     }
@@ -498,6 +499,7 @@ impl Parser {
             .arguments(declaration.arguments)
             .return_type(declaration.return_type)
             .function(declaration.is_function)
+            .internal(declaration.is_internal)
             .span(line.span.clone()),
         ))
     }

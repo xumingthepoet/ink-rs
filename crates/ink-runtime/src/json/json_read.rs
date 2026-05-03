@@ -15,7 +15,17 @@ use crate::{
     variable_reference::VariableReference, void::Void,
 };
 
+pub(crate) struct LoadedProgram {
+    pub(crate) main_content_container: Rc<Container>,
+    pub(crate) internal_functions: BTreeMap<String, format::InternalFunction>,
+}
+
+#[cfg(test)]
 pub fn load_from_string(s: &str) -> Result<Rc<Container>, StoryError> {
+    Ok(load_program_from_string(s)?.main_content_container)
+}
+
+pub(crate) fn load_program_from_string(s: &str) -> Result<LoadedProgram, StoryError> {
     let program = format::Program::from_json_str(s)
         .map_err(|error| StoryError::BadJson(error.to_string()))?;
     let version = program.ink_version;
@@ -29,7 +39,10 @@ pub fn load_from_string(s: &str) -> Result<Rc<Container>, StoryError> {
 
     let main_content_container = format_container_to_runtime(&program.root)?;
 
-    Ok(main_content_container)
+    Ok(LoadedProgram {
+        main_content_container,
+        internal_functions: program.internal_functions,
+    })
 }
 
 fn format_container_to_runtime(container: &format::Container) -> Result<Rc<Container>, StoryError> {

@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 mod assignment;
 mod conditional;
@@ -13,7 +13,8 @@ mod value;
 mod weave;
 
 use ink_story_json_format::{
-    Container, ControlCommand, NamedContainer, Object as RuntimeObject, Program as RuntimeProgram,
+    Container, ControlCommand, InternalFunction, NamedContainer, Object as RuntimeObject,
+    Program as RuntimeProgram,
 };
 
 use crate::{
@@ -96,9 +97,69 @@ fn lower_module_story(
     };
     compact_path_strings_in_container(&mut root);
 
+    let mut program = RuntimeProgram::new(root);
+    program.internal_functions = collect_internal_functions(story);
+
     StageOutput {
-        artifact: Some(RuntimeProgram::new(root)),
+        artifact: Some(program),
         diagnostics: Vec::new(),
+    }
+}
+
+fn collect_internal_functions(story: &CheckedStory) -> BTreeMap<String, InternalFunction> {
+    let mut functions = BTreeMap::new();
+    for module in story
+        .parsed
+        .modules()
+        .iter()
+        .filter(|module| story.module_reachability.is_reachable(module.name()))
+    {
+        for flow in module.flows() {
+            collect_internal_functions_in_flow(flow, Some(module.name()), None, &mut functions);
+        }
+    }
+    for flow in story.parsed.flows() {
+        collect_internal_functions_in_flow(flow, None, None, &mut functions);
+    }
+    functions
+}
+
+fn collect_internal_functions_in_flow(
+    flow: &crate::parsed::Flow,
+    module_name: Option<&str>,
+    parent_flow_path: Option<&str>,
+    functions: &mut BTreeMap<String, InternalFunction>,
+) {
+    let source_flow_path = parent_flow_path
+        .map(|parent| format!("{parent}.{}", flow.name()))
+        .unwrap_or_else(|| flow.name().to_string());
+
+    if flow.is_internal() {
+        let host_name = module_name
+            .map(|module| format!("{module}::{source_flow_path}"))
+            .unwrap_or_else(|| source_flow_path.clone());
+        let runtime_path = module_name
+            .map(|module| format!("{module}.{source_flow_path}"))
+            .unwrap_or_else(|| source_flow_path.clone());
+        let arg_types = flow
+            .arguments()
+            .iter()
+            .map(|argument| {
+                argument
+                    .declared_type()
+                    .expect("INTERNAL parameters are typed during parsing")
+                    .to_string()
+            })
+            .collect();
+
+        functions.insert(
+            host_name,
+            InternalFunction::new(runtime_path, arg_types, flow.return_type().to_string()),
+        );
+    }
+
+    for child in flow.child_flows() {
+        collect_internal_functions_in_flow(child, module_name, Some(&source_flow_path), functions);
     }
 }
 

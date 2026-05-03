@@ -1892,6 +1892,24 @@ must match the declared runtime shape: primitive values for primitive returns,
 arrays for `T[]`, objects with matching fields for struct returns, and divert
 target values for `->` returns.
 
+`INTERNAL` declarations expose ink functions for host code to call through the
+runtime API:
+
+	=== module config ===
+	VAR reads: int = 0
+
+	== INTERNAL read_config(key: string) => string ==
+	~ reads = reads + 1
+	~ return key
+
+Host calls use the source-qualified name:
+
+	story.call_internal("config::read_config", Some(&args))
+
+`INTERNAL` functions are implemented in ink, may modify story state, and should
+return host-callable values with `~ return`. Ordinary `function` declarations
+remain ink-only helpers and are not exposed through `call_internal`.
+
 # Part 4: Advanced Flow Control
 
 

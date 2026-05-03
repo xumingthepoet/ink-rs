@@ -12,6 +12,7 @@ pub(super) struct FlowDecl {
     pub arguments: Vec<FlowArgument>,
     pub return_type: TypeName,
     pub is_function: bool,
+    pub is_internal: bool,
 }
 
 pub(super) fn is_knot_declaration_line(line: &str) -> bool {
@@ -38,7 +39,7 @@ pub(super) fn parse_knot_declaration(parser: &mut RuleParser<'_>) -> Option<Flow
     let first_identifier =
         parser.expect("knot name", parse_identifier, |parser| parser.skip_to_end())?;
 
-    let (name, is_function) = if first_identifier == "function" {
+    let (name, is_function, is_internal) = if first_identifier == "function" {
         parser.expect(
             "whitespace after 'function'",
             parse_horizontal_whitespace,
@@ -47,20 +48,40 @@ pub(super) fn parse_knot_declaration(parser: &mut RuleParser<'_>) -> Option<Flow
         let name = parser.expect("function name", parse_identifier, |parser| {
             parser.skip_to_end();
         })?;
-        (name, true)
+        (name, true, false)
+    } else if first_identifier == "INTERNAL" {
+        parser.expect(
+            "whitespace after 'INTERNAL'",
+            parse_horizontal_whitespace,
+            |_| {},
+        )?;
+        let name = parser.expect("INTERNAL function name", parse_identifier, |parser| {
+            parser.skip_to_end();
+        })?;
+        (name, true, true)
     } else {
-        (first_identifier, false)
+        (first_identifier, false, false)
     };
 
     parser.skip_horizontal_whitespace();
 
-    let arguments = parse_arguments(parser).unwrap_or_default();
+    let arguments = parse_arguments(parser);
+    let has_argument_list = arguments.is_some();
+    let arguments = arguments.unwrap_or_default();
     let return_type = if is_function {
         parse_return_type(parser)
     } else {
         None
     };
-    validate_function_signature(parser, is_function, &name, &arguments, return_type.as_ref());
+    validate_function_signature(
+        parser,
+        is_function,
+        is_internal,
+        has_argument_list,
+        &name,
+        &arguments,
+        return_type.as_ref(),
+    );
     let return_type = return_type.unwrap_or_else(TypeName::void);
 
     parser.skip_horizontal_whitespace();
@@ -87,6 +108,7 @@ pub(super) fn parse_knot_declaration(parser: &mut RuleParser<'_>) -> Option<Flow
         arguments,
         return_type,
         is_function,
+        is_internal,
     })
 }
 
@@ -104,7 +126,7 @@ pub(super) fn parse_stitch_declaration(parser: &mut RuleParser<'_>) -> Option<Fl
         parser.skip_to_end()
     })?;
 
-    let (name, is_function) = if first_identifier == "function" {
+    let (name, is_function, is_internal) = if first_identifier == "function" {
         parser.expect(
             "whitespace after 'function'",
             parse_horizontal_whitespace,
@@ -113,20 +135,40 @@ pub(super) fn parse_stitch_declaration(parser: &mut RuleParser<'_>) -> Option<Fl
         let name = parser.expect("function name", parse_identifier, |parser| {
             parser.skip_to_end();
         })?;
-        (name, true)
+        (name, true, false)
+    } else if first_identifier == "INTERNAL" {
+        parser.expect(
+            "whitespace after 'INTERNAL'",
+            parse_horizontal_whitespace,
+            |_| {},
+        )?;
+        let name = parser.expect("INTERNAL function name", parse_identifier, |parser| {
+            parser.skip_to_end();
+        })?;
+        (name, true, true)
     } else {
-        (first_identifier, false)
+        (first_identifier, false, false)
     };
 
     parser.skip_horizontal_whitespace();
 
-    let arguments = parse_arguments(parser).unwrap_or_default();
+    let arguments = parse_arguments(parser);
+    let has_argument_list = arguments.is_some();
+    let arguments = arguments.unwrap_or_default();
     let return_type = if is_function {
         parse_return_type(parser)
     } else {
         None
     };
-    validate_function_signature(parser, is_function, &name, &arguments, return_type.as_ref());
+    validate_function_signature(
+        parser,
+        is_function,
+        is_internal,
+        has_argument_list,
+        &name,
+        &arguments,
+        return_type.as_ref(),
+    );
     let return_type = return_type.unwrap_or_else(TypeName::void);
 
     parser.skip_horizontal_whitespace();
@@ -145,6 +187,7 @@ pub(super) fn parse_stitch_declaration(parser: &mut RuleParser<'_>) -> Option<Fl
         arguments,
         return_type,
         is_function,
+        is_internal,
     })
 }
 
@@ -162,6 +205,8 @@ fn parse_return_type(parser: &mut RuleParser<'_>) -> Option<TypeName> {
 fn validate_function_signature(
     parser: &mut RuleParser<'_>,
     is_function: bool,
+    is_internal: bool,
+    has_argument_list: bool,
     name: &str,
     arguments: &[FlowArgument],
     return_type: Option<&TypeName>,
@@ -178,6 +223,14 @@ fn validate_function_signature(
             ));
             return;
         }
+    }
+
+    if is_internal && !has_argument_list {
+        parser.diagnostic(Diagnostic::error(
+            parser.current_span(),
+            format!("INTERNAL function '{name}' must declare an argument list with parentheses"),
+        ));
+        return;
     }
 
     if return_type.is_none() {
@@ -333,6 +386,50 @@ mod tests {
         assert_eq!(
             declaration.arguments[1].declared_type(),
             Some(&TypeName::float())
+        );
+    }
+
+    #[test]
+    fn parses_internal_function_signature() {
+        let (declaration, diagnostics) =
+            parse_knot("== INTERNAL read_config(section: string) => string ==");
+
+        assert!(diagnostics.is_empty(), "{diagnostics:#?}");
+        let declaration = declaration.expect("expected internal function declaration");
+        assert!(declaration.is_function);
+        assert!(declaration.is_internal);
+        assert_eq!(declaration.name, "read_config");
+        assert_eq!(declaration.return_type, TypeName::string());
+        assert_eq!(declaration.arguments.len(), 1);
+        assert_eq!(
+            declaration.arguments[0].declared_type(),
+            Some(&TypeName::string())
+        );
+    }
+
+    #[test]
+    fn rejects_internal_function_without_parentheses() {
+        let (declaration, diagnostics) = parse_knot("== INTERNAL read_config => string ==");
+
+        assert!(declaration.is_some());
+        assert_eq!(diagnostics.len(), 1, "{diagnostics:#?}");
+        assert_eq!(diagnostics[0].severity, DiagnosticSeverity::Error);
+        assert_eq!(
+            diagnostics[0].message,
+            "INTERNAL function 'read_config' must declare an argument list with parentheses"
+        );
+    }
+
+    #[test]
+    fn rejects_internal_function_with_missing_return_type() {
+        let (declaration, diagnostics) = parse_knot("== INTERNAL read_config() ==");
+
+        assert!(declaration.is_some());
+        assert_eq!(diagnostics.len(), 1, "{diagnostics:#?}");
+        assert_eq!(diagnostics[0].severity, DiagnosticSeverity::Error);
+        assert_eq!(
+            diagnostics[0].message,
+            "Function 'read_config' is missing a return type"
         );
     }
 

@@ -1,7 +1,10 @@
 //! [`Story`] is the entry point to load and run an Ink story.
 use crate::{
     container::Container,
-    story::{errors::ErrorHandler, external_functions::ExternalFunctionDef},
+    story::{
+        errors::ErrorHandler, external_functions::ExternalFunctionDef,
+        internal_functions::InternalFunctionDef,
+    },
     story_state::StoryState,
 };
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
@@ -32,6 +35,7 @@ pub struct Story {
     pub(crate) allow_external_function_fallbacks: bool,
     pub(crate) saw_lookahead_unsafe_function_after_new_line: bool,
     pub(crate) externals: HashMap<String, ExternalFunctionDef>,
+    pub(crate) internal_functions: HashMap<String, InternalFunctionDef>,
 }
 
 struct CSharpRandom {
@@ -125,7 +129,11 @@ mod misc {
         /// Construct a `Story` out of a JSON string that was compiled with
         /// `inklecate`.
         pub fn new(json_string: &str) -> Result<Self, StoryError> {
-            let main_content_container = json_read::load_from_string(json_string)?;
+            let loaded_program = json_read::load_program_from_string(json_string)?;
+            let main_content_container = loaded_program.main_content_container;
+            let internal_functions = super::internal_functions::load_internal_function_defs(
+                loaded_program.internal_functions,
+            )?;
 
             let mut story = Story {
                 main_content_container: main_content_container.clone(),
@@ -141,6 +149,7 @@ mod misc {
                 has_validated_externals: false,
                 allow_external_function_fallbacks: false,
                 externals: HashMap::with_capacity(0),
+                internal_functions,
             };
 
             story.reset_globals()?;
@@ -238,6 +247,7 @@ mod control_logic;
 pub mod errors;
 pub mod external_functions;
 mod flow;
+mod internal_functions;
 mod navigation;
 mod progress;
 mod state;

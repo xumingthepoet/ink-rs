@@ -4,14 +4,22 @@ When ink is compiled to JSON, it is converted to a low level format for use by t
 
 ## Top level
 
-At the top level of the JSON file are two properties. `inkVersion` is an
-integer that denotes the format version, and `root` is the outer-most Container
-for the entire story.
+At the top level of the JSON file are `inkVersion`, `root`, and optional
+metadata. `inkVersion` is an integer that denotes the format version, and
+`root` is the outer-most Container for the entire story.
 
 ```json
 {
     "inkVersion": 1,
-    "root": <root container>
+    "root": <root container>,
+    "internalFunctions": {
+        "config::read_config": {
+            "path": "config.read_config",
+            "args": 1,
+            "argTypes": ["string"],
+            "returnType": "string"
+        }
+    }
 }
 ```
 
@@ -26,6 +34,13 @@ root container starts by diverting to the unique `module.main` entry point and
 stores reachable module containers as root named content. Source-qualified flow
 names such as `items::take` are lowered to dot-separated runtime paths such as
 `items.take`.
+
+`internalFunctions` is emitted only when the source declares `INTERNAL`
+host-callable ink functions. The object key is the source-qualified host API
+name. `path` is the runtime container path, `args` is the argument count,
+`argTypes` stores source type names, and `returnType` stores the declared return
+type. Runtime loading keeps this metadata separate from the runtime execution
+graph and uses it to validate `Story::call_internal`.
 
 ## Containers
 

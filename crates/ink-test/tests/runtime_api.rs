@@ -1,4 +1,4 @@
-use std::{cell::RefCell, error::Error, rc::Rc};
+use std::{cell::RefCell, collections::BTreeMap, error::Error, rc::Rc};
 
 mod support;
 
@@ -305,4 +305,153 @@ fn variable_get_set_fixture_runs() {
     story.choose_choice_index(0);
 
     assert_eq!(story.continue_maximally(), "10\n");
+}
+
+#[test]
+fn internal_function_metadata_is_emitted_for_host_calls() {
+    let compiled = compile_fixture("runtime_api/internal-functions.ink");
+    let json: serde_json::Value =
+        serde_json::from_str(&compiled.json).expect("compiled JSON should parse");
+
+    assert_eq!(
+        json["internalFunctions"]["game::read_config"],
+        serde_json::json!({
+            "path": "game.read_config",
+            "args": 0,
+            "argTypes": [],
+            "returnType": "string"
+        })
+    );
+    assert_eq!(
+        json["internalFunctions"]["game::double"],
+        serde_json::json!({
+            "path": "game.double",
+            "args": 1,
+            "argTypes": ["int"],
+            "returnType": "int"
+        })
+    );
+}
+
+#[test]
+fn internal_host_calls_return_values_and_keep_side_effects() {
+    let compiled = compile_fixture("runtime_api/internal-functions.ink");
+    let mut story = Story::new(&compiled.json);
+
+    let result = story
+        .call_internal("game::read_config", None)
+        .expect("internal call should succeed");
+
+    assert!(matches!(
+        result,
+        Some(ValueType::String(value)) if value.string == "enabled"
+    ));
+    assert!(matches!(
+        story.get_variable("game::counter"),
+        Some(ValueType::Int(1))
+    ));
+}
+
+#[test]
+fn internal_host_calls_accept_typed_arguments_and_composite_returns() {
+    let compiled = compile_fixture("runtime_api/internal-functions.ink");
+    let mut story = Story::new(&compiled.json);
+
+    assert!(matches!(
+        story
+            .call_internal("game::double", Some(vec![ValueType::Int(21)]))
+            .expect("int call should succeed"),
+        Some(ValueType::Int(42))
+    ));
+
+    let mut story = Story::new(&compiled.json);
+    let scores = story
+        .call_internal(
+            "game::identity_scores",
+            Some(vec![ValueType::Array(vec![
+                ValueType::Int(4),
+                ValueType::Int(5),
+            ])]),
+        )
+        .expect("array call should succeed");
+    assert!(matches!(
+        scores,
+        Some(ValueType::Array(values))
+            if matches!(values.as_slice(), [ValueType::Int(4), ValueType::Int(5)])
+    ));
+
+    let mut story = Story::new(&compiled.json);
+    let mut fields = BTreeMap::new();
+    fields.insert("hp".to_string(), ValueType::Int(7));
+    let player = story
+        .call_internal(
+            "game::identity_player",
+            Some(vec![ValueType::Object(fields)]),
+        )
+        .expect("object call should succeed");
+    assert!(matches!(
+        player,
+        Some(ValueType::Object(fields)) if matches!(fields.get("hp"), Some(ValueType::Int(7)))
+    ));
+}
+
+#[test]
+fn internal_host_calls_reject_private_functions_bad_args_and_output_text() {
+    let compiled = compile_fixture("runtime_api/internal-functions.ink");
+    let mut story = Story::new(&compiled.json);
+
+    assert!(story.call_internal("game::private_value", None).is_err());
+    assert!(story
+        .call_internal(
+            "game::double",
+            Some(vec![ValueType::Int(1), ValueType::Int(2)])
+        )
+        .is_err());
+    assert!(story
+        .call_internal("game::double", Some(vec![ValueType::new("bad")]))
+        .is_err());
+    assert!(story.call_internal("game::noisy", None).is_err());
+}
+
+#[test]
+fn internal_host_calls_validate_return_metadata_at_runtime() {
+    let compiled = compile_fixture("runtime_api/internal-functions.ink");
+    let mut json: serde_json::Value =
+        serde_json::from_str(&compiled.json).expect("compiled JSON should parse");
+    json["internalFunctions"]["game::read_config"]["returnType"] = serde_json::json!("int");
+    let mut story = Story::new(&json.to_string());
+
+    let error = match story.call_internal("game::read_config", None) {
+        Ok(_) => panic!("return type mismatch should fail"),
+        Err(error) => error,
+    };
+
+    assert!(error
+        .to_string()
+        .contains("expected return type int, got string"));
+}
+
+#[test]
+fn internal_host_calls_survive_save_load() {
+    let compiled = compile_fixture("runtime_api/internal-functions.ink");
+    let mut story = Story::new(&compiled.json);
+    story
+        .call_internal("game::read_config", None)
+        .expect("internal call should succeed");
+    let save = story.save_state();
+    let mut reloaded = Story::new(&compiled.json);
+    reloaded.load_state(&save);
+
+    let result = reloaded
+        .call_internal("game::read_config", None)
+        .expect("internal call after load should succeed");
+
+    assert!(matches!(
+        result,
+        Some(ValueType::String(value)) if value.string == "enabled"
+    ));
+    assert!(matches!(
+        reloaded.get_variable("game::counter"),
+        Some(ValueType::Int(2))
+    ));
 }

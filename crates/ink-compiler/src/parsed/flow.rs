@@ -26,6 +26,7 @@ pub struct Flow {
     arguments: Vec<FlowArgument>,
     return_type: TypeName,
     is_function: bool,
+    is_internal: bool,
     span: SourceSpan,
 }
 
@@ -38,6 +39,7 @@ pub struct FlowParts {
     arguments: Vec<FlowArgument>,
     return_type: TypeName,
     is_function: bool,
+    is_internal: bool,
     span: SourceSpan,
 }
 
@@ -89,6 +91,7 @@ impl FlowParts {
             arguments: Vec::new(),
             return_type: TypeName::void(),
             is_function: false,
+            is_internal: false,
             span: SourceSpan::new(None, 1, 1),
         }
     }
@@ -113,6 +116,14 @@ impl FlowParts {
         self
     }
 
+    pub fn internal(mut self, is_internal: bool) -> Self {
+        self.is_internal = is_internal;
+        if is_internal {
+            self.is_function = true;
+        }
+        self
+    }
+
     pub fn span(mut self, span: SourceSpan) -> Self {
         self.span = span;
         self
@@ -129,6 +140,7 @@ impl Flow {
             arguments: parts.arguments,
             return_type: parts.return_type,
             is_function: parts.is_function,
+            is_internal: parts.is_internal,
             span: parts.span,
         }
     }
@@ -173,6 +185,10 @@ impl Flow {
         self.is_function
     }
 
+    pub fn is_internal(&self) -> bool {
+        self.is_internal
+    }
+
     pub(crate) fn write_parse_snapshot(&self, out: &mut String, indent: usize) {
         out.push('\n');
         push_indent(out, indent);
@@ -185,6 +201,9 @@ impl Flow {
         out.push_str(&self.name);
         out.push_str("\", function=");
         out.push_str(if self.is_function { "true" } else { "false" });
+        if self.is_internal {
+            out.push_str(", internal=true");
+        }
         out.push(')');
         if !self.weave.content().is_empty() {
             self.weave.write_parse_snapshot(out, indent + 2);

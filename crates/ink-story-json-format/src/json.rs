@@ -2,7 +2,9 @@ use std::collections::BTreeMap;
 
 use serde_json::{Map, Number, Value as JsonValue};
 
-use crate::{Container, FormatError, NamedContainer, NativeFunction, Object, Program};
+use crate::{
+    Container, FormatError, InternalFunction, NamedContainer, NativeFunction, Object, Program,
+};
 
 pub(crate) fn program_from_str(input: &str) -> Result<Program, FormatError> {
     let value = serde_json::from_str(input)
@@ -20,8 +22,16 @@ pub(crate) fn program_from_value(value: JsonValue) -> Result<Program, FormatErro
         .get("root")
         .ok_or_else(|| FormatError::new("compiled story JSON is missing root"))?;
     let root = container_from_value(root_value, None)?;
+    let internal_functions = match obj.get("internalFunctions") {
+        Some(value) => internal_functions_from_value(value)?,
+        None => BTreeMap::new(),
+    };
 
-    Ok(Program { ink_version, root })
+    Ok(Program {
+        ink_version,
+        root,
+        internal_functions,
+    })
 }
 
 pub(crate) fn program_to_string(program: &Program) -> Result<String, FormatError> {
@@ -37,6 +47,95 @@ pub(crate) fn program_to_value(program: &Program) -> JsonValue {
         JsonValue::Number(program.ink_version.into()),
     );
     obj.insert("root".to_string(), container_to_value(&program.root, true));
+    if !program.internal_functions.is_empty() {
+        obj.insert(
+            "internalFunctions".to_string(),
+            internal_functions_to_value(&program.internal_functions),
+        );
+    }
+    JsonValue::Object(obj)
+}
+
+fn internal_functions_from_value(
+    value: &JsonValue,
+) -> Result<BTreeMap<String, InternalFunction>, FormatError> {
+    let obj = value
+        .as_object()
+        .ok_or_else(|| FormatError::new("internalFunctions must be a JSON object"))?;
+    let mut functions = BTreeMap::new();
+    for (name, value) in obj {
+        functions.insert(name.clone(), internal_function_from_value(name, value)?);
+    }
+    Ok(functions)
+}
+
+fn internal_function_from_value(
+    name: &str,
+    value: &JsonValue,
+) -> Result<InternalFunction, FormatError> {
+    let obj = value
+        .as_object()
+        .ok_or_else(|| FormatError::new(format!("internal function '{name}' must be an object")))?;
+    let path = required_json_string(obj, "path")?.to_string();
+    let return_type = required_json_string(obj, "returnType")?.to_string();
+    let args = usize::try_from(required_i32(obj, "args")?)
+        .map_err(|_| FormatError::new(format!("internal function '{name}' args must be >= 0")))?;
+    let arg_types = match obj.get("argTypes") {
+        Some(value) => string_array_from_value(value, "argTypes")?,
+        None if args == 0 => Vec::new(),
+        None => {
+            return Err(FormatError::new(format!(
+                "internal function '{name}' is missing argTypes"
+            )))
+        }
+    };
+    if arg_types.len() != args {
+        return Err(FormatError::new(format!(
+            "internal function '{name}' args does not match argTypes length"
+        )));
+    }
+    Ok(InternalFunction {
+        path,
+        args,
+        arg_types,
+        return_type,
+    })
+}
+
+fn string_array_from_value(value: &JsonValue, field: &str) -> Result<Vec<String>, FormatError> {
+    value
+        .as_array()
+        .ok_or_else(|| FormatError::new(format!("{field} must be an array")))?
+        .iter()
+        .map(|value| Ok(json_value_to_string(value, field)?.to_string()))
+        .collect()
+}
+
+fn internal_functions_to_value(functions: &BTreeMap<String, InternalFunction>) -> JsonValue {
+    let mut obj = Map::new();
+    for (name, function) in functions {
+        let mut function_obj = Map::new();
+        function_obj.insert("path".to_string(), JsonValue::String(function.path.clone()));
+        function_obj.insert(
+            "args".to_string(),
+            JsonValue::Number((function.args as u64).into()),
+        );
+        function_obj.insert(
+            "argTypes".to_string(),
+            JsonValue::Array(
+                function
+                    .arg_types
+                    .iter()
+                    .map(|arg| JsonValue::String(arg.clone()))
+                    .collect(),
+            ),
+        );
+        function_obj.insert(
+            "returnType".to_string(),
+            JsonValue::String(function.return_type.clone()),
+        );
+        obj.insert(name.clone(), JsonValue::Object(function_obj));
+    }
     JsonValue::Object(obj)
 }
 
@@ -442,6 +541,16 @@ fn required_i32(obj: &Map<String, JsonValue>, key: &str) -> Result<i32, FormatEr
     json_value_to_i32(value, key)
 }
 
+fn required_json_string<'a>(
+    obj: &'a Map<String, JsonValue>,
+    key: &str,
+) -> Result<&'a str, FormatError> {
+    let value = obj
+        .get(key)
+        .ok_or_else(|| FormatError::new(format!("compiled story JSON is missing {key}")))?;
+    json_value_to_string(value, key)
+}
+
 fn json_value_to_string<'a>(value: &'a JsonValue, key: &str) -> Result<&'a str, FormatError> {
     value
         .as_str()
@@ -546,6 +655,52 @@ mod tests {
         let program = program_from_value(input.clone()).expect("format should parse modules");
 
         assert_eq!(program_to_value(&program), input);
+    }
+
+    #[test]
+    fn roundtrips_internal_function_metadata() {
+        let input = json!({
+            "inkVersion": 1,
+            "root": ["done", null],
+            "internalFunctions": {
+                "game::read_config": {
+                    "path": "game.read_config",
+                    "args": 1,
+                    "argTypes": ["string"],
+                    "returnType": "string"
+                }
+            }
+        });
+
+        let program = program_from_value(input.clone()).expect("format should parse metadata");
+
+        assert_eq!(program_to_value(&program), input);
+        assert_eq!(
+            program.internal_functions["game::read_config"],
+            InternalFunction::new("game.read_config", vec!["string".to_string()], "string")
+        );
+    }
+
+    #[test]
+    fn rejects_internal_function_metadata_with_mismatched_arg_count() {
+        let input = json!({
+            "inkVersion": 1,
+            "root": ["done", null],
+            "internalFunctions": {
+                "game::bad": {
+                    "path": "game.bad",
+                    "args": 2,
+                    "argTypes": ["int"],
+                    "returnType": "int"
+                }
+            }
+        });
+
+        let error = program_from_value(input).expect_err("metadata should be rejected");
+
+        assert!(error
+            .to_string()
+            .contains("internal function 'game::bad' args does not match argTypes length"));
     }
 
     #[test]

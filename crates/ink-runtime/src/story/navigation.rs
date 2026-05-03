@@ -135,13 +135,23 @@ impl Story {
             return Err(StoryError::BadArgument(e));
         }
 
+        self.evaluate_function_container(func_name, func_container.unwrap(), args, text_output)
+    }
+
+    pub(crate) fn evaluate_function_container(
+        &mut self,
+        _func_name: &str,
+        func_container: Rc<Container>,
+        args: Option<&Vec<ValueType>>,
+        text_output: &mut String,
+    ) -> Result<Option<ValueType>, StoryError> {
         // Snapshot the output stream
         let output_stream_before = self.get_state().get_output_stream().clone();
         self.get_state_mut().reset_output(None);
 
         // State will temporarily replace the callstack in order to evaluate
         self.get_state_mut()
-            .start_function_evaluation_from_game(func_container.unwrap(), args)?;
+            .start_function_evaluation_from_game(func_container, args)?;
 
         // Evaluate the function, and collect the string output
         while self.can_continue() {

@@ -102,6 +102,14 @@ impl Story {
             .expect("expected external function binding to succeed");
     }
 
+    pub fn call_internal(
+        &mut self,
+        func_name: &str,
+        arguments: Option<Vec<ValueType>>,
+    ) -> Result<Option<ValueType>, StoryError> {
+        self.inner.call_internal(func_name, arguments.as_ref())
+    }
+
     pub fn save_state(&self) -> String {
         self.inner.save_state().expect("expected state to save")
     }
