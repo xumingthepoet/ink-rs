@@ -8,13 +8,11 @@ use super::assignment::{
     collect_assignment_path, lower_assignment_path_update_value_into,
     lower_cached_assignment_indexes_into, push_reassignment_for_name, AssignmentUpdateValue,
 };
+use super::composite_literal::lower_dynamic_composite_literal_into;
 use super::context::{ChoicePathMode, LoweringContext};
 use super::indexes::{CallSignature, ConstantValue, ConstantValues, ExternalSignatures};
 use super::path::{module_scoped_source_path_to_runtime_path, source_path_to_runtime_path};
-use super::value::{
-    lower_value_literal, resolve_divert_target_value, runtime_default_for_type,
-    struct_field_definitions_for_type,
-};
+use super::value::{lower_value_literal, resolve_divert_target_value};
 use super::weave::lower_content_list_into_context;
 
 pub(super) fn lower_output_expression_into(
@@ -75,10 +73,16 @@ pub(super) fn lower_expression_with_expected_type_into(
     )
 }
 
-struct ExpressionLoweringContext<'a, 'ctx> {
+pub(super) struct ExpressionLoweringContext<'a, 'ctx> {
     context: &'a LoweringContext<'ctx>,
     has_start_content: bool,
     visiting_constants: &'a mut HashSet<String>,
+}
+
+impl<'ctx> ExpressionLoweringContext<'_, 'ctx> {
+    pub(super) fn context(&self) -> &LoweringContext<'ctx> {
+        self.context
+    }
 }
 
 fn lower_expression_into_with_constants(
@@ -225,7 +229,7 @@ fn lower_constant_expression_into(
     lower_expression_into_with_constants(content, constant.expression(), lowering);
 }
 
-fn lower_expression_with_expected_type_into_with_constants(
+pub(super) fn lower_expression_with_expected_type_into_with_constants(
     content: &mut Vec<RuntimeObject>,
     expression: &Expression,
     expected_type: Option<&TypeName>,
@@ -256,89 +260,6 @@ fn lower_expression_with_expected_type_into_with_constants(
     let before = content.len();
     lower_expression_into_with_constants(content, expression, lowering);
     content.len() > before
-}
-
-fn lower_dynamic_composite_literal_into(
-    content: &mut Vec<RuntimeObject>,
-    expression: &Expression,
-    expected_type: Option<&TypeName>,
-    lowering: &mut ExpressionLoweringContext<'_, '_>,
-) -> bool {
-    let context = lowering.context;
-    match (expected_type, expression) {
-        (Some(TypeName::Array(element_type)), Expression::ArrayLiteral(elements)) => {
-            let Some(default_element) = runtime_default_for_type(
-                element_type,
-                context.struct_definitions(),
-                context.path_mode().current_module_name(),
-            ) else {
-                return false;
-            };
-            let defaults = vec![default_element; elements.len()];
-            let mut emitted = vec![RuntimeObject::ValueArray(defaults)];
-            for (index, element) in elements.iter().enumerate() {
-                let Ok(index) = i32::try_from(index) else {
-                    return false;
-                };
-                emitted.push(RuntimeObject::Int(index));
-                if !lower_expression_with_expected_type_into_with_constants(
-                    &mut emitted,
-                    element,
-                    Some(element_type),
-                    lowering,
-                ) {
-                    return false;
-                }
-                emitted.push(RuntimeObject::NativeFunction(NativeFunction::IndexWrite));
-            }
-            content.extend(emitted);
-            true
-        }
-        (Some(expected_type), Expression::StructLiteral(fields))
-            if matches!(
-                expected_type,
-                TypeName::Struct(_) | TypeName::QualifiedStruct(_)
-            ) =>
-        {
-            let Some(default_object) = runtime_default_for_type(
-                expected_type,
-                context.struct_definitions(),
-                context.path_mode().current_module_name(),
-            ) else {
-                return false;
-            };
-            let Some(field_definitions) = struct_field_definitions_for_type(
-                expected_type,
-                context.struct_definitions(),
-                context.path_mode().current_module_name(),
-            ) else {
-                return false;
-            };
-
-            let mut emitted = vec![default_object];
-            for field in fields {
-                let Some((_, field_type)) = field_definitions
-                    .iter()
-                    .find(|(field_name, _)| field_name == field.name())
-                else {
-                    return false;
-                };
-                emitted.push(RuntimeObject::String(field.name().to_string()));
-                if !lower_expression_with_expected_type_into_with_constants(
-                    &mut emitted,
-                    field.expression(),
-                    Some(field_type),
-                    lowering,
-                ) {
-                    return false;
-                }
-                emitted.push(RuntimeObject::NativeFunction(NativeFunction::FieldWrite));
-            }
-            content.extend(emitted);
-            true
-        }
-        _ => false,
-    }
 }
 
 fn lower_function_call_into(

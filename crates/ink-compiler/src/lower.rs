@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 mod assignment;
+mod composite_literal;
 mod conditional;
 mod context;
 mod divert;
