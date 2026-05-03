@@ -263,8 +263,28 @@ impl Value {
                 )),
             },
             ValueType::String(v) => match cast_dest_type {
-                CAST_INT => Ok(Some(Self::new::<i32>(v.string.parse::<i32>().unwrap()))),
-                CAST_FLOAT => Ok(Some(Self::new::<f32>(v.string.parse::<f32>().unwrap()))),
+                CAST_INT => v
+                    .string
+                    .parse::<i32>()
+                    .map(Self::new::<i32>)
+                    .map(Some)
+                    .map_err(|_| {
+                        StoryError::InvalidStoryState(format!(
+                            "Failed to cast string '{}' to int",
+                            v.string
+                        ))
+                    }),
+                CAST_FLOAT => v
+                    .string
+                    .parse::<f32>()
+                    .map(Self::new::<f32>)
+                    .map(Some)
+                    .map_err(|_| {
+                        StoryError::InvalidStoryState(format!(
+                            "Failed to cast string '{}' to float",
+                            v.string
+                        ))
+                    }),
                 CAST_STRING => Ok(None),
                 _ => Err(StoryError::InvalidStoryState(
                     "Cast not allowed for string".to_owned(),
@@ -295,5 +315,55 @@ impl Value {
                 )),
             },
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn invalid_string_cast_to_int_returns_error() {
+        let value = Value::new::<&str>("not an int");
+        let error = match value.cast(CAST_INT) {
+            Ok(_) => panic!("invalid int parse should be reported"),
+            Err(error) => error,
+        };
+
+        assert!(matches!(
+            error,
+            StoryError::InvalidStoryState(message)
+                if message.contains("Failed to cast string 'not an int' to int")
+        ));
+    }
+
+    #[test]
+    fn invalid_string_cast_to_float_returns_error() {
+        let value = Value::new::<&str>("not a float");
+        let error = match value.cast(CAST_FLOAT) {
+            Ok(_) => panic!("invalid float parse should be reported"),
+            Err(error) => error,
+        };
+
+        assert!(matches!(
+            error,
+            StoryError::InvalidStoryState(message)
+                if message.contains("Failed to cast string 'not a float' to float")
+        ));
+    }
+
+    #[test]
+    fn valid_string_numeric_casts_still_succeed() {
+        let int_value = Value::new::<&str>("42")
+            .cast(CAST_INT)
+            .expect("valid int parse should succeed")
+            .expect("string to int should produce a new value");
+        assert!(matches!(int_value.value, ValueType::Int(42)));
+
+        let float_value = Value::new::<&str>("3.5")
+            .cast(CAST_FLOAT)
+            .expect("valid float parse should succeed")
+            .expect("string to float should produce a new value");
+        assert!(matches!(float_value.value, ValueType::Float(value) if value == 3.5));
     }
 }
