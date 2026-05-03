@@ -19,6 +19,7 @@ Goal: Fix the host-evaluated INTERNAL function panic recorded in `docs/issues_fo
 Implementation method:
 
 - Add focused regression coverage for INTERNAL functions that assign array and struct literals to typed temps, return those composite values, and are called through the host API.
+- Lower non-constant array and struct literals into runtime stack operations instead of emitting an empty initializer when literal fields depend on variables or expressions.
 - Replace the direct `pop().unwrap()` evaluation-stack API with a checked runtime API where malformed stack state can occur.
 - Update variable-assignment execution to reject missing or non-`Value` assignment inputs with `StoryError::InvalidStoryState` instead of panicking.
 - Update native-function parameter consumption to fail with `StoryError::InvalidStoryState` when too few stack values exist.
@@ -41,7 +42,7 @@ Forbidden shortcuts:
 
 Modification boundaries:
 
-- Allowed: `crates/ink-runtime/src/story_state.rs`, runtime control logic that consumes the evaluation stack, focused runtime tests/fixtures, and the matching issue record.
+- Allowed: `crates/ink-runtime/src/story_state.rs`, runtime control logic that consumes the evaluation stack, compiler lowering for array/struct literals, focused runtime tests/fixtures, and the matching issue record.
 - Allowed if needed: small helper methods in nearby runtime modules to preserve call-site clarity.
 - Not allowed: compiler parser semantics, compiled-story JSON schema changes, runtime save-state schema changes, broad `Rc<dyn RTObject>` object-graph refactors.
 
