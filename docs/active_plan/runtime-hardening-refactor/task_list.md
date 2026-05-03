@@ -52,7 +52,7 @@ Commit record:
 - Review validation: `make gate`
 - Completion record commit: this commit
 
-### [ ] Task 02: Return Errors For Invalid String Numeric Casts
+### [>] Task 02: Return Errors For Invalid String Numeric Casts
 
 Goal: Replace string-to-int and string-to-float `unwrap()` casts with `StoryError::InvalidStoryState` so malformed runtime string values cannot unwind the host process.
 
@@ -86,7 +86,9 @@ Validation commands:
 
 Commit record:
 
-- Implementation commit: pending
+- Implementation commit: `cf8bbb55` (`Return errors for invalid string casts`)
+- Focused validation: `cargo fmt --all --check`; `cargo test -p ink-runtime invalid_string_cast`; `cargo test -p ink-runtime`
+- Full validation: `make gate`
 - Review/fix commits: pending
 - Completion record commit: pending
 
