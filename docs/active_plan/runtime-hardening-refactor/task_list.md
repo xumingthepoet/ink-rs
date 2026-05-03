@@ -12,7 +12,7 @@ Progress: 0/7
 
 ## Milestone 1: Tooling And Small Runtime Panics
 
-### [ ] Task 01: Make Gate Portable Without GNU Timeout
+### [>] Task 01: Make Gate Portable Without GNU Timeout
 
 Goal: Let `make gate` run on macOS hosts that do not have GNU `timeout` or `gtimeout`, while preserving timeout behavior on hosts that do.
 
@@ -46,7 +46,8 @@ Validation commands:
 
 Commit record:
 
-- Implementation commit: pending
+- Implementation commit: `63540c5b` (`Make gate timeout wrapper portable`)
+- Focused validation: `make gate`
 - Review/fix commits: pending
 - Completion record commit: pending
 
