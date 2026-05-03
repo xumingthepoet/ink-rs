@@ -28,3 +28,16 @@ This should not be output.
 
 == function private_value() => string ==
 ~ return "private"
+
+=== module host_config ===
+IMPORT default_value FROM config_data
+
+VAR reads: int = 0
+
+== INTERNAL read_unimported_config() => string ==
+~ reads = reads + 1
+~ return config_data::default_value()
+
+=== module config_data ===
+== function default_value() => string ==
+~ return "remote"

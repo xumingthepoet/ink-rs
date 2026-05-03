@@ -331,6 +331,15 @@ fn internal_function_metadata_is_emitted_for_host_calls() {
             "returnType": "int"
         })
     );
+    assert_eq!(
+        json["internalFunctions"]["host_config::read_unimported_config"],
+        serde_json::json!({
+            "path": "host_config.read_unimported_config",
+            "args": 0,
+            "argTypes": [],
+            "returnType": "string"
+        })
+    );
 }
 
 #[test]
@@ -393,6 +402,28 @@ fn internal_host_calls_accept_typed_arguments_and_composite_returns() {
         player,
         Some(ValueType::Object(fields)) if matches!(fields.get("hp"), Some(ValueType::Int(7)))
     ));
+}
+
+#[test]
+fn internal_host_calls_unimported_internal_module_and_dependency() {
+    let compiled = compile_fixture("runtime_api/internal-functions.ink");
+    let mut story = Story::new(&compiled.json);
+
+    let result = story
+        .call_internal("host_config::read_unimported_config", None)
+        .expect("unimported internal module should be callable");
+
+    assert!(matches!(
+        result,
+        Some(ValueType::String(value)) if value.string == "remote"
+    ));
+    assert!(matches!(
+        story.get_variable("host_config::reads"),
+        Some(ValueType::Int(1))
+    ));
+    assert!(story
+        .call_internal("config_data::default_value", None)
+        .is_err());
 }
 
 #[test]

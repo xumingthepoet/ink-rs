@@ -1910,6 +1910,11 @@ Host calls use the source-qualified name:
 return host-callable values with `~ return`. Ordinary `function` declarations
 remain ink-only helpers and are not exposed through `call_internal`.
 
+Modules that declare `INTERNAL` functions are compiled as host-callable roots
+even when they are not imported by the `main` module. Their import dependencies
+are compiled with them. Other modules that are unreachable from `main` or an
+`INTERNAL` module are omitted from compiled JSON.
+
 # Part 4: Advanced Flow Control
 
 

@@ -563,6 +563,63 @@ mod tests {
     }
 
     #[test]
+    fn internal_modules_are_lowered_as_host_roots_with_import_dependencies() {
+        let source = concat!(
+            "=== module game ===\n",
+            "== main ==\n",
+            "-> END\n",
+            "=== module host_api ===\n",
+            "IMPORT value FROM config\n",
+            "== INTERNAL read() => string ==\n",
+            "~ return config::value()\n",
+            "=== module config ===\n",
+            "== function value() => string ==\n",
+            "~ return \"ok\"\n",
+            "=== module unused ===\n",
+            "== spare ==\n",
+            "-> END\n",
+        );
+        let compiled = Compiler::default().compile(SourceInput::new(source));
+
+        assert!(
+            compiled.artifact.is_some(),
+            "module story should compile with unreachable warning only: {:#?}",
+            compiled.diagnostics
+        );
+        let json = compiled
+            .artifact
+            .expect("compiled story")
+            .program
+            .to_json_value();
+        let root = json
+            .get("root")
+            .and_then(Value::as_array)
+            .expect("root should encode as JSON array");
+        let named = root
+            .last()
+            .and_then(Value::as_object)
+            .expect("root should end with named content object");
+        let internal_functions = json
+            .get("internalFunctions")
+            .and_then(Value::as_object)
+            .expect("internalFunctions should be emitted");
+
+        assert!(named.contains_key("game"), "{json:#}");
+        assert!(named.contains_key("host_api"), "{json:#}");
+        assert!(named.contains_key("config"), "{json:#}");
+        assert!(!named.contains_key("unused"), "{json:#}");
+        assert_eq!(
+            internal_functions.get("host_api::read"),
+            Some(&json!({
+                "args": 0,
+                "argTypes": [],
+                "returnType": "string",
+                "path": "host_api.read"
+            }))
+        );
+    }
+
+    #[test]
     fn module_global_initializer_lowering_uses_scoped_runtime_names() {
         let source = concat!(
             "=== module game ===\n",

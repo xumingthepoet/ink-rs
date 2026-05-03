@@ -1,6 +1,10 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::{diagnostic::Diagnostic, parsed::Story, source::SourceSpan};
+use crate::{
+    diagnostic::Diagnostic,
+    parsed::{Flow, Story},
+    source::SourceSpan,
+};
 
 use super::super::ModuleEntryPoint;
 use super::sort_diagnostics;
@@ -36,18 +40,22 @@ pub fn build_module_dependency_graph(story: &Story) -> ModuleDependencyGraph {
 }
 
 pub fn build_module_reachability(
+    story: &Story,
     graph: &ModuleDependencyGraph,
     entry_point: Option<&ModuleEntryPoint>,
 ) -> ModuleReachability {
-    let Some(entry_point) = entry_point else {
-        return ModuleReachability::default();
-    };
-
     let mut reachable_modules = BTreeSet::new();
-    collect_reachable_modules(&entry_point.module, graph, &mut reachable_modules);
+    let entry_module = entry_point.map(|entry_point| {
+        collect_reachable_modules(&entry_point.module, graph, &mut reachable_modules);
+        entry_point.module.clone()
+    });
+
+    for module in internal_module_roots(story) {
+        collect_reachable_modules(&module, graph, &mut reachable_modules);
+    }
 
     ModuleReachability {
-        entry_module: Some(entry_point.module.clone()),
+        entry_module,
         reachable_modules,
     }
 }
@@ -163,6 +171,19 @@ fn collect_reachable_modules(
     for dependency in graph.dependencies_for(module) {
         collect_reachable_modules(dependency, graph, reachable_modules);
     }
+}
+
+fn internal_module_roots(story: &Story) -> BTreeSet<String> {
+    story
+        .modules()
+        .iter()
+        .filter(|module| module.flows().iter().any(flow_contains_internal))
+        .map(|module| module.name().to_string())
+        .collect()
+}
+
+fn flow_contains_internal(flow: &Flow) -> bool {
+    flow.is_internal() || flow.child_flows().iter().any(flow_contains_internal)
 }
 
 fn module_dependency_cycle_diagnostics(graph: &ModuleDependencyGraph) -> Vec<Diagnostic> {

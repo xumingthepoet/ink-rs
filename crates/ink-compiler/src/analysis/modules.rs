@@ -40,7 +40,8 @@ impl ModuleAnalysis {
         let symbols = build_module_symbol_index(story);
         let dependencies = build_module_dependency_graph(story);
         let imports = build_module_import_index(story);
-        let reachability = build_module_reachability(&dependencies, entry_points.entry_point());
+        let reachability =
+            build_module_reachability(story, &dependencies, entry_points.entry_point());
 
         Self {
             entry_points,
@@ -681,7 +682,7 @@ mod tests {
         );
         let graph = build_module_dependency_graph(&story);
         let entry_points = build_module_entry_point_analysis(&story);
-        let reachability = build_module_reachability(&graph, entry_points.entry_point());
+        let reachability = build_module_reachability(&story, &graph, entry_points.entry_point());
 
         let diagnostics = unreachable_module_diagnostics(&story, &reachability);
 
@@ -696,6 +697,45 @@ mod tests {
         assert_eq!(
             reachability.reachable_modules().collect::<Vec<_>>(),
             vec!["game"]
+        );
+    }
+
+    #[test]
+    fn internal_modules_and_import_dependencies_are_reachable_roots() {
+        let story = parse_story(
+            "=== module game ===\n\
+             == main ==\n\
+             -> END\n\
+             === module host_api ===\n\
+             IMPORT value FROM config\n\
+             == INTERNAL read() => string ==\n\
+             ~ return config::value()\n\
+             === module config ===\n\
+             == function value() => string ==\n\
+             ~ return \"ok\"\n\
+             === module unused ===\n\
+             == helper ==\n\
+             -> END",
+        );
+        let graph = build_module_dependency_graph(&story);
+        let entry_points = build_module_entry_point_analysis(&story);
+        let reachability = build_module_reachability(&story, &graph, entry_points.entry_point());
+
+        let diagnostics = unreachable_module_diagnostics(&story, &reachability);
+
+        assert!(reachability.is_reachable("game"));
+        assert!(reachability.is_reachable("host_api"));
+        assert!(reachability.is_reachable("config"));
+        assert!(!reachability.is_reachable("unused"));
+        assert_eq!(
+            reachability.reachable_modules().collect::<Vec<_>>(),
+            vec!["config", "game", "host_api"]
+        );
+        assert_eq!(diagnostics.len(), 1, "{diagnostics:#?}");
+        assert_eq!(diagnostics[0].severity, DiagnosticSeverity::Warning);
+        assert_eq!(
+            diagnostics[0].message,
+            "Module 'unused' is not reachable from entry point 'game::main'"
         );
     }
 

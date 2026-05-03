@@ -33,7 +33,8 @@ Explicit source modules do not require a new compiled-story JSON schema. The
 root container starts by diverting to the unique `module.main` entry point and
 stores reachable module containers as root named content. Source-qualified flow
 names such as `items::take` are lowered to dot-separated runtime paths such as
-`items.take`.
+`items.take`. Reachable modules include the `main` module import closure plus
+modules that declare `INTERNAL` functions and their import closures.
 
 `internalFunctions` is emitted only when the source declares `INTERNAL`
 host-callable ink functions. The object key is the source-qualified host API

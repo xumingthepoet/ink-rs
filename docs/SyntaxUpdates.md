@@ -32,14 +32,17 @@ Each entry should include:
 - ink-rs behavior: `== INTERNAL name(args) => type ==` declares an ink function
   that host code may call through `Story::call_internal`. `EXTERNAL` remains
   ink-to-host; `INTERNAL` is host-to-ink. Host names use source-qualified
-  module names such as `game::read_config`.
+  module names such as `game::read_config`. Modules containing `INTERNAL`
+  functions are compiled as host roots with their import dependencies, even when
+  unreachable from `main`.
 - documentation effect: `SyntaxReference.md` documents `INTERNAL` declarations
   next to `EXTERNAL`, and `ink_JSON_runtime_format.md` documents the
   `internalFunctions` compiled-story metadata.
 - rationale: host games can put configuration and query logic in ink while
   keeping the callable host API explicit and type-checked.
 - migration guidance: keep ordinary `function` declarations for ink-only
-  helpers. Mark only functions intended for host calls as `INTERNAL`.
+  helpers. Mark only functions intended for host calls as `INTERNAL`. Leave
+  unused non-host modules unmarked so they stay out of compiled JSON.
 - tests: parser tests cover `INTERNAL` signatures and missing parentheses,
   format tests cover `internalFunctions`, and runtime API tests cover host
   calls, type checks, metadata, save/load, and rejection of ordinary functions.
