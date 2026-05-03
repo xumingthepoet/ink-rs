@@ -85,8 +85,13 @@ impl Flow {
         let mut has_choice_threads = false;
         let mut jct: Map<String, serde_json::Value> = Map::new();
         for c in self.current_choices.iter() {
+            let thread_at_generation = c.get_thread_at_generation().ok_or_else(|| {
+                StoryError::InvalidStoryState(
+                    "Choice is missing thread state from generation time".to_owned(),
+                )
+            })?;
             c.original_thread_index
-                .replace(c.get_thread_at_generation().unwrap().thread_index);
+                .replace(thread_at_generation.thread_index);
 
             if self
                 .callstack
@@ -100,7 +105,7 @@ impl Flow {
 
                 jct.insert(
                     c.original_thread_index.borrow().to_string(),
-                    c.get_thread_at_generation().unwrap().write_json()?,
+                    thread_at_generation.write_json()?,
                 );
             }
         }
@@ -168,5 +173,65 @@ impl Flow {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::path::Path;
+    use std::collections::HashMap;
+
+    #[test]
+    fn malformed_json_write_choice_without_generation_thread_returns_error() {
+        let root = Container::new(None, 0, Vec::new(), HashMap::new());
+        let choice = Rc::new(Choice::new_from_json(
+            "0",
+            "0".to_string(),
+            "Choice",
+            0,
+            0,
+            Vec::new(),
+        ));
+        let flow = Flow {
+            name: "default".to_string(),
+            callstack: Rc::new(RefCell::new(CallStack::new(root))),
+            output_stream: Vec::new(),
+            current_choices: vec![choice],
+        };
+
+        let error = match flow.write_json() {
+            Ok(_) => panic!("missing choice generation thread should fail"),
+            Err(error) => error,
+        };
+
+        assert!(matches!(
+            error,
+            StoryError::InvalidStoryState(message)
+                if message.contains("Choice is missing thread state")
+        ));
+    }
+
+    #[test]
+    fn valid_flow_choice_generation_thread_still_writes() {
+        let root = Container::new(None, 0, Vec::new(), HashMap::new());
+        let callstack = CallStack::new(root.clone());
+        let choice = Rc::new(Choice::new(
+            Path::new_with_defaults(),
+            "0".to_string(),
+            false,
+            Vec::new(),
+            callstack.get_current_thread().clone(),
+            "Choice".to_string(),
+        ));
+        let flow = Flow {
+            name: "default".to_string(),
+            callstack: Rc::new(RefCell::new(callstack)),
+            output_stream: Vec::new(),
+            current_choices: vec![choice],
+        };
+
+        let json = flow.write_json().expect("valid flow should write");
+        assert!(json.get("currentChoices").is_some());
     }
 }

@@ -63,7 +63,7 @@ fn runtime_object_to_format_object(object: Rc<dyn RTObject>) -> Result<format::O
     }
 
     if let Ok(divert) = object.clone().into_any().downcast::<Divert>() {
-        return Ok(divert_to_format_object(&divert));
+        return divert_to_format_object(&divert);
     }
 
     if let Ok(cp) = object.clone().into_any().downcast::<ChoicePoint>() {
@@ -123,32 +123,38 @@ fn runtime_object_to_format_object(object: Rc<dyn RTObject>) -> Result<format::O
     )))
 }
 
-fn divert_to_format_object(divert: &Rc<Divert>) -> format::Object {
+fn divert_to_format_object(divert: &Rc<Divert>) -> Result<format::Object, StoryError> {
     let target_str = if divert.has_variable_target() {
-        divert.variable_divert_name.clone().unwrap()
+        divert.variable_divert_name.clone().ok_or_else(|| {
+            StoryError::InvalidStoryState(
+                "Variable divert is missing its variable target name".to_owned(),
+            )
+        })?
     } else {
-        divert.get_target_path_string().unwrap()
+        divert.get_target_path_string().ok_or_else(|| {
+            StoryError::InvalidStoryState("Divert is missing its target path".to_owned())
+        })?
     };
 
     if divert.is_external {
-        format::Object::ExternalFunction {
+        Ok(format::Object::ExternalFunction {
             target: target_str,
             args: divert.external_args,
-        }
+        })
     } else if divert.pushes_to_stack && divert.stack_push_type == PushPopType::Function {
-        format::Object::FunctionDivert { target: target_str }
+        Ok(format::Object::FunctionDivert { target: target_str })
     } else if divert.pushes_to_stack && divert.stack_push_type == PushPopType::Tunnel {
-        format::Object::TunnelDivert {
+        Ok(format::Object::TunnelDivert {
             target: target_str,
             variable: divert.has_variable_target(),
-        }
+        })
     } else if divert.is_conditional {
-        format::Object::ConditionalDivert { target: target_str }
+        Ok(format::Object::ConditionalDivert { target: target_str })
     } else {
-        format::Object::Divert {
+        Ok(format::Object::Divert {
             target: target_str,
             variable: divert.has_variable_target(),
-        }
+        })
     }
 }
 
@@ -280,6 +286,7 @@ mod tests {
 
     use crate::native_function_call::{NativeFunctionCall, Op};
     use crate::object::Object;
+    use crate::push_pop::PushPopType;
 
     #[test]
     fn writes_native_function_calls_through_format_native_functions() {
@@ -402,6 +409,30 @@ mod tests {
         };
 
         assert!(error.contains("Failed to write runtime object to JSON: unsupported"));
+    }
+
+    #[test]
+    fn malformed_json_write_divert_without_target_returns_error() {
+        let object: Rc<dyn RTObject> = Rc::new(Divert::new(
+            false,
+            PushPopType::Tunnel,
+            false,
+            0,
+            false,
+            None,
+            None,
+        ));
+
+        let error = match write_rtobject(object) {
+            Ok(_) => panic!("missing divert target should fail"),
+            Err(error) => error,
+        };
+
+        assert!(matches!(
+            error,
+            StoryError::InvalidStoryState(message)
+                if message.contains("Divert is missing its target path")
+        ));
     }
 
     struct UnsupportedObject {

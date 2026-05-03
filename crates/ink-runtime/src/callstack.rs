@@ -173,15 +173,43 @@ impl Thread {
         thread.insert("threadIndex".to_owned(), json!(self.thread_index));
 
         if !self.previous_pointer.is_null() {
+            let previous_object = self.previous_pointer.resolve().ok_or_else(|| {
+                StoryError::InvalidStoryState(
+                    "Thread previous pointer could not be resolved".to_owned(),
+                )
+            })?;
             thread.insert(
                 "previousContentObject".to_owned(),
-                json!(
-                    Object::get_path(self.previous_pointer.resolve().unwrap().as_ref()).to_string()
-                ),
+                json!(Object::get_path(previous_object.as_ref()).to_string()),
             );
         }
 
         Ok(serde_json::Value::Object(thread))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::object::RTObject;
+
+    #[test]
+    fn malformed_json_write_unresolved_previous_pointer_returns_error() {
+        let child: Rc<dyn RTObject> = Rc::new(Value::new::<&str>("child"));
+        let root = Container::new(None, 0, vec![child], HashMap::new());
+        let mut thread = Thread::new();
+        thread.previous_pointer = Pointer::new(Some(root), 99);
+
+        let error = match thread.write_json() {
+            Ok(_) => panic!("unresolved previous pointer should fail"),
+            Err(error) => error,
+        };
+
+        assert!(matches!(
+            error,
+            StoryError::InvalidStoryState(message)
+                if message.contains("previous pointer could not be resolved")
+        ));
     }
 }
 
