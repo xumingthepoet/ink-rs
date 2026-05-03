@@ -1,4 +1,4 @@
-Progress: 1/2
+Progress: 2/2
 
 # Runtime Evaluation Stack Error Handling Plan
 
@@ -65,7 +65,7 @@ Commit record:
 
 ## Milestone 2: Closeout
 
-### [ ] Task 02: Archive The Completed Plan
+### [x] Task 02: Archive The Completed Plan
 
 Goal: Move this active plan to `docs/finished_plans/` after Task 01 is implemented, reviewed, validated, and marked complete.
 
@@ -93,9 +93,10 @@ Modification boundaries:
 
 Validation commands:
 
-- `find docs/active_plan/runtime-evaluation-stack-errors -maxdepth 2 -type f`
+- `test ! -e docs/active_plan/runtime-evaluation-stack-errors`
 - `test -f docs/finished_plans/runtime-evaluation-stack-errors/task_list.md`
 
 Commit record:
 
-- Completion record commit: pending
+- Validation: `test ! -e docs/active_plan/runtime-evaluation-stack-errors`; `test -f docs/finished_plans/runtime-evaluation-stack-errors/task_list.md`
+- Completion record commit: this commit
