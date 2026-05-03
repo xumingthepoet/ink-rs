@@ -1,4 +1,4 @@
-Progress: 4/7
+Progress: 5/7
 
 # Runtime Hardening And Lowering Refactor Plan
 
@@ -182,7 +182,7 @@ Commit record:
 - Review validation: `cargo fmt --all --check`; `cargo test -p ink-runtime path_`; `cargo test -p ink-runtime divert_`; `make gate`
 - Completion record commit: this commit
 
-### [>] Task 05: Harden CallStack Context Access
+### [x] Task 05: Harden CallStack Context Access
 
 Goal: Convert callstack context lookups that depend on save-state/runtime stack integrity into checked errors where the caller can recover.
 
@@ -221,8 +221,9 @@ Commit record:
 - Implementation commit: `ae332429` (`Harden callstack temporary contexts`)
 - Focused validation: `cargo fmt --all --check`; `cargo test -p ink-runtime temporary_variable`; `cargo test -p ink-runtime`
 - Full validation: `make gate`
-- Review/fix commits: pending
-- Completion record commit: pending
+- Review/fix commits: none; review of `ae332429` found no follow-up changes needed.
+- Review validation: `cargo fmt --all --check`; `cargo test -p ink-runtime temporary_variable`; `make gate`
+- Completion record commit: this commit
 
 ## Milestone 3: Compiler Lowering Structure
 
