@@ -105,6 +105,17 @@ pub(super) fn runtime_default_for_type(
     )
 }
 
+pub(super) fn struct_field_definitions_for_type<'a>(
+    type_name: &TypeName,
+    struct_definitions: &'a StructDefinitions,
+    module_name: Option<&str>,
+) -> Option<&'a Vec<(String, TypeName)>> {
+    let struct_name = type_name.as_struct_name()?;
+    let definition_name =
+        resolve_struct_definition_name(struct_name, module_name, struct_definitions)?;
+    struct_definitions.get(&definition_name)
+}
+
 fn runtime_default_for_type_with_seen(
     type_name: &TypeName,
     struct_definitions: &StructDefinitions,

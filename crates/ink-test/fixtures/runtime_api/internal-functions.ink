@@ -22,6 +22,14 @@ Ready.
 == INTERNAL identity_player(player: Player) => Player ==
 ~ return player
 
+== INTERNAL build_scores(value: int) => int[] ==
+~ temp scores: int[] = [value, value + 1]
+~ return scores
+
+== INTERNAL build_player(hp: int) => Player ==
+~ temp player: Player = { hp: hp }
+~ return player
+
 == INTERNAL noisy() => string ==
 This should not be output.
 ~ return "noisy"

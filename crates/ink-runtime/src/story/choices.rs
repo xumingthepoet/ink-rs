@@ -56,7 +56,7 @@ impl Story {
 
         // Don't create choice if choice point doesn't pass conditional
         if choice_point.has_condition() {
-            let condition_value = self.get_state_mut().pop_evaluation_stack();
+            let condition_value = self.get_state_mut().pop_evaluation_stack()?;
             if !self.is_truthy(condition_value)? {
                 show_choice = false;
             }
@@ -67,11 +67,11 @@ impl Story {
         let mut tags: Vec<String> = Vec::with_capacity(0);
 
         if choice_point.has_choice_only_content() {
-            choice_only_text = self.pop_choice_string_and_tags(&mut tags);
+            choice_only_text = self.pop_choice_string_and_tags(&mut tags)?;
         }
 
         if choice_point.has_start_content() {
-            start_text = self.pop_choice_string_and_tags(&mut tags);
+            start_text = self.pop_choice_string_and_tags(&mut tags)?;
         }
 
         // We go through the full process of creating the choice above so
@@ -145,9 +145,14 @@ impl Story {
         self.choose_path(&choice.target_path, false)
     }
 
-    fn pop_choice_string_and_tags(&mut self, tags: &mut Vec<String>) -> String {
-        let obj = self.get_state_mut().pop_evaluation_stack();
-        let choice_only_str_val = Value::get_value::<&StringValue>(obj.as_ref()).unwrap();
+    fn pop_choice_string_and_tags(&mut self, tags: &mut Vec<String>) -> Result<String, StoryError> {
+        let obj = self.get_state_mut().pop_evaluation_stack()?;
+        let choice_only_str_val =
+            Value::get_value::<&StringValue>(obj.as_ref()).ok_or_else(|| {
+                StoryError::InvalidStoryState(
+                    "Choice text expected a string on the evaluation stack".to_owned(),
+                )
+            })?;
 
         while !self.get_state().evaluation_stack.is_empty()
             && self
@@ -159,14 +164,18 @@ impl Story {
         {
             let tag = self
                 .get_state_mut()
-                .pop_evaluation_stack()
+                .pop_evaluation_stack()?
                 .into_any()
                 .downcast::<Tag>()
-                .unwrap();
+                .map_err(|_| {
+                    StoryError::InvalidStoryState(
+                        "Choice tag expected a tag on the evaluation stack".to_owned(),
+                    )
+                })?;
             tags.insert(0, tag.get_text().clone()); // popped in reverse
                                                     // order
         }
 
-        choice_only_str_val.string.to_string()
+        Ok(choice_only_str_val.string.to_string())
     }
 }

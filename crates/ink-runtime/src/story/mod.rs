@@ -187,7 +187,7 @@ mod misc {
         }
 
         pub(crate) fn next_sequence_shuffle_index(&mut self) -> Result<i32, StoryError> {
-            let pop_evaluation_stack = self.get_state_mut().pop_evaluation_stack();
+            let pop_evaluation_stack = self.get_state_mut().pop_evaluation_stack()?;
             let num_elements =
                 if let Some(v) = Value::get_value::<i32>(pop_evaluation_stack.as_ref()) {
                     v
@@ -200,7 +200,7 @@ mod misc {
             let seq_container = self.get_state().get_current_pointer().container.unwrap();
 
             let seq_count = if let Some(v) =
-                Value::get_value::<i32>(self.get_state_mut().pop_evaluation_stack().as_ref())
+                Value::get_value::<i32>(self.get_state_mut().pop_evaluation_stack()?.as_ref())
             {
                 v
             } else {

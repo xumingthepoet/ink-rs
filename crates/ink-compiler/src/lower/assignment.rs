@@ -3,8 +3,8 @@ use ink_story_json_format::{ControlCommand, NativeFunction, Object as RuntimeObj
 use crate::parsed::{AssignmentTarget, Expression, IncDec, VariableAssignment};
 
 use super::context::{ChoicePathMode, LoweringContext};
-use super::expression::lower_expression_into;
-use super::value::{lower_value_literal, runtime_default_for_type};
+use super::expression::{lower_expression_into, lower_expression_with_expected_type_into};
+use super::value::runtime_default_for_type;
 
 pub(super) enum AssignmentPathComponent<'a> {
     Field(&'a str),
@@ -38,22 +38,12 @@ fn lower_assignment_initializer_into(
     context: &LoweringContext<'_>,
 ) -> bool {
     if let Some(expression) = assignment.expression() {
-        if let Expression::ArrayLiteral(_) | Expression::StructLiteral(_) = expression {
-            if let Some(value) = lower_value_literal(
-                expression,
-                assignment.declared_type(),
-                context.struct_definitions(),
-                context.choice_labels(),
-                context.global_labels(),
-                context.path_mode(),
-            ) {
-                content.push(value);
-                return true;
-            }
-        }
-
-        lower_expression_into(content, expression, context, false);
-        return true;
+        return lower_expression_with_expected_type_into(
+            content,
+            expression,
+            assignment.declared_type(),
+            context,
+        );
     }
 
     assignment

@@ -748,18 +748,27 @@ impl StoryState {
         self.output_stream_dirty();
     }
 
-    pub fn pop_evaluation_stack(&mut self) -> Rc<dyn RTObject> {
-        self.evaluation_stack.pop().unwrap()
+    pub fn pop_evaluation_stack(&mut self) -> Result<Rc<dyn RTObject>, StoryError> {
+        self.evaluation_stack
+            .pop()
+            .ok_or_else(|| StoryError::InvalidStoryState("Evaluation stack underflow".to_owned()))
     }
 
     pub fn pop_evaluation_stack_multiple(
         &mut self,
         number_of_objects: usize,
-    ) -> Vec<Rc<dyn RTObject>> {
+    ) -> Result<Vec<Rc<dyn RTObject>>, StoryError> {
+        if self.evaluation_stack.len() < number_of_objects {
+            return Err(StoryError::InvalidStoryState(format!(
+                "Evaluation stack underflow: expected {number_of_objects} value(s), found {}.",
+                self.evaluation_stack.len()
+            )));
+        }
+
         let start = self.evaluation_stack.len() - number_of_objects;
         let obj: Vec<Rc<dyn RTObject>> = self.evaluation_stack.drain(start..).collect();
 
-        obj
+        Ok(obj)
     }
 
     pub fn set_diverted_pointer(&mut self, p: Pointer) {
@@ -921,7 +930,7 @@ impl StoryState {
         // for that)
         let mut returned_obj = None;
         while self.evaluation_stack.len() > original_evaluation_stack_height {
-            let popped_obj = self.pop_evaluation_stack();
+            let popped_obj = self.pop_evaluation_stack()?;
             if returned_obj.is_none() {
                 returned_obj = Some(popped_obj);
             }
@@ -1220,6 +1229,62 @@ mod tests {
 
         let save = choice_save_with_original_thread(9, Some(json!({ "9": { "callstack": [] } })));
         assert_save_load_bad_json(save, "Invalid thread index");
+    }
+
+    #[test]
+    fn malformed_evaluation_stack_underflow_returns_error() {
+        let json = r#"{
+            "inkVersion": 1,
+            "root": ["ev", {"temp=": "missing"}, "/ev", "done", null]
+        }"#;
+        let mut story = Story::new(json).expect("malformed story still loads");
+
+        let error = story
+            .continue_maximally()
+            .expect_err("stack underflow should be reported");
+
+        assert!(matches!(
+            error,
+            StoryError::InvalidStoryState(message) if message.contains("Evaluation stack underflow")
+        ));
+    }
+
+    #[test]
+    fn malformed_native_call_underflow_returns_error() {
+        let json = r#"{
+            "inkVersion": 1,
+            "root": ["ev", "+", "/ev", "done", null]
+        }"#;
+        let mut story = Story::new(json).expect("malformed story still loads");
+
+        let error = story
+            .continue_maximally()
+            .expect_err("native parameter underflow should be reported");
+
+        assert!(matches!(
+            error,
+            StoryError::InvalidStoryState(message)
+                if message.contains("expected 2 value(s), found 0")
+        ));
+    }
+
+    #[test]
+    fn malformed_variable_assignment_non_value_returns_error() {
+        let json = r#"{
+            "inkVersion": 1,
+            "root": ["ev", "void", {"temp=": "missing"}, "/ev", "done", null]
+        }"#;
+        let mut story = Story::new(json).expect("malformed story still loads");
+
+        let error = story
+            .continue_maximally()
+            .expect_err("non-value assignment input should be reported");
+
+        assert!(matches!(
+            error,
+            StoryError::InvalidStoryState(message)
+                if message.contains("Variable assignment expected a value")
+        ));
     }
 
     #[test]

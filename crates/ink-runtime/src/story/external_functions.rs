@@ -158,7 +158,7 @@ impl Story {
         // Pop arguments
         let mut arguments: Vec<ValueType> = Vec::new();
         for _ in 0..number_of_arguments {
-            let popped_obj = self.get_state_mut().pop_evaluation_stack();
+            let popped_obj = self.get_state_mut().pop_evaluation_stack()?;
             let value_obj = popped_obj.into_any().downcast::<Value>();
 
             if let Ok(value_obj) = value_obj {

@@ -35,7 +35,7 @@ impl Story {
         }; // Divert
         if let Ok(current_divert) = content_obj.clone().into_any().downcast::<Divert>() {
             if current_divert.is_conditional {
-                let o = self.get_state_mut().pop_evaluation_stack();
+                let o = self.get_state_mut().pop_evaluation_stack()?;
                 if !self.is_truthy(o)? {
                     return Ok(true);
                 }
@@ -117,8 +117,8 @@ impl Story {
                     // If the expression turned out to be empty, there may not be
                     // anything on the stack
                     if !self.get_state().evaluation_stack.is_empty() {
-                        let output = self.get_state_mut().pop_evaluation_stack(); // Functions may evaluate to Void, in which case we skip
-                                                                                  // output
+                        let output = self.get_state_mut().pop_evaluation_stack()?; // Functions may evaluate to Void, in which case we skip
+                                                                                   // output
                         if !output.as_ref().as_any().is::<Void>() {
                             // TODO: Should we really always blanket convert to
                             // string?
@@ -141,11 +141,17 @@ impl Story {
                     self.get_state().set_in_expression_evaluation(false);
                 }
                 CommandType::Duplicate => {
-                    let obj = self.get_state().peek_evaluation_stack().unwrap().clone();
+                    let obj = self
+                        .get_state()
+                        .peek_evaluation_stack()
+                        .cloned()
+                        .ok_or_else(|| {
+                            StoryError::InvalidStoryState("Evaluation stack underflow".to_owned())
+                        })?;
                     self.get_state_mut().push_evaluation_stack(obj);
                 }
                 CommandType::PopEvaluatedValue => {
-                    self.get_state_mut().pop_evaluation_stack();
+                    let _ = self.get_state_mut().pop_evaluation_stack()?;
                 }
                 CommandType::PopFunction | CommandType::PopTunnel => {
                     let pop_type = if CommandType::PopFunction == eval_command.command_type {
@@ -156,7 +162,7 @@ impl Story {
                        // divert to go to immediately after returning: ->-> target
                     let mut override_tunnel_return_target = None;
                     if pop_type == PushPopType::Tunnel {
-                        let popped = self.get_state_mut().pop_evaluation_stack();
+                        let popped = self.get_state_mut().pop_evaluation_stack()?;
                         if let Some(v) = Value::get_value::<&Path>(popped.as_ref()) {
                             override_tunnel_return_target = Some(v.clone());
                         }
@@ -295,7 +301,7 @@ impl Story {
                         .push_evaluation_stack(Rc::new(Value::new::<i32>(0)));
                 }
                 CommandType::TurnsSince | CommandType::ReadCount => {
-                    let target = self.get_state_mut().pop_evaluation_stack();
+                    let target = self.get_state_mut().pop_evaluation_stack()?;
                     if Value::get_value::<&Path>(target.as_ref()).is_none() {
                         let mut extra_note = "".to_owned();
                         if Value::get_value::<i32>(target.as_ref()).is_some() {
@@ -345,12 +351,12 @@ impl Story {
                 }
                 CommandType::Random => {
                     let mut max_int = None;
-                    let o = self.get_state_mut().pop_evaluation_stack();
+                    let o = self.get_state_mut().pop_evaluation_stack()?;
                     if let Some(v) = Value::get_value::<i32>(o.as_ref()) {
                         max_int = Some(v);
                     }
 
-                    let o = self.get_state_mut().pop_evaluation_stack();
+                    let o = self.get_state_mut().pop_evaluation_stack()?;
                     let mut min_int = None;
                     if let Some(v) = Value::get_value::<i32>(o.as_ref()) {
                         min_int = Some(v);
@@ -392,7 +398,7 @@ impl Story {
                 }
                 CommandType::SeedRandom => {
                     let mut seed: Option<i32> = None;
-                    let o = self.get_state_mut().pop_evaluation_stack();
+                    let o = self.get_state_mut().pop_evaluation_stack()?;
                     if let Some(v) = Value::get_value::<i32>(o.as_ref()) {
                         seed = Some(v);
                     }
@@ -525,12 +531,16 @@ impl Story {
             .as_any()
             .downcast_ref::<VariableAssignment>()
         {
-            let assigned_val = self.get_state_mut().pop_evaluation_stack(); // When in temporary evaluation, don't create new variables purely
-                                                                            // within
-                                                                            // the temporary context, but attempt to create them globally
-                                                                            // var prioritiseHigherInCallStack = _temporaryEvaluationContainer
-                                                                            // != null;
-            let assigned_val = assigned_val.into_any().downcast::<Value>().unwrap();
+            let assigned_val = self.get_state_mut().pop_evaluation_stack()?; // When in temporary evaluation, don't create new variables purely
+                                                                             // within
+                                                                             // the temporary context, but attempt to create them globally
+                                                                             // var prioritiseHigherInCallStack = _temporaryEvaluationContainer
+                                                                             // != null;
+            let assigned_val = assigned_val.into_any().downcast::<Value>().map_err(|_| {
+                StoryError::InvalidStoryState(
+                    "Variable assignment expected a value on the evaluation stack".to_owned(),
+                )
+            })?;
             self.get_state_mut()
                 .variables_state
                 .assign(var_ass, assigned_val)?;
@@ -574,7 +584,7 @@ impl Story {
         {
             let func_params = self
                 .get_state_mut()
-                .pop_evaluation_stack_multiple(func.get_number_of_parameters());
+                .pop_evaluation_stack_multiple(func.get_number_of_parameters())?;
             let result = func.call(func_params)?;
             self.get_state_mut().push_evaluation_stack(result);
             return Ok(true);

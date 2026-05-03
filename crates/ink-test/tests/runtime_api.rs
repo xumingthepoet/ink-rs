@@ -402,6 +402,25 @@ fn internal_host_calls_accept_typed_arguments_and_composite_returns() {
         player,
         Some(ValueType::Object(fields)) if matches!(fields.get("hp"), Some(ValueType::Int(7)))
     ));
+
+    let mut story = Story::new(&compiled.json);
+    let scores = story
+        .call_internal("game::build_scores", Some(vec![ValueType::Int(6)]))
+        .expect("array temp assignment should succeed");
+    assert!(matches!(
+        scores,
+        Some(ValueType::Array(values))
+            if matches!(values.as_slice(), [ValueType::Int(6), ValueType::Int(7)])
+    ));
+
+    let mut story = Story::new(&compiled.json);
+    let player = story
+        .call_internal("game::build_player", Some(vec![ValueType::Int(9)]))
+        .expect("struct temp assignment should succeed");
+    assert!(matches!(
+        player,
+        Some(ValueType::Object(fields)) if matches!(fields.get("hp"), Some(ValueType::Int(9)))
+    ));
 }
 
 #[test]
