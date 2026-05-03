@@ -11,6 +11,7 @@ use crate::{
     container::Container,
     path::{Component, Path},
     search_result::SearchResult,
+    story_error::StoryError,
 };
 
 #[derive(Clone)]
@@ -107,6 +108,16 @@ impl Object {
     }
 
     pub fn resolve_path(rtobject: Rc<dyn RTObject>, path: &Path) -> SearchResult {
+        match Object::try_resolve_path(rtobject.clone(), path) {
+            Ok(result) => result,
+            Err(_) => SearchResult::new(rtobject, true),
+        }
+    }
+
+    pub fn try_resolve_path(
+        rtobject: Rc<dyn RTObject>,
+        path: &Path,
+    ) -> Result<SearchResult, StoryError> {
         if path.is_relative() {
             let mut p = path.clone();
             let mut nearest_container = rtobject.clone().into_any().downcast::<Container>().ok();
@@ -116,9 +127,15 @@ impl Object {
                 p = path.get_tail();
             };
 
-            nearest_container.unwrap().content_at_path(&p, 0, -1)
+            nearest_container
+                .map(|container| container.content_at_path(&p, 0, -1))
+                .ok_or_else(|| {
+                    StoryError::InvalidStoryState(
+                        "Relative path has no container to resolve from".to_owned(),
+                    )
+                })
         } else {
-            Object::get_root_container(rtobject).content_at_path(path, 0, -1)
+            Ok(Object::try_get_root_container(rtobject)?.content_at_path(path, 0, -1))
         }
     }
 
@@ -126,12 +143,17 @@ impl Object {
         // 1. Find last shared ancestor
         // 2. Drill up using ".." style (actually represented as "^")
         // 3. Re-build downward chain from common ancestor
-        let own_path = rtobject.get_object().path.borrow();
-        let min_path_length = std::cmp::min(global_path.len(), own_path.as_ref().unwrap().len());
+        let own_path = rtobject
+            .get_object()
+            .path
+            .borrow()
+            .clone()
+            .unwrap_or_else(|| Object::get_path(rtobject.as_ref()));
+        let min_path_length = std::cmp::min(global_path.len(), own_path.len());
         let mut last_shared_path_comp_index: i32 = -1;
 
         for i in 0..min_path_length {
-            let own_comp = &own_path.as_ref().unwrap().get_component(i);
+            let own_comp = &own_path.get_component(i);
             let other_comp = &global_path.get_component(i);
 
             if own_comp == other_comp {
@@ -146,8 +168,7 @@ impl Object {
             return global_path.clone();
         }
 
-        let num_upwards_moves =
-            (own_path.as_ref().unwrap().len() - 1) - last_shared_path_comp_index as usize;
+        let num_upwards_moves = (own_path.len() - 1) - last_shared_path_comp_index as usize;
         let mut new_path_comps = Vec::new();
 
         for _ in 0..num_upwards_moves {
@@ -155,7 +176,9 @@ impl Object {
         }
 
         for down in (last_shared_path_comp_index as usize + 1)..global_path.len() {
-            new_path_comps.push(global_path.get_component(down).unwrap().clone());
+            if let Some(component) = global_path.get_component(down) {
+                new_path_comps.push(component.clone());
+            }
         }
 
         Path::new(&new_path_comps, true)
@@ -184,6 +207,10 @@ impl Object {
     }
 
     pub fn get_root_container(rtobject: Rc<dyn RTObject>) -> Rc<Container> {
+        Object::try_get_root_container(rtobject).expect("root runtime object should be a container")
+    }
+
+    pub fn try_get_root_container(rtobject: Rc<dyn RTObject>) -> Result<Rc<Container>, StoryError> {
         let mut ancestor = rtobject;
 
         while let Some(p) = ancestor.get_object().get_parent() {
@@ -191,8 +218,10 @@ impl Object {
         }
 
         match ancestor.into_any().downcast::<Container>() {
-            Ok(c) => c.clone(),
-            _ => panic!(), // Not possible
+            Ok(c) => Ok(c.clone()),
+            Err(_) => Err(StoryError::InvalidStoryState(
+                "Root runtime object is not a container".to_owned(),
+            )),
         }
     }
 }
@@ -221,6 +250,8 @@ pub trait RTObject: Display + IntoAny {
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
+
+    use crate::value::Value;
 
     use super::*;
 
@@ -263,5 +294,17 @@ mod tests {
         assert_eq!(Object::get_path(container2.as_ref()).to_string(), "1");
         assert_eq!(Object::get_path(container21.as_ref()).to_string(), "1.0");
         assert_eq!(Object::get_path(root.as_ref()).to_string(), "");
+    }
+
+    #[test]
+    fn try_get_root_container_reports_non_container_root() {
+        let rootless: Rc<dyn RTObject> = Rc::new(Value::new("rootless"));
+
+        match Object::try_get_root_container(rootless) {
+            Err(StoryError::InvalidStoryState(message)) => {
+                assert_eq!(message, "Root runtime object is not a container")
+            }
+            _ => panic!("expected invalid story state"),
+        }
     }
 }

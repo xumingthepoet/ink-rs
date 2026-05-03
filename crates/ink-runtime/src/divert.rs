@@ -6,6 +6,7 @@ use crate::{
     path::{Component, Path},
     pointer::{self, Pointer},
     push_pop::PushPopType,
+    story_error::StoryError,
 };
 
 pub struct Divert {
@@ -80,56 +81,75 @@ impl Divert {
     }
 
     pub fn get_target_pointer(self: &Rc<Self>) -> Pointer {
-        let target_pointer_null = self.target_pointer.borrow().is_null();
-        if target_pointer_null {
-            let target_obj =
-                Object::resolve_path(self.clone(), self.target_path.borrow().as_ref().unwrap())
-                    .obj
-                    .clone();
+        self.try_get_target_pointer()
+            .unwrap_or_else(|_| pointer::NULL.clone())
+    }
 
-            if self
-                .target_path
-                .borrow()
-                .as_ref()
-                .unwrap()
-                .get_last_component()
-                .unwrap()
-                .is_index()
-            {
-                self.target_pointer.borrow_mut().container = target_obj.get_object().get_parent();
-                self.target_pointer.borrow_mut().index = self
-                    .target_path
-                    .borrow()
-                    .as_ref()
-                    .unwrap()
-                    .get_last_component()
-                    .unwrap()
-                    .index
-                    .unwrap() as i32;
-            } else {
-                let c = target_obj.into_any().downcast::<Container>();
-                self.target_pointer.replace(Pointer::start_of(c.unwrap()));
-            }
+    pub fn try_get_target_pointer(self: &Rc<Self>) -> Result<Pointer, StoryError> {
+        if !self.target_pointer.borrow().is_null() {
+            return Ok(self.target_pointer.borrow().clone());
         }
 
-        self.target_pointer.borrow().clone()
+        let target_path = self.target_path.borrow().clone().ok_or_else(|| {
+            StoryError::InvalidStoryState("Divert is missing its target path".to_owned())
+        })?;
+
+        let target_result = Object::try_resolve_path(self.clone(), &target_path)?;
+        if target_result.approximate {
+            return Err(StoryError::InvalidStoryState(format!(
+                "Divert target path '{}' could not be resolved",
+                target_path.get_components_string()
+            )));
+        }
+
+        let target_obj = target_result.obj.clone();
+        let pointer = match target_path.get_last_component() {
+            Some(last_component) if last_component.is_index() => {
+                let index = last_component.index.ok_or_else(|| {
+                    StoryError::InvalidStoryState(
+                        "Divert target path has an index component without an index".to_owned(),
+                    )
+                })?;
+                let parent = target_obj.get_object().get_parent().ok_or_else(|| {
+                    StoryError::InvalidStoryState(
+                        "Indexed divert target has no parent container".to_owned(),
+                    )
+                })?;
+
+                Pointer::new(Some(parent), index as i32)
+            }
+            _ => {
+                let target_container =
+                    target_obj.into_any().downcast::<Container>().map_err(|_| {
+                        StoryError::InvalidStoryState(
+                            "Named divert target did not resolve to a container".to_owned(),
+                        )
+                    })?;
+
+                Pointer::start_of(target_container)
+            }
+        };
+
+        self.target_pointer.replace(pointer.clone());
+
+        Ok(pointer)
     }
 
     pub fn get_target_path(self: &Rc<Self>) -> Option<Path> {
         // Resolve any relative paths to global ones as we come across them
-        let target_path = self.target_path.borrow();
+        let target_path = self.target_path.borrow().clone();
 
-        match target_path.as_ref() {
+        match target_path {
             Some(target_path) => {
                 if target_path.is_relative() {
-                    let target_obj = self.get_target_pointer().resolve();
-
-                    if let Some(target_obj) = target_obj {
-                        self.target_path
-                            .replace(Some(Object::get_path(target_obj.as_ref())));
+                    if let Ok(target_pointer) = self.try_get_target_pointer() {
+                        if let Some(target_obj) = target_pointer.resolve() {
+                            self.target_path
+                                .replace(Some(Object::get_path(target_obj.as_ref())));
+                        }
                     }
                 }
-                Some(self.target_path.borrow().as_ref().unwrap().clone())
+                self.target_path.borrow().clone()
             }
             None => None,
         }
@@ -163,7 +183,9 @@ impl Divert {
         }
 
         for down in (last_shared_path_comp_index as usize + 1)..global_path.len() {
-            new_path_comps.push(global_path.get_component(down).unwrap().clone());
+            if let Some(component) = global_path.get_component(down) {
+                new_path_comps.push(component.clone());
+            }
         }
 
         Path::new(&new_path_comps, true)
@@ -216,5 +238,59 @@ impl fmt::Display for Divert {
         }
 
         write!(f, "{result}")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+    use std::rc::Rc;
+
+    use super::*;
+
+    #[test]
+    fn divert_without_target_returns_error_and_null_pointer() {
+        let divert = Rc::new(Divert::new(
+            false,
+            PushPopType::Tunnel,
+            false,
+            0,
+            false,
+            None,
+            None,
+        ));
+
+        match divert.try_get_target_pointer() {
+            Err(StoryError::InvalidStoryState(message)) => {
+                assert_eq!(message, "Divert is missing its target path")
+            }
+            _ => panic!("expected invalid story state"),
+        }
+
+        assert!(divert.get_target_pointer().is_null());
+    }
+
+    #[test]
+    fn unresolved_divert_target_returns_error_and_null_pointer() {
+        let divert = Rc::new(Divert::new(
+            false,
+            PushPopType::Tunnel,
+            false,
+            0,
+            false,
+            None,
+            Some("missing"),
+        ));
+        let _root = Container::new(None, 0, vec![divert.clone()], HashMap::new());
+
+        match divert.try_get_target_pointer() {
+            Err(StoryError::InvalidStoryState(message)) => assert_eq!(
+                message,
+                "Divert target path 'missing' could not be resolved"
+            ),
+            _ => panic!("expected invalid story state"),
+        }
+
+        assert!(divert.get_target_pointer().is_null());
     }
 }

@@ -129,13 +129,9 @@ impl Path {
 
         let mut components = Vec::new();
 
-        for i in 0..self.components.len() - upward_moves {
-            components.push(self.components.get(i).unwrap().clone());
-        }
-
-        for i in upward_moves..self.components.len() {
-            components.push(self.components.get(i).unwrap().clone());
-        }
+        let retained_components = self.components.len().saturating_sub(upward_moves);
+        components.extend(self.components.iter().take(retained_components).cloned());
+        components.extend(path_to_append.components.iter().skip(upward_moves).cloned());
 
         Path {
             components,
@@ -151,9 +147,9 @@ impl Path {
                 if let Some(first_component) = self.components.first() {
                     sb.push_str(&first_component.to_string());
 
-                    for i in 1..self.components.len() {
+                    for component in self.components.iter().skip(1) {
                         sb.push('.');
-                        sb.push_str(&self.components.get(i).unwrap().to_string());
+                        sb.push_str(&component.to_string());
                     }
                 }
 
@@ -196,13 +192,8 @@ impl PartialEq for Path {
             return false;
         }
 
-        for i in 0..other.components.len() {
-            if !other
-                .components
-                .get(i)
-                .unwrap()
-                .eq(self.components.get(i).unwrap())
-            {
+        for (other, current) in other.components.iter().zip(self.components.iter()) {
+            if other != current {
                 return false;
             }
         }
@@ -250,33 +241,65 @@ impl Component {
 
 impl fmt::Display for Component {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let s = match self.index {
-            Some(index) => index.to_string(),
-            None => self.name.as_ref().unwrap().to_string(),
-        };
-
-        write!(f, "{s}")
+        match (self.index, self.name.as_ref()) {
+            (Some(index), _) => write!(f, "{index}"),
+            (None, Some(name)) => write!(f, "{name}"),
+            (None, None) => Ok(()),
+        }
     }
 }
 
 impl PartialEq for Component {
     fn eq(&self, other: &Self) -> bool {
-        if other.is_index() == self.is_index() {
-            match self.index {
-                Some(index) => return index == other.index.unwrap(),
-                None => return self.name.as_ref().unwrap().eq(other.name.as_ref().unwrap()),
-            }
+        match (
+            self.index,
+            other.index,
+            self.name.as_ref(),
+            other.name.as_ref(),
+        ) {
+            (Some(left), Some(right), _, _) => left == right,
+            (None, None, Some(left), Some(right)) => left == right,
+            (None, None, None, None) => true,
+            _ => false,
         }
-
-        false
     }
 }
 
 impl Hash for Component {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        match self.index {
-            Some(index) => index.hash(state),
-            None => self.name.as_ref().unwrap().hash(state),
-        }
+        match (self.index, self.name.as_ref()) {
+            (Some(index), _) => index.hash(state),
+            (None, Some(name)) => name.hash(state),
+            (None, None) => 0usize.hash(state),
+        };
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn path_append_parent_heavy_relative_path_does_not_panic() {
+        let base = Path::new_with_components_string(Some("root.child"));
+        let relative = Path::new_with_components_string(Some(".^.^.target"));
+
+        assert_eq!(
+            base.path_by_appending_path(&relative)
+                .get_components_string(),
+            "target"
+        );
+    }
+
+    #[test]
+    fn path_append_relative_path_preserves_remaining_components() {
+        let base = Path::new_with_components_string(Some("root.branch.leaf"));
+        let relative = Path::new_with_components_string(Some(".^.sibling"));
+
+        assert_eq!(
+            base.path_by_appending_path(&relative)
+                .get_components_string(),
+            "root.branch.sibling"
+        );
     }
 }
