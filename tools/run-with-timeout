@@ -1,0 +1,20 @@
+#!/bin/sh
+set -eu
+
+if [ "$#" -lt 2 ]; then
+    echo "usage: $0 <duration> <command> [args...]" >&2
+    exit 2
+fi
+
+duration="$1"
+shift
+
+if command -v timeout >/dev/null 2>&1; then
+    exec timeout "$duration" "$@"
+fi
+
+if command -v gtimeout >/dev/null 2>&1; then
+    exec gtimeout "$duration" "$@"
+fi
+
+exec "$@"
