@@ -40,7 +40,7 @@ Review validation: `cargo test -p ink-compiler syntax::parser`; `cargo test -p i
 
 ## Milestone 2: Type Model And Module Symbols
 
-### [ ] Task 02: Add Enum Types, Indexes, And Module Import Integration
+### [>] Task 02: Add Enum Types, Indexes, And Module Import Integration
 
 Goal:
 Represent enum types as first-class nominal types and make enum declarations participate in module symbols, imports, name conflicts, and type existence diagnostics.
@@ -63,7 +63,7 @@ Validation commands:
 `make gate`
 
 Commit record:
-Implementation commit: pending
+Implementation commit: `5f4f3aa4` Add enum type analysis
 Review validation: pending
 
 ## Milestone 3: Expressions And Lowering
