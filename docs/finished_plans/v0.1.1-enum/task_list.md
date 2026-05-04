@@ -1,4 +1,4 @@
-Progress: 4/5
+Progress: 5/5
 
 # v0.1.1 ENUM Feature Active Plan
 
@@ -127,7 +127,7 @@ Review validation: `cargo test -p ink-compiler analysis`; `cargo test -p ink-com
 
 ## Milestone 5: Closeout
 
-### [>] Task 05: Archive Completed ENUM Plan
+### [x] Task 05: Archive Completed ENUM Plan
 
 Goal:
 Close the active plan after all implementation tasks are reviewed and validated.
@@ -148,5 +148,6 @@ Validation commands:
 `git status --short`
 
 Commit record:
-Implementation commit: pending
-Review validation: pending
+Implementation commit: `b3997b32` Archive enum active plan
+Implementation validation: `git status --short`
+Review validation: `git status --short`
