@@ -4,6 +4,7 @@ mod conditional;
 mod constant_declaration;
 mod content_list;
 mod divert;
+mod enum_declaration;
 mod expression;
 mod external_declaration;
 mod flow;
@@ -29,6 +30,7 @@ pub use conditional::{Conditional, ConditionalBranch, ConditionalKind};
 pub use constant_declaration::ConstantDeclaration;
 pub use content_list::ContentList;
 pub use divert::{Divert, DivertTarget};
+pub use enum_declaration::{EnumDeclaration, EnumMember};
 pub use expression::{BinaryOperator, Expression, FloatLiteral, StructLiteralField, UnaryOperator};
 pub use external_declaration::ExternalDeclaration;
 pub use flow::{Flow, FlowArgument, FlowLevel, FlowParts};
@@ -60,6 +62,7 @@ pub enum Object {
     IncDec(IncDec),
     Choice(Choice),
     Divert(Divert),
+    EnumDeclaration(EnumDeclaration),
     Gather(Gather),
     Tag(Tag),
     Return(Return),
@@ -109,6 +112,7 @@ impl Object {
             Object::StructDeclaration(declaration) => declaration.write_parse_snapshot(out, indent),
             Object::Choice(choice) => choice.write_parse_snapshot(out, indent),
             Object::Divert(divert) => divert.write_parse_snapshot(out, indent),
+            Object::EnumDeclaration(declaration) => declaration.write_parse_snapshot(out, indent),
             Object::Gather(gather) => gather.write_parse_snapshot(out, indent),
             Object::Tag(tag) => tag.write_parse_snapshot(out, indent),
             Object::VariableAssignment(assignment) => assignment.write_parse_snapshot(out, indent),

@@ -396,6 +396,7 @@ fn collect_qualified_uses_in_object(
             }
             collect_qualified_uses_in_type_name(current_module, external.return_type(), uses);
         }
+        Object::EnumDeclaration(_) => {}
         Object::StructDeclaration(declaration) => {
             for field in declaration.fields() {
                 collect_qualified_uses_in_type_name(current_module, field.type_name(), uses);

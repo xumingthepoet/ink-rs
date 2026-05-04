@@ -279,6 +279,7 @@ fn collect_struct_declarations_in_object<'a>(
         | Object::Choice(_)
         | Object::ConstantDeclaration(_)
         | Object::Divert(_)
+        | Object::EnumDeclaration(_)
         | Object::Expression(_)
         | Object::ExternalDeclaration(_)
         | Object::Gather(_)

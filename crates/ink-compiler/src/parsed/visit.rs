@@ -167,6 +167,7 @@ where
         }
         Object::Weave(weave) => walk_weave(weave, visitor, context),
         Object::AuthorWarning(_)
+        | Object::EnumDeclaration(_)
         | Object::ExternalDeclaration(_)
         | Object::Gather(_)
         | Object::Glue(_)

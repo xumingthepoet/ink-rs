@@ -756,6 +756,7 @@ impl ParsedVisitor for CallTargetChecker<'_> {
             }
             Object::AuthorWarning(_)
             | Object::ContentList(_)
+            | Object::EnumDeclaration(_)
             | Object::ExternalDeclaration(_)
             | Object::Gather(_)
             | Object::Glue(_)

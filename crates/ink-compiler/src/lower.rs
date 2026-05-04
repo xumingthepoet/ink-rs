@@ -349,6 +349,7 @@ fn lower_object_into_with_context_count(
         }
         Object::Choice(_) => {}
         Object::ConstantDeclaration(_) => {}
+        Object::EnumDeclaration(_) => {}
         Object::Gather(_) => {} // Handled in lower_choice_weave
         Object::StructDeclaration(_) => {}
         Object::VariableAssignment(assignment) => {

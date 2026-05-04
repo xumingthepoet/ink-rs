@@ -415,6 +415,7 @@ fn collect_constant_values_in_object(
             collect_constant_values_in_objects(weave.content(), module_name, constants)
         }
         Object::AuthorWarning(_)
+        | Object::EnumDeclaration(_)
         | Object::Text(_)
         | Object::Expression(_)
         | Object::LogicLine(_)

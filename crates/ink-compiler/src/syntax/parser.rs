@@ -162,6 +162,13 @@ impl Parser {
                     }
                 }
 
+                if line.text.trim_start().starts_with("ENUM ") {
+                    if let Some(parsed) = self.parse_enum_declaration(&lines, &mut index) {
+                        modules[module_index].push_objects(vec![Object::EnumDeclaration(parsed)]);
+                        continue;
+                    }
+                }
+
                 if knot::is_knot_declaration_line(&line.text) {
                     if let Some(flow) = self.parse_flow(&lines, &mut index) {
                         modules[module_index].push_flow(flow);
@@ -204,6 +211,13 @@ impl Parser {
             if line.text.trim_start().starts_with("STRUCT ") {
                 if let Some(parsed) = self.parse_struct_declaration(&lines, &mut index) {
                     objects.push(Object::StructDeclaration(parsed));
+                    continue;
+                }
+            }
+
+            if line.text.trim_start().starts_with("ENUM ") {
+                if let Some(parsed) = self.parse_enum_declaration(&lines, &mut index) {
+                    objects.push(Object::EnumDeclaration(parsed));
                     continue;
                 }
             }
@@ -569,6 +583,66 @@ impl Parser {
         ))
     }
 
+    fn parse_enum_declaration(
+        &mut self,
+        lines: &[SourceLine],
+        index: &mut usize,
+    ) -> Option<crate::parsed::EnumDeclaration> {
+        let line = &lines[*index];
+        let mut line_parser = RuleParser::new(line);
+        let header = line_parser.parse_rule(structure::parse_enum_header);
+        let had_error = line_parser.had_error();
+        self.diagnostics.extend(line_parser.finish());
+
+        let mut header = header?;
+
+        *index += 1;
+        if had_error {
+            return Some(crate::parsed::EnumDeclaration::new(
+                header.name,
+                header.members,
+                line.span.clone(),
+            ));
+        }
+
+        while !header.closed && *index < lines.len() {
+            let next_line = &lines[*index];
+            let trimmed = next_line.text.trim();
+
+            if trimmed.is_empty() {
+                *index += 1;
+                continue;
+            }
+
+            if trimmed == "}" {
+                header.closed = true;
+                *index += 1;
+                break;
+            }
+
+            let mut member_parser = RuleParser::new(next_line);
+            let member = member_parser.parse_rule(structure::parse_enum_member);
+            self.diagnostics.extend(member_parser.finish());
+            if let Some(member) = member {
+                header.members.push(member);
+            }
+            *index += 1;
+        }
+
+        if !header.closed {
+            self.diagnostics.push(Diagnostic::error(
+                line.span.clone(),
+                "Expected closing '}' for enum declaration",
+            ));
+        }
+
+        Some(crate::parsed::EnumDeclaration::new(
+            header.name,
+            header.members,
+            line.span.clone(),
+        ))
+    }
+
     pub(super) fn parse_compound_statement(
         &mut self,
         lines: &[SourceLine],
@@ -814,6 +888,78 @@ mod tests {
             story.to_parse_snapshot(),
             "Story\n  Weave(baseIndent=0)\n    StructDeclaration(name=\"Player\")\n      Field(name=\"hp\", type=int)\n      Field(name=\"name\", type=string)\n      Field(name=\"inventory\", type=Item[])\n    Gather(name=null, depth=1)\n    Divert(target=\"-> DONE\", empty=false, tunnel=false, thread=false)"
         );
+    }
+
+    #[test]
+    fn parses_inline_enum_declaration_and_snapshot() {
+        let output = parse(SourceInput::new("ENUM State { Idle Busy Done }"));
+
+        assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
+        let story = output.artifact.expect("story should parse");
+        let Object::EnumDeclaration(declaration) = &story.root_weave().content()[0] else {
+            panic!("expected enum declaration");
+        };
+        assert_eq!(declaration.name(), "State");
+        assert_eq!(
+            declaration
+                .members()
+                .iter()
+                .map(|member| member.name())
+                .collect::<Vec<_>>(),
+            vec!["Idle", "Busy", "Done"]
+        );
+        assert_eq!(
+            story.to_parse_snapshot(),
+            "Story\n  Weave(baseIndent=0)\n    EnumDeclaration(name=\"State\")\n      Member(name=\"Idle\")\n      Member(name=\"Busy\")\n      Member(name=\"Done\")\n    Gather(name=null, depth=1)\n    Divert(target=\"-> DONE\", empty=false, tunnel=false, thread=false)"
+        );
+    }
+
+    #[test]
+    fn parses_multiline_module_enum_declaration() {
+        let output = parse(SourceInput::new(
+            "=== module items ===\n\
+             ENUM State {\n\
+             Idle\n\
+             Busy\n\
+             }\n\
+             == main ==\n\
+             -> END",
+        ));
+
+        assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
+        let story = output.artifact.expect("story should parse");
+        let Object::EnumDeclaration(declaration) = &story.modules()[0].weave().content()[0] else {
+            panic!("expected enum declaration");
+        };
+        assert_eq!(declaration.name(), "State");
+        assert_eq!(declaration.members().len(), 2);
+        assert_eq!(declaration.members()[0].span().line, 3);
+        assert_eq!(story.modules()[0].flows()[0].name(), "main");
+    }
+
+    #[test]
+    fn rejects_enum_member_values_commas_and_semicolons() {
+        let cases = [
+            (
+                "ENUM State { Idle = \"idle\" }",
+                "Enum members do not support explicit values",
+            ),
+            (
+                "ENUM State { Idle, Busy }",
+                "Enum members must be declared without comma or semicolon separators",
+            ),
+            (
+                "ENUM State {\nIdle;\n}",
+                "Enum members must be declared without comma or semicolon separators",
+            ),
+        ];
+
+        for (source, expected_message) in cases {
+            let output = parse(SourceInput::new(source));
+
+            assert_eq!(output.diagnostics.len(), 1, "{:#?}", output.diagnostics);
+            assert_eq!(output.diagnostics[0].message, expected_message);
+        }
     }
 
     #[test]

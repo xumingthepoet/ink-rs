@@ -115,6 +115,7 @@ fn object_contains_function_call(object: &Object) -> bool {
         | Object::TunnelOnwards(_)
         | Object::Gather(_)
         | Object::ExternalDeclaration(_)
+        | Object::EnumDeclaration(_)
         | Object::StructDeclaration(_)
         | Object::Tag(_) => false,
     }
