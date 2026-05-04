@@ -127,7 +127,7 @@ Review validation: `cargo test -p ink-compiler analysis`; `cargo test -p ink-com
 
 ## Milestone 5: Closeout
 
-### [ ] Task 05: Archive Completed ENUM Plan
+### [>] Task 05: Archive Completed ENUM Plan
 
 Goal:
 Close the active plan after all implementation tasks are reviewed and validated.
