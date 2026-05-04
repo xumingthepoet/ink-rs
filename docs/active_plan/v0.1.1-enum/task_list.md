@@ -1,4 +1,4 @@
-Progress: 0/5
+Progress: 1/5
 
 # v0.1.1 ENUM Feature Active Plan
 
@@ -12,7 +12,7 @@ Progress: 0/5
 
 ## Milestone 1: Parser And Parsed Model
 
-### [>] Task 01: Add ENUM Declarations To Syntax And Parsed Model
+### [x] Task 01: Add ENUM Declarations To Syntax And Parsed Model
 
 Goal:
 Add payload-free `ENUM` declarations as root/module-level parsed objects without changing type checking or lowering yet.
@@ -36,7 +36,7 @@ Validation commands:
 
 Commit record:
 Implementation commit: `f071fe50` Add enum declarations to parser
-Review validation: pending
+Review validation: `cargo test -p ink-compiler syntax::parser`; `cargo test -p ink-compiler parsed`; `make gate`
 
 ## Milestone 2: Type Model And Module Symbols
 
