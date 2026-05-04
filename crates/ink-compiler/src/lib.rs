@@ -16,8 +16,12 @@ mod syntax;
 pub use analysis::{
     CheckedStory, ModuleDependencyGraph, ModuleEntryPoint, ModuleImportIndex, ModuleReachability,
 };
-pub use compiler::{CompiledStory, Compiler, CompilerOptions, StageOutput};
-pub use diagnostic::{Diagnostic, DiagnosticCode, DiagnosticSeverity};
+pub use compiler::{
+    CompileResult, CompiledStory, Compiler, CompilerOptions, DiagnosticsPolicy, StageOutput,
+};
+pub use diagnostic::{
+    format_diagnostic, format_diagnostics, Diagnostic, DiagnosticCode, DiagnosticSeverity,
+};
 pub use ink_story_json_format::{
     Container as RuntimeContainer, ControlCommand as RuntimeControlCommand,
     NamedContainer as RuntimeNamedContainer, Object as RuntimeObject, Program as RuntimeProgram,

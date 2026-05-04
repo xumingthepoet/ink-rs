@@ -199,9 +199,11 @@ SourceInput
   -> CompiledStory { program, json }
 ```
 
-Every public stage returns `StageOutput<T>`, which contains an optional artifact
-and accumulated diagnostics. Later stages should not run after error diagnostics
-from earlier stages.
+Individual public stages return `StageOutput<T>`, which contains an optional
+artifact and accumulated diagnostics. Full compile entry points return
+`CompileResult<CompiledStory>` so host projects can apply
+`CompilerOptions::diagnostics_policy` through `CompileResult::failed()`. Later
+stages should not run after diagnostics that fail the active compile policy.
 
 ### Source Preparation
 

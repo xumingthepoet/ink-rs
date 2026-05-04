@@ -10,7 +10,10 @@
 //! [`SyntaxReference.md`](https://github.com/xumingthepoet/ink-rs/blob/main/docs/SyntaxReference.md).
 
 #[cfg(feature = "compiler")]
-pub use ink_compiler::{Compiler, CompilerOptions, SourceInput};
+pub use ink_compiler::{
+    format_diagnostic, format_diagnostics, CompileResult, CompiledStory, Compiler, CompilerOptions,
+    Diagnostic, DiagnosticSeverity, DiagnosticsPolicy, SourceInput,
+};
 
 #[cfg(feature = "runtime")]
 pub use ink_runtime::story::Story;

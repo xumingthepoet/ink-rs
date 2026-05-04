@@ -24,6 +24,38 @@ pub struct Diagnostic {
     pub column: usize,
 }
 
+/// Formats diagnostics as `file:line:column: severity: message` lines.
+pub fn format_diagnostics(diagnostics: &[Diagnostic]) -> String {
+    diagnostics
+        .iter()
+        .map(format_diagnostic)
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Formats one diagnostic as `file:line:column: severity: message`.
+pub fn format_diagnostic(diagnostic: &Diagnostic) -> String {
+    let source_filename = diagnostic.source_filename.as_deref().unwrap_or("<unknown>");
+
+    format!(
+        "{source_filename}:{}:{}: {}: {}",
+        diagnostic.line,
+        diagnostic.column,
+        diagnostic.severity.as_str(),
+        diagnostic.message
+    )
+}
+
+impl DiagnosticSeverity {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            DiagnosticSeverity::Error => "error",
+            DiagnosticSeverity::Warning => "warning",
+            DiagnosticSeverity::Author => "author",
+        }
+    }
+}
+
 impl Diagnostic {
     pub fn error(span: SourceSpan, message: impl Into<String>) -> Self {
         Self {

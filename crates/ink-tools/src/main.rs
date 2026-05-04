@@ -1,6 +1,6 @@
 use std::{env, fs, path::PathBuf};
 
-use ink_compiler::{Compiler, CompilerOptions, SourceInput};
+use ink_compiler::{format_diagnostics, Compiler, CompilerOptions, SourceInput};
 
 fn main() {
     if let Err(message) = run() {
@@ -25,14 +25,15 @@ fn run() -> Result<(), String> {
 
     let compiler = Compiler::with_options(CompilerOptions {
         source_filename: Some(source_filename.clone()),
+        ..CompilerOptions::default()
     });
 
     let result = compiler.compile_sources(vec![SourceInput::named(
         source_text,
         source_filename.clone(),
     )]);
-    for diagnostic in &result.diagnostics {
-        eprintln!("{}", format_diagnostic(diagnostic, &source_filename));
+    if !result.diagnostics.is_empty() {
+        eprintln!("{}", format_diagnostics(&result.diagnostics));
     }
 
     let Some(compiled) = result.artifact else {
@@ -49,49 +50,6 @@ fn run() -> Result<(), String> {
 
     Ok(())
 }
-
-fn format_diagnostic(diagnostic: &ink_compiler::Diagnostic, fallback_source: &str) -> String {
-    let source_filename = diagnostic
-        .source_filename
-        .as_deref()
-        .unwrap_or(fallback_source);
-
-    format!(
-        "{source_filename}:{}:{}: {}",
-        diagnostic.line, diagnostic.column, diagnostic.message
-    )
-}
-
 fn usage() -> String {
     "Usage: ink_compile <story.ink> [output.json]".to_string()
-}
-
-#[cfg(test)]
-mod tests {
-    use ink_compiler::{Diagnostic, SourceSpan};
-
-    use super::*;
-
-    #[test]
-    fn formats_diagnostic_with_source_filename() {
-        let diagnostic = Diagnostic::error(
-            SourceSpan::new(Some("story.ink".to_string()), 3, 5),
-            "bad syntax",
-        );
-
-        assert_eq!(
-            format_diagnostic(&diagnostic, "fallback.ink"),
-            "story.ink:3:5: bad syntax"
-        );
-    }
-
-    #[test]
-    fn formats_diagnostic_with_fallback_filename() {
-        let diagnostic = Diagnostic::error(SourceSpan::new(None, 7, 2), "bad syntax");
-
-        assert_eq!(
-            format_diagnostic(&diagnostic, "fallback.ink"),
-            "fallback.ink:7:2: bad syntax"
-        );
-    }
 }

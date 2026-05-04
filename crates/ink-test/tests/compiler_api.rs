@@ -1,6 +1,7 @@
 use ink_compiler::{
-    CheckedStory, Compiler, CompilerOptions, DiagnosticCode, DiagnosticSeverity, ParsedStory,
-    RuntimeContainer, RuntimeObject, RuntimeProgram, SourceInput,
+    format_diagnostics, CheckedStory, Compiler, CompilerOptions, Diagnostic, DiagnosticCode,
+    DiagnosticSeverity, DiagnosticsPolicy, ParsedStory, RuntimeContainer, RuntimeObject,
+    RuntimeProgram, SourceInput, SourceSpan,
 };
 use std::collections::BTreeMap;
 
@@ -32,6 +33,7 @@ fn public_compiler_api_exposes_pipeline_artifacts() {
 fn public_compiler_options_are_constructible() {
     let compiler = Compiler::with_options(CompilerOptions {
         source_filename: Some("api-options.ink".to_string()),
+        ..CompilerOptions::default()
     });
 
     let output = compiler.compile(unnamed_fixture("basic.ink"));
@@ -42,6 +44,76 @@ fn public_compiler_options_are_constructible() {
         .expect("expected compiled story")
         .json
         .contains("Line."));
+}
+
+#[test]
+fn public_compile_result_reports_warnings_and_policy_failure() {
+    let source = named_fixture("loose-end-warning.ink", "warning.ink");
+
+    let allow_output = Compiler::default().compile(source.clone());
+    assert!(
+        !allow_output.has_errors(),
+        "{:#?}",
+        allow_output.diagnostics
+    );
+    assert!(
+        allow_output.has_warnings(),
+        "{:#?}",
+        allow_output.diagnostics
+    );
+    assert!(!allow_output.failed(), "{:#?}", allow_output.diagnostics);
+    assert!(allow_output.artifact.is_some());
+
+    let deny_output = Compiler::with_options(CompilerOptions {
+        diagnostics_policy: DiagnosticsPolicy::DenyWarnings,
+        ..CompilerOptions::default()
+    })
+    .compile(source);
+    assert!(!deny_output.has_errors(), "{:#?}", deny_output.diagnostics);
+    assert!(deny_output.has_warnings(), "{:#?}", deny_output.diagnostics);
+    assert!(deny_output.failed(), "{:#?}", deny_output.diagnostics);
+    assert!(deny_output.artifact.is_none());
+}
+
+#[test]
+fn public_compile_result_treats_author_diagnostics_as_warnings() {
+    let source = named_fixture("author-warning.ink", "author.ink");
+
+    let output = Compiler::with_options(CompilerOptions {
+        diagnostics_policy: DiagnosticsPolicy::DenyWarnings,
+        ..CompilerOptions::default()
+    })
+    .compile(source);
+
+    assert!(!output.has_errors(), "{:#?}", output.diagnostics);
+    assert!(output.has_warnings(), "{:#?}", output.diagnostics);
+    assert!(output.failed(), "{:#?}", output.diagnostics);
+    assert!(output
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.severity == DiagnosticSeverity::Author));
+}
+
+#[test]
+fn public_format_diagnostics_uses_stable_host_format() {
+    let diagnostics = vec![
+        Diagnostic::error(
+            SourceSpan::new(Some("story.ink".to_string()), 2, 3),
+            "bad syntax",
+        ),
+        Diagnostic::warning(SourceSpan::new(None, 4, 5), "loose end"),
+        Diagnostic::author(
+            SourceSpan::new(Some("notes.ink".to_string()), 6, 7),
+            "check this",
+        ),
+    ];
+
+    assert_eq!(
+        format_diagnostics(&diagnostics),
+        "story.ink:2:3: error: bad syntax\n\
+         <unknown>:4:5: warning: loose end\n\
+         notes.ink:6:7: author: check this"
+    );
 }
 
 #[test]

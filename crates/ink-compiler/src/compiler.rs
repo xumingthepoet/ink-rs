@@ -9,9 +9,12 @@ use crate::{
     syntax,
 };
 
+/// Options that control source attribution and full compile failure policy.
 #[derive(Clone, Default)]
 pub struct CompilerOptions {
     pub source_filename: Option<String>,
+    /// Controls whether warning diagnostics make full compile results fail.
+    pub diagnostics_policy: DiagnosticsPolicy,
 }
 
 #[derive(Default)]
@@ -19,6 +22,17 @@ pub struct Compiler {
     options: CompilerOptions,
 }
 
+/// Controls how `CompileResult::failed` treats non-error diagnostics.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum DiagnosticsPolicy {
+    /// Only error diagnostics make a compile result fail.
+    #[default]
+    AllowWarnings,
+    /// Error, warning, and author diagnostics make a compile result fail.
+    DenyWarnings,
+}
+
+/// Output from an individual public compiler pipeline stage.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StageOutput<T> {
     pub artifact: Option<T>,
@@ -27,9 +41,51 @@ pub struct StageOutput<T> {
 
 impl<T> StageOutput<T> {
     pub fn has_errors(&self) -> bool {
-        self.diagnostics
-            .iter()
-            .any(|diagnostic| diagnostic.severity == DiagnosticSeverity::Error)
+        diagnostics_have_errors(&self.diagnostics)
+    }
+
+    pub fn has_warnings(&self) -> bool {
+        diagnostics_have_warnings(&self.diagnostics)
+    }
+}
+
+/// Output from `Compiler::compile` and `Compiler::compile_sources`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompileResult<T> {
+    pub artifact: Option<T>,
+    pub diagnostics: Vec<Diagnostic>,
+    diagnostics_policy: DiagnosticsPolicy,
+}
+
+impl<T> CompileResult<T> {
+    fn new(
+        artifact: Option<T>,
+        diagnostics: Vec<Diagnostic>,
+        diagnostics_policy: DiagnosticsPolicy,
+    ) -> Self {
+        Self {
+            artifact,
+            diagnostics,
+            diagnostics_policy,
+        }
+    }
+
+    pub fn has_errors(&self) -> bool {
+        diagnostics_have_errors(&self.diagnostics)
+    }
+
+    pub fn has_warnings(&self) -> bool {
+        diagnostics_have_warnings(&self.diagnostics)
+    }
+
+    pub fn failed(&self) -> bool {
+        diagnostics_failed(&self.diagnostics, self.diagnostics_policy)
+    }
+}
+
+impl DiagnosticsPolicy {
+    fn denies_warnings(self) -> bool {
+        matches!(self, DiagnosticsPolicy::DenyWarnings)
     }
 }
 
@@ -139,7 +195,7 @@ impl Compiler {
         emit::emit_json(program)
     }
 
-    pub fn compile(&self, input: SourceInput) -> StageOutput<CompiledStory> {
+    pub fn compile(&self, input: SourceInput) -> CompileResult<CompiledStory> {
         self.compile_sources(vec![input])
     }
 
@@ -147,52 +203,34 @@ impl Compiler {
         self.parse_source_inputs(inputs, "Compiler::parse_sources")
     }
 
-    pub fn compile_sources(&self, inputs: Vec<SourceInput>) -> StageOutput<CompiledStory> {
+    pub fn compile_sources(&self, inputs: Vec<SourceInput>) -> CompileResult<CompiledStory> {
         let mut diagnostics = Vec::new();
 
         let parsed = self.parse_source_inputs(inputs, "Compiler::compile_sources");
         diagnostics.extend(parsed.diagnostics);
-        if diagnostics_have_errors(&diagnostics) {
-            return StageOutput {
-                artifact: None,
-                diagnostics,
-            };
+        if self.compile_failed(&diagnostics) {
+            return self.compile_result(None, diagnostics);
         }
         let Some(parsed) = parsed.artifact else {
-            return StageOutput {
-                artifact: None,
-                diagnostics,
-            };
+            return self.compile_result(None, diagnostics);
         };
 
         let checked = self.analyze(parsed);
         diagnostics.extend(checked.diagnostics);
-        if diagnostics_have_errors(&diagnostics) {
-            return StageOutput {
-                artifact: None,
-                diagnostics,
-            };
+        if self.compile_failed(&diagnostics) {
+            return self.compile_result(None, diagnostics);
         }
         let Some(checked) = checked.artifact else {
-            return StageOutput {
-                artifact: None,
-                diagnostics,
-            };
+            return self.compile_result(None, diagnostics);
         };
 
         let lowered = self.lower(&checked);
         diagnostics.extend(lowered.diagnostics);
-        if diagnostics_have_errors(&diagnostics) {
-            return StageOutput {
-                artifact: None,
-                diagnostics,
-            };
+        if self.compile_failed(&diagnostics) {
+            return self.compile_result(None, diagnostics);
         }
         let Some(program) = lowered.artifact else {
-            return StageOutput {
-                artifact: None,
-                diagnostics,
-            };
+            return self.compile_result(None, diagnostics);
         };
 
         let emitted = self.emit_json(program.clone());
@@ -201,12 +239,25 @@ impl Compiler {
             diagnostics: emitted_diagnostics,
         } = emitted;
         diagnostics.extend(emitted_diagnostics);
-        let artifact = emitted_json.map(|json| CompiledStory { program, json });
+        let artifact = if self.compile_failed(&diagnostics) {
+            None
+        } else {
+            emitted_json.map(|json| CompiledStory { program, json })
+        };
 
-        StageOutput {
-            artifact,
-            diagnostics,
-        }
+        self.compile_result(artifact, diagnostics)
+    }
+
+    fn compile_failed(&self, diagnostics: &[Diagnostic]) -> bool {
+        diagnostics_failed(diagnostics, self.options.diagnostics_policy)
+    }
+
+    fn compile_result<T>(
+        &self,
+        artifact: Option<T>,
+        diagnostics: Vec<Diagnostic>,
+    ) -> CompileResult<T> {
+        CompileResult::new(artifact, diagnostics, self.options.diagnostics_policy)
     }
 }
 
@@ -228,6 +279,20 @@ fn diagnostics_have_errors(diagnostics: &[Diagnostic]) -> bool {
     diagnostics
         .iter()
         .any(|diagnostic| diagnostic.severity == DiagnosticSeverity::Error)
+}
+
+fn diagnostics_have_warnings(diagnostics: &[Diagnostic]) -> bool {
+    diagnostics.iter().any(|diagnostic| {
+        matches!(
+            diagnostic.severity,
+            DiagnosticSeverity::Warning | DiagnosticSeverity::Author
+        )
+    })
+}
+
+fn diagnostics_failed(diagnostics: &[Diagnostic], policy: DiagnosticsPolicy) -> bool {
+    diagnostics_have_errors(diagnostics)
+        || (policy.denies_warnings() && diagnostics_have_warnings(diagnostics))
 }
 
 fn explicit_module_diagnostic(source: &SourceFile) -> Option<Diagnostic> {

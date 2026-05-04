@@ -48,10 +48,23 @@ fn run_story(json: &str) -> Result<(), StoryError> {
 }
 ```
 
+Host tooling can fail builds on warnings by setting a diagnostics policy:
+
+```rust
+use ink_rs::{Compiler, CompilerOptions, DiagnosticsPolicy, SourceInput};
+
+let compiler = Compiler::with_options(CompilerOptions {
+    source_filename: None,
+    diagnostics_policy: DiagnosticsPolicy::DenyWarnings,
+});
+let result = compiler.compile_sources(vec![SourceInput::new("...")]);
+assert!(result.failed());
+```
+
 ## Compiler Use
 
 ```rust
-use ink_rs::{Compiler, SourceInput};
+use ink_rs::{compiler::format_diagnostics, Compiler, SourceInput};
 
 fn compile_story() -> Option<String> {
     let source = r#"
@@ -63,10 +76,8 @@ Hello world.
 "#;
 
     let output = Compiler::new().compile(SourceInput::new(source));
-    if output.has_errors() {
-        for diagnostic in output.diagnostics {
-            eprintln!("{diagnostic:?}");
-        }
+    if output.failed() {
+        eprintln!("{}", format_diagnostics(&output.diagnostics));
         None
     } else {
         Some(output.artifact.unwrap().json)
