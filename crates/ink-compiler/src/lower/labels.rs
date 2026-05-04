@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use crate::parsed::{Flow, Object, Story, Weave};
 
-use super::indexes::{ConstantValues, RuntimeLenEstimator, StructDefinitions};
+use super::indexes::{ConstantValues, EnumDefinitions, RuntimeLenEstimator, StructDefinitions};
 use super::path::{child_path, LabelIndex, RuntimePath};
 use super::weave::weave_has_weave_points;
 
@@ -10,6 +10,7 @@ pub(super) fn build_label_index(
     story: &Story,
     constants: &ConstantValues,
     struct_definitions: &StructDefinitions,
+    enum_definitions: &EnumDefinitions,
     global_variables: &HashSet<String>,
     estimator: &RuntimeLenEstimator,
 ) -> LabelIndex {
@@ -17,6 +18,7 @@ pub(super) fn build_label_index(
     let mut context = LabelCollectionContext {
         constants,
         struct_definitions,
+        enum_definitions,
         global_variables,
         estimator,
         labels: &mut labels,
@@ -36,6 +38,7 @@ pub(super) fn build_label_index(
 struct LabelCollectionContext<'a> {
     constants: &'a ConstantValues,
     struct_definitions: &'a StructDefinitions,
+    enum_definitions: &'a EnumDefinitions,
     global_variables: &'a HashSet<String>,
     estimator: &'a RuntimeLenEstimator,
     labels: &'a mut LabelIndex,
@@ -107,6 +110,7 @@ fn collect_weave_labels(
                         choice,
                         context.constants,
                         context.struct_definitions,
+                        context.enum_definitions,
                         context.global_variables,
                     ),
                 ));
@@ -156,6 +160,7 @@ fn collect_weave_labels(
                         object,
                         context.constants,
                         context.struct_definitions,
+                        context.enum_definitions,
                         context.global_variables,
                     );
                 }

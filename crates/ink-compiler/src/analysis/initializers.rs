@@ -7,7 +7,8 @@ use crate::{
 };
 
 use super::{
-    context::{StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
+    context::{EnumTypeIndex, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
+    enums::{build_enum_type_index, type_name_is_enum},
     expression_types::infer_expression_type,
     structs::build_struct_type_index,
     target_symbols::build_target_symbol_index,
@@ -16,10 +17,15 @@ use super::{
 
 pub(super) fn variable_initializer_diagnostics(story: &Story) -> Vec<Diagnostic> {
     let struct_types = build_struct_type_index(story);
+    let enum_types = build_enum_type_index(story);
     let variable_scopes = build_variable_scope_index(story);
     let target_symbols = build_target_symbol_index(story);
-    let mut checker =
-        VariableInitializerChecker::new(&variable_scopes, &struct_types, &target_symbols);
+    let mut checker = VariableInitializerChecker::new(
+        &variable_scopes,
+        &struct_types,
+        &enum_types,
+        &target_symbols,
+    );
     walk_story(story, &mut checker);
     checker.diagnostics
 }
@@ -27,6 +33,7 @@ pub(super) fn variable_initializer_diagnostics(story: &Story) -> Vec<Diagnostic>
 struct VariableInitializerChecker<'a> {
     variable_scopes: &'a VariableScopeIndex,
     struct_types: &'a StructTypeIndex,
+    enum_types: &'a EnumTypeIndex,
     target_symbols: &'a TargetSymbolIndex,
     diagnostics: Vec<Diagnostic>,
 }
@@ -35,11 +42,13 @@ impl<'a> VariableInitializerChecker<'a> {
     fn new(
         variable_scopes: &'a VariableScopeIndex,
         struct_types: &'a StructTypeIndex,
+        enum_types: &'a EnumTypeIndex,
         target_symbols: &'a TargetSymbolIndex,
     ) -> Self {
         Self {
             variable_scopes,
             struct_types,
+            enum_types,
             target_symbols,
             diagnostics: Vec::new(),
         }
@@ -72,6 +81,7 @@ impl<'a> VariableInitializerChecker<'a> {
             expression,
             self.variable_scopes,
             self.struct_types,
+            self.enum_types,
             self.target_symbols,
             context.current_module.as_deref(),
             context.current_flow_path.as_deref(),
@@ -84,7 +94,14 @@ impl<'a> VariableInitializerChecker<'a> {
                 ));
             }
             Ok(_) => {}
-            Err(error) if declared_type.primitive_type().is_some() => {
+            Err(error)
+                if declared_type.primitive_type().is_some()
+                    || type_name_is_enum(
+                        declared_type,
+                        self.enum_types,
+                        context.current_module.as_deref(),
+                    ) =>
+            {
                 self.diagnostics.push(Diagnostic::error(
                     assignment.span().clone(),
                     format!(
@@ -103,6 +120,7 @@ impl<'a> VariableInitializerChecker<'a> {
             declaration.expression(),
             self.variable_scopes,
             self.struct_types,
+            self.enum_types,
             self.target_symbols,
             context.current_module.as_deref(),
             context.current_flow_path.as_deref(),
@@ -119,7 +137,14 @@ impl<'a> VariableInitializerChecker<'a> {
                 ));
             }
             Ok(_) => {}
-            Err(error) if declaration.declared_type().primitive_type().is_some() => {
+            Err(error)
+                if declaration.declared_type().primitive_type().is_some()
+                    || type_name_is_enum(
+                        declaration.declared_type(),
+                        self.enum_types,
+                        context.current_module.as_deref(),
+                    ) =>
+            {
                 self.diagnostics.push(Diagnostic::error(
                     declaration.span().clone(),
                     format!(
@@ -324,6 +349,53 @@ mod tests {
             &diagnostics,
             DiagnosticSeverity::Error,
             "Variable 'next' of type -> cannot be default-initialized",
+        );
+    }
+
+    #[test]
+    fn accepts_enum_initializers_and_defaults() {
+        let story = parse_story(
+            "ENUM State { Idle Busy }\n\
+             CONST DEFAULT_STATE: State = State.Busy\n\
+             VAR state: State = State.Idle\n\
+             VAR default_state: State\n\
+             -> DONE",
+        );
+
+        assert_eq!(variable_initializer_diagnostics(&story), []);
+    }
+
+    #[test]
+    fn reports_unknown_enum_member_initializers() {
+        let story = parse_story(
+            "ENUM State { Idle Busy }\n\
+             VAR state: State = State.Missing\n\
+             -> DONE",
+        );
+
+        let diagnostics = variable_initializer_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Cannot type-check initializer for variable 'state': Unknown member 'Missing' in enum 'State'",
+        );
+    }
+
+    #[test]
+    fn rejects_string_initializers_for_enum_types() {
+        let story = parse_story(
+            "ENUM State { Idle Busy }\n\
+             VAR state: State = \"State.Idle\"\n\
+             -> DONE",
+        );
+
+        let diagnostics = variable_initializer_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Initializer for variable 'state' has type string but declared type is State",
         );
     }
 

@@ -107,7 +107,6 @@ impl EnumTypeSymbol {
         &self.members
     }
 
-    #[cfg(test)]
     pub(super) fn contains_member(&self, member: &str) -> bool {
         self.members.iter().any(|candidate| candidate == member)
     }

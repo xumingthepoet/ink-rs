@@ -36,7 +36,9 @@ use divert::{
 };
 use expression::{lower_expression_into, lower_logic_line_into, lower_output_expression_into};
 use flow::lower_module_flow;
-use indexes::{ConstantValues, LoweringIndexes, RuntimeLenEstimator, StructDefinitions};
+use indexes::{
+    ConstantValues, EnumDefinitions, LoweringIndexes, RuntimeLenEstimator, StructDefinitions,
+};
 use path::{compact_path_strings_in_container, LabelIndex};
 use weave::{lower_choice_weave, lower_content_list_into_context};
 
@@ -243,6 +245,7 @@ fn lower_global_declarations(
             &indexes.external_signatures,
             &indexes.constants,
             &indexes.struct_definitions,
+            &indexes.enum_definitions,
         );
         if lower_assignment_initializer_with_context(
             &mut content,
@@ -269,6 +272,7 @@ fn estimated_choice_content_len(
     choice: &Choice,
     constants: &ConstantValues,
     struct_definitions: &StructDefinitions,
+    enum_definitions: &EnumDefinitions,
     global_variables: &HashSet<String>,
 ) -> usize {
     let mut content = Vec::new();
@@ -283,6 +287,7 @@ fn estimated_choice_content_len(
         &external_signatures,
         constants,
         struct_definitions,
+        enum_definitions,
     );
     lower_content_list_into_context(&mut content, choice.inner_content(), &context);
     content.len()
@@ -292,6 +297,7 @@ fn estimated_runtime_len_for_label_collection(
     object: &Object,
     constants: &ConstantValues,
     struct_definitions: &StructDefinitions,
+    enum_definitions: &EnumDefinitions,
     global_variables: &HashSet<String>,
 ) -> usize {
     if matches!(object, Object::Weave(_)) {
@@ -310,6 +316,7 @@ fn estimated_runtime_len_for_label_collection(
         &external_signatures,
         constants,
         struct_definitions,
+        enum_definitions,
     );
     lower_object_into_with_context_count(&mut content, object, &context);
     content.len()

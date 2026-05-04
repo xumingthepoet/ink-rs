@@ -12,7 +12,9 @@ use super::composite_literal::lower_dynamic_composite_literal_into;
 use super::context::{ChoicePathMode, LoweringContext};
 use super::indexes::{CallSignature, ConstantValue, ConstantValues, ExternalSignatures};
 use super::path::{module_scoped_source_path_to_runtime_path, source_path_to_runtime_path};
-use super::value::{lower_value_literal, resolve_divert_target_value};
+use super::value::{
+    lower_enum_member_expression_value, lower_value_literal, resolve_divert_target_value,
+};
 use super::weave::lower_content_list_into_context;
 
 pub(super) fn lower_output_expression_into(
@@ -160,6 +162,7 @@ fn lower_expression_into_with_constants(
                 expression,
                 None,
                 context.struct_definitions(),
+                context.enum_definitions(),
                 context.choice_labels(),
                 context.global_labels(),
                 context.path_mode(),
@@ -168,6 +171,17 @@ fn lower_expression_into_with_constants(
             }
         }
         Expression::FieldAccess { base, field } => {
+            if !field_access_base_is_visible_value(base, context) {
+                if let Some(value) = lower_enum_member_expression_value(
+                    base,
+                    field,
+                    context.enum_definitions(),
+                    context.path_mode(),
+                ) {
+                    content.push(value);
+                    return;
+                }
+            }
             lower_expression_into_with_constants(content, base, lowering);
             content.push(RuntimeObject::String(field.clone()));
             content.push(RuntimeObject::NativeFunction(NativeFunction::FieldRead));
@@ -218,6 +232,7 @@ fn lower_constant_expression_into(
         constant.expression(),
         Some(constant.declared_type()),
         context.struct_definitions(),
+        context.enum_definitions(),
         context.choice_labels(),
         context.global_labels(),
         context.path_mode(),
@@ -244,6 +259,7 @@ pub(super) fn lower_expression_with_expected_type_into_with_constants(
             expression,
             expected_type,
             context.struct_definitions(),
+            context.enum_definitions(),
             context.choice_labels(),
             context.global_labels(),
             context.path_mode(),
@@ -260,6 +276,27 @@ pub(super) fn lower_expression_with_expected_type_into_with_constants(
     let before = content.len();
     lower_expression_into_with_constants(content, expression, lowering);
     content.len() > before
+}
+
+fn field_access_base_is_visible_value(base: &Expression, context: &LoweringContext<'_>) -> bool {
+    match base {
+        Expression::VariableReference(name) => {
+            context.path_mode().is_local_variable(name)
+                || resolve_constant_name(name, context.path_mode(), context.constants()).is_some()
+                || context
+                    .global_variables()
+                    .contains(&resolve_runtime_variable_name(
+                        name,
+                        context.path_mode(),
+                        context.global_variables(),
+                    ))
+        }
+        Expression::QualifiedReference(name) => {
+            context.constants().contains_key(name.as_str())
+                || context.global_variables().contains(name.as_str())
+        }
+        _ => true,
+    }
 }
 
 fn lower_function_call_into(

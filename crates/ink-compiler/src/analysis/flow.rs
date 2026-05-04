@@ -9,7 +9,8 @@ use crate::{
 };
 
 use super::{
-    context::{StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
+    context::{EnumTypeIndex, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
+    enums::{build_enum_type_index, is_enum_member_reference},
     expression_types::{
         infer_binary_operator_type, infer_expression_type, typed_builtin_return_type,
     },
@@ -22,10 +23,12 @@ use super::{
 pub(super) fn flow_diagnostics(story: &Story) -> Vec<Diagnostic> {
     let variable_scopes = build_variable_scope_index(story);
     let struct_types = build_struct_type_index(story);
+    let enum_types = build_enum_type_index(story);
     let target_symbols = build_target_symbol_index(story);
     let analysis = FlowAnalysisIndexes {
         variable_scopes: &variable_scopes,
         struct_types: &struct_types,
+        enum_types: &enum_types,
         target_symbols: &target_symbols,
     };
     let mut diagnostics = Vec::new();
@@ -154,6 +157,7 @@ fn nested_global_var_declaration_diagnostic(span: SourceSpan) -> Diagnostic {
 struct FlowAnalysisIndexes<'a> {
     variable_scopes: &'a VariableScopeIndex,
     struct_types: &'a StructTypeIndex,
+    enum_types: &'a EnumTypeIndex,
     target_symbols: &'a TargetSymbolIndex,
 }
 
@@ -292,6 +296,7 @@ impl ConditionTypeChecker<'_> {
             expression,
             self.analysis.variable_scopes,
             self.analysis.struct_types,
+            self.analysis.enum_types,
             self.analysis.target_symbols,
             context.current_module.as_deref(),
             current_flow_path,
@@ -322,6 +327,7 @@ impl ConditionTypeChecker<'_> {
             condition,
             self.analysis.variable_scopes,
             self.analysis.struct_types,
+            self.analysis.enum_types,
             self.analysis.target_symbols,
             context.current_module.as_deref(),
             current_flow_path,
@@ -347,6 +353,7 @@ impl ConditionTypeChecker<'_> {
         condition_type_signal(
             expression,
             self.analysis.variable_scopes,
+            self.analysis.enum_types,
             self.analysis.target_symbols,
             context.current_module.as_deref(),
             context.current_flow_path.as_deref(),
@@ -364,6 +371,7 @@ enum ConditionTypeSignal {
 fn condition_type_signal(
     expression: &Expression,
     variable_scopes: &VariableScopeIndex,
+    enum_types: &EnumTypeIndex,
     target_symbols: &TargetSymbolIndex,
     current_module: Option<&str>,
     current_flow_path: Option<&str>,
@@ -404,10 +412,16 @@ fn condition_type_signal(
         )
         .is_some_and(|symbol| symbol.is_function() && symbol.has_typed_signature())
         .then_some(ConditionTypeSignal::Typed),
+        Expression::FieldAccess { .. }
+            if is_enum_member_reference(expression, enum_types, current_module) =>
+        {
+            Some(ConditionTypeSignal::Typed)
+        }
         Expression::FieldAccess { base, .. } | Expression::IndexAccess { base, .. } => {
             condition_type_signal(
                 base,
                 variable_scopes,
+                enum_types,
                 target_symbols,
                 current_module,
                 current_flow_path,
@@ -417,6 +431,7 @@ fn condition_type_signal(
         Expression::Unary { expression, .. } => condition_type_signal(
             expression,
             variable_scopes,
+            enum_types,
             target_symbols,
             current_module,
             current_flow_path,
@@ -425,6 +440,7 @@ fn condition_type_signal(
             condition_type_signal(
                 left,
                 variable_scopes,
+                enum_types,
                 target_symbols,
                 current_module,
                 current_flow_path,
@@ -432,6 +448,7 @@ fn condition_type_signal(
             condition_type_signal(
                 right,
                 variable_scopes,
+                enum_types,
                 target_symbols,
                 current_module,
                 current_flow_path,
@@ -443,6 +460,7 @@ fn condition_type_signal(
                 condition_type_signal(
                     expression,
                     variable_scopes,
+                    enum_types,
                     target_symbols,
                     current_module,
                     current_flow_path,
@@ -739,6 +757,7 @@ impl FunctionFlowControlVisitor<'_> {
             expression,
             self.analysis.variable_scopes,
             self.analysis.struct_types,
+            self.analysis.enum_types,
             self.analysis.target_symbols,
             context.current_module.as_deref(),
             context.current_flow_path.as_deref(),

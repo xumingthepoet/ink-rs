@@ -4,12 +4,17 @@ use ink_story_json_format::Object as RuntimeObject;
 
 use crate::parsed::{DefaultValue, Expression, StructLiteralField, TypeName};
 
-use super::{context::ChoicePathMode, indexes::StructDefinitions, path::LabelIndex};
+use super::{
+    context::ChoicePathMode,
+    indexes::{EnumDefinitions, StructDefinitions},
+    path::LabelIndex,
+};
 
 pub(super) fn lower_value_literal(
     expression: &Expression,
     expected_type: Option<&TypeName>,
     struct_definitions: &StructDefinitions,
+    enum_definitions: &EnumDefinitions,
     choice_labels: &LabelIndex,
     global_labels: &LabelIndex,
     path_mode: &ChoicePathMode,
@@ -22,6 +27,7 @@ pub(super) fn lower_value_literal(
                     element,
                     Some(element_type),
                     struct_definitions,
+                    enum_definitions,
                     choice_labels,
                     global_labels,
                     path_mode,
@@ -34,6 +40,7 @@ pub(super) fn lower_value_literal(
                 fields,
                 struct_name,
                 struct_definitions,
+                enum_definitions,
                 choice_labels,
                 global_labels,
                 path_mode,
@@ -44,6 +51,7 @@ pub(super) fn lower_value_literal(
                 fields,
                 struct_name.as_str(),
                 struct_definitions,
+                enum_definitions,
                 choice_labels,
                 global_labels,
                 path_mode,
@@ -63,6 +71,7 @@ pub(super) fn lower_value_literal(
                     element,
                     None,
                     struct_definitions,
+                    enum_definitions,
                     choice_labels,
                     global_labels,
                     path_mode,
@@ -73,6 +82,7 @@ pub(super) fn lower_value_literal(
         (None, Expression::StructLiteral(fields)) => lower_dynamic_struct_literal(
             fields,
             struct_definitions,
+            enum_definitions,
             choice_labels,
             global_labels,
             path_mode,
@@ -94,12 +104,20 @@ pub(super) fn lower_value_literal(
 pub(super) fn runtime_default_for_type(
     type_name: &TypeName,
     struct_definitions: &StructDefinitions,
+    enum_definitions: &EnumDefinitions,
     module_name: Option<&str>,
 ) -> Option<RuntimeObject> {
+    if let Some(default_value) =
+        runtime_enum_default_for_type(type_name, enum_definitions, module_name)
+    {
+        return Some(default_value);
+    }
+
     let mut visiting_structs = HashSet::new();
     runtime_default_for_type_with_seen(
         type_name,
         struct_definitions,
+        enum_definitions,
         &mut visiting_structs,
         module_name,
     )
@@ -119,13 +137,21 @@ pub(super) fn struct_field_definitions_for_type<'a>(
 fn runtime_default_for_type_with_seen(
     type_name: &TypeName,
     struct_definitions: &StructDefinitions,
+    enum_definitions: &EnumDefinitions,
     visiting_structs: &mut HashSet<String>,
     module_name: Option<&str>,
 ) -> Option<RuntimeObject> {
+    if let Some(default_value) =
+        runtime_enum_default_for_type(type_name, enum_definitions, module_name)
+    {
+        return Some(default_value);
+    }
+
     let default_value = type_name.default_value()?;
     runtime_default_value(
         &default_value,
         struct_definitions,
+        enum_definitions,
         visiting_structs,
         module_name,
     )
@@ -134,6 +160,7 @@ fn runtime_default_for_type_with_seen(
 fn runtime_default_value(
     default_value: &DefaultValue,
     struct_definitions: &StructDefinitions,
+    enum_definitions: &EnumDefinitions,
     visiting_structs: &mut HashSet<String>,
     module_name: Option<&str>,
 ) -> Option<RuntimeObject> {
@@ -160,6 +187,7 @@ fn runtime_default_value(
                 let Some(field_value) = runtime_default_for_type_with_seen(
                     field_type,
                     struct_definitions,
+                    enum_definitions,
                     visiting_structs,
                     module_name,
                 ) else {
@@ -179,6 +207,7 @@ fn lower_struct_literal(
     fields: &[StructLiteralField],
     struct_name: &str,
     struct_definitions: &StructDefinitions,
+    enum_definitions: &EnumDefinitions,
     choice_labels: &LabelIndex,
     global_labels: &LabelIndex,
     path_mode: &ChoicePathMode,
@@ -201,6 +230,7 @@ fn lower_struct_literal(
                 expression,
                 Some(field_type),
                 struct_definitions,
+                enum_definitions,
                 choice_labels,
                 global_labels,
                 path_mode,
@@ -209,6 +239,7 @@ fn lower_struct_literal(
             runtime_default_for_type(
                 field_type,
                 struct_definitions,
+                enum_definitions,
                 path_mode.current_module_name(),
             )?
         };
@@ -221,6 +252,7 @@ fn lower_struct_literal(
 fn lower_dynamic_struct_literal(
     fields: &[StructLiteralField],
     struct_definitions: &StructDefinitions,
+    enum_definitions: &EnumDefinitions,
     choice_labels: &LabelIndex,
     global_labels: &LabelIndex,
     path_mode: &ChoicePathMode,
@@ -233,6 +265,7 @@ fn lower_dynamic_struct_literal(
                 field.expression(),
                 None,
                 struct_definitions,
+                enum_definitions,
                 choice_labels,
                 global_labels,
                 path_mode,
@@ -240,6 +273,73 @@ fn lower_dynamic_struct_literal(
         );
     }
     Some(RuntimeObject::ValueObject(object_fields))
+}
+
+pub(super) fn lower_enum_member_expression_value(
+    base: &Expression,
+    member: &str,
+    enum_definitions: &EnumDefinitions,
+    path_mode: &ChoicePathMode,
+) -> Option<RuntimeObject> {
+    let enum_name = resolve_enum_definition_name_for_expression(
+        base,
+        path_mode.current_module_name(),
+        enum_definitions,
+    )?;
+    enum_definitions
+        .get(&enum_name)?
+        .iter()
+        .any(|candidate| candidate == member)
+        .then(|| RuntimeObject::String(format!("{enum_name}.{member}")))
+}
+
+pub(super) fn runtime_enum_default_for_type(
+    type_name: &TypeName,
+    enum_definitions: &EnumDefinitions,
+    module_name: Option<&str>,
+) -> Option<RuntimeObject> {
+    let enum_name = resolve_enum_definition_name_for_type(type_name, module_name)?;
+    let first_member = enum_definitions.get(&enum_name)?.first()?;
+    Some(RuntimeObject::String(format!("{enum_name}.{first_member}")))
+}
+
+fn resolve_enum_definition_name_for_type(
+    type_name: &TypeName,
+    module_name: Option<&str>,
+) -> Option<String> {
+    match type_name {
+        TypeName::Struct(name) => Some(
+            module_name
+                .map(|module| format!("{module}::{name}"))
+                .unwrap_or_else(|| name.clone()),
+        ),
+        TypeName::QualifiedStruct(name) => Some(name.as_str().to_string()),
+        TypeName::Primitive(_) | TypeName::Void | TypeName::Array(_) => None,
+    }
+}
+
+fn resolve_enum_definition_name_for_expression(
+    expression: &Expression,
+    module_name: Option<&str>,
+    enum_definitions: &EnumDefinitions,
+) -> Option<String> {
+    match expression {
+        Expression::VariableReference(name) => {
+            let scoped_name = module_name
+                .map(|module| format!("{module}::{name}"))
+                .unwrap_or_else(|| name.clone());
+            enum_definitions
+                .contains_key(&scoped_name)
+                .then_some(scoped_name)
+        }
+        Expression::QualifiedReference(name) => {
+            let scoped_name = name.as_str().to_string();
+            enum_definitions
+                .contains_key(&scoped_name)
+                .then_some(scoped_name)
+        }
+        _ => None,
+    }
 }
 
 pub(super) fn resolve_divert_target_value(

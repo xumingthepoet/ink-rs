@@ -16,25 +16,38 @@ pub(super) struct LoweringIndexes<'a> {
     pub(super) variable_declarations: Vec<VariableDeclaration<'a>>,
     pub(super) external_signatures: ExternalSignatures,
     pub(super) struct_definitions: StructDefinitions,
+    pub(super) enum_definitions: EnumDefinitions,
 }
 
 pub(super) struct RuntimeLenEstimator {
-    pub(super) choice_content_len:
-        fn(&Choice, &ConstantValues, &StructDefinitions, &HashSet<String>) -> usize,
-    pub(super) object_len:
-        fn(&Object, &ConstantValues, &StructDefinitions, &HashSet<String>) -> usize,
+    pub(super) choice_content_len: fn(
+        &Choice,
+        &ConstantValues,
+        &StructDefinitions,
+        &EnumDefinitions,
+        &HashSet<String>,
+    ) -> usize,
+    pub(super) object_len: fn(
+        &Object,
+        &ConstantValues,
+        &StructDefinitions,
+        &EnumDefinitions,
+        &HashSet<String>,
+    ) -> usize,
 }
 
 impl<'a> LoweringIndexes<'a> {
     pub(super) fn build(story: &'a Story, estimator: RuntimeLenEstimator) -> Self {
         let constants = build_constant_values(story);
         let struct_definitions = build_struct_definitions(story);
+        let enum_definitions = build_enum_definitions(story);
         let variable_declarations = collect_story_variable_declarations(story);
         let global_variables = build_global_variable_names(&variable_declarations);
         let global_labels = build_label_index(
             story,
             &constants,
             &struct_definitions,
+            &enum_definitions,
             &global_variables,
             &estimator,
         );
@@ -47,12 +60,14 @@ impl<'a> LoweringIndexes<'a> {
             variable_declarations,
             external_signatures,
             struct_definitions,
+            enum_definitions,
         }
     }
 }
 
 pub(super) type ExternalSignatures = HashMap<String, CallSignature>;
 pub(super) type StructDefinitions = HashMap<String, Vec<(String, crate::parsed::TypeName)>>;
+pub(super) type EnumDefinitions = HashMap<String, Vec<String>>;
 pub(super) type ConstantValues = HashMap<String, ConstantValue>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -219,6 +234,101 @@ fn build_struct_definitions(story: &Story) -> StructDefinitions {
         }
     }
     definitions
+}
+
+fn build_enum_definitions(story: &Story) -> EnumDefinitions {
+    let mut definitions = HashMap::new();
+    collect_enum_definitions_in_objects(story.root_weave().content(), None, &mut definitions);
+    for flow in story.flows() {
+        collect_enum_definitions_in_flow(flow, None, &mut definitions);
+    }
+    for module in story.modules() {
+        collect_enum_definitions_in_objects(
+            module.weave().content(),
+            Some(module.name()),
+            &mut definitions,
+        );
+        for flow in module.flows() {
+            collect_enum_definitions_in_flow(flow, Some(module.name()), &mut definitions);
+        }
+    }
+    definitions
+}
+
+fn collect_enum_definitions_in_flow(
+    flow: &Flow,
+    module_name: Option<&str>,
+    definitions: &mut EnumDefinitions,
+) {
+    collect_enum_definitions_in_objects(flow.weave().content(), module_name, definitions);
+    for child in flow.child_flows() {
+        collect_enum_definitions_in_flow(child, module_name, definitions);
+    }
+}
+
+fn collect_enum_definitions_in_objects(
+    objects: &[Object],
+    module_name: Option<&str>,
+    definitions: &mut EnumDefinitions,
+) {
+    for object in objects {
+        collect_enum_definitions_in_object(object, module_name, definitions);
+    }
+}
+
+fn collect_enum_definitions_in_content_list(
+    content_list: &ContentList,
+    module_name: Option<&str>,
+    definitions: &mut EnumDefinitions,
+) {
+    collect_enum_definitions_in_objects(content_list.objects(), module_name, definitions);
+}
+
+fn collect_enum_definitions_in_object(
+    object: &Object,
+    module_name: Option<&str>,
+    definitions: &mut EnumDefinitions,
+) {
+    match object {
+        Object::EnumDeclaration(declaration) => {
+            let definition_name = module_name
+                .map(|module| format!("{module}::{}", declaration.name()))
+                .unwrap_or_else(|| declaration.name().to_string());
+            definitions.entry(definition_name).or_insert_with(|| {
+                declaration
+                    .members()
+                    .iter()
+                    .map(|member| member.name().to_string())
+                    .collect()
+            });
+        }
+        Object::ContentList(content_list) => {
+            collect_enum_definitions_in_content_list(content_list, module_name, definitions);
+        }
+        Object::Conditional(conditional) => {
+            for branch in conditional.branches() {
+                collect_enum_definitions_in_objects(
+                    branch.content().content(),
+                    module_name,
+                    definitions,
+                );
+            }
+        }
+        Object::Choice(choice) => {
+            if let Some(content) = choice.start_content() {
+                collect_enum_definitions_in_content_list(content, module_name, definitions);
+            }
+            collect_enum_definitions_in_content_list(
+                choice.inner_content(),
+                module_name,
+                definitions,
+            );
+        }
+        Object::Weave(weave) => {
+            collect_enum_definitions_in_objects(weave.content(), module_name, definitions)
+        }
+        _ => {}
+    }
 }
 
 fn collect_struct_definitions_in_flow(

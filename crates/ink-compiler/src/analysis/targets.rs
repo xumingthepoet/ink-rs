@@ -11,7 +11,11 @@ use crate::{
 };
 
 use super::{
-    context::{FlowContext, FlowSymbol, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
+    context::{
+        EnumTypeIndex, FlowContext, FlowSymbol, StructTypeIndex, TargetSymbolIndex,
+        VariableScopeIndex,
+    },
+    enums::{build_enum_type_index, is_enum_member_reference},
     expression_types::{infer_expression_type, typed_builtin_return_type},
     span::object_span,
     structs::build_struct_type_index,
@@ -25,7 +29,13 @@ pub(super) fn call_target_diagnostics(story: &Story) -> Vec<Diagnostic> {
     let target_symbols = build_target_symbol_index(story);
     let variable_scopes = build_variable_scope_index(story);
     let struct_types = build_struct_type_index(story);
-    let mut checker = CallTargetChecker::new(&target_symbols, &variable_scopes, &struct_types);
+    let enum_types = build_enum_type_index(story);
+    let mut checker = CallTargetChecker::new(
+        &target_symbols,
+        &variable_scopes,
+        &struct_types,
+        &enum_types,
+    );
     walk_story(story, &mut checker);
     checker.diagnostics
 }
@@ -34,6 +44,7 @@ struct CallTargetChecker<'a> {
     target_symbols: &'a TargetSymbolIndex,
     variable_scopes: &'a VariableScopeIndex,
     struct_types: &'a StructTypeIndex,
+    enum_types: &'a EnumTypeIndex,
     diagnostics: Vec<Diagnostic>,
     flow_contexts_by_path: HashMap<String, FlowContext>,
 }
@@ -43,11 +54,13 @@ impl<'a> CallTargetChecker<'a> {
         target_symbols: &'a TargetSymbolIndex,
         variable_scopes: &'a VariableScopeIndex,
         struct_types: &'a StructTypeIndex,
+        enum_types: &'a EnumTypeIndex,
     ) -> Self {
         Self {
             target_symbols,
             variable_scopes,
             struct_types,
+            enum_types,
             diagnostics: Vec::new(),
             flow_contexts_by_path: HashMap::new(),
         }
@@ -204,6 +217,7 @@ impl<'a> CallTargetChecker<'a> {
             expression,
             self.variable_scopes,
             self.struct_types,
+            self.enum_types,
             self.target_symbols,
             self.current_module(context),
             self.current_flow_path(context),
@@ -249,9 +263,16 @@ impl<'a> CallTargetChecker<'a> {
                     self.check_expression(field.expression(), span, context);
                 }
             }
-            Expression::FieldAccess { base, .. } => {
+            Expression::FieldAccess { base, .. }
+                if !is_enum_member_reference(
+                    expression,
+                    self.enum_types,
+                    self.current_module(context),
+                ) =>
+            {
                 self.check_expression(base, span, context);
             }
+            Expression::FieldAccess { .. } => {}
             Expression::IndexAccess { base, index } => {
                 self.check_expression(base, span, context);
                 self.check_expression(index, span, context);
@@ -387,6 +408,7 @@ impl<'a> CallTargetChecker<'a> {
             &args[0],
             self.variable_scopes,
             self.struct_types,
+            self.enum_types,
             self.target_symbols,
             self.current_module(context),
             self.current_flow_path(context),
@@ -414,6 +436,7 @@ impl<'a> CallTargetChecker<'a> {
             &args[1],
             self.variable_scopes,
             self.struct_types,
+            self.enum_types,
             self.target_symbols,
             self.current_module(context),
             self.current_flow_path(context),
@@ -451,6 +474,7 @@ impl<'a> CallTargetChecker<'a> {
             &args[0],
             self.variable_scopes,
             self.struct_types,
+            self.enum_types,
             self.target_symbols,
             self.current_module(context),
             self.current_flow_path(context),
@@ -504,6 +528,7 @@ impl<'a> CallTargetChecker<'a> {
                 argument,
                 self.variable_scopes,
                 self.struct_types,
+                self.enum_types,
                 self.target_symbols,
                 self.current_module(context),
                 self.current_flow_path(context),

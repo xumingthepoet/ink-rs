@@ -11,7 +11,8 @@ use crate::{
 };
 
 use super::{
-    context::{StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
+    context::{EnumTypeIndex, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
+    enums::{build_enum_type_index, type_name_contains_enum},
     expression_types::infer_expression_type,
     structs::{build_struct_type_index, resolve_struct_symbol},
     target_symbols::build_target_symbol_index,
@@ -26,15 +27,22 @@ enum StructLiteralMode {
 
 pub(super) fn array_literal_diagnostics(story: &Story) -> Vec<Diagnostic> {
     let struct_types = build_struct_type_index(story);
+    let enum_types = build_enum_type_index(story);
     let variable_scopes = build_variable_scope_index(story);
     let target_symbols = build_target_symbol_index(story);
-    let mut checker = ArrayLiteralChecker::new(&struct_types, &variable_scopes, &target_symbols);
+    let mut checker = ArrayLiteralChecker::new(
+        &struct_types,
+        &enum_types,
+        &variable_scopes,
+        &target_symbols,
+    );
     walk_story(story, &mut checker);
     checker.diagnostics
 }
 
 struct ArrayLiteralChecker<'a> {
     struct_types: &'a StructTypeIndex,
+    enum_types: &'a EnumTypeIndex,
     variable_scopes: &'a VariableScopeIndex,
     target_symbols: &'a TargetSymbolIndex,
     diagnostics: Vec<Diagnostic>,
@@ -44,11 +52,13 @@ struct ArrayLiteralChecker<'a> {
 impl<'a> ArrayLiteralChecker<'a> {
     fn new(
         struct_types: &'a StructTypeIndex,
+        enum_types: &'a EnumTypeIndex,
         variable_scopes: &'a VariableScopeIndex,
         target_symbols: &'a TargetSymbolIndex,
     ) -> Self {
         Self {
             struct_types,
+            enum_types,
             variable_scopes,
             target_symbols,
             diagnostics: Vec::new(),
@@ -227,6 +237,7 @@ impl<'a> ArrayLiteralChecker<'a> {
             expression,
             self.variable_scopes,
             self.struct_types,
+            self.enum_types,
             self.target_symbols,
             context.current_module.as_deref(),
             context.current_flow_path.as_deref(),
@@ -263,6 +274,7 @@ impl<'a> ArrayLiteralChecker<'a> {
             expression,
             self.variable_scopes,
             self.struct_types,
+            self.enum_types,
             self.target_symbols,
             context.current_module.as_deref(),
             context.current_flow_path.as_deref(),
@@ -276,7 +288,14 @@ impl<'a> ArrayLiteralChecker<'a> {
                 ));
             }
             Ok(_) => {}
-            Err(error) if expected_type.primitive_type().is_some() => {
+            Err(error)
+                if expected_type.primitive_type().is_some()
+                    || type_name_contains_enum(
+                        expected_type,
+                        self.enum_types,
+                        context.current_module.as_deref(),
+                    ) =>
+            {
                 self.diagnostics.push(Diagnostic::error(
                     span.clone(),
                     format!(

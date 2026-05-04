@@ -7,7 +7,8 @@ use crate::{
 };
 
 use super::{
-    context::{StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
+    context::{EnumTypeIndex, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
+    enums::{build_enum_type_index, type_name_is_enum},
     expression_types::infer_expression_type,
     structs::{build_struct_type_index, resolve_struct_symbol},
     target_symbols::build_target_symbol_index,
@@ -16,10 +17,15 @@ use super::{
 
 pub(super) fn variable_assignment_diagnostics(story: &Story) -> Vec<Diagnostic> {
     let struct_types = build_struct_type_index(story);
+    let enum_types = build_enum_type_index(story);
     let variable_scopes = build_variable_scope_index(story);
     let target_symbols = build_target_symbol_index(story);
-    let mut checker =
-        VariableAssignmentChecker::new(&variable_scopes, &struct_types, &target_symbols);
+    let mut checker = VariableAssignmentChecker::new(
+        &variable_scopes,
+        &struct_types,
+        &enum_types,
+        &target_symbols,
+    );
     walk_story(story, &mut checker);
     checker.diagnostics
 }
@@ -27,6 +33,7 @@ pub(super) fn variable_assignment_diagnostics(story: &Story) -> Vec<Diagnostic> 
 struct VariableAssignmentChecker<'a> {
     variable_scopes: &'a VariableScopeIndex,
     struct_types: &'a StructTypeIndex,
+    enum_types: &'a EnumTypeIndex,
     target_symbols: &'a TargetSymbolIndex,
     diagnostics: Vec<Diagnostic>,
 }
@@ -35,11 +42,13 @@ impl<'a> VariableAssignmentChecker<'a> {
     fn new(
         variable_scopes: &'a VariableScopeIndex,
         struct_types: &'a StructTypeIndex,
+        enum_types: &'a EnumTypeIndex,
         target_symbols: &'a TargetSymbolIndex,
     ) -> Self {
         Self {
             variable_scopes,
             struct_types,
+            enum_types,
             target_symbols,
             diagnostics: Vec::new(),
         }
@@ -194,6 +203,7 @@ impl<'a> VariableAssignmentChecker<'a> {
                     index,
                     self.variable_scopes,
                     self.struct_types,
+                    self.enum_types,
                     self.target_symbols,
                     context.current_module.as_deref(),
                     context.current_flow_path.as_deref(),
@@ -250,6 +260,7 @@ impl<'a> VariableAssignmentChecker<'a> {
             expression,
             self.variable_scopes,
             self.struct_types,
+            self.enum_types,
             self.target_symbols,
             context.current_module.as_deref(),
             context.current_flow_path.as_deref(),
@@ -289,6 +300,7 @@ impl<'a> VariableAssignmentChecker<'a> {
             expression,
             self.variable_scopes,
             self.struct_types,
+            self.enum_types,
             self.target_symbols,
             context.current_module.as_deref(),
             context.current_flow_path.as_deref(),
@@ -329,6 +341,7 @@ fn infer_assignable_primitive_type(
     expression: &crate::parsed::Expression,
     variable_scopes: &VariableScopeIndex,
     struct_types: &StructTypeIndex,
+    enum_types: &EnumTypeIndex,
     target_symbols: &TargetSymbolIndex,
     current_module: Option<&str>,
     current_flow_path: Option<&str>,
@@ -337,12 +350,18 @@ fn infer_assignable_primitive_type(
         expression,
         variable_scopes,
         struct_types,
+        enum_types,
         target_symbols,
         current_module,
         current_flow_path,
     ) {
         Ok(actual_type) => Some(Ok(actual_type)),
-        Err(error) if declared_type.primitive_type().is_some() => Some(Err(error)),
+        Err(error)
+            if declared_type.primitive_type().is_some()
+                || type_name_is_enum(declared_type, enum_types, current_module) =>
+        {
+            Some(Err(error))
+        }
         Err(_) => None,
     }
 }
@@ -435,6 +454,38 @@ mod tests {
             &diagnostics,
             DiagnosticSeverity::Error,
             "Assignment to variable 'ratio' has type int but declared type is float",
+        );
+    }
+
+    #[test]
+    fn accepts_enum_assignments() {
+        let story = parse_story(
+            "ENUM State { Idle Busy }\n\
+             VAR state: State = State.Idle\n\
+             == knot ==\n\
+             ~ state = State.Busy\n\
+             -> DONE",
+        );
+
+        assert_eq!(variable_assignment_diagnostics(&story), []);
+    }
+
+    #[test]
+    fn rejects_unknown_enum_member_assignments() {
+        let story = parse_story(
+            "ENUM State { Idle Busy }\n\
+             VAR state: State = State.Idle\n\
+             == knot ==\n\
+             ~ state = State.Missing\n\
+             -> DONE",
+        );
+
+        let diagnostics = variable_assignment_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Cannot type-check assignment to variable 'state': Unknown member 'Missing' in enum 'State'",
         );
     }
 

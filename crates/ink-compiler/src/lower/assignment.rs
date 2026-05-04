@@ -52,6 +52,7 @@ fn lower_assignment_initializer_into(
             runtime_default_for_type(
                 declared_type,
                 context.struct_definitions(),
+                context.enum_definitions(),
                 context.path_mode().current_module_name(),
             )
         })

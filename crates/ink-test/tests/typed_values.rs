@@ -37,6 +37,20 @@ fn divert_target_values_run() {
 }
 
 #[test]
+fn enums_run_at_runtime() {
+    let compiled = compile_fixture("typed/enums.ink");
+
+    assert_story_output(
+        &compiled,
+        "game::State.Idle|true|game::State.Busy|game::State.Busy|game::State.Idle|game::State.Done\n|true\n",
+    );
+    assert_json_sequence(
+        &compiled.program.to_json_value(),
+        vec![json!("^game::State.Idle"), json!({"VAR=": "game::state"})],
+    );
+}
+
+#[test]
 fn nested_values_run() {
     let compiled = compile_fixture("typed/nested.ink");
     assert_story_output(&compiled, "2|0|4|1|false\n");

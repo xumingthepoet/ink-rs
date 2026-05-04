@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use crate::{
     diagnostic::Diagnostic,
-    parsed::{EnumDeclaration, Flow, Object, Story, Weave},
+    parsed::{EnumDeclaration, Expression, Flow, Object, Story, TypeName, Weave},
 };
 
 use super::context::{EnumTypeIndex, EnumTypeSymbol};
@@ -91,6 +91,78 @@ pub(super) fn resolve_enum_symbol<'a>(
         scoped_enum_name(current_module, enum_name)
     };
     index.get(&key)
+}
+
+pub(super) fn resolve_enum_member_type(
+    base: &Expression,
+    member: &str,
+    index: &EnumTypeIndex,
+    current_module: Option<&str>,
+) -> Option<Result<TypeName, String>> {
+    let (key, type_name, display_name) = enum_reference_parts(base, current_module)?;
+    let symbol = index.get(&key)?;
+    if symbol.contains_member(member) {
+        Some(Ok(type_name))
+    } else {
+        Some(Err(format!(
+            "Unknown member '{member}' in enum '{display_name}'"
+        )))
+    }
+}
+
+pub(super) fn is_enum_member_reference(
+    expression: &Expression,
+    index: &EnumTypeIndex,
+    current_module: Option<&str>,
+) -> bool {
+    let Expression::FieldAccess { base, field } = expression else {
+        return false;
+    };
+    resolve_enum_member_type(base, field, index, current_module).is_some()
+}
+
+pub(super) fn type_name_is_enum(
+    type_name: &TypeName,
+    index: &EnumTypeIndex,
+    current_module: Option<&str>,
+) -> bool {
+    match type_name {
+        TypeName::Struct(name) => index.contains_key(&scoped_enum_name(current_module, name)),
+        TypeName::QualifiedStruct(name) => index.contains_key(name.as_str()),
+        TypeName::Primitive(_) | TypeName::Void | TypeName::Array(_) => false,
+    }
+}
+
+pub(super) fn type_name_contains_enum(
+    type_name: &TypeName,
+    index: &EnumTypeIndex,
+    current_module: Option<&str>,
+) -> bool {
+    match type_name {
+        TypeName::Array(element_type) => {
+            type_name_contains_enum(element_type, index, current_module)
+        }
+        _ => type_name_is_enum(type_name, index, current_module),
+    }
+}
+
+fn enum_reference_parts(
+    expression: &Expression,
+    current_module: Option<&str>,
+) -> Option<(String, TypeName, String)> {
+    match expression {
+        Expression::VariableReference(name) => Some((
+            scoped_enum_name(current_module, name),
+            TypeName::struct_type(name.clone()),
+            name.clone(),
+        )),
+        Expression::QualifiedReference(name) => Some((
+            name.as_str().to_string(),
+            TypeName::qualified_struct_type(name.clone()),
+            name.as_str().to_string(),
+        )),
+        _ => None,
+    }
 }
 
 fn collect_enum_declarations(story: &Story) -> Vec<EnumDeclarationRecord<'_>> {

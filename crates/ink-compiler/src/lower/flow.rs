@@ -94,6 +94,7 @@ fn lower_flow_with_context(flow: &Flow, context: &FlowLoweringContext<'_, '_>) -
             &context.indexes.external_signatures,
             &context.indexes.constants,
             &context.indexes.struct_definitions,
+            &context.indexes.enum_definitions,
         );
         content.push(RuntimeObject::Container(lower_choice_weave(
             flow.weave(),
@@ -119,6 +120,7 @@ fn lower_flow_with_context(flow: &Flow, context: &FlowLoweringContext<'_, '_>) -
             &context.indexes.external_signatures,
             &context.indexes.constants,
             &context.indexes.struct_definitions,
+            &context.indexes.enum_definitions,
         );
         lower_linear_weave_into_context(&mut content, flow.weave(), &lowering_context);
     }

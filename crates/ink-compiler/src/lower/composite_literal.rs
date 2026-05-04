@@ -19,6 +19,7 @@ pub(super) fn lower_dynamic_composite_literal_into(
             let Some(default_element) = runtime_default_for_type(
                 element_type,
                 context.struct_definitions(),
+                context.enum_definitions(),
                 context.path_mode().current_module_name(),
             ) else {
                 return false;
@@ -52,6 +53,7 @@ pub(super) fn lower_dynamic_composite_literal_into(
             let Some(default_object) = runtime_default_for_type(
                 expected_type,
                 context.struct_definitions(),
+                context.enum_definitions(),
                 context.path_mode().current_module_name(),
             ) else {
                 return false;

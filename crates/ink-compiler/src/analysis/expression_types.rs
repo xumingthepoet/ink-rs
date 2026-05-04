@@ -1,7 +1,8 @@
 use crate::parsed::{BinaryOperator, Expression, TypeName, UnaryOperator};
 
 use super::{
-    context::{StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
+    context::{EnumTypeIndex, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
+    enums::resolve_enum_member_type,
     structs::resolve_struct_symbol,
     target_symbols::resolve_target_symbol,
 };
@@ -100,6 +101,7 @@ pub(super) fn infer_expression_type(
     expression: &Expression,
     variable_scopes: &VariableScopeIndex,
     struct_types: &StructTypeIndex,
+    enum_types: &EnumTypeIndex,
     target_symbols: &TargetSymbolIndex,
     current_module: Option<&str>,
     current_flow_path: Option<&str>,
@@ -107,6 +109,7 @@ pub(super) fn infer_expression_type(
     let context = TypeInferenceContext {
         variable_scopes,
         struct_types,
+        enum_types,
         target_symbols,
         current_module,
         current_flow_path,
@@ -117,6 +120,7 @@ pub(super) fn infer_expression_type(
 struct TypeInferenceContext<'a> {
     variable_scopes: &'a VariableScopeIndex,
     struct_types: &'a StructTypeIndex,
+    enum_types: &'a EnumTypeIndex,
     target_symbols: &'a TargetSymbolIndex,
     current_module: Option<&'a str>,
     current_flow_path: Option<&'a str>,
@@ -128,13 +132,25 @@ fn infer_expression_type_in_context(
 ) -> Result<TypeName, TypeInferenceError> {
     match expression {
         Expression::FieldAccess { base, field } => {
-            let base_type = infer_expression_type_in_context(base, context)?;
-            infer_field_type(
-                &base_type,
-                field,
-                context.struct_types,
-                context.current_module,
-            )
+            match infer_expression_type_in_context(base, context) {
+                Ok(base_type) => infer_field_type(
+                    &base_type,
+                    field,
+                    context.struct_types,
+                    context.current_module,
+                ),
+                Err(error) => {
+                    if let Some(member_type) = resolve_enum_member_type(
+                        base,
+                        field,
+                        context.enum_types,
+                        context.current_module,
+                    ) {
+                        return member_type.map_err(TypeInferenceError::new);
+                    }
+                    Err(error)
+                }
+            }
         }
         Expression::FunctionCall { name, .. } => {
             typed_builtin_return_type(name).map(Ok).unwrap_or_else(|| {
@@ -584,8 +600,9 @@ mod tests {
 
     use super::{
         super::{
-            structs::build_struct_type_index, target_symbols::build_target_symbol_index,
-            test_support::parse_story, variables::build_variable_scope_index,
+            enums::build_enum_type_index, structs::build_struct_type_index,
+            target_symbols::build_target_symbol_index, test_support::parse_story,
+            variables::build_variable_scope_index,
         },
         *,
     };
@@ -790,6 +807,7 @@ mod tests {
         );
         let scopes = build_variable_scope_index(&story);
         let structs = build_struct_type_index(&story);
+        let enums = build_enum_type_index(&story);
         let targets = build_target_symbol_index(&story);
         let cases = [
             (
@@ -807,8 +825,9 @@ mod tests {
         ];
 
         for (expression, expected_message) in cases {
-            let error = infer_expression_type(&expression, &scopes, &structs, &targets, None, None)
-                .unwrap_err();
+            let error =
+                infer_expression_type(&expression, &scopes, &structs, &enums, &targets, None, None)
+                    .unwrap_err();
 
             assert_eq!(error.message(), expected_message);
         }
@@ -838,6 +857,7 @@ mod tests {
         );
         let scopes = build_variable_scope_index(&story);
         let structs = build_struct_type_index(&story);
+        let enums = build_enum_type_index(&story);
         let targets = build_target_symbol_index(&story);
         let expressions = [
             binary(
@@ -879,10 +899,67 @@ mod tests {
 
         for expression in expressions {
             assert_eq!(
-                infer_expression_type(&expression, &scopes, &structs, &targets, None, None),
+                infer_expression_type(&expression, &scopes, &structs, &enums, &targets, None, None),
                 Ok(TypeName::bool())
             );
         }
+    }
+
+    #[test]
+    fn infers_enum_member_and_equality_types() {
+        let story = parse_story(
+            "ENUM State { Idle Busy }\n\
+             VAR state: State = State.Idle\n\
+             -> DONE",
+        );
+        let scopes = build_variable_scope_index(&story);
+        let structs = build_struct_type_index(&story);
+        let enums = build_enum_type_index(&story);
+        let targets = build_target_symbol_index(&story);
+        let idle = Expression::FieldAccess {
+            base: Box::new(variable("State")),
+            field: "Idle".to_string(),
+        };
+        let busy = Expression::FieldAccess {
+            base: Box::new(variable("State")),
+            field: "Busy".to_string(),
+        };
+
+        assert_eq!(
+            infer_expression_type(&idle, &scopes, &structs, &enums, &targets, None, None),
+            Ok(TypeName::struct_type("State"))
+        );
+        assert_eq!(
+            infer_expression_type(
+                &binary(BinaryOperator::Equals, idle, busy),
+                &scopes,
+                &structs,
+                &enums,
+                &targets,
+                None,
+                None
+            ),
+            Ok(TypeName::bool())
+        );
+    }
+
+    #[test]
+    fn rejects_unknown_enum_members() {
+        let story = parse_story("ENUM State { Idle Busy }\n-> DONE");
+        let scopes = build_variable_scope_index(&story);
+        let structs = build_struct_type_index(&story);
+        let enums = build_enum_type_index(&story);
+        let targets = build_target_symbol_index(&story);
+        let missing = Expression::FieldAccess {
+            base: Box::new(variable("State")),
+            field: "Missing".to_string(),
+        };
+
+        let error =
+            infer_expression_type(&missing, &scopes, &structs, &enums, &targets, None, None)
+                .unwrap_err();
+
+        assert_eq!(error.message(), "Unknown member 'Missing' in enum 'State'");
     }
 
     #[test]
@@ -899,6 +976,7 @@ mod tests {
         );
         let scopes = build_variable_scope_index(&story);
         let structs = build_struct_type_index(&story);
+        let enums = build_enum_type_index(&story);
         let targets = build_target_symbol_index(&story);
         let cases = [
             (
@@ -920,8 +998,9 @@ mod tests {
         ];
 
         for (expression, expected_message) in cases {
-            let error = infer_expression_type(&expression, &scopes, &structs, &targets, None, None)
-                .unwrap_err();
+            let error =
+                infer_expression_type(&expression, &scopes, &structs, &enums, &targets, None, None)
+                    .unwrap_err();
 
             assert_eq!(error.message(), expected_message);
         }
@@ -933,6 +1012,7 @@ mod tests {
             "STRUCT Player {\n\
              hp: int\n\
              }\n\
+             ENUM State { Idle Busy }\n\
              VAR score: int = 1\n\
              VAR source_player: Player = { hp: 10 }\n\
              VAR other_player: Player = { hp: 20 }\n\
@@ -948,6 +1028,7 @@ mod tests {
         );
         let scopes = build_variable_scope_index(&story);
         let structs = build_struct_type_index(&story);
+        let enums = build_enum_type_index(&story);
         let targets = build_target_symbol_index(&story);
         let cases = [
             (
@@ -977,6 +1058,20 @@ mod tests {
             (
                 binary(
                     BinaryOperator::GreaterThan,
+                    Expression::FieldAccess {
+                        base: Box::new(variable("State")),
+                        field: "Idle".to_string(),
+                    },
+                    Expression::FieldAccess {
+                        base: Box::new(variable("State")),
+                        field: "Busy".to_string(),
+                    },
+                ),
+                "Operator '>' is not defined for types State and State",
+            ),
+            (
+                binary(
+                    BinaryOperator::GreaterThan,
                     Expression::String("a".to_string()),
                     Expression::String("b".to_string()),
                 ),
@@ -985,8 +1080,9 @@ mod tests {
         ];
 
         for (expression, expected_message) in cases {
-            let error = infer_expression_type(&expression, &scopes, &structs, &targets, None, None)
-                .unwrap_err();
+            let error =
+                infer_expression_type(&expression, &scopes, &structs, &enums, &targets, None, None)
+                    .unwrap_err();
 
             assert_eq!(error.message(), expected_message);
         }

@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use super::indexes::{ConstantValues, ExternalSignatures, StructDefinitions};
+use super::indexes::{ConstantValues, EnumDefinitions, ExternalSignatures, StructDefinitions};
 use super::path::{child_path, module_scoped_source_path_to_runtime_path, LabelIndex};
 
 pub(super) struct LoweringContext<'a> {
@@ -11,6 +11,7 @@ pub(super) struct LoweringContext<'a> {
     external_signatures: &'a ExternalSignatures,
     constants: &'a ConstantValues,
     struct_definitions: &'a StructDefinitions,
+    enum_definitions: &'a EnumDefinitions,
 }
 
 impl<'a> LoweringContext<'a> {
@@ -22,6 +23,7 @@ impl<'a> LoweringContext<'a> {
         external_signatures: &'a ExternalSignatures,
         constants: &'a ConstantValues,
         struct_definitions: &'a StructDefinitions,
+        enum_definitions: &'a EnumDefinitions,
     ) -> Self {
         Self {
             path_mode,
@@ -31,6 +33,7 @@ impl<'a> LoweringContext<'a> {
             external_signatures,
             constants,
             struct_definitions,
+            enum_definitions,
         }
     }
 
@@ -62,6 +65,10 @@ impl<'a> LoweringContext<'a> {
         self.struct_definitions
     }
 
+    pub(super) fn enum_definitions(&self) -> &EnumDefinitions {
+        self.enum_definitions
+    }
+
     pub(super) fn with_path_mode(&self, path_mode: ChoicePathMode) -> Self {
         Self {
             path_mode,
@@ -71,6 +78,7 @@ impl<'a> LoweringContext<'a> {
             external_signatures: self.external_signatures,
             constants: self.constants,
             struct_definitions: self.struct_definitions,
+            enum_definitions: self.enum_definitions,
         }
     }
 
@@ -87,6 +95,7 @@ impl<'a> LoweringContext<'a> {
             external_signatures: self.external_signatures,
             constants: self.constants,
             struct_definitions: self.struct_definitions,
+            enum_definitions: self.enum_definitions,
         }
     }
 }
