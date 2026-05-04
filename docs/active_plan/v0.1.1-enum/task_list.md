@@ -98,7 +98,7 @@ Review validation: `cargo test -p ink-compiler analysis::expression_types`; `car
 
 ## Milestone 4: Fixtures And Documentation
 
-### [ ] Task 04: Add Public Fixtures, Diagnostics, And Syntax Documentation
+### [~] Task 04: Add Public Fixtures, Diagnostics, And Syntax Documentation
 
 Goal:
 Pin the complete v0.1.1 enum language behavior in integration fixtures and user-facing syntax documentation.
