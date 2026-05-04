@@ -2,6 +2,7 @@ mod array_literals;
 mod assignments;
 mod constants;
 mod context;
+mod enums;
 mod expression_types;
 mod field_access;
 mod flow;
@@ -24,6 +25,7 @@ use crate::{compiler::StageOutput, diagnostic::Diagnostic, parsed::Story};
 use array_literals::array_literal_diagnostics;
 use assignments::variable_assignment_diagnostics;
 use constants::constant_redefinition_diagnostics;
+use enums::enum_type_diagnostics;
 use field_access::field_access_diagnostics;
 use flow::flow_diagnostics;
 use index_access::index_access_diagnostics;
@@ -104,6 +106,7 @@ fn run_analysis_passes_with_modules(
     // not depend on symbol or variable indexes.
     diagnostics.extend(constant_redefinition_diagnostics(story));
     diagnostics.extend(author_warning_diagnostics(story));
+    diagnostics.extend(enum_type_diagnostics(story));
     diagnostics.extend(struct_type_diagnostics(story));
     diagnostics.extend(modules::module_symbol_diagnostics(
         story,
@@ -159,6 +162,7 @@ mod tests {
         ("assignments.rs", include_str!("assignments.rs")),
         ("constants.rs", include_str!("constants.rs")),
         ("context.rs", include_str!("context.rs")),
+        ("enums.rs", include_str!("enums.rs")),
         ("expression_types.rs", include_str!("expression_types.rs")),
         ("field_access.rs", include_str!("field_access.rs")),
         ("flow.rs", include_str!("flow.rs")),

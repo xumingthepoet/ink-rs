@@ -14,6 +14,7 @@ pub(super) enum ModuleSymbolKind {
     Function,
     Constant,
     GlobalVariable,
+    Enum,
     Struct,
     External,
 }
@@ -25,6 +26,7 @@ impl ModuleSymbolKind {
             Self::Function => "function",
             Self::Constant => "constant",
             Self::GlobalVariable => "global variable",
+            Self::Enum => "enum",
             Self::Struct => "struct",
             Self::External => "external",
         }
@@ -392,6 +394,14 @@ fn insert_module_weave_symbols(index: &mut ModuleSymbolIndex, module: &Module) {
                     )
                     .with_optional_declared_type(assignment.declared_type().cloned()),
                 );
+            }
+            Object::EnumDeclaration(declaration) => {
+                index.insert(ModuleSymbol::new(
+                    module.name(),
+                    declaration.name(),
+                    ModuleSymbolKind::Enum,
+                    declaration.span().clone(),
+                ));
             }
             Object::StructDeclaration(declaration) => {
                 index.insert(

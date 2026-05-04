@@ -133,6 +133,7 @@ mod tests {
              hp: int\n\
              name: string\n\
              }\n\
+             ENUM State { Idle Busy }\n\
              EXTERNAL play(name: string) => void\n\
              == function heal(amount: int) => int ==\n\
              ~ return amount\n\
@@ -165,9 +166,13 @@ mod tests {
         assert_eq!(struct_symbol.fields()[1].name(), "name");
         assert_eq!(struct_symbol.fields()[1].type_name(), &TypeName::string());
 
+        let enum_symbol = index.get("game", "State").expect("enum symbol");
+        assert_eq!(enum_symbol.kind(), ModuleSymbolKind::Enum);
+        assert_eq!(enum_symbol.span().line, 8);
+
         let external = index.get("game", "play").expect("external symbol");
         assert_eq!(external.kind(), ModuleSymbolKind::External);
-        assert_eq!(external.span().line, 8);
+        assert_eq!(external.span().line, 9);
         let external_signature = external.signature().expect("external signature");
         assert_eq!(external_signature.parameters()[0].name(), "name");
         assert_eq!(
@@ -179,7 +184,7 @@ mod tests {
 
         let function = index.get("game", "heal").expect("function symbol");
         assert_eq!(function.kind(), ModuleSymbolKind::Function);
-        assert_eq!(function.span().line, 9);
+        assert_eq!(function.span().line, 10);
         let function_signature = function.signature().expect("function signature");
         assert_eq!(function_signature.parameters()[0].name(), "amount");
         assert_eq!(
@@ -193,7 +198,7 @@ mod tests {
         assert_eq!(knot.kind(), ModuleSymbolKind::Knot);
         assert_eq!(knot.module(), "game");
         assert_eq!(knot.name(), "main");
-        assert_eq!(knot.span().line, 11);
+        assert_eq!(knot.span().line, 12);
         let knot_signature = knot.signature().expect("knot signature");
         assert_eq!(knot_signature.parameters()[0].name(), "arg");
         assert_eq!(
@@ -671,6 +676,25 @@ mod tests {
     }
 
     #[test]
+    fn qualified_enum_type_references_count_as_import_uses() {
+        let story = parse_story(
+            "=== module game ===\n\
+             IMPORT State FROM items\n\
+             VAR state: items::State\n\
+             == main ==\n\
+             -> END\n\
+             === module items ===\n\
+             ENUM State { Idle Busy }\n\
+             == helper ==\n\
+             -> END",
+        );
+
+        let diagnostics = import_diagnostics(&story);
+
+        assert!(diagnostics.is_empty(), "{diagnostics:#?}");
+    }
+
+    #[test]
     fn warns_for_modules_unreachable_from_main_import_path() {
         let story = parse_story(
             "=== module game ===\n\
@@ -813,6 +837,7 @@ mod tests {
              STRUCT Player {\n\
              hp: int\n\
              }\n\
+             ENUM Player { Ready }\n\
              EXTERNAL Player() => void\n\
              == function util() => void ==\n\
              ~ return\n\
@@ -822,7 +847,7 @@ mod tests {
 
         let diagnostics = symbol_diagnostics(&story);
 
-        assert_eq!(diagnostics.len(), 3, "{diagnostics:#?}");
+        assert_eq!(diagnostics.len(), 4, "{diagnostics:#?}");
         assert_eq!(diagnostics[0].line, 3);
         assert_eq!(
             diagnostics[0].message,
@@ -831,11 +856,16 @@ mod tests {
         assert_eq!(diagnostics[1].line, 7);
         assert_eq!(
             diagnostics[1].message,
-            "Module 'game' already contains a struct named 'Player'; external declarations cannot reuse that name"
+            "Module 'game' already contains a struct named 'Player'; enum declarations cannot reuse that name"
         );
-        assert_eq!(diagnostics[2].line, 10);
+        assert_eq!(diagnostics[2].line, 8);
         assert_eq!(
             diagnostics[2].message,
+            "Module 'game' already contains a struct named 'Player'; external declarations cannot reuse that name"
+        );
+        assert_eq!(diagnostics[3].line, 11);
+        assert_eq!(
+            diagnostics[3].message,
             "Module 'game' already contains a function named 'util'; knot declarations cannot reuse that name"
         );
     }

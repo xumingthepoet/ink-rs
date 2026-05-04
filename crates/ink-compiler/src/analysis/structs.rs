@@ -5,7 +5,10 @@ use crate::{
     parsed::{ContentList, Flow, Object, Story, StructDeclaration, TypeName, Weave},
 };
 
-use super::context::{StructTypeIndex, StructTypeSymbol};
+use super::{
+    context::{EnumTypeIndex, StructTypeIndex, StructTypeSymbol},
+    enums::build_enum_type_index,
+};
 
 #[derive(Debug, Clone, Copy)]
 struct StructDeclarationRecord<'a> {
@@ -16,7 +19,12 @@ struct StructDeclarationRecord<'a> {
 pub(super) fn struct_type_diagnostics(story: &Story) -> Vec<Diagnostic> {
     let declarations = collect_struct_declarations(story);
     let (index, mut diagnostics) = build_struct_type_index_from_declarations(&declarations);
-    diagnostics.extend(unknown_field_type_diagnostics(&declarations, &index));
+    let enum_index = build_enum_type_index(story);
+    diagnostics.extend(unknown_field_type_diagnostics(
+        &declarations,
+        &index,
+        &enum_index,
+    ));
     diagnostics.extend(recursive_struct_diagnostics(&declarations, &index));
     diagnostics
 }
@@ -69,19 +77,20 @@ fn build_struct_type_index_from_declarations(
 fn unknown_field_type_diagnostics(
     declarations: &[StructDeclarationRecord<'_>],
     index: &StructTypeIndex,
+    enum_index: &EnumTypeIndex,
 ) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
     for record in declarations {
         let declaration = record.declaration;
         for field in declaration.fields() {
-            for (struct_name, key) in referenced_struct_names(field.type_name(), record.module) {
-                if !index.contains_key(&key) {
+            for (type_name, key) in referenced_named_type_names(field.type_name(), record.module) {
+                if !index.contains_key(&key) && !enum_index.contains_key(&key) {
                     diagnostics.push(Diagnostic::error(
                         field.span().clone(),
                         format!(
-                            "Unknown struct type '{}' for field '{}' in struct '{}'",
-                            struct_name,
+                            "Unknown named type '{}' for field '{}' in struct '{}'",
+                            type_name,
                             field.name(),
                             declaration.name()
                         ),
@@ -130,7 +139,7 @@ fn struct_dependency_graph(index: &StructTypeIndex) -> BTreeMap<String, BTreeSet
             let dependencies = symbol
                 .fields()
                 .values()
-                .flat_map(|type_name| referenced_struct_names(type_name, module_name(name)))
+                .flat_map(|type_name| referenced_named_type_names(type_name, module_name(name)))
                 .map(|(_, referenced)| referenced)
                 .filter(|referenced| index.contains_key(referenced))
                 .collect();
@@ -184,7 +193,7 @@ fn module_name(scoped_name: &str) -> Option<&str> {
     scoped_name.split_once("::").map(|(module, _)| module)
 }
 
-fn referenced_struct_names(
+fn referenced_named_type_names(
     type_name: &TypeName,
     current_module: Option<&str>,
 ) -> Vec<(String, String)> {
@@ -195,7 +204,7 @@ fn referenced_struct_names(
         TypeName::QualifiedStruct(name) => {
             vec![(name.as_str().to_string(), name.as_str().to_string())]
         }
-        TypeName::Array(element_type) => referenced_struct_names(element_type, current_module),
+        TypeName::Array(element_type) => referenced_named_type_names(element_type, current_module),
         TypeName::Primitive(_) | TypeName::Void => Vec::new(),
     }
 }
@@ -448,7 +457,7 @@ mod tests {
         assert_single_diagnostic(
             &diagnostics,
             DiagnosticSeverity::Error,
-            "Unknown struct type 'Item' for field 'inventory' in struct 'Player'",
+            "Unknown named type 'Item' for field 'inventory' in struct 'Player'",
         );
     }
 
@@ -474,7 +483,7 @@ mod tests {
         assert_single_diagnostic(
             &diagnostics,
             DiagnosticSeverity::Error,
-            "Unknown struct type 'Item' for field 'item' in struct 'Box'",
+            "Unknown named type 'Item' for field 'item' in struct 'Box'",
         );
     }
 
@@ -490,6 +499,37 @@ mod tests {
              }\n\
              == main ==\n\
              -> DONE",
+        );
+
+        assert!(struct_type_diagnostics(&story).is_empty());
+    }
+
+    #[test]
+    fn accepts_enum_field_types_in_same_scope() {
+        let story = parse_story(
+            "ENUM State { Idle Busy }\n\
+             STRUCT Actor {\n\
+             state: State\n\
+             }\n\
+             -> DONE",
+        );
+
+        assert!(struct_type_diagnostics(&story).is_empty());
+    }
+
+    #[test]
+    fn accepts_qualified_enum_field_types() {
+        let story = parse_story(
+            "=== module game ===\n\
+             STRUCT Actor {\n\
+             state: items::State\n\
+             }\n\
+             == main ==\n\
+             -> END\n\
+             === module items ===\n\
+             ENUM State { Idle Busy }\n\
+             == helper ==\n\
+             -> END",
         );
 
         assert!(struct_type_diagnostics(&story).is_empty());

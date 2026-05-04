@@ -75,6 +75,7 @@ impl ParameterSymbol {
 
 pub(super) type TargetSymbolIndex = HashMap<String, FlowSymbol>;
 pub(super) type StructTypeIndex = BTreeMap<String, StructTypeSymbol>;
+pub(super) type EnumTypeIndex = BTreeMap<String, EnumTypeSymbol>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct StructTypeSymbol {
@@ -88,6 +89,27 @@ impl StructTypeSymbol {
 
     pub(super) fn fields(&self) -> &BTreeMap<String, TypeName> {
         &self.fields
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct EnumTypeSymbol {
+    members: Vec<String>,
+}
+
+impl EnumTypeSymbol {
+    pub(super) fn new(members: Vec<String>) -> Self {
+        Self { members }
+    }
+
+    #[cfg(test)]
+    pub(super) fn members(&self) -> &[String] {
+        &self.members
+    }
+
+    #[cfg(test)]
+    pub(super) fn contains_member(&self, member: &str) -> bool {
+        self.members.iter().any(|candidate| candidate == member)
     }
 }
 
