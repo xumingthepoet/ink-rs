@@ -98,7 +98,7 @@ Review validation: `cargo test -p ink-compiler analysis::expression_types`; `car
 
 ## Milestone 4: Fixtures And Documentation
 
-### [~] Task 04: Add Public Fixtures, Diagnostics, And Syntax Documentation
+### [>] Task 04: Add Public Fixtures, Diagnostics, And Syntax Documentation
 
 Goal:
 Pin the complete v0.1.1 enum language behavior in integration fixtures and user-facing syntax documentation.
@@ -121,7 +121,8 @@ Validation commands:
 `make gate`
 
 Commit record:
-Implementation commit: pending
+Implementation commit: `26e1a2b6` Add enum fixtures and documentation
+Implementation validation: `cargo test -p ink-compiler analysis`; `cargo test -p ink-compiler parsed::qualified_name`; `cargo test -p ink-test --test compiler_snapshots`; `cargo test -p ink-test --test typed_values`; `cargo test -p ink-test --test diagnostics`; `cargo test --workspace`; `make gate`
 Review validation: pending
 
 ## Milestone 5: Closeout
