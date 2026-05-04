@@ -24,6 +24,34 @@ Each entry should include:
 - migration guidance
 - tests
 
+## 2026-05-04: ENUM Declarations And Values
+
+- status: supported
+- upstream behavior: upstream Ink uses LIST declarations for symbolic value
+  sets and list membership operations.
+- ink-rs behavior: `ENUM Name { Member Member }` declares a nominal enum type
+  at module top level. Enum members are referenced as `Name.Member` inside the
+  same module or as `module::Name.Member` after importing the enum name. Enum
+  types can be used in `VAR`, `CONST`, function parameters and returns, struct
+  fields, and arrays. Omitted enum initializers default to the first declared
+  member. Enum values support equality, inequality, assignment, function
+  passing, switch cases, and text output; they do not interoperate with
+  strings, ordering, arithmetic, or explicit numeric/string member values.
+- documentation effect: `SyntaxReference.md` documents the current enum
+  syntax, type positions, defaulting rule, member reference forms, and invalid
+  operations. Removed list syntax remains documented only as historical
+  migration material.
+- rationale: story code needs named state sets without depending on removed
+  upstream list behavior or integer/string constants that weaken type checks.
+- migration guidance: replace string or integer state constants with an enum
+  declaration and use `State.Member` or `module::State.Member` at value sites.
+  Keep member order stable when relying on omitted initializer defaults.
+- tests: parser and analysis tests cover declarations, imports, duplicate and
+  empty enums, type resolution, member lookup, equality, invalid operators, and
+  invalid string interop. Runtime and compiler snapshot fixtures cover module
+  enum values, defaults, arrays, struct fields, functions, switch with `else`,
+  text output, and compiled JSON string lowering.
+
 ## 2026-05-03: INTERNAL Host-Callable Functions
 
 - status: supported

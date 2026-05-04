@@ -22,6 +22,7 @@ use super::{
     target_symbols::{
         build_target_symbol_index, is_cross_module_stitch_target, resolve_target_symbol,
     },
+    type_names::qualify_type_name_for_module,
     variables::build_variable_scope_index,
 };
 
@@ -508,6 +509,7 @@ impl<'a> CallTargetChecker<'a> {
         context: &VisitContext,
     ) {
         let parameters = symbol.arguments();
+        let qualified_module = name.split_once("::").map(|(module, _)| module);
         if args.len() != parameters.len() {
             self.diagnostics.push(Diagnostic::error(
                 span.clone(),
@@ -524,6 +526,9 @@ impl<'a> CallTargetChecker<'a> {
             let Some(expected_type) = parameter.declared_type() else {
                 continue;
             };
+            let expected_type = qualified_module
+                .map(|module| qualify_type_name_for_module(expected_type, module))
+                .unwrap_or_else(|| expected_type.clone());
             match infer_expression_type(
                 argument,
                 self.variable_scopes,
@@ -533,7 +538,7 @@ impl<'a> CallTargetChecker<'a> {
                 self.current_module(context),
                 self.current_flow_path(context),
             ) {
-                Ok(actual_type) if &actual_type != expected_type => {
+                Ok(actual_type) if actual_type != expected_type => {
                     self.diagnostics.push(Diagnostic::error(
                         span.clone(),
                         format!(
@@ -1206,6 +1211,24 @@ mod tests {
              === module math ===\n\
              == function add(left: int, right: int) => int ==\n\
              ~ return left + right",
+        );
+
+        assert_eq!(call_target_diagnostics(&story), []);
+    }
+
+    #[test]
+    fn qualified_module_function_calls_use_declaring_module_named_types() {
+        let story = parse_story(
+            "=== module game ===\n\
+             IMPORT State, echo, DEFAULT_STATE FROM data\n\
+             == main ==\n\
+             ~ temp state: data::State = data::echo(data::DEFAULT_STATE)\n\
+             -> END\n\
+             === module data ===\n\
+             ENUM State { Idle Busy }\n\
+             CONST DEFAULT_STATE: State = State.Idle\n\
+             == function echo(value: State) => State ==\n\
+             ~ return value",
         );
 
         assert_eq!(call_target_diagnostics(&story), []);

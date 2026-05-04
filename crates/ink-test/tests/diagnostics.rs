@@ -56,6 +56,41 @@ fn removed_source_sequences_report_removed_feature_diagnostic() {
 }
 
 #[test]
+fn enum_diagnostics_cover_invalid_declarations_and_values() {
+    let cases = [
+        (
+            "diagnostics/enums/empty.ink",
+            "Enum 'State' must declare at least one member",
+        ),
+        (
+            "diagnostics/enums/duplicate-member.ink",
+            "Duplicate member 'Idle' in enum 'State'",
+        ),
+        (
+            "diagnostics/enums/explicit-member-value.ink",
+            "Enum members do not support explicit values",
+        ),
+        (
+            "diagnostics/enums/unknown-member.ink",
+            "Unknown member 'Missing' in enum 'State'",
+        ),
+        (
+            "diagnostics/enums/string-interop.ink",
+            "has type string but expected State",
+        ),
+        (
+            "diagnostics/enums/invalid-operator.ink",
+            "Operator '>' is not defined for types State and State",
+        ),
+    ];
+
+    for (fixture, message) in cases {
+        let diagnostics = diagnostics_for_fixture(fixture);
+        assert_diagnostic(&diagnostics, DiagnosticSeverity::Error, message);
+    }
+}
+
+#[test]
 fn diagnostic_helper_asserts_error_messages() {
     let diagnostics = diagnostics_for_fixture("diagnostics/diagnostic-smoke.ink");
     assert_diagnostic(&diagnostics, DiagnosticSeverity::Error, "target not found");

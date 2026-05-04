@@ -1121,7 +1121,7 @@ Note the level 2 gather point directly below the first option: there's nothing t
 So far we've made conditional text and conditional choices using explicit
 variables, labels, and expressions.
 
-**ink** also supports variables, both temporary and global, storing typed values such as numbers, booleans, strings, structs, and arrays. It is fully-featured in terms of logic, and contains a few additional structures to help keep the often complex logic of a branching story better organised.
+**ink** also supports variables, both temporary and global, storing typed values such as numbers, booleans, strings, enums, structs, and arrays. It is fully-featured in terms of logic, and contains a few additional structures to help keep the often complex logic of a branching story better organised.
 
 
 ## 1) Global Variables
@@ -1221,6 +1221,67 @@ Struct literals can omit fields whose type has a default value; fields of type `
 	{current_player.stats.hp}
 	~ current_player.stats.hp += 1
 	~ party[1].stats.hp += 1
+
+### Enums
+
+Named story states can be declared with `ENUM` at module top level. Enum
+declarations list member names without commas, semicolons, or explicit member
+values:
+
+	ENUM State { Idle Busy Done }
+
+	ENUM Mood {
+		Calm
+		Alarmed
+	}
+
+Enum names are nominal types. They can be used anywhere other maintained value
+types can be used, including globals, constants, function parameters, function
+returns, struct fields, and arrays:
+
+	ENUM State { Idle Busy Done }
+
+	STRUCT Actor {
+		state: State
+		history: State[]
+	}
+
+	VAR state: State
+	VAR actor: Actor = {
+		state: State.Busy,
+		history: [State.Idle]
+	}
+	CONST DEFAULT_STATE: State = State.Done
+
+An omitted enum initializer defaults to the first declared member, so the
+`state` variable above starts as `State.Idle`. Enum members are referenced as
+`State.Member` inside the same module. From another module, import the enum name
+and use the qualified form:
+
+	=== module game ===
+	IMPORT State FROM data
+
+	== main ==
+	{data::State.Idle}
+	-> DONE
+
+Enum values can be assigned, passed through functions, printed in text output,
+stored inside structs and arrays, compared with `==` and `!=`, and used in
+`switch` case values:
+
+	{ switch state:
+	- State.Idle:
+		Still waiting.
+	- State.Busy:
+		In motion.
+	- else:
+		Done.
+	}
+
+Enum values do not interoperate with strings. Even though compiled enum values
+are stored as strings in the runtime format, source code must use enum members,
+not string literals. Ordering and arithmetic operators are not defined for
+enums.
 
 ### Using Global Variables
 

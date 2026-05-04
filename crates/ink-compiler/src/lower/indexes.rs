@@ -107,13 +107,15 @@ impl<'a> VariableDeclaration<'a> {
 pub(super) struct ConstantValue {
     expression: Expression,
     declared_type: TypeName,
+    module_name: Option<String>,
 }
 
 impl ConstantValue {
-    fn new(expression: Expression, declared_type: TypeName) -> Self {
+    fn new(expression: Expression, declared_type: TypeName, module_name: Option<&str>) -> Self {
         Self {
             expression,
             declared_type,
+            module_name: module_name.map(str::to_string),
         }
     }
 
@@ -123,6 +125,10 @@ impl ConstantValue {
 
     pub(super) fn declared_type(&self) -> &TypeName {
         &self.declared_type
+    }
+
+    pub(super) fn module_name(&self) -> Option<&str> {
+        self.module_name.as_deref()
     }
 }
 
@@ -500,6 +506,7 @@ fn collect_constant_values_in_object(
                 ConstantValue::new(
                     constant.expression().clone(),
                     constant.declared_type().clone(),
+                    module_name,
                 ),
             );
         }

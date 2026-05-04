@@ -5,6 +5,7 @@ use super::{
     enums::resolve_enum_member_type,
     structs::resolve_struct_symbol,
     target_symbols::resolve_target_symbol,
+    type_names::{qualify_type_name_for_module, type_name_module},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -245,11 +246,14 @@ fn infer_qualified_global_type(
     name: &str,
     variable_scopes: &VariableScopeIndex,
 ) -> Result<TypeName, TypeInferenceError> {
+    let module = name.split_once("::").map(|(module, _)| module);
     match variable_scopes
         .qualified_constant_declared_type(name)
         .or_else(|| variable_scopes.qualified_global_variable_declared_type(name))
     {
-        Some(Some(type_name)) => Ok(type_name.clone()),
+        Some(Some(type_name)) => Ok(module
+            .map(|module| qualify_type_name_for_module(type_name, module))
+            .unwrap_or_else(|| type_name.clone())),
         Some(None) => Err(TypeInferenceError::new(format!(
             "Qualified global '{name}' has no declared type"
         ))),
@@ -278,9 +282,12 @@ fn infer_field_type(
         )));
     };
 
-    symbol.fields().get(field).cloned().ok_or_else(|| {
+    let field_type = symbol.fields().get(field).cloned().ok_or_else(|| {
         TypeInferenceError::new(format!("Unknown field '{field}' on struct '{struct_name}'"))
-    })
+    })?;
+    Ok(type_name_module(base_type)
+        .map(|module| qualify_type_name_for_module(&field_type, module))
+        .unwrap_or(field_type))
 }
 
 fn infer_function_return_type(
@@ -289,6 +296,7 @@ fn infer_function_return_type(
     current_module: Option<&str>,
     current_flow_path: Option<&str>,
 ) -> Result<TypeName, TypeInferenceError> {
+    let qualified_module = name.split_once("::").map(|(module, _)| module);
     let Some(symbol) =
         resolve_target_symbol(name, current_module, current_flow_path, target_symbols)
     else {
@@ -303,7 +311,9 @@ fn infer_function_return_type(
         )));
     }
 
-    Ok(symbol.return_type().clone())
+    Ok(qualified_module
+        .map(|module| qualify_type_name_for_module(symbol.return_type(), module))
+        .unwrap_or_else(|| symbol.return_type().clone()))
 }
 
 fn infer_index_type(
@@ -639,6 +649,15 @@ mod tests {
         ))
     }
 
+    fn qualified_type(module: &str, symbol: &str) -> TypeName {
+        TypeName::qualified_struct_type(QualifiedName::new(
+            module,
+            SourceSpan::new(None, 1, 1),
+            symbol,
+            SourceSpan::new(None, 1, 1),
+        ))
+    }
+
     #[test]
     fn infers_literal_and_variable_primitive_types() {
         let story = parse_story(
@@ -708,6 +727,87 @@ mod tests {
                 Some("main")
             ),
             Ok(TypeName::int())
+        );
+    }
+
+    #[test]
+    fn infers_qualified_global_named_types_in_declaring_module_scope() {
+        let story = parse_story(
+            "=== module game ===\n\
+             IMPORT actor, DEFAULT_STATE, State FROM data\n\
+             == main ==\n\
+             -> DONE\n\
+             === module data ===\n\
+             ENUM State { Idle Busy }\n\
+             STRUCT Actor {\n\
+             state: State\n\
+             history: State[]\n\
+             }\n\
+             VAR actor: Actor\n\
+             CONST DEFAULT_STATE: State = State.Idle\n\
+             == helper ==\n\
+             -> DONE",
+        );
+        let scopes = build_variable_scope_index(&story);
+        let structs = build_struct_type_index(&story);
+        let enums = build_enum_type_index(&story);
+        let targets = build_target_symbol_index(&story);
+        let actor_state = Expression::FieldAccess {
+            base: Box::new(qualified_reference("data", "actor")),
+            field: "state".to_string(),
+        };
+        let actor_history = Expression::FieldAccess {
+            base: Box::new(qualified_reference("data", "actor")),
+            field: "history".to_string(),
+        };
+
+        assert_eq!(
+            infer_expression_type(
+                &qualified_reference("data", "actor"),
+                &scopes,
+                &structs,
+                &enums,
+                &targets,
+                Some("game"),
+                Some("main")
+            ),
+            Ok(qualified_type("data", "Actor"))
+        );
+        assert_eq!(
+            infer_expression_type(
+                &actor_state,
+                &scopes,
+                &structs,
+                &enums,
+                &targets,
+                Some("game"),
+                Some("main")
+            ),
+            Ok(qualified_type("data", "State"))
+        );
+        assert_eq!(
+            infer_expression_type(
+                &actor_history,
+                &scopes,
+                &structs,
+                &enums,
+                &targets,
+                Some("game"),
+                Some("main")
+            ),
+            Ok(TypeName::array(qualified_type("data", "State")))
+        );
+        assert_eq!(
+            infer_expression_type(
+                &qualified_reference("data", "DEFAULT_STATE"),
+                &scopes,
+                &structs,
+                &enums,
+                &targets,
+                Some("game"),
+                Some("main")
+            ),
+            Ok(qualified_type("data", "State"))
         );
     }
 

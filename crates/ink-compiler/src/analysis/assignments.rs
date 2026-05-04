@@ -12,6 +12,7 @@ use super::{
     expression_types::infer_expression_type,
     structs::{build_struct_type_index, resolve_struct_symbol},
     target_symbols::build_target_symbol_index,
+    type_names::{qualify_type_name_for_module, type_name_module},
     variables::build_variable_scope_index,
 };
 
@@ -123,11 +124,18 @@ impl<'a> VariableAssignmentChecker<'a> {
         name: &str,
         span: &crate::source::SourceSpan,
     ) -> Option<TypeName> {
+        let module = name.split_once("::").map(|(module, _)| module);
         match self
             .variable_scopes
             .qualified_global_variable_declared_type(name)
         {
-            Some(Some(type_name)) => return Some(type_name.clone()),
+            Some(Some(type_name)) => {
+                return Some(
+                    module
+                        .map(|module| qualify_type_name_for_module(type_name, module))
+                        .unwrap_or_else(|| type_name.clone()),
+                );
+            }
             Some(None) => return None,
             None => {}
         }
@@ -187,15 +195,21 @@ impl<'a> VariableAssignmentChecker<'a> {
                     return None;
                 };
 
-                symbol.fields().get(field).cloned().or_else(|| {
+                let Some(field_type) = symbol.fields().get(field).cloned() else {
                     self.diagnostics.push(Diagnostic::error(
                         span.clone(),
                         format!(
                             "Unknown field '{field}' on assignment target struct '{struct_name}'"
                         ),
                     ));
-                    None
-                })
+                    return None;
+                };
+
+                Some(
+                    type_name_module(&base_type)
+                        .map(|module| qualify_type_name_for_module(&field_type, module))
+                        .unwrap_or(field_type),
+                )
             }
             AssignmentTarget::IndexAccess { base, index } => {
                 let base_type = self.resolve_assignment_target_type(base, context, span)?;
@@ -713,6 +727,24 @@ mod tests {
              -> END\n\
              === module state ===\n\
              VAR score: int = 0\n\
+             == helper ==\n\
+             -> END",
+        );
+
+        assert_eq!(variable_assignment_diagnostics(&story), []);
+    }
+
+    #[test]
+    fn accepts_qualified_imported_enum_assignments() {
+        let story = parse_story(
+            "=== module game ===\n\
+             IMPORT State, state FROM data\n\
+             == main ==\n\
+             ~ data::state = data::State.Busy\n\
+             -> END\n\
+             === module data ===\n\
+             ENUM State { Idle Busy }\n\
+             VAR state: State = State.Idle\n\
              == helper ==\n\
              -> END",
         );

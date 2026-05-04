@@ -42,11 +42,19 @@ fn enums_run_at_runtime() {
 
     assert_story_output(
         &compiled,
-        "game::State.Idle|true|game::State.Busy|game::State.Busy|game::State.Idle|game::State.Done\n|true\n",
+        "data::State.Idle|true|data::State.Busy|data::State.Busy|data::State.Idle|data::State.Done|calm|data::Tone.Sharp\n|true\n",
     );
     assert_json_sequence(
         &compiled.program.to_json_value(),
-        vec![json!("^game::State.Idle"), json!({"VAR=": "game::state"})],
+        vec![json!("^data::State.Idle"), json!({"VAR=": "data::state"})],
+    );
+    assert_json_sequence(
+        &compiled.program.to_json_value(),
+        vec![
+            json!("^data::State.Done"),
+            json!("/ev"),
+            json!({"VAR=": "data::state", "re": true}),
+        ],
     );
 }
 

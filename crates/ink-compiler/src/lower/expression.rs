@@ -227,7 +227,20 @@ fn lower_constant_expression_into(
     constant: &ConstantValue,
     lowering: &mut ExpressionLoweringContext<'_, '_>,
 ) {
-    let context = lowering.context;
+    let scoped_context;
+    let context = if let Some(module_name) = constant.module_name() {
+        scoped_context = lowering.context.with_path_mode(ChoicePathMode::Module {
+            module_name: module_name.to_string(),
+        });
+        &scoped_context
+    } else {
+        lowering.context
+    };
+    let mut constant_lowering = ExpressionLoweringContext {
+        context,
+        has_start_content: lowering.has_start_content,
+        visiting_constants: &mut *lowering.visiting_constants,
+    };
     if let Some(value) = lower_value_literal(
         constant.expression(),
         Some(constant.declared_type()),
@@ -241,7 +254,7 @@ fn lower_constant_expression_into(
         return;
     }
 
-    lower_expression_into_with_constants(content, constant.expression(), lowering);
+    lower_expression_into_with_constants(content, constant.expression(), &mut constant_lowering);
 }
 
 pub(super) fn lower_expression_with_expected_type_into_with_constants(

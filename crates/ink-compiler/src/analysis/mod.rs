@@ -17,6 +17,7 @@ mod target_symbols;
 mod targets;
 #[cfg(test)]
 mod test_support;
+mod type_names;
 mod variables;
 mod warnings;
 

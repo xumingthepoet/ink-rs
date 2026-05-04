@@ -30,6 +30,7 @@ fixture!(
 fixture!(tags_tags_dynamic_content, "tags/tagsDynamicContent.ink");
 fixture!(variable_varcalc, "variables/varcalc.ink");
 fixture!(typed_array_literals, "typed/array-literals.ink");
+fixture!(typed_enums, "typed/enums.ink");
 fixture!(typed_struct_literals, "typed/struct-literals.ink");
 fixture!(function_rnd_func, "functions/rnd-func.ink");
 fixture!(misc_operations, "misc/operations.ink");
