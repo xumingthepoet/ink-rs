@@ -1,4 +1,4 @@
-Progress: 2/5
+Progress: 3/5
 
 # v0.1.1 ENUM Feature Active Plan
 
@@ -68,7 +68,7 @@ Review validation: `cargo test -p ink-compiler analysis`; `cargo test -p ink-com
 
 ## Milestone 3: Expressions And Lowering
 
-### [>] Task 03: Resolve Enum Members And Lower Enum Values
+### [x] Task 03: Resolve Enum Members And Lower Enum Values
 
 Goal:
 Make `Enum.Member` and `module::Enum.Member` valid enum member expressions with type-safe equality, assignment, defaults, and lowering to runtime strings.
@@ -94,7 +94,7 @@ Validation commands:
 Commit record:
 Implementation commit: `831f41ba` Add enum member lowering
 Implementation validation: `cargo test -p ink-compiler analysis::expression_types`; `cargo test -p ink-compiler analysis::initializers`; `cargo test -p ink-compiler analysis::assignments`; `cargo test -p ink-compiler analysis::field_access`; `cargo test -p ink-compiler analysis::flow`; `cargo test -p ink-compiler analysis::targets`; `cargo test -p ink-compiler analysis`; `cargo test -p ink-test --test integration_policy`; `cargo test -p ink-test --test typed_values`; `make gate`
-Review validation: pending
+Review validation: `cargo test -p ink-compiler analysis::expression_types`; `cargo test -p ink-compiler analysis::initializers`; `cargo test -p ink-test --test typed_values`; `make gate`
 
 ## Milestone 4: Fixtures And Documentation
 
