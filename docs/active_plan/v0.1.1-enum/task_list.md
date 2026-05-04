@@ -46,7 +46,7 @@ Goal:
 Represent enum types as first-class nominal types and make enum declarations participate in module symbols, imports, name conflicts, and type existence diagnostics.
 
 Implementation method:
-Extend `TypeName` with root and qualified enum variants, default metadata, display names, and array support. Add an enum type index analogous to struct indexing, with diagnostics for empty enums and duplicate members. Register enums in module symbols and import-use collection so `IMPORT State FROM items` authorizes `items::State` and `items::State.Member`. Update name collision analysis so enum names share the module element namespace with structs, variables, constants, flows/functions, and externals.
+Refactor named type analysis so parsed root and qualified user-defined names can resolve to either struct declarations or enum declarations without making the parser guess the declaration kind. Add an enum type index analogous to struct indexing, with diagnostics for empty enums and duplicate members. Register enums in module symbols and import-use collection so `IMPORT State FROM items` authorizes `items::State` and `items::State.Member`. Update name collision analysis so enum names share the module element namespace with structs, variables, constants, flows/functions, and externals.
 
 Acceptance criteria:
 Enum types are accepted in every existing type position syntactically. Unknown enum types and invalid declarations produce explicit diagnostics. Existing struct import and namespace diagnostics continue to pass.
