@@ -11,6 +11,9 @@
       "include": "#comments"
     },
     {
+      "include": "#enum-declaration"
+    },
+    {
       "include": "#struct-declaration"
     },
     {
@@ -133,6 +136,41 @@
         }
       },
       "name": "comment.todo.ink"
+    },
+    "enum-declaration": {
+      "begin": "^\\s*(ENUM)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*(\\{)",
+      "beginCaptures": {
+        "1": {
+          "name": "storage.type.struct.ink"
+        },
+        "2": {
+          "name": "entity.name.type.struct.ink"
+        },
+        "3": {
+          "name": "keyword.control.heading.ink"
+        }
+      },
+      "end": "\\}",
+      "endCaptures": {
+        "0": {
+          "name": "keyword.control.heading.ink"
+        }
+      },
+      "name": "meta.enum.declaration.ink",
+      "patterns": [
+        {
+          "include": "#comments"
+        },
+        {
+          "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\b",
+          "captures": {
+            "1": {
+              "name": "constant.other.enum.member.ink"
+            }
+          },
+          "name": "meta.enum.member.ink"
+        }
+      ]
     },
     "struct-declaration": {
       "begin": "^\\s*(STRUCT)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*(\\{)",

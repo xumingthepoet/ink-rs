@@ -6,6 +6,7 @@ This is an independent TextMate grammar for ink-rs. It covers the ink-rs
 language surface directly:
 
 - `STRUCT Name { field: Type }`
+- `ENUM Name { Member }`
 - explicit `=== module name ===` declarations
 - `IMPORT name FROM module` and comma-wrapped `IMPORT { ... } FROM module` declarations
 - typed `VAR` and `~ temp` declarations

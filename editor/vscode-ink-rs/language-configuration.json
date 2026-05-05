@@ -62,12 +62,12 @@
   ],
   "folding": {
     "markers": {
-      "start": "^\\s*(STRUCT\\s+[A-Za-z_][A-Za-z0-9_]*\\s*\\{|===\\s*module\\s+[A-Za-z_][A-Za-z0-9_]*\\s*===|==\\s*(?:function\\s+)?[A-Za-z_][A-Za-z0-9_]*)",
+      "start": "^\\s*((?:STRUCT|ENUM)\\s+[A-Za-z_][A-Za-z0-9_]*\\s*\\{|===\\s*module\\s+[A-Za-z_][A-Za-z0-9_]*\\s*===|==\\s*(?:function\\s+)?[A-Za-z_][A-Za-z0-9_]*)",
       "end": "^\\s*\\}"
     }
   },
   "indentationRules": {
-    "increaseIndentPattern": "^\\s*(STRUCT\\s+[A-Za-z_][A-Za-z0-9_]*\\s*\\{|\\{[^}\"']*)$",
+    "increaseIndentPattern": "^\\s*((?:STRUCT|ENUM)\\s+[A-Za-z_][A-Za-z0-9_]*\\s*\\{|\\{[^}\"']*)$",
     "decreaseIndentPattern": "^\\s*\\}"
   },
   "wordPattern": "(-?\\d*\\.\\d\\w*)|([^`~!@#%^&*()=+[{\\]}\\\\|;:'\",.<>/?\\s]+)"
