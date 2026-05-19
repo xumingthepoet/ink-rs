@@ -474,7 +474,7 @@ Commit record:
 
 ## Milestone 3: Compiled Story JSON Format
 
-### [ ] Task 11: Add Format Objects For Dynamic Interface Access
+### [~] Task 11: Add Format Objects For Dynamic Interface Access
 
 Goal: Add typed compiled-story JSON model support for dynamic interface targets, dynamic interface function calls, and runtime interface validation metadata in `ink-story-json-format`.
 
