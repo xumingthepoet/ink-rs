@@ -273,6 +273,11 @@ impl<'a> InterfaceModuleLiteralUseCollector<'a> {
                     self.check_expression_against_type(element, element_type, context);
                 }
             }
+            (TypeName::Dict { value_type, .. }, Expression::DictLiteral(entries)) => {
+                for entry in entries {
+                    self.check_expression_against_type(entry.value(), value_type, context);
+                }
+            }
             (TypeName::Struct(struct_name), Expression::StructLiteral(fields)) => {
                 self.check_struct_literal(struct_name, fields, context);
             }

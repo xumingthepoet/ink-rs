@@ -91,6 +91,20 @@ fn enum_diagnostics_cover_invalid_declarations_and_values() {
 }
 
 #[test]
+fn dict_literal_diagnostics_report_invalid_literals() {
+    let diagnostics = diagnostics_for_fixture("diagnostics/dict-literals.ink");
+
+    for message in [
+        "Dict literal key for 'wrongKey' has type string but expected int",
+        "Value for 'wrongValue[\"one\"]' has type string but expected int",
+        "Value for 'wrongNested[\"row\"][1]' has type int but expected string",
+        "Value for 'wrongExpected' is a Dict literal but expected int",
+    ] {
+        assert_diagnostic(&diagnostics, DiagnosticSeverity::Error, message);
+    }
+}
+
+#[test]
 fn interface_body_diagnostics_reject_executable_content() {
     let diagnostics = diagnostics_for_fixture("diagnostics/interface-invalid-body.ink");
 

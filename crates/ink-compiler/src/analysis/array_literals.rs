@@ -4,8 +4,8 @@ use crate::{
     diagnostic::Diagnostic,
     parsed::{
         visit::{walk_story, ParsedVisitor, VisitContext},
-        ConstantDeclaration, Expression, Object, Story, StructLiteralField, TypeName,
-        VariableAssignment,
+        ConstantDeclaration, DictLiteralEntry, Expression, Object, Story, StructLiteralField,
+        TypeName, VariableAssignment,
     },
     source::SourceSpan,
 };
@@ -154,6 +154,10 @@ impl<'a> ArrayLiteralChecker<'a> {
                     context,
                 );
             }
+            (TypeName::Dict { value_type, .. }, Expression::DictLiteral(entries)) => {
+                self.check_dict_literal_values(value_type, entries, context_name, span, context);
+            }
+            (TypeName::Dict { .. }, Expression::EmptyCompositeLiteral) => {}
             (TypeName::Struct(struct_name), Expression::StructLiteral(fields)) => {
                 self.check_struct_literal(
                     struct_name,
@@ -252,6 +256,10 @@ impl<'a> ArrayLiteralChecker<'a> {
                     StructLiteralMode::Full,
                 );
             }
+            (TypeName::Dict { value_type, .. }, Expression::DictLiteral(entries)) => {
+                self.check_dict_literal_values(value_type, entries, context_name, span, context);
+            }
+            (TypeName::Dict { .. }, Expression::EmptyCompositeLiteral) => {}
             (TypeName::Struct(_), _)
             | (TypeName::QualifiedStruct(_), _)
             | (TypeName::Interface { .. }, _)
@@ -512,14 +520,37 @@ impl<'a> ArrayLiteralChecker<'a> {
                         );
                     }
                 }
+                (StructLiteralMode::ArraysOnly, TypeName::Dict { value_type, .. }) => {
+                    if let Expression::DictLiteral(entries) = field.expression() {
+                        self.check_dict_literal_values(
+                            value_type,
+                            entries,
+                            &field_context,
+                            span,
+                            context,
+                        );
+                    }
+                }
                 (
                     StructLiteralMode::ArraysOnly,
-                    TypeName::Primitive(_)
-                    | TypeName::Interface { .. }
-                    | TypeName::Dict { .. }
-                    | TypeName::Void,
+                    TypeName::Primitive(_) | TypeName::Interface { .. } | TypeName::Void,
                 ) => {}
             }
+        }
+    }
+
+    fn check_dict_literal_values(
+        &mut self,
+        value_type: &TypeName,
+        entries: &[DictLiteralEntry],
+        context_name: &str,
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) {
+        for entry in entries {
+            self.mark_expected_expression(entry.value());
+            let value_context = format!("{context_name}[]");
+            self.check_array_element(entry.value(), value_type, &value_context, span, context);
         }
     }
 

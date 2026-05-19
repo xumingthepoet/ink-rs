@@ -156,9 +156,7 @@ impl<'a> StructLiteralChecker<'a> {
                     context,
                 );
             }
-            (TypeName::Primitive(_), _)
-            | (TypeName::Interface { .. }, _)
-            | (TypeName::Dict { .. }, _) => {
+            (TypeName::Primitive(_), _) | (TypeName::Interface { .. }, _) => {
                 self.check_non_literal_expression(
                     expression,
                     expected_type,
@@ -167,6 +165,7 @@ impl<'a> StructLiteralChecker<'a> {
                     context,
                 );
             }
+            (TypeName::Dict { .. }, _) => {}
             (TypeName::Array(_), _) => {
                 if let Ok(actual_type) = infer_expression_type(
                     expression,
