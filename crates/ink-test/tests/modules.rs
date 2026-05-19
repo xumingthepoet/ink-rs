@@ -1,5 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
+use ink_runtime::story::Story as RuntimeStory;
+
 mod support;
 
 use support::{
@@ -62,6 +64,35 @@ fn dynamic_qualified_divert_target_values_run() {
         "runtime divert target values should use dot-separated container paths: {:#}",
         compiled.json
     );
+}
+
+#[test]
+fn interface_dynamic_knot_targets_run() {
+    let compiled = compile_fixture("modules/interface-dynamic-knot-targets.ink");
+
+    assert_story_output(&compiled, "Left 3.\n");
+
+    let mut story = Story::new(&compiled.json);
+    story
+        .set_variable("game::route", &ValueType::from("right"))
+        .expect("route should accept another implementing module");
+    assert_eq!(story.continue_maximally(), "Right 3.\n");
+    assert!(
+        story.get_current_errors().is_empty(),
+        "story should not emit runtime errors: {:#?}",
+        story.get_current_errors()
+    );
+
+    let mut invalid = RuntimeStory::new(&compiled.json).expect("story should load");
+    invalid
+        .set_variable("game::route", &ValueType::from("missing"))
+        .expect("route is stored as a runtime string");
+    let error = invalid
+        .continue_maximally()
+        .expect_err("invalid route should stop with a runtime error");
+    assert!(error
+        .to_string()
+        .contains("Module missing does not implement dynamic interface IItem"));
 }
 
 #[test]

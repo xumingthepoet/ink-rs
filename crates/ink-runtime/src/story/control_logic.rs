@@ -598,16 +598,8 @@ impl Story {
             .as_any()
             .downcast_ref::<DynamicInterfaceTarget>()
         {
-            self.validate_dynamic_interface_member(
-                target.interface(),
-                target.member(),
-                DynamicInterfaceMemberKind::Knot,
-            )?;
-            return Err(StoryError::InvalidStoryState(format!(
-                "Dynamic interface target execution is not implemented yet: {}::{}",
-                target.interface(),
-                target.member()
-            )));
+            self.evaluate_dynamic_interface_target(target)?;
+            return Ok(true);
         }
 
         if let Some(call) = content_obj
@@ -630,12 +622,72 @@ impl Story {
         Ok(false)
     }
 
+    fn evaluate_dynamic_interface_target(
+        &mut self,
+        target: &DynamicInterfaceTarget,
+    ) -> Result<(), StoryError> {
+        let module_value = self.get_state_mut().pop_evaluation_stack()?;
+        let module = Value::get_value::<&StringValue>(module_value.as_ref())
+            .map(|value| value.string.as_str())
+            .ok_or_else(|| {
+                StoryError::InvalidStoryState(format!(
+                    "Dynamic interface target {}::{} expected a string module name, but got {}",
+                    target.interface(),
+                    target.member(),
+                    module_value
+                ))
+            })?;
+
+        self.validate_dynamic_interface_module_member(
+            target.interface(),
+            module,
+            target.member(),
+            DynamicInterfaceMemberKind::Knot,
+        )?;
+
+        let target_path = format!("{}.{}", module, target.member());
+        let path = Path::new_with_components_string(Some(&target_path));
+        let target_obj = self.content_at_path(&path).correct_obj();
+        if target_obj
+            .and_then(|object| object.into_any().downcast::<Container>().ok())
+            .is_none()
+        {
+            return Err(StoryError::InvalidStoryState(format!(
+                "Dynamic interface target {}::{} resolved to missing runtime path {}",
+                target.interface(),
+                target.member(),
+                target_path
+            )));
+        }
+
+        self.get_state_mut()
+            .push_evaluation_stack(Rc::new(Value::new::<Path>(path)));
+        Ok(())
+    }
+
+    fn validate_dynamic_interface_module_member(
+        &self,
+        interface: &str,
+        module: &str,
+        member: &str,
+        expected_kind: DynamicInterfaceMemberKind,
+    ) -> Result<(), StoryError> {
+        let definition =
+            self.validate_dynamic_interface_member(interface, member, expected_kind)?;
+        if !definition.implementations().contains(module) {
+            return Err(StoryError::InvalidStoryState(format!(
+                "Module {module} does not implement dynamic interface {interface}"
+            )));
+        }
+        Ok(())
+    }
+
     fn validate_dynamic_interface_member(
         &self,
         interface: &str,
         member: &str,
         expected_kind: DynamicInterfaceMemberKind,
-    ) -> Result<(), StoryError> {
+    ) -> Result<&crate::dynamic_interface::DynamicInterfaceDefinition, StoryError> {
         let definition = self
             .dynamic_interfaces
             .interface(interface)
@@ -651,7 +703,7 @@ impl Story {
         }
 
         match definition.member_kind(member) {
-            Some(kind) if kind == expected_kind => Ok(()),
+            Some(kind) if kind == expected_kind => Ok(definition),
             Some(kind) => Err(StoryError::InvalidStoryState(format!(
                 "Dynamic interface member {interface}::{member} has kind {kind:?}, expected {expected_kind:?}"
             ))),
@@ -659,5 +711,99 @@ impl Story {
                 "Dynamic interface member {interface}::{member} is missing from metadata"
             ))),
         }
+    }
+}
+
+#[cfg(test)]
+mod dynamic_interface_tests {
+    use std::collections::BTreeMap;
+
+    use ink_story_json_format as format;
+
+    use crate::{story::Story, value_type::ValueType};
+
+    fn dynamic_interface_story_json() -> String {
+        use format::{
+            Container as FContainer, ControlCommand as C, InterfaceDefinition, InterfaceMemberKind,
+            NamedContainer, Object as O, Program,
+        };
+
+        let target = FContainer::named(
+            "target",
+            vec![O::String("Left.\n".to_string()), O::ControlCommand(C::Done)],
+        );
+        let mut left = FContainer::named("left", Vec::new());
+        left.named_content
+            .push(NamedContainer::new("target", target));
+
+        let global_decl = FContainer::named(
+            "global decl",
+            vec![
+                O::ControlCommand(C::EvalStart),
+                O::String("left".to_string()),
+                O::GlobalVariableAssignment("route".to_string()),
+                O::ControlCommand(C::EvalEnd),
+                O::ControlCommand(C::End),
+            ],
+        );
+
+        let mut root = FContainer::unnamed(vec![
+            O::ControlCommand(C::EvalStart),
+            O::VariableReference("route".to_string()),
+            O::DynamicInterfaceTarget {
+                interface: "IItem".to_string(),
+                member: "target".to_string(),
+            },
+            O::VariableAssignment("$divertTarget".to_string()),
+            O::ControlCommand(C::EvalEnd),
+            O::Divert {
+                target: "$divertTarget".to_string(),
+                variable: true,
+            },
+            O::ControlCommand(C::Done),
+        ]);
+        root.named_content.push(NamedContainer::new("left", left));
+        root.named_content
+            .push(NamedContainer::new("global decl", global_decl));
+
+        let mut members = BTreeMap::new();
+        members.insert("target".to_string(), InterfaceMemberKind::Knot);
+
+        let mut program = Program::new(root);
+        program.interfaces.insert(
+            "IItem".to_string(),
+            InterfaceDefinition::new(members, vec!["left".to_string()]),
+        );
+        program.to_json_string().expect("valid story JSON")
+    }
+
+    #[test]
+    fn dynamic_interface_target_runs_to_implementation_knot() {
+        let json = dynamic_interface_story_json();
+        let mut story = Story::new(&json).expect("story should load");
+
+        let output = story
+            .continue_maximally()
+            .expect("story should continue through dynamic target");
+
+        assert_eq!(output, "Left.\n");
+        assert!(story.get_current_errors().is_empty());
+    }
+
+    #[test]
+    fn dynamic_interface_target_rejects_unknown_module_values() {
+        let json = dynamic_interface_story_json();
+        let mut story = Story::new(&json).expect("story should load");
+        story
+            .set_variable("route", &ValueType::new("missing"))
+            .expect("route variable should be settable");
+
+        let error = story
+            .continue_maximally()
+            .expect_err("invalid module should stop with a runtime error");
+
+        assert!(error
+            .to_string()
+            .contains("Module missing does not implement dynamic interface IItem"));
     }
 }
