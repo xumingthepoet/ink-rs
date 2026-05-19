@@ -1,4 +1,4 @@
-Progress: 16/23
+Progress: 17/23
 
 # Interface-Typed Dynamic Module Access Active Plan
 
@@ -740,7 +740,7 @@ Commit record:
 - Review/fix commits: `b4664371 Cover public dynamic interface story loading`; post-review validation: `cargo fmt --all --check`; `cargo check --workspace`; `cargo test -p ink-runtime json`; `cargo test -p ink-story-json-format`; `cargo test -p ink-test --test compiler_snapshots interface`; `make gate`
 - Completion record commit: this task-list commit
 
-### [>] Task 17: Execute Dynamic Interface Knot Targets
+### [x] Task 17: Execute Dynamic Interface Knot Targets
 
 Goal: Make runtime dynamic interface target instructions produce valid divert targets from saved module names.
 
@@ -781,8 +781,8 @@ Commit record:
 - Implementation commit: `2bc2bcf0 Execute dynamic interface knot targets`
 - Focused validation: `cargo fmt --all --check`; `cargo test -p ink-runtime dynamic_interface`; `cargo test -p ink-test --test modules interface`
 - Full validation: `make gate`
-- Review/fix commits: pending
-- Completion record commit: pending
+- Review/fix commits: `b8da979c Cover saved dynamic interface route errors`; post-review validation: `cargo fmt --all --check`; `cargo test -p ink-runtime dynamic_interface`; `cargo test -p ink-test --test modules interface`; `make gate`
+- Completion record commit: this task-list commit
 
 ### [ ] Task 18: Execute Dynamic Interface Function Calls
 
