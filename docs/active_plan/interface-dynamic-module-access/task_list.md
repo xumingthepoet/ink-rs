@@ -1,4 +1,4 @@
-Progress: 1/23
+Progress: 2/23
 
 # Interface-Typed Dynamic Module Access Active Plan
 
@@ -55,7 +55,7 @@ Commit record:
 - Review/fix commits: reviewed; no fix commits required
 - Completion record commit: this task-list commit
 
-### [>] Task 02: Parse Interface Member Signatures
+### [x] Task 02: Parse Interface Member Signatures
 
 Goal: Let interface bodies declare knot and function signatures without executable content.
 
@@ -95,8 +95,8 @@ Commit record:
 - Implementation commit: `d436460f Parse interface member signatures`
 - Focused validation: `cargo test -p ink-compiler syntax::parser`; `cargo test -p ink-compiler parsed`; `cargo test -p ink-test --test diagnostics interface`
 - Full validation: `make gate`
-- Review/fix commits: pending
-- Completion record commit: pending
+- Review/fix commits: reviewed; no fix commits required
+- Completion record commit: this task-list commit
 
 ### [ ] Task 03: Parse Module Implementation Clauses And New Import Syntax
 
