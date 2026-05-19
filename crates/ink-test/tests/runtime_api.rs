@@ -441,6 +441,22 @@ fn interface_values_save_as_existing_json_values_and_restore_defaults() {
         reset.get_variable("game::route"),
         Some(ValueType::String(value)) if value.string == "left"
     ));
+    assert!(matches!(
+        reset.get_variable("game::routes"),
+        Some(ValueType::Array(values))
+            if matches!(
+                values.as_slice(),
+                [ValueType::String(first), ValueType::String(second)]
+                    if first.string == "left" && second.string == "right"
+            )
+    ));
+    assert!(matches!(
+        reset.get_variable("game::config"),
+        Some(ValueType::Object(fields))
+            if matches!(fields.get("route"), Some(ValueType::String(value)) if value.string == "right")
+                && matches!(fields.get("routes"), Some(ValueType::Array(values))
+                    if matches!(values.as_slice(), [ValueType::String(value)] if value.string == "left"))
+    ));
 }
 
 #[test]
