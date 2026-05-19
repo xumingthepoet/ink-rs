@@ -3,12 +3,13 @@
 
 === module game ===
 FROM left
-FROM right IMPORT target
+FROM right IMPORT helper
 FROM wrong
 
 VAR route: interface<IItem> = left
 
 == main ==
+{right::helper()}
 ~ route = right
 ~ route = wrong
 -> END
@@ -20,6 +21,9 @@ VAR route: interface<IItem> = left
 === module right implements IItem ===
 == target ==
 -> END
+
+== function helper() => string ==
+~ return "helper"
 
 === module wrong ===
 == target ==
