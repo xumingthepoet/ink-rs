@@ -32,7 +32,7 @@ Global forbidden shortcuts:
 
 ## Milestone 1: Source Model And Parser
 
-### [ ] Task 01: Add Dict Type Names
+### [~] Task 01: Add Dict Type Names
 
 Goal: Represent and parse `Dict<K, V>` type names with `string` and `int` keys.
 
@@ -522,4 +522,3 @@ Modification boundaries: plan directory move only.
 Validation commands: `cargo fmt --all --check`
 
 Commit record: pending
-
