@@ -362,6 +362,88 @@ fn internal_host_calls_return_values_and_keep_side_effects() {
 }
 
 #[test]
+fn interface_values_save_as_existing_json_values_and_restore_defaults() {
+    let compiled = compile_fixture("typed/interface-values.ink");
+
+    let fresh = Story::new(&compiled.json);
+    let fresh_save = fresh.save_state();
+    let fresh_save_json: serde_json::Value =
+        serde_json::from_str(&fresh_save).expect("fresh save should be JSON");
+    assert_eq!(fresh_save_json["variablesState"], serde_json::json!({}));
+
+    let mut story = Story::new(&compiled.json);
+    story
+        .set_variable("game::route", &ValueType::from("right"))
+        .expect("interface global should be settable as string");
+    story
+        .set_variable(
+            "game::routes",
+            &ValueType::Array(vec![ValueType::from("right"), ValueType::from("left")]),
+        )
+        .expect("interface array global should be settable as string array");
+    let mut config = BTreeMap::new();
+    config.insert("route".to_string(), ValueType::from("left"));
+    config.insert(
+        "routes".to_string(),
+        ValueType::Array(vec![ValueType::from("right")]),
+    );
+    story
+        .set_variable("game::config", &ValueType::Object(config))
+        .expect("struct with interface fields should be settable");
+
+    let save = story.save_state();
+    let save_json: serde_json::Value = serde_json::from_str(&save).expect("save should be JSON");
+    assert_eq!(
+        save_json["variablesState"]["game::route"],
+        serde_json::json!("^right")
+    );
+    assert_eq!(
+        save_json["variablesState"]["game::routes"],
+        serde_json::json!(["^right", "^left"])
+    );
+    assert_eq!(
+        save_json["variablesState"]["game::config"],
+        serde_json::json!({
+            "route": "^left",
+            "routes": ["^right"]
+        })
+    );
+
+    let mut reloaded = Story::new(&compiled.json);
+    reloaded.load_state(&save);
+    assert!(matches!(
+        reloaded.get_variable("game::route"),
+        Some(ValueType::String(value)) if value.string == "right"
+    ));
+    assert!(matches!(
+        reloaded.get_variable("game::routes"),
+        Some(ValueType::Array(values))
+            if matches!(
+                values.as_slice(),
+                [ValueType::String(first), ValueType::String(second)]
+                    if first.string == "right" && second.string == "left"
+            )
+    ));
+    assert!(matches!(
+        reloaded.get_variable("game::config"),
+        Some(ValueType::Object(fields))
+            if matches!(fields.get("route"), Some(ValueType::String(value)) if value.string == "left")
+                && matches!(fields.get("routes"), Some(ValueType::Array(values))
+                    if matches!(values.as_slice(), [ValueType::String(value)] if value.string == "right"))
+    ));
+
+    let mut reset = Story::new(&compiled.json);
+    reset
+        .set_variable("game::route", &ValueType::from("right"))
+        .expect("interface global should be settable");
+    reset.load_state(&fresh_save);
+    assert!(matches!(
+        reset.get_variable("game::route"),
+        Some(ValueType::String(value)) if value.string == "left"
+    ));
+}
+
+#[test]
 fn internal_host_calls_accept_typed_arguments_and_composite_returns() {
     let compiled = compile_fixture("runtime_api/internal-functions.ink");
     let mut story = Story::new(&compiled.json);

@@ -83,6 +83,20 @@ fn interface_dynamic_knot_targets_run() {
         story.get_current_errors()
     );
 
+    let mut saved = Story::new(&compiled.json);
+    saved
+        .set_variable("game::route", &ValueType::from("right"))
+        .expect("route should accept another implementing module");
+    let save = saved.save_state();
+    let mut reloaded = Story::new(&compiled.json);
+    reloaded.load_state(&save);
+    assert_eq!(reloaded.continue_maximally(), "Right 3.\n");
+    assert!(
+        reloaded.get_current_errors().is_empty(),
+        "reloaded story should not emit runtime errors: {:#?}",
+        reloaded.get_current_errors()
+    );
+
     let mut invalid = RuntimeStory::new(&compiled.json).expect("story should load");
     invalid
         .set_variable("game::route", &ValueType::from("missing"))
