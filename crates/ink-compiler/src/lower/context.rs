@@ -1,4 +1,6 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
+
+use crate::parsed::TypeName;
 
 use super::indexes::{ConstantValues, EnumDefinitions, ExternalSignatures, StructDefinitions};
 use super::path::{child_path, module_scoped_source_path_to_runtime_path, LabelIndex};
@@ -8,6 +10,7 @@ pub(super) struct LoweringContext<'a> {
     choice_labels: &'a LabelIndex,
     global_labels: &'a LabelIndex,
     global_variables: &'a HashSet<String>,
+    global_variable_types: &'a HashMap<String, TypeName>,
     external_signatures: &'a ExternalSignatures,
     constants: &'a ConstantValues,
     struct_definitions: &'a StructDefinitions,
@@ -20,6 +23,7 @@ impl<'a> LoweringContext<'a> {
         choice_labels: &'a LabelIndex,
         global_labels: &'a LabelIndex,
         global_variables: &'a HashSet<String>,
+        global_variable_types: &'a HashMap<String, TypeName>,
         external_signatures: &'a ExternalSignatures,
         constants: &'a ConstantValues,
         struct_definitions: &'a StructDefinitions,
@@ -30,6 +34,7 @@ impl<'a> LoweringContext<'a> {
             choice_labels,
             global_labels,
             global_variables,
+            global_variable_types,
             external_signatures,
             constants,
             struct_definitions,
@@ -51,6 +56,10 @@ impl<'a> LoweringContext<'a> {
 
     pub(super) fn global_variables(&self) -> &HashSet<String> {
         self.global_variables
+    }
+
+    pub(super) fn global_variable_types(&self) -> &HashMap<String, TypeName> {
+        self.global_variable_types
     }
 
     pub(super) fn external_signatures(&self) -> &ExternalSignatures {
@@ -75,6 +84,7 @@ impl<'a> LoweringContext<'a> {
             choice_labels: self.choice_labels,
             global_labels: self.global_labels,
             global_variables: self.global_variables,
+            global_variable_types: self.global_variable_types,
             external_signatures: self.external_signatures,
             constants: self.constants,
             struct_definitions: self.struct_definitions,
@@ -92,6 +102,7 @@ impl<'a> LoweringContext<'a> {
             choice_labels,
             global_labels: self.global_labels,
             global_variables: self.global_variables,
+            global_variable_types: self.global_variable_types,
             external_signatures: self.external_signatures,
             constants: self.constants,
             struct_definitions: self.struct_definitions,
@@ -121,6 +132,7 @@ pub(super) enum ChoicePathMode {
         parent_flow_name: Option<String>,
         sibling_stitch_names: Vec<String>,
         local_variables: HashSet<String>,
+        local_variable_types: HashMap<String, TypeName>,
         self_target_relative: bool,
         fallback_gather_target: Option<String>,
     },
@@ -177,6 +189,7 @@ impl ChoicePathMode {
                 parent_flow_name,
                 sibling_stitch_names,
                 local_variables,
+                local_variable_types,
                 ..
             } => ChoicePathMode::Flow {
                 module_name: module_name.clone(),
@@ -185,6 +198,7 @@ impl ChoicePathMode {
                 parent_flow_name: parent_flow_name.clone(),
                 sibling_stitch_names: sibling_stitch_names.clone(),
                 local_variables: local_variables.clone(),
+                local_variable_types: local_variable_types.clone(),
                 self_target_relative: true,
                 fallback_gather_target: if has_following_gather {
                     Some(child_path(container_path, gather_container_name))
@@ -224,6 +238,7 @@ impl ChoicePathMode {
                 parent_flow_name,
                 sibling_stitch_names,
                 local_variables,
+                local_variable_types,
                 self_target_relative,
                 fallback_gather_target,
             } => ChoicePathMode::Flow {
@@ -233,6 +248,7 @@ impl ChoicePathMode {
                 parent_flow_name: parent_flow_name.clone(),
                 sibling_stitch_names: sibling_stitch_names.clone(),
                 local_variables: local_variables.clone(),
+                local_variable_types: local_variable_types.clone(),
                 self_target_relative: *self_target_relative,
                 fallback_gather_target: fallback_gather_target.clone(),
             },
@@ -263,6 +279,7 @@ impl ChoicePathMode {
                 parent_flow_name,
                 sibling_stitch_names,
                 local_variables,
+                local_variable_types,
                 self_target_relative,
                 fallback_gather_target,
             } => ChoicePathMode::Flow {
@@ -272,6 +289,7 @@ impl ChoicePathMode {
                 parent_flow_name: parent_flow_name.clone(),
                 sibling_stitch_names: sibling_stitch_names.clone(),
                 local_variables: local_variables.clone(),
+                local_variable_types: local_variable_types.clone(),
                 self_target_relative: *self_target_relative,
                 fallback_gather_target: fallback_gather_target.clone(),
             },
@@ -300,6 +318,7 @@ impl ChoicePathMode {
                 parent_flow_name,
                 sibling_stitch_names,
                 local_variables,
+                local_variable_types,
                 ..
             } => ChoicePathMode::Flow {
                 module_name: module_name.clone(),
@@ -308,6 +327,7 @@ impl ChoicePathMode {
                 parent_flow_name: parent_flow_name.clone(),
                 sibling_stitch_names: sibling_stitch_names.clone(),
                 local_variables: local_variables.clone(),
+                local_variable_types: local_variable_types.clone(),
                 self_target_relative: true,
                 fallback_gather_target: None,
             },
@@ -362,6 +382,16 @@ impl ChoicePathMode {
                 local_variables, ..
             } => local_variables.contains(name),
             _ => false,
+        }
+    }
+
+    pub(super) fn local_variable_type(&self, name: &str) -> Option<&TypeName> {
+        match self {
+            ChoicePathMode::Flow {
+                local_variable_types,
+                ..
+            } => local_variable_types.get(name),
+            _ => None,
         }
     }
 

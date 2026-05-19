@@ -1,10 +1,13 @@
 use ink_story_json_format::{ControlCommand, NativeFunction, Object as RuntimeObject};
 
-use crate::parsed::{AssignmentTarget, Expression, IncDec, VariableAssignment};
+use crate::parsed::{
+    AssignmentTarget, Expression, IncDec, QualifiedName, TypeName, VariableAssignment,
+};
+use crate::source::SourceSpan;
 
 use super::context::{ChoicePathMode, LoweringContext};
 use super::expression::{lower_expression_into, lower_expression_with_expected_type_into};
-use super::value::runtime_default_for_type;
+use super::value::{runtime_default_for_type, struct_field_definitions_for_type};
 
 pub(super) enum AssignmentPathComponent<'a> {
     Field(&'a str),
@@ -14,7 +17,10 @@ pub(super) enum AssignmentPathComponent<'a> {
 
 #[derive(Clone, Copy)]
 pub(super) enum AssignmentUpdateValue<'a> {
-    Expression(&'a Expression),
+    Expression {
+        expression: &'a Expression,
+        expected_type: Option<&'a TypeName>,
+    },
     Compound {
         expression: &'a Expression,
         operator: NativeFunction,
@@ -38,10 +44,14 @@ fn lower_assignment_initializer_into(
     context: &LoweringContext<'_>,
 ) -> bool {
     if let Some(expression) = assignment.expression() {
+        let expected_type = assignment
+            .declared_type()
+            .cloned()
+            .or_else(|| assignment_target_type(assignment.target(), context));
         return lower_expression_with_expected_type_into(
             content,
             expression,
-            assignment.declared_type(),
+            expected_type.as_ref(),
             context,
         );
     }
@@ -127,8 +137,18 @@ fn lower_assignment_update_value_into(
     context: &LoweringContext<'_>,
 ) {
     match value {
-        AssignmentUpdateValue::Expression(expression) => {
-            lower_expression_into(content, expression, context, false)
+        AssignmentUpdateValue::Expression {
+            expression,
+            expected_type,
+        } => {
+            if !lower_expression_with_expected_type_into(
+                content,
+                expression,
+                expected_type,
+                context,
+            ) {
+                lower_expression_into(content, expression, context, false);
+            }
         }
         AssignmentUpdateValue::Compound {
             expression,
@@ -254,6 +274,7 @@ pub(super) fn lower_variable_assignment_into(
         if components.is_empty() {
             return;
         }
+        let expected_type = assignment_target_type(assignment.target(), context);
 
         content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
         let resolved_root_name = resolve_runtime_variable_name(
@@ -266,7 +287,10 @@ pub(super) fn lower_variable_assignment_into(
             resolved_root_name.as_str(),
             &components,
             0,
-            AssignmentUpdateValue::Expression(expression),
+            AssignmentUpdateValue::Expression {
+                expression,
+                expected_type: expected_type.as_ref(),
+            },
             context,
         );
         content.push(RuntimeObject::ControlCommand(ControlCommand::EvalEnd));
@@ -290,6 +314,71 @@ pub(super) fn lower_variable_assignment_into(
             resolve_runtime_variable_name(name, context.path_mode(), context.global_variables());
         push_reassignment_for_name(content, resolved_name.as_str(), context.path_mode());
     }
+}
+
+fn assignment_target_type(
+    target: &AssignmentTarget,
+    context: &LoweringContext<'_>,
+) -> Option<TypeName> {
+    match target {
+        AssignmentTarget::Variable(name) => visible_variable_type(name, context),
+        AssignmentTarget::QualifiedVariable(name) => {
+            context.global_variable_types().get(name.as_str()).cloned()
+        }
+        AssignmentTarget::FieldAccess { base, field } => {
+            let base_type = assignment_target_type(base, context)?;
+            let field_type = struct_field_definitions_for_type(
+                &base_type,
+                context.struct_definitions(),
+                context.path_mode().current_module_name(),
+            )?
+            .iter()
+            .find(|(field_name, _)| field_name == field)?
+            .1
+            .clone();
+            Some(qualify_field_type_for_base(&field_type, &base_type))
+        }
+        AssignmentTarget::IndexAccess { base, .. } => assignment_target_type(base, context)?
+            .array_element_type()
+            .cloned(),
+    }
+}
+
+fn visible_variable_type(name: &str, context: &LoweringContext<'_>) -> Option<TypeName> {
+    if let Some(local_type) = context.path_mode().local_variable_type(name) {
+        return Some(local_type.clone());
+    }
+
+    let runtime_name =
+        resolve_runtime_variable_name(name, context.path_mode(), context.global_variables());
+    context.global_variable_types().get(&runtime_name).cloned()
+}
+
+fn qualify_field_type_for_base(field_type: &TypeName, base_type: &TypeName) -> TypeName {
+    match base_type {
+        TypeName::QualifiedStruct(name) => qualify_type_name_for_module(field_type, name.module()),
+        _ => field_type.clone(),
+    }
+}
+
+fn qualify_type_name_for_module(type_name: &TypeName, module: &str) -> TypeName {
+    match type_name {
+        TypeName::Struct(name) => {
+            TypeName::qualified_struct_type(qualified_type_name(module, name))
+        }
+        TypeName::Array(element_type) => {
+            TypeName::array(qualify_type_name_for_module(element_type, module))
+        }
+        TypeName::Primitive(_)
+        | TypeName::QualifiedStruct(_)
+        | TypeName::Interface { .. }
+        | TypeName::Void => type_name.clone(),
+    }
+}
+
+fn qualified_type_name(module: &str, name: &str) -> QualifiedName {
+    let span = SourceSpan::new(None, 1, 1);
+    QualifiedName::new(module, span.clone(), name, span)
 }
 
 pub(super) fn lower_inc_dec_into(

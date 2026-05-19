@@ -70,7 +70,7 @@ fn interface_values_lower_to_runtime_strings() {
 
     assert_story_output(
         &compiled,
-        "left|[left, right]|{route: right, routes: [left]}|right|right|[left, left]|{route: left, routes: [right]}\n",
+        "right|[right, right]|{route: left, routes: [left]}|right|left|[left, right]|{route: right, routes: [right]}\n",
     );
 
     let json = compiled.program.to_json_value();
@@ -84,6 +84,15 @@ fn interface_values_lower_to_runtime_strings() {
         vec![
             json!({"route": "^right", "routes": ["^left"]}),
             json!({"VAR=": "game::config"}),
+        ],
+    );
+    assert_json_sequence(
+        &json,
+        vec![
+            json!("ev"),
+            json!("^right"),
+            json!("/ev"),
+            json!({"VAR=": "game::route", "re": true}),
         ],
     );
 }

@@ -1,8 +1,8 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use ink_story_json_format::{Container, Object as RuntimeObject};
 
-use crate::parsed::{ContentList, Flow, Object, Weave};
+use crate::parsed::{ContentList, Flow, Object, TypeName, Weave};
 
 use super::context::{ChoicePathMode, LoweringContext};
 use super::indexes::LoweringIndexes;
@@ -57,6 +57,7 @@ fn lower_flow_with_context(flow: &Flow, context: &FlowLoweringContext<'_, '_>) -
         .map(|module| format!("{module}.{source_flow_path}"))
         .unwrap_or_else(|| source_flow_path.clone());
     let local_variables = collect_flow_local_variables(flow);
+    let local_variable_types = collect_flow_local_variable_types(flow);
 
     lower_flow_arguments_into(&mut content, flow);
 
@@ -82,6 +83,7 @@ fn lower_flow_with_context(flow: &Flow, context: &FlowLoweringContext<'_, '_>) -
             parent_flow_name: context.parent_knot_name.map(|s| s.to_string()),
             sibling_stitch_names: context.sibling_stitch_names.to_vec(),
             local_variables: local_variables.clone(),
+            local_variable_types: local_variable_types.clone(),
             self_target_relative: false,
             fallback_gather_target: None,
         };
@@ -91,6 +93,7 @@ fn lower_flow_with_context(flow: &Flow, context: &FlowLoweringContext<'_, '_>) -
             &choice_labels,
             &context.indexes.global_labels,
             &context.indexes.global_variables,
+            &context.indexes.global_variable_types,
             &context.indexes.external_signatures,
             &context.indexes.constants,
             &context.indexes.struct_definitions,
@@ -108,6 +111,7 @@ fn lower_flow_with_context(flow: &Flow, context: &FlowLoweringContext<'_, '_>) -
             parent_flow_name: context.parent_knot_name.map(str::to_string),
             sibling_stitch_names: context.sibling_stitch_names.to_vec(),
             local_variables,
+            local_variable_types,
             self_target_relative: false,
             fallback_gather_target: None,
         };
@@ -117,6 +121,7 @@ fn lower_flow_with_context(flow: &Flow, context: &FlowLoweringContext<'_, '_>) -
             &choice_labels,
             &context.indexes.global_labels,
             &context.indexes.global_variables,
+            &context.indexes.global_variable_types,
             &context.indexes.external_signatures,
             &context.indexes.constants,
             &context.indexes.struct_definitions,
@@ -188,9 +193,33 @@ pub(super) fn collect_flow_local_variables(flow: &Flow) -> HashSet<String> {
     local_variables
 }
 
+fn collect_flow_local_variable_types(flow: &Flow) -> HashMap<String, TypeName> {
+    let mut local_variable_types = flow
+        .arguments()
+        .iter()
+        .filter_map(|argument| {
+            argument
+                .declared_type()
+                .cloned()
+                .map(|declared_type| (argument.name().to_string(), declared_type))
+        })
+        .collect::<HashMap<_, _>>();
+    collect_local_variable_types_in_weave(flow.weave(), &mut local_variable_types);
+    local_variable_types
+}
+
 fn collect_local_variables_in_weave(weave: &Weave, local_variables: &mut HashSet<String>) {
     for object in weave.content() {
         collect_local_variables_in_object(object, local_variables);
+    }
+}
+
+fn collect_local_variable_types_in_weave(
+    weave: &Weave,
+    local_variable_types: &mut HashMap<String, TypeName>,
+) {
+    for object in weave.content() {
+        collect_local_variable_types_in_object(object, local_variable_types);
     }
 }
 
@@ -200,6 +229,15 @@ fn collect_local_variables_in_content_list(
 ) {
     for object in content_list.objects() {
         collect_local_variables_in_object(object, local_variables);
+    }
+}
+
+fn collect_local_variable_types_in_content_list(
+    content_list: &ContentList,
+    local_variable_types: &mut HashMap<String, TypeName>,
+) {
+    for object in content_list.objects() {
+        collect_local_variable_types_in_object(object, local_variable_types);
     }
 }
 
@@ -223,6 +261,40 @@ fn collect_local_variables_in_object(object: &Object, local_variables: &mut Hash
             collect_local_variables_in_content_list(choice.inner_content(), local_variables);
         }
         Object::Weave(weave) => collect_local_variables_in_weave(weave, local_variables),
+        _ => {}
+    }
+}
+
+fn collect_local_variable_types_in_object(
+    object: &Object,
+    local_variable_types: &mut HashMap<String, TypeName>,
+) {
+    match object {
+        Object::VariableAssignment(assignment) if assignment.is_temporary() => {
+            if let Some(declared_type) = assignment.declared_type() {
+                local_variable_types.insert(assignment.name().to_string(), declared_type.clone());
+            }
+        }
+        Object::ContentList(content_list) => {
+            collect_local_variable_types_in_content_list(content_list, local_variable_types);
+        }
+        Object::Conditional(conditional) => {
+            for branch in conditional.branches() {
+                collect_local_variable_types_in_weave(branch.content(), local_variable_types);
+            }
+        }
+        Object::Choice(choice) => {
+            if let Some(content) = choice.start_content() {
+                collect_local_variable_types_in_content_list(content, local_variable_types);
+            }
+            collect_local_variable_types_in_content_list(
+                choice.inner_content(),
+                local_variable_types,
+            );
+        }
+        Object::Weave(weave) => {
+            collect_local_variable_types_in_weave(weave, local_variable_types);
+        }
         _ => {}
     }
 }

@@ -302,6 +302,7 @@ fn lower_global_declarations(
             &choice_labels,
             &indexes.global_labels,
             &indexes.global_variables,
+            &indexes.global_variable_types,
             &indexes.external_signatures,
             &indexes.constants,
             &indexes.struct_definitions,
@@ -339,11 +340,13 @@ fn estimated_choice_content_len(
     let choice_labels = LabelIndex::new();
     let global_labels = LabelIndex::new();
     let external_signatures = HashMap::new();
+    let global_variable_types = HashMap::new();
     let context = LoweringContext::new(
         ChoicePathMode::Root,
         &choice_labels,
         &global_labels,
         global_variables,
+        &global_variable_types,
         &external_signatures,
         constants,
         struct_definitions,
@@ -368,11 +371,13 @@ fn estimated_runtime_len_for_label_collection(
     let choice_labels = LabelIndex::new();
     let global_labels = LabelIndex::new();
     let external_signatures = HashMap::new();
+    let global_variable_types = HashMap::new();
     let context = LoweringContext::new(
         ChoicePathMode::Root,
         &choice_labels,
         &global_labels,
         global_variables,
+        &global_variable_types,
         &external_signatures,
         constants,
         struct_definitions,

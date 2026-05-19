@@ -13,6 +13,7 @@ pub(super) struct LoweringIndexes<'a> {
     pub(super) constants: ConstantValues,
     pub(super) global_labels: LabelIndex,
     pub(super) global_variables: HashSet<String>,
+    pub(super) global_variable_types: HashMap<String, TypeName>,
     pub(super) variable_declarations: Vec<VariableDeclaration<'a>>,
     pub(super) external_signatures: ExternalSignatures,
     pub(super) struct_definitions: StructDefinitions,
@@ -43,6 +44,7 @@ impl<'a> LoweringIndexes<'a> {
         let enum_definitions = build_enum_definitions(story);
         let variable_declarations = collect_story_variable_declarations(story);
         let global_variables = build_global_variable_names(&variable_declarations);
+        let global_variable_types = build_global_variable_types(&variable_declarations);
         let global_labels = build_label_index(
             story,
             &constants,
@@ -57,6 +59,7 @@ impl<'a> LoweringIndexes<'a> {
             constants,
             global_labels,
             global_variables,
+            global_variable_types,
             variable_declarations,
             external_signatures,
             struct_definitions,
@@ -219,6 +222,24 @@ fn build_global_variable_names(declarations: &[VariableDeclaration<'_>]) -> Hash
         .filter_map(|declaration| match declaration.assignment() {
             assignment if assignment.is_global() => Some(declaration.runtime_name().to_string()),
             _ => None,
+        })
+        .collect()
+}
+
+fn build_global_variable_types(
+    declarations: &[VariableDeclaration<'_>],
+) -> HashMap<String, TypeName> {
+    declarations
+        .iter()
+        .filter_map(|declaration| {
+            let assignment = declaration.assignment();
+            if !assignment.is_global() {
+                return None;
+            }
+            assignment
+                .declared_type()
+                .cloned()
+                .map(|declared_type| (declaration.runtime_name().to_string(), declared_type))
         })
         .collect()
 }
