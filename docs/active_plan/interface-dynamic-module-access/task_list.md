@@ -740,7 +740,7 @@ Commit record:
 - Review/fix commits: `b4664371 Cover public dynamic interface story loading`; post-review validation: `cargo fmt --all --check`; `cargo check --workspace`; `cargo test -p ink-runtime json`; `cargo test -p ink-story-json-format`; `cargo test -p ink-test --test compiler_snapshots interface`; `make gate`
 - Completion record commit: this task-list commit
 
-### [ ] Task 17: Execute Dynamic Interface Knot Targets
+### [~] Task 17: Execute Dynamic Interface Knot Targets
 
 Goal: Make runtime dynamic interface target instructions produce valid divert targets from saved module names.
 
