@@ -695,7 +695,7 @@ Commit record:
 
 ## Milestone 4: Runtime Execution And Save Behavior
 
-### [~] Task 16: Load Dynamic Interface Format Objects Into Runtime
+### [>] Task 16: Load Dynamic Interface Format Objects Into Runtime
 
 Goal: Convert the new format crate dynamic interface objects and interface metadata into runtime execution objects.
 
@@ -734,9 +734,9 @@ Validation commands:
 
 Commit record:
 
-- Implementation commit: pending
-- Focused validation: pending
-- Full validation: pending
+- Implementation commit: `4cb99adb Load dynamic interface runtime objects`
+- Focused validation: `cargo fmt --all --check`; `cargo check --workspace`; `cargo test -p ink-runtime json`; `cargo test -p ink-story-json-format`; `cargo test -p ink-test --test compiler_snapshots interface`
+- Full validation: `make gate`
 - Review/fix commits: pending
 - Completion record commit: pending
 
