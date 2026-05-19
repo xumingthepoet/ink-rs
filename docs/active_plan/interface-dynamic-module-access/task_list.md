@@ -784,7 +784,7 @@ Commit record:
 - Review/fix commits: `b8da979c Cover saved dynamic interface route errors`; post-review validation: `cargo fmt --all --check`; `cargo test -p ink-runtime dynamic_interface`; `cargo test -p ink-test --test modules interface`; `make gate`
 - Completion record commit: this task-list commit
 
-### [ ] Task 18: Execute Dynamic Interface Function Calls
+### [~] Task 18: Execute Dynamic Interface Function Calls
 
 Goal: Make runtime dynamic interface function calls dispatch to the implementation module selected by the interface value.
 
