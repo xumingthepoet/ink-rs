@@ -647,7 +647,7 @@ Commit record:
 - Review/fix commits: reviewed; no fix commits required; post-review validation: `cargo fmt --all --check`; `cargo test -p ink-compiler lower`; `cargo test -p ink-test --test compiler_snapshots interface`; `cargo test -p ink-test --test functions`; `cargo test -p ink-test --test diagnostics interface_dynamic_function_lowering_is_implemented`; `make gate`
 - Completion record commit: pending
 
-### [~] Task 15: Lower Interface Metadata And Document Compiled JSON Format
+### [>] Task 15: Lower Interface Metadata And Document Compiled JSON Format
 
 Goal: Emit interface implementation metadata into compiled story JSON and record the new JSON contract in maintained format notes.
 
@@ -687,9 +687,9 @@ Validation commands:
 
 Commit record:
 
-- Implementation commit: pending
-- Focused validation: pending
-- Full validation: pending
+- Implementation commit: `9729646d Lower interface metadata into story JSON`
+- Focused validation: `rg -n "dynamic interface|interface<|save-state|compiled story JSON" docs/ink_JSON_runtime_format.md`; `cargo fmt --all --check`; `cargo test -p ink-story-json-format`; `cargo test -p ink-test --test compiler_snapshots interface`; `cargo test -p ink-compiler lower`
+- Full validation: `make gate`
 - Review/fix commits: pending
 - Completion record commit: pending
 
