@@ -1,4 +1,4 @@
-Progress: 12/23
+Progress: 13/23
 
 # Interface-Typed Dynamic Module Access Active Plan
 
@@ -560,7 +560,7 @@ Commit record:
 - Review/fix commits: `c469cb8d Lower interface assignment values as strings`; post-review validation: `cargo fmt --all --check`; `cargo test -p ink-compiler lower`; `cargo test -p ink-test --test compiler_snapshots interface` (matched 0 tests); `cargo test -p ink-test --test typed_values`; `make gate`
 - Completion record commit: this task-list commit
 
-### [>] Task 13: Lower Dynamic Interface Knot Targets
+### [x] Task 13: Lower Dynamic Interface Knot Targets
 
 Goal: Emit typed format objects for dynamic interface knot target construction.
 
@@ -601,8 +601,8 @@ Commit record:
 - Implementation commit: `7639c38e Lower dynamic interface targets`
 - Focused validation: `cargo fmt --all --check`; `cargo test -p ink-compiler lower`; `cargo test -p ink-test --test compiler_snapshots interface`; `cargo test -p ink-story-json-format`; `cargo test -p ink-test --test diagnostics interface_dynamic_target_lowering_is_implemented`
 - Full validation: `make gate`
-- Review/fix commits: pending
-- Completion record commit: pending
+- Review/fix commits: reviewed; no fix commits required; post-review validation: `cargo fmt --all --check`; `cargo test -p ink-compiler lower`; `cargo test -p ink-test --test compiler_snapshots interface`; `cargo test -p ink-story-json-format`; `cargo test -p ink-test --test diagnostics interface_dynamic_target_lowering_is_implemented`; `make gate`
+- Completion record commit: this task-list commit
 
 ### [ ] Task 14: Lower Dynamic Interface Function Calls
 
