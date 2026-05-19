@@ -20,7 +20,7 @@ pub enum TypeName {
     Void,
     Array(Box<TypeName>),
     Dict {
-        key_type: PrimitiveType,
+        key_type: DictKeyType,
         value_type: Box<TypeName>,
     },
 }
@@ -101,7 +101,7 @@ pub enum DefaultValue {
         element_type: Box<TypeName>,
     },
     Dict {
-        key_type: PrimitiveType,
+        key_type: DictKeyType,
         value_type: Box<TypeName>,
     },
     Struct {
@@ -116,6 +116,12 @@ pub enum PrimitiveType {
     Bool,
     String,
     DivertTarget,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum DictKeyType {
+    String,
+    Int,
 }
 
 impl TypeName {
@@ -167,7 +173,7 @@ impl TypeName {
         Self::Array(Box::new(element_type))
     }
 
-    pub fn dict(key_type: PrimitiveType, value_type: TypeName) -> Self {
+    pub fn dict(key_type: DictKeyType, value_type: TypeName) -> Self {
         Self::Dict {
             key_type,
             value_type: Box::new(value_type),
@@ -189,7 +195,7 @@ impl TypeName {
         }
     }
 
-    pub fn dict_key_value_types(&self) -> Option<(PrimitiveType, &TypeName)> {
+    pub fn dict_key_value_types(&self) -> Option<(DictKeyType, &TypeName)> {
         match self {
             Self::Dict {
                 key_type,
@@ -273,6 +279,15 @@ impl fmt::Display for PrimitiveType {
     }
 }
 
+impl fmt::Display for DictKeyType {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::String => "string",
+            Self::Int => "int",
+        })
+    }
+}
+
 impl DefaultValue {
     pub fn for_type(type_name: &TypeName) -> Option<Self> {
         match type_name {
@@ -326,7 +341,7 @@ impl DefaultValue {
 mod tests {
     use crate::source::SourceSpan;
 
-    use super::{DefaultValue, PrimitiveType, TypeName};
+    use super::{DefaultValue, DictKeyType, PrimitiveType, TypeName};
 
     #[test]
     fn displays_primitive_and_void_type_names() {
@@ -360,10 +375,10 @@ mod tests {
 
     #[test]
     fn displays_dict_type_names() {
-        let scores = TypeName::dict(PrimitiveType::String, TypeName::int());
+        let scores = TypeName::dict(DictKeyType::String, TypeName::int());
         let nested = TypeName::dict(
-            PrimitiveType::Int,
-            TypeName::array(TypeName::dict(PrimitiveType::String, TypeName::bool())),
+            DictKeyType::Int,
+            TypeName::array(TypeName::dict(DictKeyType::String, TypeName::bool())),
         );
 
         assert_eq!(scores.display_name(), "Dict<string, int>");
@@ -372,7 +387,7 @@ mod tests {
         assert_eq!(nested.display_name(), "Dict<int, Dict<string, bool>[]>");
         assert_eq!(
             scores.dict_key_value_types(),
-            Some((PrimitiveType::String, &TypeName::int()))
+            Some((DictKeyType::String, &TypeName::int()))
         );
     }
 
@@ -421,8 +436,8 @@ mod tests {
             Some(PrimitiveType::DivertTarget)
         );
         assert_eq!(
-            TypeName::dict(PrimitiveType::Int, TypeName::string()).dict_key_value_types(),
-            Some((PrimitiveType::Int, &TypeName::string()))
+            TypeName::dict(DictKeyType::Int, TypeName::string()).dict_key_value_types(),
+            Some((DictKeyType::Int, &TypeName::string()))
         );
         assert!(TypeName::void().is_void());
         assert!(!TypeName::string().is_void());
@@ -474,12 +489,12 @@ mod tests {
 
     #[test]
     fn builds_dict_default_value_metadata() {
-        let dict_type = TypeName::dict(PrimitiveType::String, TypeName::array(TypeName::int()));
+        let dict_type = TypeName::dict(DictKeyType::String, TypeName::array(TypeName::int()));
 
         assert_eq!(
             dict_type.default_value(),
             Some(DefaultValue::Dict {
-                key_type: PrimitiveType::String,
+                key_type: DictKeyType::String,
                 value_type: Box::new(TypeName::array(TypeName::int()))
             })
         );

@@ -1,5 +1,5 @@
 use crate::{
-    parsed::{PrimitiveType, QualifiedName, TypeName},
+    parsed::{DictKeyType, PrimitiveType, QualifiedName, TypeName},
     source::SourceSpan,
 };
 
@@ -99,11 +99,11 @@ fn parse_dict_type_name(parser: &mut RuleParser<'_>) -> Option<TypeName> {
     Some(TypeName::dict(key_type, value_type))
 }
 
-fn parse_dict_key_type(parser: &mut RuleParser<'_>) -> Option<PrimitiveType> {
+fn parse_dict_key_type(parser: &mut RuleParser<'_>) -> Option<DictKeyType> {
     let key_type = parse_type_name(parser)?;
     match key_type {
-        TypeName::Primitive(PrimitiveType::String) => Some(PrimitiveType::String),
-        TypeName::Primitive(PrimitiveType::Int) => Some(PrimitiveType::Int),
+        TypeName::Primitive(PrimitiveType::String) => Some(DictKeyType::String),
+        TypeName::Primitive(PrimitiveType::Int) => Some(DictKeyType::Int),
         _ => {
             parser.diagnostic(crate::diagnostic::Diagnostic::error(
                 parser.current_span(),
@@ -284,21 +284,21 @@ mod tests {
         let cases = [
             (
                 "Dict<string, int>",
-                TypeName::dict(crate::parsed::PrimitiveType::String, TypeName::int()),
+                TypeName::dict(crate::parsed::DictKeyType::String, TypeName::int()),
             ),
             (
                 "Dict<int, string[]>",
                 TypeName::dict(
-                    crate::parsed::PrimitiveType::Int,
+                    crate::parsed::DictKeyType::Int,
                     TypeName::array(TypeName::string()),
                 ),
             ),
             (
                 "Dict<string, Dict<int, Player>>[]",
                 TypeName::array(TypeName::dict(
-                    crate::parsed::PrimitiveType::String,
+                    crate::parsed::DictKeyType::String,
                     TypeName::dict(
-                        crate::parsed::PrimitiveType::Int,
+                        crate::parsed::DictKeyType::Int,
                         TypeName::struct_type("Player"),
                     ),
                 )),

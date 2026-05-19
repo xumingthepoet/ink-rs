@@ -47,7 +47,7 @@ pub use struct_declaration::{StructDeclaration, StructField};
 pub use tag::Tag;
 pub use text::Text;
 pub use tunnel_onwards::TunnelOnwards;
-pub use type_name::{DefaultValue, PrimitiveType, TypeName};
+pub use type_name::{DefaultValue, DictKeyType, PrimitiveType, TypeName};
 pub use variable_assignment::{AssignmentTarget, VariableAssignment};
 pub use weave::Weave;
 
