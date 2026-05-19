@@ -260,7 +260,7 @@ fn parse_imported_names(
             return None;
         }
 
-        if imported_names.is_empty() && name == source_module {
+        if name == source_module {
             parser.diagnostic(Diagnostic::error(
                 name_span,
                 format!(
@@ -489,6 +489,10 @@ mod tests {
             ),
             (
                 "FROM items IMPORT items",
+                "Module literals must be imported with `FROM items`, not `FROM items IMPORT items`",
+            ),
+            (
+                "FROM items IMPORT sword, items",
                 "Module literals must be imported with `FROM items`, not `FROM items IMPORT items`",
             ),
             (
