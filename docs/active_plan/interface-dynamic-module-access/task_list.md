@@ -1,4 +1,4 @@
-Progress: 10/23
+Progress: 11/23
 
 # Interface-Typed Dynamic Module Access Active Plan
 
@@ -474,7 +474,7 @@ Commit record:
 
 ## Milestone 3: Compiled Story JSON Format
 
-### [>] Task 11: Add Format Objects For Dynamic Interface Access
+### [x] Task 11: Add Format Objects For Dynamic Interface Access
 
 Goal: Add typed compiled-story JSON model support for dynamic interface targets, dynamic interface function calls, and runtime interface validation metadata in `ink-story-json-format`.
 
@@ -514,8 +514,8 @@ Commit record:
 - Implementation commit: `28a5a248 Add dynamic interface format objects`
 - Focused validation: `cargo test -p ink-story-json-format`; `cargo check --workspace`
 - Full validation: `make gate`
-- Review/fix commits: pending
-- Completion record commit: pending
+- Review/fix commits: reviewed; no fix commits required; post-review validation: `cargo fmt --all --check`; `cargo test -p ink-story-json-format`; `cargo check --workspace`; `make gate`
+- Completion record commit: this task-list commit
 
 ### [ ] Task 12: Lower Interface Values To Runtime Strings
 
