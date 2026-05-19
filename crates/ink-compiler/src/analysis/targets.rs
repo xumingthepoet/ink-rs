@@ -958,6 +958,10 @@ impl ParsedVisitor for CallTargetChecker<'_> {
     fn visit_object(&mut self, object: &Object, context: &VisitContext) {
         match object {
             Object::Divert(divert) => {
+                let arguments_checked_by_dynamic_interface_target = matches!(
+                    divert.target(),
+                    DivertTarget::Dynamic(Expression::DynamicInterfaceAccess { .. })
+                );
                 match divert.target() {
                     DivertTarget::Empty => self.diagnostics.push(Diagnostic::error(
                         divert.span().clone(),
@@ -981,7 +985,7 @@ impl ParsedVisitor for CallTargetChecker<'_> {
                     | DivertTarget::Done
                     | DivertTarget::End => {}
                 }
-                if !matches!(divert.target(), DivertTarget::Dynamic(_)) {
+                if !arguments_checked_by_dynamic_interface_target {
                     for argument in divert.arguments() {
                         self.check_expression(argument, divert.span(), context);
                     }
@@ -1023,9 +1027,12 @@ impl ParsedVisitor for CallTargetChecker<'_> {
                 }
             }
             Object::TunnelOnwards(tunnel_onwards) => {
-                for argument in tunnel_onwards.arguments() {
-                    self.check_expression(argument, tunnel_onwards.span(), context);
-                }
+                let arguments_checked_by_dynamic_interface_target = matches!(
+                    tunnel_onwards.override_target(),
+                    Some(DivertTarget::Dynamic(
+                        Expression::DynamicInterfaceAccess { .. }
+                    ))
+                );
                 if let Some(target) = tunnel_onwards.override_target() {
                     match target {
                         DivertTarget::Dynamic(expression) => {
@@ -1046,6 +1053,11 @@ impl ParsedVisitor for CallTargetChecker<'_> {
                             }
                         }
                         DivertTarget::Done | DivertTarget::End | DivertTarget::Empty => {}
+                    }
+                }
+                if !arguments_checked_by_dynamic_interface_target {
+                    for argument in tunnel_onwards.arguments() {
+                        self.check_expression(argument, tunnel_onwards.span(), context);
                     }
                 }
             }
@@ -1754,5 +1766,22 @@ mod tests {
         );
 
         assert_eq!(call_target_diagnostics(&story), []);
+    }
+
+    #[test]
+    fn checks_plain_dynamic_divert_arguments() {
+        let story = parse_story(
+            "VAR next: -> = -> done\n\
+             -> {next}(missing())\n\
+             == done ==\n\
+             -> END",
+        );
+        let diagnostics = call_target_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Function 'missing' is not declared",
+        );
     }
 }
