@@ -1,4 +1,4 @@
-Progress: 1/24
+Progress: 1/20
 
 # Typed Dict Values Task List
 
@@ -71,13 +71,13 @@ Goal: Distinguish struct literals from Dict literals in the parsed expression
 model.
 
 Implementation method: Add parsed Dict literal key/value entries for string and
-int keys. Extend expression token parsing so quoted-string or integer keys in
-`{ key: value }` become Dict literals, while identifier keys remain struct
-literal fields. Preserve existing `{}` behavior as an empty composite literal
-that can be checked against expected struct or Dict type.
+int keys plus an explicit empty-composite expression for `{}`. Extend expression
+token parsing so quoted-string or integer keys in `{ key: value }` become Dict
+literals, while identifier keys remain struct literal fields. Empty `{}` must
+remain expected-type-driven so later analysis can accept it for structs or Dicts.
 
 Acceptance criteria: Parser tests cover `{"a": 1}`, `{1: "a"}`, nested Dict
-literals, existing struct literals, and mixed syntax errors.
+literals, empty `{}`, existing struct literals, and mixed syntax errors.
 
 Forbidden shortcuts: Do not reinterpret identifier-key struct literals as Dicts.
 Do not break inline conditional parsing.
@@ -179,47 +179,33 @@ Commit record: pending
 
 ## Milestone 3: Format JSON
 
-### [ ] Task 07: Add Format Dict Wire Model
+### [ ] Task 07: Add Format Dict Wire Model And Document Encoding
 
 Goal: Make `ink-story-json-format` own a reversible Dict value representation.
 
 Implementation method: Add a Dict key enum and Dict value object model. Serialize
 Dicts using a marker encoding that preserves key type and never conflicts with
-existing struct/object values. Deserialize the same encoding recursively.
+existing struct/object values. Deserialize the same encoding recursively. Update
+`docs/ink_JSON_runtime_format.md` in the same task with examples for string and
+int keys and a compatibility note for existing object values.
 
 Acceptance criteria: Format tests roundtrip string-key Dicts, int-key Dicts,
-nested Dicts, and values containing arrays/objects.
+nested Dicts, and values containing arrays/objects. Runtime format docs describe
+the marker shape, recursive values, and key-type preservation.
 
 Forbidden shortcuts: Do not encode int keys as object field names. Do not break
 existing object-value parsing.
 
-Modification boundaries: `crates/ink-story-json-format`.
+Modification boundaries: `crates/ink-story-json-format` and
+`docs/ink_JSON_runtime_format.md`.
 
 Validation commands: `cargo test -p ink-story-json-format`
 
 Commit record: pending
 
-### [ ] Task 08: Document Dict JSON Encoding
-
-Goal: Record the compiled-story JSON contract for Dict values.
-
-Implementation method: Update runtime format documentation to describe the Dict
-marker shape, recursive values, and key-type preservation.
-
-Acceptance criteria: Documentation gives examples for string and int keys and
-states compatibility with existing object values.
-
-Forbidden shortcuts: Do not describe unsupported Dict builtins.
-
-Modification boundaries: `docs/ink_JSON_runtime_format.md`.
-
-Validation commands: `cargo fmt --all --check`
-
-Commit record: pending
-
 ## Milestone 4: Lowering
 
-### [ ] Task 09: Lower Dict Defaults And Literals
+### [ ] Task 08: Lower Dict Defaults And Literals
 
 Goal: Emit format Dict values for defaults, constants, global initializers, temp
 initializers, and nested literals.
@@ -240,7 +226,7 @@ Validation commands: `cargo test -p ink-test typed_values`
 
 Commit record: pending
 
-### [ ] Task 10: Lower Dict Reads
+### [ ] Task 09: Lower Dict Reads
 
 Goal: Emit runtime instructions for Dict index reads through existing expression
 lowering.
@@ -260,7 +246,7 @@ Validation commands: `cargo test -p ink-test typed_values`
 
 Commit record: pending
 
-### [ ] Task 11: Lower Dict Writes
+### [ ] Task 10: Lower Dict Writes
 
 Goal: Emit runtime instructions for Dict indexed assignment and nested lvalue
 updates.
@@ -283,7 +269,7 @@ Commit record: pending
 
 ## Milestone 5: Runtime Values
 
-### [ ] Task 12: Add Runtime Dict Value Type
+### [ ] Task 11: Add Runtime Dict Value Type
 
 Goal: Represent Dict values in runtime-owned value data.
 
@@ -301,7 +287,7 @@ Validation commands: `cargo test -p ink-runtime value_type value`
 
 Commit record: pending
 
-### [ ] Task 13: Runtime Dict INDEX And SET_INDEX
+### [ ] Task 12: Runtime Dict INDEX And SET_INDEX
 
 Goal: Execute Dict reads and writes with existing native index operations.
 
@@ -320,7 +306,7 @@ Validation commands: `cargo test -p ink-runtime native_function_call::composite`
 
 Commit record: pending
 
-### [ ] Task 14: Runtime Dict Equality
+### [ ] Task 13: Runtime Dict Equality
 
 Goal: Compare Dict values recursively with `==` and `!=`.
 
@@ -338,7 +324,7 @@ Validation commands: `cargo test -p ink-runtime native_function_call::scalar`
 
 Commit record: pending
 
-### [ ] Task 15: Runtime JSON Load And Save
+### [ ] Task 14: Runtime JSON Load And Save
 
 Goal: Load and save Dict values through the format crate.
 
@@ -358,7 +344,7 @@ Validation commands: `cargo test -p ink-runtime json variables_state`
 
 Commit record: pending
 
-### [ ] Task 16: Runtime API And Externals
+### [ ] Task 15: Runtime API And Externals
 
 Goal: Expose Dict values through host variable and external APIs.
 
@@ -379,26 +365,33 @@ Commit record: pending
 
 ## Milestone 6: Integration Fixtures
 
-### [ ] Task 17: Add Dict Runtime Fixtures
+### [ ] Task 16: Add Dict Runtime Fixtures And Author Docs
 
-Goal: Cover end-to-end story behavior for core Dict operations.
+Goal: Cover end-to-end story behavior for core Dict operations and document the
+supported author-facing feature.
 
 Implementation method: Add typed fixtures and tests for defaults, literals,
 reads, writes, insertion, replacement, nesting, equality, functions, constants,
-and externals.
+and externals. Update `docs/SyntaxUpdates.md` and `docs/SyntaxReference.md` in
+the same task to describe the completed V1 syntax and explicitly omit unsupported
+collection APIs.
 
 Acceptance criteria: `typed_values` tests assert output and key JSON sequences
-for string and int key Dicts.
+for string and int key Dicts. Syntax docs mention `Dict<K, V>`, key
+restrictions, literals, defaults, index read/write, equality, functions,
+externals, and V1 non-goals.
 
 Forbidden shortcuts: Do not weaken existing fixture expected output.
 
-Modification boundaries: `crates/ink-test` fixtures and tests.
+Modification boundaries: `crates/ink-test` fixtures/tests,
+`docs/SyntaxUpdates.md`, and `docs/SyntaxReference.md`. Do not edit
+`docs/WritingWithInk.md`.
 
 Validation commands: `cargo test -p ink-test typed_values`
 
 Commit record: pending
 
-### [ ] Task 18: Add Dict Diagnostic Fixtures
+### [ ] Task 17: Add Dict Diagnostic Fixtures
 
 Goal: Cover user-facing compiler failures for invalid Dict code.
 
@@ -416,7 +409,7 @@ Validation commands: `cargo test -p ink-test diagnostics`
 
 Commit record: pending
 
-### [ ] Task 19: Add Parse Snapshots
+### [ ] Task 18: Add Parse Snapshots
 
 Goal: Pin the visible parsed model for Dict source syntax.
 
@@ -434,87 +427,32 @@ Validation commands: `cargo test -p ink-test parse`
 
 Commit record: pending
 
-## Milestone 7: Documentation
+## Milestone 7: Gate And Closeout
 
-### [ ] Task 20: Update Syntax Updates
+### [ ] Task 19: Review Active Plan Records And Final Gate
 
-Goal: Record the Dict language addition in the syntax change log.
-
-Implementation method: Add a dated entry describing syntax, behavior, non-goals,
-JSON/runtime impact, and tests.
-
-Acceptance criteria: Entry mentions `Dict<K, V>`, key restrictions, literals,
-index read/write, and missing V1 collection API.
-
-Forbidden shortcuts: Do not include stale or speculative API promises.
-
-Modification boundaries: `docs/SyntaxUpdates.md`.
-
-Validation commands: `cargo fmt --all --check`
-
-Commit record: pending
-
-### [ ] Task 21: Update Syntax Reference
-
-Goal: Document the latest supported Dict syntax for authors.
-
-Implementation method: Add Dict examples to value types, literals,
-indexing/assignment, equality, functions/externals, and defaults where
-appropriate.
-
-Acceptance criteria: Reference includes only current Dict behavior and omits
-unsupported migration notes.
-
-Forbidden shortcuts: Do not edit `docs/WritingWithInk.md`.
-
-Modification boundaries: `docs/SyntaxReference.md`.
-
-Validation commands: `cargo fmt --all --check`
-
-Commit record: pending
-
-## Milestone 8: Gate And Closeout
-
-### [ ] Task 22: Run Workspace Validation
-
-Goal: Verify the feature across the whole workspace before closeout.
-
-Implementation method: Run format, check, workspace tests, and `make gate`.
-Fix any Dict-related regressions in follow-up implementation commits before
-marking this task waiting review.
-
-Acceptance criteria: All validation commands pass.
-
-Forbidden shortcuts: Do not hide failing legacy tests unless the failure is an
-intentional Dict-related behavior change documented in this plan.
-
-Modification boundaries: Fixes only for failures found by validation.
-
-Validation commands: `cargo fmt --all --check`, `cargo check --workspace`,
-`cargo test --workspace`, `make gate`
-
-Commit record: pending
-
-### [ ] Task 23: Review Active Plan Records
-
-Goal: Ensure task status, validation, and commit records are complete.
+Goal: Ensure task status, validation, commit records, and final workspace
+validation are complete.
 
 Implementation method: Review this task list for stale statuses, missing
-validation records, missing commit hashes, and inconsistent progress count.
+validation records, missing commit hashes, and inconsistent progress count. Run
+the full workspace validation and record the final results before closeout.
 
 Acceptance criteria: Every implementation task has validation evidence and a
-commit record.
+commit record. `cargo fmt --all --check`, `cargo check --workspace`,
+`cargo test --workspace`, and `make gate` pass.
 
 Forbidden shortcuts: Do not mark tasks complete without matching validation and
 commit records.
 
 Modification boundaries: active plan records only.
 
-Validation commands: `cargo fmt --all --check`
+Validation commands: `cargo fmt --all --check`, `cargo check --workspace`,
+`cargo test --workspace`, `make gate`
 
 Commit record: pending
 
-### [ ] Task 24: Move Dict Plan To Finished Plans
+### [ ] Task 20: Move Dict Plan To Finished Plans
 
 Goal: Close the active plan after implementation and validation are complete.
 

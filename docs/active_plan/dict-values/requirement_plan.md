@@ -17,7 +17,8 @@ types are `string` and `int`.
   - `{1: "left", 2: "right"}` for `Dict<int, string>`
 - Existing struct literals keep identifier field keys such as `{ hp: 10 }`.
 - Empty `{}` is valid only when the expected type is known, including
-  `Dict<K, V>`.
+  `Dict<K, V>`. The parser should keep empty braces as an expected-type-driven
+  empty composite expression rather than pretending it is only a struct literal.
 
 ## Semantics
 
@@ -50,4 +51,3 @@ types are `string` and `int`.
 - No remove, contains, keys, or values builtin.
 - No non-`string`/`int` keys.
 - No implicit conversion between string keys and int keys.
-
