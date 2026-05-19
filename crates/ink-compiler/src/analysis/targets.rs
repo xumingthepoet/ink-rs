@@ -214,6 +214,9 @@ impl<'a> CallTargetChecker<'a> {
         context: &VisitContext,
     ) {
         self.check_expression(expression, span, context);
+        if expression_contains_dynamic_interface_access(expression) {
+            return;
+        }
         match infer_expression_type(
             expression,
             self.variable_scopes,
@@ -697,6 +700,48 @@ fn expression_root_variable_name(expression: &Expression) -> Option<&str> {
         Expression::DynamicInterfaceAccess { .. }
         | Expression::DynamicInterfaceFunctionCall { .. } => None,
         _ => None,
+    }
+}
+
+fn expression_contains_dynamic_interface_access(expression: &Expression) -> bool {
+    match expression {
+        Expression::DynamicInterfaceAccess { .. }
+        | Expression::DynamicInterfaceFunctionCall { .. } => true,
+        Expression::StringContent(content) => content.objects().iter().any(|object| {
+            matches!(
+                object,
+                Object::Expression(expression) | Object::LogicLine(expression)
+                    if expression_contains_dynamic_interface_access(expression)
+            )
+        }),
+        Expression::FunctionCall { args, .. }
+        | Expression::QualifiedFunctionCall { args, .. }
+        | Expression::ArrayLiteral(args)
+        | Expression::MultipleCondition(args) => args
+            .iter()
+            .any(expression_contains_dynamic_interface_access),
+        Expression::StructLiteral(fields) => fields
+            .iter()
+            .any(|field| expression_contains_dynamic_interface_access(field.expression())),
+        Expression::FieldAccess { base, .. } => expression_contains_dynamic_interface_access(base),
+        Expression::IndexAccess { base, index } => {
+            expression_contains_dynamic_interface_access(base)
+                || expression_contains_dynamic_interface_access(index)
+        }
+        Expression::Binary { left, right, .. } => {
+            expression_contains_dynamic_interface_access(left)
+                || expression_contains_dynamic_interface_access(right)
+        }
+        Expression::Unary { expression, .. } => {
+            expression_contains_dynamic_interface_access(expression)
+        }
+        Expression::String(_)
+        | Expression::NumberInt(_)
+        | Expression::NumberFloat(_)
+        | Expression::NumberBool(_)
+        | Expression::DivertTarget(_)
+        | Expression::VariableReference(_)
+        | Expression::QualifiedReference(_) => false,
     }
 }
 
