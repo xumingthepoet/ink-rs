@@ -152,7 +152,7 @@ Commit record:
 - Review/fix commits: `7ff86ab3 Reject redundant module symbol imports`; post-review validation: `cargo test -p ink-compiler syntax::import`; `cargo test -p ink-compiler syntax::parser`; `cargo test -p ink-test --test diagnostics imports`; `make gate`
 - Completion record commit: this task-list commit
 
-### [ ] Task 04: Parse Interface Type Names
+### [>] Task 04: Parse Interface Type Names
 
 Goal: Add source type syntax `interface<IItem>` and make it available anywhere the later tasks explicitly support interface values.
 
@@ -189,9 +189,9 @@ Validation commands:
 
 Commit record:
 
-- Implementation commit: pending
-- Focused validation: pending
-- Full validation: pending
+- Implementation commit: `43891621 Parse interface type names`
+- Focused validation: `cargo test -p ink-compiler syntax::type_name`; `cargo test -p ink-compiler parsed::type_name`; `cargo test -p ink-compiler analysis`
+- Full validation: `make gate`
 - Review/fix commits: pending
 - Completion record commit: pending
 
