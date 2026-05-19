@@ -48,3 +48,18 @@ optionally selects a choice:
 Do not work around a compiler or runtime bug in experiment ink. Stop at the
 first real bug, record it under `docs/issues_found/`, and continue only after
 the bug is scheduled or fixed.
+
+## Experiment Recap
+
+After adding or updating an experiment, include a short recap in the final
+response:
+
+- what current ink-rs behavior the experiment proves
+- what felt awkward, repetitive, or insufficiently general
+- whether each limitation is syntax, runtime behavior, or local experiment
+  shape
+- possible future syntax or helper improvements
+- whether a real bug was found and recorded under `docs/issues_found/`
+
+Do not record design discomfort as a bug unless compiler or runtime behavior is
+actually incorrect.
