@@ -498,6 +498,20 @@ mod tests {
     }
 
     #[test]
+    fn accepts_interface_array_default_initializers() {
+        let story = parse_story(
+            "=== interface IItem ===\n\
+             == target ==\n\
+             === module game ===\n\
+             VAR routes: interface<IItem>[]\n\
+             == main ==\n\
+             -> END",
+        );
+
+        assert_eq!(variable_initializer_diagnostics(&story), []);
+    }
+
+    #[test]
     fn rejects_non_implementing_modules_as_interface_initializers() {
         let story = parse_story(
             "=== interface IItem ===\n\
