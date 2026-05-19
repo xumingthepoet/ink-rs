@@ -1,4 +1,4 @@
-Progress: 7/23
+Progress: 8/23
 
 # Interface-Typed Dynamic Module Access Active Plan
 
@@ -339,7 +339,7 @@ Commit record:
 - Review/fix commits: `56501e11 Cover overlapping interface members`; post-review validation: `cargo fmt --all --check`; `cargo test -p ink-compiler analysis::interfaces`; `cargo test -p ink-compiler analysis`; `cargo test -p ink-test --test diagnostics interface`; `make gate`
 - Completion record commit: this task-list commit
 
-### [>] Task 08: Type-Check Interface Values And Assignments
+### [x] Task 08: Type-Check Interface Values And Assignments
 
 Goal: Allow variables, temps, constants, arrays, and struct fields with `interface<IItem>` types while rejecting incompatible values.
 
@@ -383,8 +383,8 @@ Commit record:
 - Implementation commit: `e80d56ce Type check interface module values`
 - Focused validation: `cargo fmt --all --check`; `cargo test -p ink-compiler analysis::initializers`; `cargo test -p ink-compiler analysis::assignments`; `cargo test -p ink-compiler analysis::array_literals`; `cargo test -p ink-compiler analysis::struct_literals`; `cargo test -p ink-compiler analysis`; `cargo test -p ink-test --test diagnostics interface`; `cargo test -p ink-test --test diagnostics imports`
 - Full validation: `make gate`
-- Review/fix commits: pending
-- Completion record commit: pending
+- Review/fix commits: `0c77459e Cover interface array default initializer`; post-review validation: `cargo fmt --all --check`; `cargo test -p ink-compiler analysis::initializers`; `cargo test -p ink-compiler analysis::assignments`; `cargo test -p ink-compiler analysis::array_literals`; `cargo test -p ink-compiler analysis::struct_literals`; `cargo test -p ink-compiler analysis`; `cargo test -p ink-test --test diagnostics interface`; `cargo test -p ink-test --test diagnostics imports`; `make gate`
+- Completion record commit: this task-list commit
 
 ### [ ] Task 09: Type-Check Dynamic Interface Knot Targets
 
