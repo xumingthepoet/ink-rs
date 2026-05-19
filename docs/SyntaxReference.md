@@ -53,13 +53,13 @@ stitches still use `=`. Exactly one module in a compilation must define
 `== main ==`, which is the story entry point.
 
 Story content and tags belong inside knots or stitches, not at module level.
-The first non-blank line of each source file must be a module declaration.
-The host compiler receives every source file as an explicit source input. Each
-module name may appear only once in a compilation, so repeating the same
-`=== module name ===` in another file is an error rather than a way to extend
-that module. A module can use another module's knots, functions, constants,
-globals, structs, or externals only after an explicit `FROM module IMPORT ...`,
-and cross-module references use `module::symbol`.
+The first non-blank line of each source file must be a module or interface
+declaration. The host compiler receives every source file as an explicit source
+input. Each module name may appear only once in a compilation, so repeating the
+same `=== module name ===` in another file is an error rather than a way to
+extend that module. A module can use another module's knots, functions,
+constants, globals, structs, or externals only after an explicit
+`FROM module IMPORT ...`, and cross-module references use `module::symbol`.
 
 For example:
 
