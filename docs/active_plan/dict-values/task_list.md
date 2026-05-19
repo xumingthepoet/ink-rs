@@ -135,7 +135,7 @@ Validation:
 Commit record: implementation `d258c6b9` (`Validate Dict literal types`);
 review fix `cbbb5d42` (`Cover Dict fields nested in structs`)
 
-### [ ] Task 04: Infer Dict Index Access
+### [~] Task 04: Infer Dict Index Access
 
 Goal: Make `dict[key]` infer the Dict value type while preserving array index
 rules.
