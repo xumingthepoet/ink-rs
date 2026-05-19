@@ -1,7 +1,8 @@
 #!/bin/sh
 set -u
 
-context=${1:-after Git operation}
+mode=${1:-sync}
+context=${2:-after Git operation}
 
 if ! command -v codegraph >/dev/null 2>&1; then
     echo "codegraph not installed; skipping CodeGraph index update"
@@ -10,12 +11,18 @@ fi
 
 update_codegraph() {
     if [ ! -f .codegraph/config.json ] || [ ! -f .codegraph/codegraph.db ]; then
-        codegraph init . >/dev/null
+        codegraph init . >/dev/null && codegraph index --force --quiet .
+        return
     fi
 
-    codegraph index --quiet . || {
+    if [ "$mode" = "force" ]; then
+        codegraph index --force --quiet .
+        return
+    fi
+
+    codegraph sync --quiet . || {
         codegraph unlock . >/dev/null 2>&1 || true
-        codegraph index --quiet .
+        codegraph sync --quiet .
     }
 }
 

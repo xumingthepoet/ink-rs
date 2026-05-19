@@ -1,2 +1,2 @@
 #!/bin/sh
-"$(dirname "$0")/update-codegraph-index" "after commit"
+"$(dirname "$0")/update-codegraph-index" sync "after commit"

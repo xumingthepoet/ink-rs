@@ -1,2 +1,2 @@
 #!/bin/sh
-"$(dirname "$0")/update-codegraph-index" "after merge"
+"$(dirname "$0")/update-codegraph-index" force "after merge"
