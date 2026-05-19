@@ -607,16 +607,8 @@ impl Story {
             .as_any()
             .downcast_ref::<DynamicInterfaceFunctionCall>()
         {
-            self.validate_dynamic_interface_member(
-                call.interface(),
-                call.member(),
-                DynamicInterfaceMemberKind::Function,
-            )?;
-            return Err(StoryError::InvalidStoryState(format!(
-                "Dynamic interface function execution is not implemented yet: {}::{}",
-                call.interface(),
-                call.member()
-            )));
+            self.evaluate_dynamic_interface_function_call(call)?;
+            return Ok(true);
         }
 
         Ok(false)
@@ -626,43 +618,100 @@ impl Story {
         &mut self,
         target: &DynamicInterfaceTarget,
     ) -> Result<(), StoryError> {
-        let module_value = self.get_state_mut().pop_evaluation_stack()?;
-        let module = Value::get_value::<&StringValue>(module_value.as_ref())
-            .map(|value| value.string.as_str())
-            .ok_or_else(|| {
-                StoryError::InvalidStoryState(format!(
-                    "Dynamic interface target {}::{} expected a string module name, but got {}",
-                    target.interface(),
-                    target.member(),
-                    module_value
-                ))
-            })?;
+        let module =
+            self.pop_dynamic_interface_module("target", target.interface(), target.member(), None)?;
 
         self.validate_dynamic_interface_module_member(
             target.interface(),
-            module,
+            &module,
             target.member(),
             DynamicInterfaceMemberKind::Knot,
         )?;
 
         let target_path = format!("{}.{}", module, target.member());
         let path = Path::new_with_components_string(Some(&target_path));
-        let target_obj = self.content_at_path(&path).correct_obj();
-        if target_obj
-            .and_then(|object| object.into_any().downcast::<Container>().ok())
-            .is_none()
-        {
-            return Err(StoryError::InvalidStoryState(format!(
-                "Dynamic interface target {}::{} resolved to missing runtime path {}",
-                target.interface(),
-                target.member(),
-                target_path
-            )));
-        }
+        self.dynamic_interface_container(&path, &target_path, target.interface(), target.member())?;
 
         self.get_state_mut()
             .push_evaluation_stack(Rc::new(Value::new::<Path>(path)));
         Ok(())
+    }
+
+    fn evaluate_dynamic_interface_function_call(
+        &mut self,
+        call: &DynamicInterfaceFunctionCall,
+    ) -> Result<(), StoryError> {
+        if self.get_state().evaluation_stack.len() <= call.args() {
+            return Err(StoryError::InvalidStoryState(format!(
+                "Dynamic interface function {}::{} expected {} argument(s) and a module value on the evaluation stack",
+                call.interface(),
+                call.member(),
+                call.args()
+            )));
+        }
+
+        let module =
+            self.pop_dynamic_interface_module("function", call.interface(), call.member(), None)?;
+        self.validate_dynamic_interface_module_member(
+            call.interface(),
+            &module,
+            call.member(),
+            DynamicInterfaceMemberKind::Function,
+        )?;
+
+        let target_path = format!("{}.{}", module, call.member());
+        let path = Path::new_with_components_string(Some(&target_path));
+        self.dynamic_interface_container(&path, &target_path, call.interface(), call.member())?;
+
+        let pointer = Self::pointer_at_path(&self.main_content_container, &path)?;
+        self.get_state_mut().set_diverted_pointer(pointer);
+
+        let evaluation_stack_height = self.get_state().evaluation_stack.len();
+        let output_stream_len = self.get_state().get_output_stream().len() as i32;
+        self.get_state().get_callstack().borrow_mut().push(
+            PushPopType::Function,
+            evaluation_stack_height,
+            output_stream_len,
+        );
+
+        Ok(())
+    }
+
+    fn pop_dynamic_interface_module(
+        &mut self,
+        instruction: &str,
+        interface: &str,
+        member: &str,
+        args: Option<usize>,
+    ) -> Result<String, StoryError> {
+        let module_value = self.get_state_mut().pop_evaluation_stack()?;
+        Value::get_value::<&StringValue>(module_value.as_ref())
+            .map(|value| value.string.clone())
+            .ok_or_else(|| {
+                let args = args
+                    .map(|count| format!(" with {count} argument(s)"))
+                    .unwrap_or_default();
+                StoryError::InvalidStoryState(format!(
+                    "Dynamic interface {instruction} {interface}::{member}{args} expected a string module name, but got {module_value}"
+                ))
+            })
+    }
+
+    fn dynamic_interface_container(
+        &self,
+        path: &Path,
+        path_string: &str,
+        interface: &str,
+        member: &str,
+    ) -> Result<Rc<Container>, StoryError> {
+        self.content_at_path(path)
+            .correct_obj()
+            .and_then(|object| object.into_any().downcast::<Container>().ok())
+            .ok_or_else(|| {
+                StoryError::InvalidStoryState(format!(
+                    "Dynamic interface member {interface}::{member} resolved to missing runtime path {path_string}"
+                ))
+            })
     }
 
     fn validate_dynamic_interface_module_member(
@@ -732,9 +781,19 @@ mod dynamic_interface_tests {
             "target",
             vec![O::String("Left.\n".to_string()), O::ControlCommand(C::Done)],
         );
+        let score = FContainer::named(
+            "score",
+            vec![
+                O::ControlCommand(C::EvalStart),
+                O::Int(7),
+                O::ControlCommand(C::EvalEnd),
+                O::ControlCommand(C::PopFunction),
+            ],
+        );
         let mut left = FContainer::named("left", Vec::new());
         left.named_content
             .push(NamedContainer::new("target", target));
+        left.named_content.push(NamedContainer::new("score", score));
 
         let global_decl = FContainer::named(
             "global decl",
@@ -768,6 +827,7 @@ mod dynamic_interface_tests {
 
         let mut members = BTreeMap::new();
         members.insert("target".to_string(), InterfaceMemberKind::Knot);
+        members.insert("score".to_string(), InterfaceMemberKind::Function);
 
         let mut program = Program::new(root);
         program.interfaces.insert(
@@ -805,5 +865,34 @@ mod dynamic_interface_tests {
         assert!(error
             .to_string()
             .contains("Module missing does not implement dynamic interface IItem"));
+    }
+
+    #[test]
+    fn dynamic_interface_function_call_returns_implementation_value() {
+        use format::{ControlCommand as C, Object as O, Program};
+
+        let mut program = Program::from_json_str(&dynamic_interface_story_json())
+            .expect("base dynamic interface story JSON should parse");
+        program.root.content = vec![
+            O::ControlCommand(C::EvalStart),
+            O::VariableReference("route".to_string()),
+            O::DynamicInterfaceFunctionCall {
+                interface: "IItem".to_string(),
+                member: "score".to_string(),
+                args: 0,
+            },
+            O::ControlCommand(C::EvalOutput),
+            O::ControlCommand(C::EvalEnd),
+            O::ControlCommand(C::Done),
+        ];
+        let json = program.to_json_string().expect("valid story JSON");
+        let mut story = Story::new(&json).expect("story should load");
+
+        let output = story
+            .continue_maximally()
+            .expect("story should continue through dynamic function");
+
+        assert_eq!(output, "7");
+        assert!(story.get_current_errors().is_empty());
     }
 }
