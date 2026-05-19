@@ -100,7 +100,7 @@ Commit record: implementation `80057918` (`Add Dict literal parsed nodes`)
 
 ## Milestone 2: Type Analysis
 
-### [ ] Task 03: Validate Dict Literal Types
+### [~] Task 03: Validate Dict Literal Types
 
 Goal: Type-check Dict literals against expected `Dict<K, V>` declarations.
 
