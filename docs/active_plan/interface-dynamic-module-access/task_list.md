@@ -428,7 +428,7 @@ Validation commands:
 - Review/fix commits: `6e143761 Preserve dynamic divert argument checks`; post-review validation: `cargo fmt --all --check`; `cargo test -p ink-compiler analysis::expression_types`; `cargo test -p ink-compiler analysis::targets`; `cargo test -p ink-compiler analysis::modules`; `cargo test -p ink-test --test diagnostics interface`; `make gate`
 - Completion record commit: this task-list commit
 
-### [ ] Task 10: Type-Check Dynamic Interface Function Calls
+### [~] Task 10: Type-Check Dynamic Interface Function Calls
 
 Goal: Make `{route}::score(args)` type-check against interface function signatures.
 
