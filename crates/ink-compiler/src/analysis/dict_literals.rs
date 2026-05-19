@@ -100,7 +100,9 @@ impl<'a> DictLiteralChecker<'a> {
             return;
         };
 
-        if type_name_contains_dict(&expected_type) || expression_contains_dict_literal(expression) {
+        if self.type_name_contains_dict(&expected_type, context.current_module.as_deref())
+            || expression_contains_dict_literal(expression)
+        {
             self.check_expression_against_type(
                 expression,
                 &expected_type,
@@ -112,8 +114,10 @@ impl<'a> DictLiteralChecker<'a> {
     }
 
     fn check_constant(&mut self, declaration: &ConstantDeclaration, context: &VisitContext) {
-        if type_name_contains_dict(declaration.declared_type())
-            || expression_contains_dict_literal(declaration.expression())
+        if self.type_name_contains_dict(
+            declaration.declared_type(),
+            context.current_module.as_deref(),
+        ) || expression_contains_dict_literal(declaration.expression())
         {
             self.check_expression_against_type(
                 declaration.expression(),
@@ -155,6 +159,26 @@ impl<'a> DictLiteralChecker<'a> {
                 self.check_dict_literal(*key_type, value_type, entries, context_name, span, context)
             }
             (TypeName::Dict { .. }, Expression::EmptyCompositeLiteral) => {}
+            (TypeName::Dict { .. }, Expression::ArrayLiteral(_)) => {
+                self.diagnostics.push(Diagnostic::error(
+                    span.clone(),
+                    format!(
+                        "Value for '{}' is an array literal but expected {}",
+                        context_name,
+                        expected_type.display_name()
+                    ),
+                ));
+            }
+            (TypeName::Dict { .. }, Expression::StructLiteral(_)) => {
+                self.diagnostics.push(Diagnostic::error(
+                    span.clone(),
+                    format!(
+                        "Value for '{}' is a struct literal but expected {}",
+                        context_name,
+                        expected_type.display_name()
+                    ),
+                ));
+            }
             (TypeName::Dict { .. }, _) => {
                 self.check_exact_expression_type(
                     expression,
@@ -431,6 +455,50 @@ impl<'a> DictLiteralChecker<'a> {
         self.expected_expression_ids
             .insert(expression as *const Expression as usize);
     }
+
+    fn type_name_contains_dict(&self, type_name: &TypeName, current_module: Option<&str>) -> bool {
+        self.type_name_contains_dict_with_seen(type_name, current_module, &mut BTreeSet::new())
+    }
+
+    fn type_name_contains_dict_with_seen(
+        &self,
+        type_name: &TypeName,
+        current_module: Option<&str>,
+        seen_structs: &mut BTreeSet<String>,
+    ) -> bool {
+        match type_name {
+            TypeName::Dict { .. } => true,
+            TypeName::Array(element_type) => {
+                self.type_name_contains_dict_with_seen(element_type, current_module, seen_structs)
+            }
+            TypeName::Struct(name) => {
+                let key = scoped_struct_key(current_module, name);
+                self.struct_type_contains_dict(&key, seen_structs)
+            }
+            TypeName::QualifiedStruct(name) => {
+                self.struct_type_contains_dict(name.as_str(), seen_structs)
+            }
+            TypeName::Primitive(_) | TypeName::Interface { .. } | TypeName::Void => false,
+        }
+    }
+
+    fn struct_type_contains_dict(
+        &self,
+        struct_key: &str,
+        seen_structs: &mut BTreeSet<String>,
+    ) -> bool {
+        if !seen_structs.insert(struct_key.to_string()) {
+            return false;
+        }
+
+        let Some(symbol) = self.struct_types.get(struct_key) else {
+            return false;
+        };
+        let field_module = struct_key_module(struct_key);
+        symbol.fields().values().any(|field_type| {
+            self.type_name_contains_dict_with_seen(field_type, field_module, seen_structs)
+        })
+    }
 }
 
 impl ParsedVisitor for DictLiteralChecker<'_> {
@@ -453,18 +521,6 @@ impl ParsedVisitor for DictLiteralChecker<'_> {
                 "Dict literal requires an expected Dict type",
             ));
         }
-    }
-}
-
-fn type_name_contains_dict(type_name: &TypeName) -> bool {
-    match type_name {
-        TypeName::Dict { .. } => true,
-        TypeName::Array(element_type) => type_name_contains_dict(element_type),
-        TypeName::Primitive(_)
-        | TypeName::Struct(_)
-        | TypeName::QualifiedStruct(_)
-        | TypeName::Interface { .. }
-        | TypeName::Void => false,
     }
 }
 
@@ -507,6 +563,20 @@ fn expression_contains_dict_literal(expression: &Expression) -> bool {
         | Expression::QualifiedReference(_)
         | Expression::EmptyCompositeLiteral => false,
     }
+}
+
+fn scoped_struct_key(current_module: Option<&str>, name: &str) -> String {
+    if name.contains("::") {
+        name.to_string()
+    } else {
+        current_module
+            .map(|module| format!("{module}::{name}"))
+            .unwrap_or_else(|| name.to_string())
+    }
+}
+
+fn struct_key_module(struct_key: &str) -> Option<&str> {
+    struct_key.split_once("::").map(|(module, _)| module)
 }
 
 fn dict_key_matches(expected: DictKeyType, actual: &DictLiteralKey) -> bool {
@@ -567,11 +637,15 @@ mod tests {
              STRUCT Player {\n\
              hp: int\n\
              }\n\
+             STRUCT Bag {\n\
+             scores: Dict<string, int>\n\
+             }\n\
              VAR players: Dict<string, Player> = {\"ada\": { hp: 10 }}\n\
              VAR nested: Dict<int, Dict<string, int[]>> = {1: {\"scores\": [1, 2]}}\n\
              VAR states: Dict<string, State> = {\"current\": State.Idle}\n\
              VAR routes: Dict<string, interface<IRoute>> = {\"next\": left}\n\
              VAR empty: Dict<string, int> = {}\n\
+             VAR emptyBag: Bag = { scores: {} }\n\
              == main ==\n\
              -> END\n\
              === module left implements IRoute ===\n\
@@ -643,6 +717,25 @@ mod tests {
             &diagnostics,
             DiagnosticSeverity::Error,
             "Dict literal requires an expected Dict type",
+        );
+    }
+
+    #[test]
+    fn checks_dict_fields_inside_struct_literals() {
+        let story = parse_story(
+            "STRUCT Bag {\n\
+             scores: Dict<string, int>\n\
+             }\n\
+             VAR bag: Bag = { scores: { wrong: 1 } }\n\
+             -> DONE",
+        );
+
+        let diagnostics = dict_literal_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Value for 'Bag.scores' is a struct literal but expected Dict<string, int>",
         );
     }
 }
