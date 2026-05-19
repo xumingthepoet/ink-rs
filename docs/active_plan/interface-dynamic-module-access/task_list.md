@@ -517,7 +517,7 @@ Commit record:
 - Review/fix commits: reviewed; no fix commits required; post-review validation: `cargo fmt --all --check`; `cargo test -p ink-story-json-format`; `cargo check --workspace`; `make gate`
 - Completion record commit: this task-list commit
 
-### [ ] Task 12: Lower Interface Values To Runtime Strings
+### [~] Task 12: Lower Interface Values To Runtime Strings
 
 Goal: Lower interface-typed values to the implementing module name string while preserving compile-time interface type safety.
 
