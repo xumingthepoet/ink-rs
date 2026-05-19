@@ -8,6 +8,7 @@ mod field_access;
 mod flow;
 mod index_access;
 mod initializers;
+mod interfaces;
 mod modules;
 mod names;
 mod span;
@@ -31,6 +32,7 @@ use field_access::field_access_diagnostics;
 use flow::flow_diagnostics;
 use index_access::index_access_diagnostics;
 use initializers::variable_initializer_diagnostics;
+use interfaces::interface_diagnostics;
 use names::naming_diagnostics;
 use struct_literals::struct_literal_diagnostics;
 use structs::struct_type_diagnostics;
@@ -109,6 +111,7 @@ fn run_analysis_passes_with_modules(
     diagnostics.extend(author_warning_diagnostics(story));
     diagnostics.extend(enum_type_diagnostics(story));
     diagnostics.extend(struct_type_diagnostics(story));
+    diagnostics.extend(interface_diagnostics(story));
     diagnostics.extend(modules::module_symbol_diagnostics(
         story,
         &module_analysis.symbols,
@@ -169,6 +172,7 @@ mod tests {
         ("flow.rs", include_str!("flow.rs")),
         ("index_access.rs", include_str!("index_access.rs")),
         ("initializers.rs", include_str!("initializers.rs")),
+        ("interfaces.rs", include_str!("interfaces.rs")),
         ("names.rs", include_str!("names.rs")),
         ("span.rs", include_str!("span.rs")),
         ("struct_literals.rs", include_str!("struct_literals.rs")),

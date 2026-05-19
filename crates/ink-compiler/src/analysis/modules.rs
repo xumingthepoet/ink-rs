@@ -393,18 +393,25 @@ mod tests {
         let story = parse_story(
             "=== module game ===\n\
              FROM missing IMPORT sword\n\
+             FROM absent\n\
              == main ==\n\
              -> END",
         );
 
         let diagnostics = import_diagnostics(&story);
 
-        assert_eq!(diagnostics.len(), 1, "{diagnostics:#?}");
+        assert_eq!(diagnostics.len(), 2, "{diagnostics:#?}");
         assert_eq!(diagnostics[0].severity, DiagnosticSeverity::Error);
         assert_eq!(diagnostics[0].line, 2);
         assert_eq!(
             diagnostics[0].message,
             "Imported module 'missing' does not exist"
+        );
+        assert_eq!(diagnostics[1].severity, DiagnosticSeverity::Error);
+        assert_eq!(diagnostics[1].line, 3);
+        assert_eq!(
+            diagnostics[1].message,
+            "Imported module 'absent' does not exist"
         );
     }
 
@@ -495,15 +502,17 @@ mod tests {
         let checked = super::super::analyze(story);
 
         assert!(!checked.has_errors(), "{:#?}", checked.diagnostics);
-        assert!(
-            checked.diagnostics.is_empty(),
-            "bare module imports should not create symbol-use warnings: {:#?}",
-            checked.diagnostics
+        assert_eq!(checked.diagnostics.len(), 1, "{:#?}", checked.diagnostics);
+        assert_eq!(checked.diagnostics[0].severity, DiagnosticSeverity::Warning);
+        assert_eq!(
+            checked.diagnostics[0].message,
+            "Imported module 'items' is never used"
         );
         let checked = checked.artifact.expect("expected checked story");
         assert!(checked
             .module_dependencies
             .contains_dependency("game", "items"));
+        assert!(checked.module_imports.imports_module("game", "items"));
         assert!(!checked.module_imports.allows("game", "items", "sword"));
     }
 

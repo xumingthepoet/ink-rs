@@ -105,6 +105,19 @@ fn interface_body_diagnostics_reject_executable_content() {
 }
 
 #[test]
+fn interface_analysis_diagnostics_report_names_and_unknown_types() {
+    let diagnostics = diagnostics_for_fixture("diagnostics/interface-analysis.ink");
+
+    for message in [
+        "Interface 'IItem' is already declared in this compilation",
+        "Interface 'IItem' conflicts with module 'IItem'",
+        "Unknown interface type 'IMissing'",
+    ] {
+        assert_diagnostic(&diagnostics, DiagnosticSeverity::Error, message);
+    }
+}
+
+#[test]
 fn imports_diagnostics_report_obsolete_import_syntax() {
     let diagnostics = diagnostics_for_fixture("diagnostics/imports-obsolete.ink");
 
@@ -112,6 +125,22 @@ fn imports_diagnostics_report_obsolete_import_syntax() {
         &diagnostics,
         DiagnosticSeverity::Error,
         "Old import syntax `IMPORT sword FROM items` has been replaced by `FROM items IMPORT sword`",
+    );
+}
+
+#[test]
+fn imports_diagnostics_report_bare_module_import_errors_and_warnings() {
+    let diagnostics = diagnostics_for_fixture("diagnostics/imports-bare.ink");
+
+    assert_diagnostic(
+        &diagnostics,
+        DiagnosticSeverity::Error,
+        "Imported module 'missing' does not exist",
+    );
+    assert_diagnostic(
+        &diagnostics,
+        DiagnosticSeverity::Warning,
+        "Imported module 'items' is never used",
     );
 }
 

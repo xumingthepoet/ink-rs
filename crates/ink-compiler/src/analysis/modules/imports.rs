@@ -13,6 +13,7 @@ use super::{sort_diagnostics, ModuleSymbolIndex};
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ModuleImportIndex {
+    module_imports: BTreeMap<String, BTreeSet<String>>,
     allowed_symbols: BTreeMap<String, BTreeMap<String, BTreeSet<String>>>,
 }
 
@@ -22,12 +23,16 @@ pub fn build_module_import_index(story: &Story) -> ModuleImportIndex {
     for module in story.modules() {
         index.ensure_module(module.name());
         for import in module.imports() {
-            for imported_name in import.imported_names() {
-                index.insert_allowed_symbol(
-                    module.name(),
-                    import.source_module(),
-                    imported_name.name(),
-                );
+            if import.is_module_import() {
+                index.insert_module_import(module.name(), import.source_module());
+            } else {
+                for imported_name in import.imported_names() {
+                    index.insert_allowed_symbol(
+                        module.name(),
+                        import.source_module(),
+                        imported_name.name(),
+                    );
+                }
             }
         }
     }
@@ -65,6 +70,14 @@ pub(in crate::analysis) fn module_import_diagnostics(
                         "Imported module '{}' does not exist",
                         import.source_module()
                     ),
+                ));
+                continue;
+            }
+
+            if import.is_module_import() {
+                diagnostics.push(Diagnostic::warning(
+                    import.source_module_span().clone(),
+                    format!("Imported module '{}' is never used", import.source_module()),
                 ));
                 continue;
             }
@@ -212,7 +225,20 @@ fn qualified_use_sets_by_module(
 
 impl ModuleImportIndex {
     fn ensure_module(&mut self, module: impl Into<String>) {
-        self.allowed_symbols.entry(module.into()).or_default();
+        let module = module.into();
+        self.module_imports.entry(module.clone()).or_default();
+        self.allowed_symbols.entry(module).or_default();
+    }
+
+    fn insert_module_import(
+        &mut self,
+        importing_module: impl Into<String>,
+        source_module: impl Into<String>,
+    ) {
+        self.module_imports
+            .entry(importing_module.into())
+            .or_default()
+            .insert(source_module.into());
     }
 
     fn insert_allowed_symbol(
@@ -242,6 +268,12 @@ impl ModuleImportIndex {
     pub fn allows(&self, importing_module: &str, source_module: &str, symbol: &str) -> bool {
         self.imports_from(importing_module, source_module)
             .is_some_and(|symbols| symbols.contains(symbol))
+    }
+
+    pub fn imports_module(&self, importing_module: &str, source_module: &str) -> bool {
+        self.module_imports
+            .get(importing_module)
+            .is_some_and(|imports| imports.contains(source_module))
     }
 }
 
