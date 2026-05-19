@@ -1,4 +1,4 @@
-Progress: 0/24
+Progress: 1/24
 
 # Typed Dict Values Task List
 
@@ -32,7 +32,7 @@ Global forbidden shortcuts:
 
 ## Milestone 1: Source Model And Parser
 
-### [>] Task 01: Add Dict Type Names
+### [x] Task 01: Add Dict Type Names
 
 Goal: Represent and parse `Dict<K, V>` type names with `string` and `int` keys.
 
@@ -58,8 +58,12 @@ Validation:
 - `cargo test -p ink-compiler syntax::type_name` passed.
 - `cargo fmt --all --check` passed.
 - `make gate` passed.
+- Review fix: replaced `PrimitiveType` Dict keys with a dedicated
+  `DictKeyType` enum and reran `cargo test -p ink-compiler syntax::type_name`,
+  `cargo fmt --all --check`, and `make gate`.
 
-Commit record: implementation `d777e817` (`Add Dict type name parsing`)
+Commit record: implementation `d777e817` (`Add Dict type name parsing`); review
+fix `3ffdc426` (`Constrain Dict key type model`)
 
 ### [ ] Task 02: Add Dict Literal Parsed Nodes
 
