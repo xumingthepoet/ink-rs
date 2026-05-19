@@ -917,7 +917,7 @@ Commit record:
 - Review/fix commits: `01cdb128 Add full interface end-to-end JSON snapshot`; post-review validation: `cargo fmt --all --check`; `cargo test -p ink-test --test compiler_snapshots interface`; `cargo test -p ink-test --test modules interface`; `cargo test -p ink-test --test functions interface`; `make gate`
 - Completion record commit: this task-list commit
 
-### [~] Task 21: Add Interface Diagnostics Fixtures
+### [>] Task 21: Add Interface Diagnostics Fixtures
 
 Goal: Pin common failure modes for interface declarations, implementations, values, new import syntax, and dynamic access.
 
@@ -954,9 +954,9 @@ Validation commands:
 
 Commit record:
 
-- Implementation commit: pending
-- Focused validation: pending
-- Full validation: pending
+- Implementation commit: `94d16e7e Add interface assignment diagnostic fixture`
+- Focused validation: `cargo fmt --all --check`; `cargo test -p ink-test --test diagnostics interface`; `cargo test -p ink-test --test diagnostics imports`; `cargo test -p ink-compiler analysis`
+- Full validation: `make gate`
 - Review/fix commits: pending
 - Completion record commit: pending
 
