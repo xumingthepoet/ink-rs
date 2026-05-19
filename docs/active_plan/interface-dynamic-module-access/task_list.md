@@ -1006,7 +1006,7 @@ Commit record:
 - Review/fix commits: `a333cc1d Clarify interface source file starts`; post-review validation: `rg -n "FROM .*IMPORT|interface<|implements|dynamic interface|\\{\\{.*\\}::" docs/SyntaxUpdates.md docs/SyntaxReference.md`; `cargo test -p ink-test --test modules docs`; `cargo test -p ink-test --test compiler_snapshots interface`; `make gate`
 - Completion record commit: this task-list commit
 
-### [ ] Task 23: Archive Completed Plan
+### [~] Task 23: Archive Completed Plan
 
 Goal: Move this active plan to `docs/finished_plans/` after all implementation tasks are complete and validated.
 
