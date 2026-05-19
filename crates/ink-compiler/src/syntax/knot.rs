@@ -9,10 +9,12 @@ use super::{is_identifier_continue, is_identifier_start, rule::RuleParser, type_
 pub(super) struct FlowDecl {
     pub level: FlowLevel,
     pub name: String,
+    pub name_span: crate::source::SourceSpan,
     pub arguments: Vec<FlowArgument>,
     pub return_type: TypeName,
     pub is_function: bool,
     pub is_internal: bool,
+    pub span: crate::source::SourceSpan,
 }
 
 pub(super) fn is_knot_declaration_line(line: &str) -> bool {
@@ -28,6 +30,7 @@ pub(super) fn is_stitch_declaration_line(line: &str) -> bool {
 
 pub(super) fn parse_knot_declaration(parser: &mut RuleParser<'_>) -> Option<FlowDecl> {
     parser.skip_horizontal_whitespace();
+    let span = parser.current_span();
 
     let equals = parser.take_while(|ch| ch == '=')?;
     if equals.chars().count() < 2 {
@@ -36,31 +39,34 @@ pub(super) fn parse_knot_declaration(parser: &mut RuleParser<'_>) -> Option<Flow
 
     parser.skip_horizontal_whitespace();
 
+    let first_identifier_span = parser.current_span();
     let first_identifier =
         parser.expect("knot name", parse_identifier, |parser| parser.skip_to_end())?;
 
-    let (name, is_function, is_internal) = if first_identifier == "function" {
+    let (name, name_span, is_function, is_internal) = if first_identifier == "function" {
         parser.expect(
             "whitespace after 'function'",
             parse_horizontal_whitespace,
             |_| {},
         )?;
+        let name_span = parser.current_span();
         let name = parser.expect("function name", parse_identifier, |parser| {
             parser.skip_to_end();
         })?;
-        (name, true, false)
+        (name, name_span, true, false)
     } else if first_identifier == "INTERNAL" {
         parser.expect(
             "whitespace after 'INTERNAL'",
             parse_horizontal_whitespace,
             |_| {},
         )?;
+        let name_span = parser.current_span();
         let name = parser.expect("INTERNAL function name", parse_identifier, |parser| {
             parser.skip_to_end();
         })?;
-        (name, true, true)
+        (name, name_span, true, true)
     } else {
-        (first_identifier, false, false)
+        (first_identifier, first_identifier_span, false, false)
     };
 
     parser.skip_horizontal_whitespace();
@@ -105,15 +111,18 @@ pub(super) fn parse_knot_declaration(parser: &mut RuleParser<'_>) -> Option<Flow
     Some(FlowDecl {
         level: FlowLevel::Knot,
         name,
+        name_span,
         arguments,
         return_type,
         is_function,
         is_internal,
+        span,
     })
 }
 
 pub(super) fn parse_stitch_declaration(parser: &mut RuleParser<'_>) -> Option<FlowDecl> {
     parser.skip_horizontal_whitespace();
+    let span = parser.current_span();
 
     let equals = parser.take_while(|ch| ch == '=')?;
     if equals.chars().count() != 1 {
@@ -122,32 +131,35 @@ pub(super) fn parse_stitch_declaration(parser: &mut RuleParser<'_>) -> Option<Fl
 
     parser.skip_horizontal_whitespace();
 
+    let first_identifier_span = parser.current_span();
     let first_identifier = parser.expect("stitch name", parse_identifier, |parser| {
         parser.skip_to_end()
     })?;
 
-    let (name, is_function, is_internal) = if first_identifier == "function" {
+    let (name, name_span, is_function, is_internal) = if first_identifier == "function" {
         parser.expect(
             "whitespace after 'function'",
             parse_horizontal_whitespace,
             |_| {},
         )?;
+        let name_span = parser.current_span();
         let name = parser.expect("function name", parse_identifier, |parser| {
             parser.skip_to_end();
         })?;
-        (name, true, false)
+        (name, name_span, true, false)
     } else if first_identifier == "INTERNAL" {
         parser.expect(
             "whitespace after 'INTERNAL'",
             parse_horizontal_whitespace,
             |_| {},
         )?;
+        let name_span = parser.current_span();
         let name = parser.expect("INTERNAL function name", parse_identifier, |parser| {
             parser.skip_to_end();
         })?;
-        (name, true, true)
+        (name, name_span, true, true)
     } else {
-        (first_identifier, false, false)
+        (first_identifier, first_identifier_span, false, false)
     };
 
     parser.skip_horizontal_whitespace();
@@ -184,10 +196,12 @@ pub(super) fn parse_stitch_declaration(parser: &mut RuleParser<'_>) -> Option<Fl
     Some(FlowDecl {
         level: FlowLevel::Stitch,
         name,
+        name_span,
         arguments,
         return_type,
         is_function,
         is_internal,
+        span,
     })
 }
 

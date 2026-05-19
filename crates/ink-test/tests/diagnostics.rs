@@ -91,6 +91,20 @@ fn enum_diagnostics_cover_invalid_declarations_and_values() {
 }
 
 #[test]
+fn interface_body_diagnostics_reject_executable_content() {
+    let diagnostics = diagnostics_for_fixture("diagnostics/interface-invalid-body.ink");
+
+    for message in [
+        "Interface bodies do not support variable declarations",
+        "Interface bodies do not support external declarations",
+        "Interface bodies do not support stitch declarations",
+        "Interface bodies only support knot and function signatures",
+    ] {
+        assert_diagnostic(&diagnostics, DiagnosticSeverity::Error, message);
+    }
+}
+
+#[test]
 fn diagnostic_helper_asserts_error_messages() {
     let diagnostics = diagnostics_for_fixture("diagnostics/diagnostic-smoke.ink");
     assert_diagnostic(&diagnostics, DiagnosticSeverity::Error, "target not found");

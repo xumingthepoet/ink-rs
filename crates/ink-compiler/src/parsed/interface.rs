@@ -68,6 +68,9 @@ impl InterfaceDeclaration {
         out.push_str("Interface(name=\"");
         out.push_str(&self.name);
         out.push_str("\")");
+        for member in &self.members {
+            member.write_parse_snapshot(out, indent + 2);
+        }
     }
 }
 
@@ -119,6 +122,47 @@ impl InterfaceMemberSignature {
     pub fn span(&self) -> &SourceSpan {
         &self.span
     }
+
+    pub(crate) fn write_parse_snapshot(&self, out: &mut String, indent: usize) {
+        out.push('\n');
+        push_indent(out, indent);
+        out.push_str("InterfaceMember(kind=");
+        out.push_str(match self.kind {
+            InterfaceMemberKind::Knot => "Knot",
+            InterfaceMemberKind::Function => "Function",
+        });
+        out.push_str(", name=\"");
+        out.push_str(&self.name);
+        out.push_str("\", typed=");
+        out.push_str(if self.has_typed_signature {
+            "true"
+        } else {
+            "false"
+        });
+        if let Some(return_type) = &self.return_type {
+            out.push_str(", return=");
+            out.push_str(&return_type.snapshot_name());
+        }
+        out.push(')');
+        for argument in &self.arguments {
+            out.push('\n');
+            push_indent(out, indent + 2);
+            out.push_str("Argument(name=\"");
+            out.push_str(argument.name());
+            out.push('"');
+            if let Some(declared_type) = argument.declared_type() {
+                out.push_str(", type=");
+                out.push_str(&declared_type.snapshot_name());
+            }
+            if argument.is_by_reference() {
+                out.push_str(", ref=true");
+            }
+            if argument.is_divert_target() {
+                out.push_str(", divertTarget=true");
+            }
+            out.push(')');
+        }
+    }
 }
 
 #[cfg(test)]
@@ -156,6 +200,39 @@ mod tests {
         );
 
         assert_eq!(declaration.members(), &[member]);
+    }
+
+    #[test]
+    fn writes_interface_member_snapshots() {
+        let member = InterfaceMemberSignature::new(
+            InterfaceMemberKind::Function,
+            "score",
+            vec![crate::parsed::FlowArgument::new(
+                "amount",
+                Some(crate::parsed::TypeName::int()),
+                false,
+                false,
+                span_at(2, 19),
+            )],
+            Some(crate::parsed::TypeName::int()),
+            true,
+            span_at(2, 13),
+            span_at(2, 1),
+        );
+        let declaration = InterfaceDeclaration::new_with_members(
+            "IItem",
+            vec![member],
+            span_at(1, 15),
+            span_at(1, 1),
+        );
+        let mut snapshot = String::new();
+
+        declaration.write_parse_snapshot(&mut snapshot, 0);
+
+        assert_eq!(
+            snapshot,
+            "\nInterface(name=\"IItem\")\n  InterfaceMember(kind=Function, name=\"score\", typed=true, return=int)\n    Argument(name=\"amount\", type=int)"
+        );
     }
 
     fn span_at(line: usize, column: usize) -> SourceSpan {

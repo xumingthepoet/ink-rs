@@ -3,7 +3,10 @@ use crate::source::SourceInput;
 use crate::{
     compiler::StageOutput,
     diagnostic::Diagnostic,
-    parsed::{Flow, FlowParts, ImportDeclaration, InterfaceDeclaration, Module, Object, Story},
+    parsed::{
+        Flow, FlowParts, ImportDeclaration, InterfaceDeclaration, InterfaceMemberKind,
+        InterfaceMemberSignature, Module, Object, Story,
+    },
     source::{SourceFile, SourceLine},
 };
 
@@ -132,10 +135,9 @@ impl Parser {
 
             if interface::is_interface_like_declaration_line(&line.text) {
                 active_module_index = None;
-                if let Some(interface) = self.parse_interface_header(line) {
+                if let Some(interface) = self.parse_interface_declaration(&lines, &mut index) {
                     interfaces.push(interface);
                 }
-                index += 1;
                 continue;
             }
 
@@ -384,15 +386,119 @@ impl Parser {
         })
     }
 
-    fn parse_interface_header(&mut self, line: &SourceLine) -> Option<InterfaceDeclaration> {
+    fn parse_interface_declaration(
+        &mut self,
+        lines: &[SourceLine],
+        index: &mut usize,
+    ) -> Option<InterfaceDeclaration> {
+        let line = &lines[*index];
         let mut line_parser = RuleParser::new(line);
         let declaration = line_parser.parse_rule(interface::parse_interface_declaration);
         let had_error = line_parser.had_error();
         self.diagnostics.extend(line_parser.finish());
+        *index += 1;
 
-        declaration.filter(|_| !had_error).map(|declaration| {
-            InterfaceDeclaration::new(declaration.name, declaration.name_span, declaration.span)
-        })
+        let declaration = declaration?;
+
+        let mut members = Vec::new();
+        if had_error {
+            return Some(InterfaceDeclaration::new_with_members(
+                declaration.name,
+                members,
+                declaration.name_span,
+                declaration.span,
+            ));
+        }
+
+        while *index < lines.len() {
+            let next_line = &lines[*index];
+
+            if next_line.text.trim().is_empty() {
+                *index += 1;
+                continue;
+            }
+
+            if module::is_module_like_declaration_line(&next_line.text)
+                || interface::is_interface_like_declaration_line(&next_line.text)
+            {
+                break;
+            }
+
+            if knot::is_stitch_declaration_line(&next_line.text) {
+                self.diagnostics.push(Diagnostic::error(
+                    next_line.span.clone(),
+                    "Interface bodies do not support stitch declarations; declare interface members with `== name ==` or `== function name(...) => type ==`",
+                ));
+                *index += 1;
+                continue;
+            }
+
+            if knot::is_knot_declaration_line(&next_line.text) {
+                if let Some(member) = self.parse_interface_member_signature(next_line) {
+                    members.push(member);
+                }
+                *index += 1;
+                continue;
+            }
+
+            self.diagnostics
+                .push(interface_body_content_diagnostic(next_line));
+            *index += 1;
+        }
+
+        Some(InterfaceDeclaration::new_with_members(
+            declaration.name,
+            members,
+            declaration.name_span,
+            declaration.span,
+        ))
+    }
+
+    fn parse_interface_member_signature(
+        &mut self,
+        line: &SourceLine,
+    ) -> Option<InterfaceMemberSignature> {
+        let mut line_parser = RuleParser::new(line);
+        let declaration = line_parser.parse_rule(knot::parse_knot_declaration);
+        let had_error = line_parser.had_error();
+        self.diagnostics.extend(line_parser.finish());
+
+        let declaration = declaration?;
+        if had_error {
+            return None;
+        }
+
+        if declaration.is_internal {
+            self.diagnostics.push(Diagnostic::error(
+                declaration.span,
+                "Interface function signatures must use `function`, not `INTERNAL`",
+            ));
+            return None;
+        }
+
+        let kind = if declaration.is_function {
+            InterfaceMemberKind::Function
+        } else {
+            InterfaceMemberKind::Knot
+        };
+        let has_typed_signature = declaration.is_function
+            || declaration
+                .arguments
+                .iter()
+                .any(|argument| argument.declared_type().is_some());
+        let return_type = declaration
+            .is_function
+            .then_some(declaration.return_type.clone());
+
+        Some(InterfaceMemberSignature::new(
+            kind,
+            declaration.name,
+            declaration.arguments,
+            return_type,
+            has_typed_signature,
+            declaration.name_span,
+            declaration.span,
+        ))
     }
 
     fn parse_import_declaration(
@@ -847,6 +953,33 @@ fn module_level_content_diagnostic(line: &SourceLine) -> Diagnostic {
     )
 }
 
+fn interface_body_content_diagnostic(line: &SourceLine) -> Diagnostic {
+    let trimmed = line.text.trim_start();
+    let message = if trimmed.starts_with('#') {
+        "Interface bodies do not support tags; declare only knot and function signatures"
+    } else if trimmed.starts_with('*') || trimmed.starts_with('+') {
+        "Interface bodies do not support choices; declare only knot and function signatures"
+    } else if trimmed.starts_with("->") {
+        "Interface bodies do not support diverts; declare only knot and function signatures"
+    } else if trimmed.starts_with('-') {
+        "Interface bodies do not support gathers; declare only knot and function signatures"
+    } else if trimmed.starts_with("VAR ") {
+        "Interface bodies do not support variable declarations; declare only knot and function signatures"
+    } else if trimmed.starts_with("CONST ") {
+        "Interface bodies do not support constants; declare only knot and function signatures"
+    } else if trimmed.starts_with("STRUCT ") {
+        "Interface bodies do not support structs; declare only knot and function signatures"
+    } else if trimmed.starts_with("ENUM ") {
+        "Interface bodies do not support enums; declare only knot and function signatures"
+    } else if trimmed.starts_with("EXTERNAL ") {
+        "Interface bodies do not support external declarations; declare only knot and function signatures"
+    } else {
+        "Interface bodies only support knot and function signatures"
+    };
+
+    Diagnostic::error(line.span.clone(), message)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1022,6 +1155,84 @@ mod tests {
             story.to_parse_snapshot(),
             "Story\n  Weave(baseIndent=0)\n    Gather(name=null, depth=1)\n    Divert(target=\"-> DONE\", empty=false, tunnel=false, thread=false)\n  Interface(name=\"IItem\")"
         );
+    }
+
+    #[test]
+    fn parses_interface_member_signatures() {
+        let output = parse(SourceInput::new(
+            "=== interface IItem ===\n\
+             == target(amount: int) ==\n\
+             == function score(amount: int) => int ==\n\
+             === module game ===",
+        ));
+
+        assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
+        let story = output.artifact.expect("story should parse");
+        let members = story.interfaces()[0].members();
+        assert_eq!(members.len(), 2);
+        assert_eq!(members[0].kind(), &crate::parsed::InterfaceMemberKind::Knot);
+        assert_eq!(members[0].name(), "target");
+        assert_eq!(
+            members[0].arguments()[0].declared_type(),
+            Some(&crate::parsed::TypeName::int())
+        );
+        assert_eq!(
+            members[1].kind(),
+            &crate::parsed::InterfaceMemberKind::Function
+        );
+        assert_eq!(members[1].name(), "score");
+        assert_eq!(
+            members[1].return_type(),
+            Some(&crate::parsed::TypeName::int())
+        );
+        assert_eq!(
+            story.to_parse_snapshot(),
+            "Story\n  Weave(baseIndent=0)\n    Gather(name=null, depth=1)\n    Divert(target=\"-> DONE\", empty=false, tunnel=false, thread=false)\n  Interface(name=\"IItem\")\n    InterfaceMember(kind=Knot, name=\"target\", typed=true)\n      Argument(name=\"amount\", type=int)\n    InterfaceMember(kind=Function, name=\"score\", typed=true, return=int)\n      Argument(name=\"amount\", type=int)\n  Module(name=\"game\")"
+        );
+    }
+
+    #[test]
+    fn rejects_executable_interface_body_content() {
+        let output = parse(SourceInput::new(
+            "=== interface IItem ===\n\
+             VAR bad: int = 1\n\
+             CONST BAD: int = 1\n\
+             EXTERNAL ext(x: int) => int\n\
+             STRUCT Bad { value: int }\n\
+             ENUM State { Idle }\n\
+             # tag\n\
+             * choice\n\
+             - gather\n\
+             -> DONE\n\
+             = stitch\n\
+             Text.\n\
+             === module game ===",
+        ));
+
+        let messages = output
+            .diagnostics
+            .iter()
+            .map(|diagnostic| diagnostic.message.as_str())
+            .collect::<Vec<_>>();
+        for expected in [
+            "Interface bodies do not support variable declarations",
+            "Interface bodies do not support constants",
+            "Interface bodies do not support external declarations",
+            "Interface bodies do not support structs",
+            "Interface bodies do not support enums",
+            "Interface bodies do not support tags",
+            "Interface bodies do not support choices",
+            "Interface bodies do not support gathers",
+            "Interface bodies do not support diverts",
+            "Interface bodies do not support stitch declarations",
+            "Interface bodies only support knot and function signatures",
+        ] {
+            assert!(
+                messages.iter().any(|message| message.contains(expected)),
+                "missing diagnostic containing {expected:?}: {:#?}",
+                output.diagnostics
+            );
+        }
     }
 
     #[test]
