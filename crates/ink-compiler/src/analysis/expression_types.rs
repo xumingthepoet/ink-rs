@@ -89,6 +89,12 @@ pub(super) fn infer_primitive_expression_type(
             "Cannot infer return type for function call '{}' yet",
             name.as_str()
         ))),
+        Expression::DynamicInterfaceAccess { member, .. } => Err(TypeInferenceError::new(format!(
+            "Cannot infer type for dynamic interface member '{member}' yet"
+        ))),
+        Expression::DynamicInterfaceFunctionCall { member, .. } => Err(TypeInferenceError::new(
+            format!("Cannot infer return type for dynamic interface function '{member}' yet"),
+        )),
         Expression::ArrayLiteral(_)
         | Expression::StructLiteral(_)
         | Expression::FieldAccess { .. }
@@ -173,6 +179,12 @@ fn infer_expression_type_in_context(
                     context.current_flow_path,
                 )
             }),
+        Expression::DynamicInterfaceAccess { member, .. } => Err(TypeInferenceError::new(format!(
+            "Cannot infer type for dynamic interface member '{member}' yet"
+        ))),
+        Expression::DynamicInterfaceFunctionCall { member, .. } => Err(TypeInferenceError::new(
+            format!("Cannot infer return type for dynamic interface function '{member}' yet"),
+        )),
         Expression::Unary {
             operator,
             expression,

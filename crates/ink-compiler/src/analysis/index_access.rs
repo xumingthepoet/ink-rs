@@ -153,6 +153,15 @@ fn mark_index_accesses(expression: &Expression, index_access_ids: &mut HashSet<u
                 mark_index_accesses(arg, index_access_ids);
             }
         }
+        Expression::DynamicInterfaceAccess { target, .. } => {
+            mark_index_accesses(target, index_access_ids);
+        }
+        Expression::DynamicInterfaceFunctionCall { target, args, .. } => {
+            mark_index_accesses(target, index_access_ids);
+            for arg in args {
+                mark_index_accesses(arg, index_access_ids);
+            }
+        }
         Expression::StructLiteral(fields) => {
             for field in fields {
                 mark_index_accesses(field.expression(), index_access_ids);

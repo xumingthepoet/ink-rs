@@ -93,6 +93,8 @@ pub(super) fn lower_value_literal(
         | (_, Expression::QualifiedReference(_))
         | (_, Expression::FunctionCall { .. })
         | (_, Expression::QualifiedFunctionCall { .. })
+        | (_, Expression::DynamicInterfaceAccess { .. })
+        | (_, Expression::DynamicInterfaceFunctionCall { .. })
         | (_, Expression::FieldAccess { .. })
         | (_, Expression::IndexAccess { .. })
         | (_, Expression::Binary { .. })

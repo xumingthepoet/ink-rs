@@ -277,6 +277,23 @@ mod tests {
     }
 
     #[test]
+    fn parses_dynamic_interface_divert_target_expression() {
+        let span = SourceSpan::new(None, 1, 1);
+        let divert = parse_divert_source("{{route}::target}", span).expect("expected divert");
+
+        let DivertTarget::Dynamic(Expression::DynamicInterfaceAccess { target, member }) =
+            divert.target()
+        else {
+            panic!("expected dynamic interface divert target");
+        };
+        assert!(matches!(
+            target.as_ref(),
+            Expression::VariableReference(name) if name == "route"
+        ));
+        assert_eq!(member, "target");
+    }
+
+    #[test]
     fn parses_qualified_tunnel_onwards_override() {
         let span = SourceSpan::new(None, 1, 1);
         let objects = parse_divert_objects_source("-> first ->-> items::open", span)

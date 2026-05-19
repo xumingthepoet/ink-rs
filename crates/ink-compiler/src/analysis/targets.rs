@@ -254,6 +254,23 @@ impl<'a> CallTargetChecker<'a> {
             Expression::QualifiedFunctionCall { name, args } => {
                 self.check_function_call(name.as_str(), args, span, context);
             }
+            Expression::DynamicInterfaceAccess { target, .. } => {
+                self.diagnostics.push(Diagnostic::error(
+                    span.clone(),
+                    "Dynamic interface member access is not type-checked yet",
+                ));
+                self.check_expression(target, span, context);
+            }
+            Expression::DynamicInterfaceFunctionCall { target, args, .. } => {
+                self.diagnostics.push(Diagnostic::error(
+                    span.clone(),
+                    "Dynamic interface function calls are not type-checked yet",
+                ));
+                self.check_expression(target, span, context);
+                for arg in args {
+                    self.check_expression(arg, span, context);
+                }
+            }
             Expression::ArrayLiteral(elements) => {
                 for element in elements {
                     self.check_expression(element, span, context);
@@ -657,6 +674,8 @@ fn is_mutable_lvalue(expression: &Expression) -> bool {
         Expression::FieldAccess { base, .. } | Expression::IndexAccess { base, .. } => {
             is_mutable_lvalue(base)
         }
+        Expression::DynamicInterfaceAccess { .. }
+        | Expression::DynamicInterfaceFunctionCall { .. } => false,
         _ => false,
     }
 }
@@ -675,6 +694,8 @@ fn expression_root_variable_name(expression: &Expression) -> Option<&str> {
         Expression::FieldAccess { base, .. } | Expression::IndexAccess { base, .. } => {
             expression_root_variable_name(base)
         }
+        Expression::DynamicInterfaceAccess { .. }
+        | Expression::DynamicInterfaceFunctionCall { .. } => None,
         _ => None,
     }
 }

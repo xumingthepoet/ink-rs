@@ -412,6 +412,8 @@ fn condition_type_signal(
         )
         .is_some_and(|symbol| symbol.is_function() && symbol.has_typed_signature())
         .then_some(ConditionTypeSignal::Typed),
+        Expression::DynamicInterfaceAccess { .. }
+        | Expression::DynamicInterfaceFunctionCall { .. } => None,
         Expression::FieldAccess { .. }
             if is_enum_member_reference(expression, enum_types, current_module) =>
         {

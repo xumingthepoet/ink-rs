@@ -232,6 +232,12 @@ enum ExpressionParseErrorKind {
         module: String,
         found: Option<String>,
     },
+    ExpectedDynamicInterfaceMember {
+        found: Option<String>,
+    },
+    ExpectedDynamicInterfaceTargetClose {
+        found: Option<String>,
+    },
     ExpectedIndexCloseBracket {
         found: Option<String>,
     },
@@ -307,6 +313,18 @@ impl ExpressionParseError {
             ExpressionParseErrorKind::ExpectedQualifiedSymbol { module, found } => {
                 format!(
                     "expected symbol name after `{module}::`{}",
+                    found_clause(found)
+                )
+            }
+            ExpressionParseErrorKind::ExpectedDynamicInterfaceMember { found } => {
+                format!(
+                    "expected dynamic interface member name after `::`{}",
+                    found_clause(found)
+                )
+            }
+            ExpressionParseErrorKind::ExpectedDynamicInterfaceTargetClose { found } => {
+                format!(
+                    "expected `}}` to close dynamic interface target{}",
                     found_clause(found)
                 )
             }
@@ -781,7 +799,13 @@ impl<'a> TokenExpressionParser<'a> {
                 Ok(expression)
             }
             ExpressionTokenKind::OpenBracket => self.parse_array_literal(),
-            ExpressionTokenKind::OpenBrace => self.parse_struct_literal(),
+            ExpressionTokenKind::OpenBrace => {
+                if self.current_brace_pair_is_dynamic_interface_target() {
+                    self.parse_dynamic_interface_target()
+                } else {
+                    self.parse_struct_literal()
+                }
+            }
             other => Err(ExpressionParseError::new(
                 ExpressionParseErrorKind::ExpectedExpression {
                     found: Some(describe_token_kind(&other)),
@@ -888,18 +912,24 @@ impl<'a> TokenExpressionParser<'a> {
             ));
         }
 
-        let mut args = Vec::new();
-        if self.match_kind(|kind| matches!(kind, ExpressionTokenKind::CloseParen)) {
-            if let Some(qualified_name) = qualified_name {
-                return Ok(Expression::QualifiedFunctionCall {
-                    name: qualified_name,
-                    args,
-                });
-            }
-            return Ok(Expression::FunctionCall {
-                name: name.to_string(),
+        let args = self.parse_argument_list(name)?;
+
+        if let Some(qualified_name) = qualified_name {
+            return Ok(Expression::QualifiedFunctionCall {
+                name: qualified_name,
                 args,
             });
+        }
+        Ok(Expression::FunctionCall {
+            name: name.to_string(),
+            args,
+        })
+    }
+
+    fn parse_argument_list(&mut self, name: &str) -> Result<Vec<Expression>, ExpressionParseError> {
+        let mut args = Vec::new();
+        if self.match_kind(|kind| matches!(kind, ExpressionTokenKind::CloseParen)) {
+            return Ok(args);
         }
 
         loop {
@@ -917,14 +947,80 @@ impl<'a> TokenExpressionParser<'a> {
             break;
         }
 
-        if let Some(qualified_name) = qualified_name {
-            return Ok(Expression::QualifiedFunctionCall {
-                name: qualified_name,
-                args,
+        Ok(args)
+    }
+
+    fn current_brace_pair_is_dynamic_interface_target(&self) -> bool {
+        let mut depth = 1;
+        for (index, token) in self.tokens.iter().enumerate().skip(self.index) {
+            match &token.kind {
+                ExpressionTokenKind::OpenBrace => depth += 1,
+                ExpressionTokenKind::CloseBrace => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return self.tokens.get(index + 1).is_some_and(|next| {
+                            matches!(&next.kind, ExpressionTokenKind::DoubleColon)
+                        });
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        false
+    }
+
+    fn parse_dynamic_interface_target(&mut self) -> Result<Expression, ExpressionParseError> {
+        let target = self.parse_expression(0)?;
+        self.expect_kind(
+            |kind| matches!(kind, ExpressionTokenKind::CloseBrace),
+            |found| ExpressionParseErrorKind::ExpectedDynamicInterfaceTargetClose { found },
+        )?;
+        self.expect_kind(
+            |kind| matches!(kind, ExpressionTokenKind::DoubleColon),
+            |found| ExpressionParseErrorKind::ExpectedDynamicInterfaceMember { found },
+        )?;
+        self.parse_dynamic_interface_member_after_target(target)
+    }
+
+    fn parse_dynamic_interface_member_after_target(
+        &mut self,
+        target: Expression,
+    ) -> Result<Expression, ExpressionParseError> {
+        let Some(token) = self.advance() else {
+            return Err(self.error_at_eof(
+                ExpressionParseErrorKind::ExpectedDynamicInterfaceMember { found: None },
+            ));
+        };
+        let kind = token.kind.clone();
+        let ExpressionTokenKind::Identifier(member) = kind else {
+            return Err(ExpressionParseError::new(
+                ExpressionParseErrorKind::ExpectedDynamicInterfaceMember {
+                    found: Some(describe_token_kind(&kind)),
+                },
+                token.span.clone(),
+            ));
+        };
+        if !is_identifier(&member) {
+            return Err(ExpressionParseError::new(
+                ExpressionParseErrorKind::ExpectedDynamicInterfaceMember {
+                    found: Some(member),
+                },
+                token.span.clone(),
+            ));
+        }
+
+        if !self.match_kind(|kind| matches!(kind, ExpressionTokenKind::OpenParen)) {
+            return Ok(Expression::DynamicInterfaceAccess {
+                target: Box::new(target),
+                member,
             });
         }
-        Ok(Expression::FunctionCall {
-            name: name.to_string(),
+
+        let args = self.parse_argument_list(&member)?;
+        Ok(Expression::DynamicInterfaceFunctionCall {
+            target: Box::new(target),
+            member,
             args,
         })
     }
@@ -1349,6 +1445,18 @@ mod tests {
             ("-> knot.stitch", "DivertTarget(-> knot.stitch)"),
             ("items::sword", "QualifiedReference(items::sword)"),
             ("audio::play(\"hit\")", "QualifiedFunctionCall(audio::play, args=1)"),
+            (
+                "{route}::target",
+                "DynamicInterfaceAccess(VariableReference(route), target)",
+            ),
+            (
+                "{route}::score(3)",
+                "DynamicInterfaceFunctionCall(VariableReference(route), score, args=1)",
+            ),
+            (
+                "{route.next}::score(amount + 1)",
+                "DynamicInterfaceFunctionCall(VariableReference(route.next), score, args=1)",
+            ),
             ("-> items::open", "DivertTarget(-> items::open)"),
             ("state.hp", "VariableReference(state.hp)"),
             ("state.stats.hp", "VariableReference(state.stats.hp)"),
@@ -1428,6 +1536,22 @@ mod tests {
                 token(ExpressionTokenKind::Operator("?".to_string()), 35, 36),
                 token(ExpressionTokenKind::Identifier("item".to_string()), 37, 38),
                 token(ExpressionTokenKind::CloseParen, 41, 42),
+            ]
+        );
+    }
+
+    #[test]
+    fn tokenizer_covers_dynamic_interface_separators() {
+        let tokens = tokenize_expression("{route}::target");
+
+        assert_eq!(
+            tokens,
+            vec![
+                token(ExpressionTokenKind::OpenBrace, 0, 1),
+                token(ExpressionTokenKind::Identifier("route".to_string()), 1, 2),
+                token(ExpressionTokenKind::CloseBrace, 6, 7),
+                token(ExpressionTokenKind::DoubleColon, 7, 8),
+                token(ExpressionTokenKind::Identifier("target".to_string()), 9, 10),
             ]
         );
     }
@@ -1612,6 +1736,18 @@ mod tests {
             ("-> knot.stitch", "DivertTarget(-> knot.stitch)"),
             ("items::sword", "QualifiedReference(items::sword)"),
             ("audio::play(\"hit\")", "QualifiedFunctionCall(audio::play, args=1)"),
+            (
+                "{route}::target",
+                "DynamicInterfaceAccess(VariableReference(route), target)",
+            ),
+            (
+                "{route}::score(3)",
+                "DynamicInterfaceFunctionCall(VariableReference(route), score, args=1)",
+            ),
+            (
+                "{route.next}::score(amount + 1)",
+                "DynamicInterfaceFunctionCall(VariableReference(route.next), score, args=1)",
+            ),
             ("-> items::open", "DivertTarget(-> items::open)"),
             ("state.hp", "VariableReference(state.hp)"),
             ("state.stats.hp", "VariableReference(state.stats.hp)"),
@@ -1715,6 +1851,16 @@ mod tests {
                 "items::123",
                 "expected symbol name after `items::`, found `123`",
                 8,
+            ),
+            (
+                "{route}::",
+                "expected dynamic interface member name after `::` before end of input",
+                10,
+            ),
+            (
+                "{route}::123",
+                "expected dynamic interface member name after `::`, found `123`",
+                10,
             ),
             (
                 "items[0",

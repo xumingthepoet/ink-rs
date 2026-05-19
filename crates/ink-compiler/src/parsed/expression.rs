@@ -62,6 +62,15 @@ pub enum Expression {
         name: QualifiedName,
         args: Vec<Expression>,
     },
+    DynamicInterfaceAccess {
+        target: Box<Expression>,
+        member: String,
+    },
+    DynamicInterfaceFunctionCall {
+        target: Box<Expression>,
+        member: String,
+        args: Vec<Expression>,
+    },
     ArrayLiteral(Vec<Expression>),
     StructLiteral(Vec<StructLiteralField>),
     FieldAccess {
@@ -169,6 +178,26 @@ impl Expression {
             Expression::QualifiedFunctionCall { name, args } => {
                 out.push_str("QualifiedFunctionCall(");
                 out.push_str(name.as_str());
+                out.push_str(", args=");
+                out.push_str(&args.len().to_string());
+                out.push(')');
+            }
+            Expression::DynamicInterfaceAccess { target, member } => {
+                out.push_str("DynamicInterfaceAccess(");
+                target.write_parse_snapshot(out, 0);
+                out.push_str(", ");
+                out.push_str(member);
+                out.push(')');
+            }
+            Expression::DynamicInterfaceFunctionCall {
+                target,
+                member,
+                args,
+            } => {
+                out.push_str("DynamicInterfaceFunctionCall(");
+                target.write_parse_snapshot(out, 0);
+                out.push_str(", ");
+                out.push_str(member);
                 out.push_str(", args=");
                 out.push_str(&args.len().to_string());
                 out.push(')');
@@ -336,6 +365,21 @@ fn expression_display(expression: &Expression) -> String {
                 .collect::<Vec<_>>()
                 .join(", ");
             format!("{}({args})", name.as_str())
+        }
+        Expression::DynamicInterfaceAccess { target, member } => {
+            format!("{{{}}}::{member}", expression_display(target))
+        }
+        Expression::DynamicInterfaceFunctionCall {
+            target,
+            member,
+            args,
+        } => {
+            let args = args
+                .iter()
+                .map(expression_display)
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!("{{{}}}::{member}({args})", expression_display(target))
         }
         Expression::ArrayLiteral(elements) => {
             let elements = elements

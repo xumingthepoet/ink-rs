@@ -225,6 +225,15 @@ where
                 walk_expression(argument, visitor, &expression_context);
             }
         }
+        Expression::DynamicInterfaceAccess { target, .. } => {
+            walk_expression(target, visitor, &expression_context);
+        }
+        Expression::DynamicInterfaceFunctionCall { target, args, .. } => {
+            walk_expression(target, visitor, &expression_context);
+            for argument in args {
+                walk_expression(argument, visitor, &expression_context);
+            }
+        }
         Expression::ArrayLiteral(elements) => {
             for element in elements {
                 walk_expression(element, visitor, &expression_context);
@@ -361,6 +370,8 @@ mod tests {
                 Expression::ArrayLiteral(_) => "array",
                 Expression::Binary { .. } => "binary",
                 Expression::DivertTarget(_) => "divert_target",
+                Expression::DynamicInterfaceAccess { .. } => "dynamic_interface_access",
+                Expression::DynamicInterfaceFunctionCall { .. } => "dynamic_interface_call",
                 Expression::FieldAccess { .. } => "field_access",
                 Expression::IndexAccess { .. } => "index_access",
                 Expression::FunctionCall { .. } => "function_call",
@@ -431,6 +442,14 @@ mod tests {
                     base: Box::new(Expression::VariableReference("items".to_string())),
                     index: Box::new(Expression::NumberInt(0)),
                 }),
+                Object::Expression(Expression::DynamicInterfaceFunctionCall {
+                    target: Box::new(Expression::DynamicInterfaceAccess {
+                        target: Box::new(Expression::VariableReference("route".to_string())),
+                        member: "next".to_string(),
+                    }),
+                    member: "score".to_string(),
+                    args: vec![Expression::VariableReference("amount".to_string())],
+                }),
                 Object::Weave(Weave::new(vec![Object::Gather(Gather::new(span(), 1))], 1)),
             ],
             vec![Flow::from_parts(
@@ -490,6 +509,8 @@ mod tests {
             "array",
             "binary",
             "divert_target",
+            "dynamic_interface_access",
+            "dynamic_interface_call",
             "field_access",
             "index_access",
             "function_call",

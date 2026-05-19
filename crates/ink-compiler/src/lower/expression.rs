@@ -157,6 +157,10 @@ fn lower_expression_into_with_constants(
         Expression::QualifiedFunctionCall { name, args } => {
             lower_function_call_into(content, name.as_str(), args, lowering);
         }
+        Expression::DynamicInterfaceAccess { .. }
+        | Expression::DynamicInterfaceFunctionCall { .. } => {
+            unreachable!("dynamic interface expressions must be rejected before lowering")
+        }
         Expression::ArrayLiteral(_) | Expression::StructLiteral(_) => {
             if let Some(value) = lower_value_literal(
                 expression,

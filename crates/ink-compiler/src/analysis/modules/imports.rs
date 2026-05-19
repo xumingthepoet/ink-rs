@@ -455,6 +455,15 @@ fn collect_qualified_uses_in_expression(
                 collect_qualified_uses_in_expression(current_module, arg, uses);
             }
         }
+        Expression::DynamicInterfaceAccess { target, .. } => {
+            collect_qualified_uses_in_expression(current_module, target, uses);
+        }
+        Expression::DynamicInterfaceFunctionCall { target, args, .. } => {
+            collect_qualified_uses_in_expression(current_module, target, uses);
+            for arg in args {
+                collect_qualified_uses_in_expression(current_module, arg, uses);
+            }
+        }
         Expression::StringContent(content) => {
             collect_qualified_uses_in_content_list(current_module, content, uses)
         }
