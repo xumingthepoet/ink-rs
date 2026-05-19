@@ -1,4 +1,4 @@
-Progress: 17/23
+Progress: 18/23
 
 # Interface-Typed Dynamic Module Access Active Plan
 
@@ -784,7 +784,7 @@ Commit record:
 - Review/fix commits: `b8da979c Cover saved dynamic interface route errors`; post-review validation: `cargo fmt --all --check`; `cargo test -p ink-runtime dynamic_interface`; `cargo test -p ink-test --test modules interface`; `make gate`
 - Completion record commit: this task-list commit
 
-### [>] Task 18: Execute Dynamic Interface Function Calls
+### [x] Task 18: Execute Dynamic Interface Function Calls
 
 Goal: Make runtime dynamic interface function calls dispatch to the implementation module selected by the interface value.
 
@@ -824,8 +824,8 @@ Commit record:
 - Implementation commit: `62bc7d9f Execute dynamic interface function calls`
 - Focused validation: `cargo fmt --all --check`; `cargo test -p ink-runtime dynamic_interface`; `cargo test -p ink-test --test functions interface`
 - Full validation: `make gate`
-- Review/fix commits: pending
-- Completion record commit: pending
+- Review/fix commits: reviewed; no fix commits required; post-review validation: `cargo fmt --all --check`; `cargo test -p ink-runtime dynamic_interface`; `cargo test -p ink-test --test functions interface`; `make gate`
+- Completion record commit: this task-list commit
 
 ### [ ] Task 19: Validate Save And Load For Interface Values
 
