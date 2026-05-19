@@ -1,4 +1,4 @@
-Progress: 8/23
+Progress: 9/23
 
 # Interface-Typed Dynamic Module Access Active Plan
 
@@ -386,7 +386,7 @@ Commit record:
 - Review/fix commits: `0c77459e Cover interface array default initializer`; post-review validation: `cargo fmt --all --check`; `cargo test -p ink-compiler analysis::initializers`; `cargo test -p ink-compiler analysis::assignments`; `cargo test -p ink-compiler analysis::array_literals`; `cargo test -p ink-compiler analysis::struct_literals`; `cargo test -p ink-compiler analysis`; `cargo test -p ink-test --test diagnostics interface`; `cargo test -p ink-test --test diagnostics imports`; `make gate`
 - Completion record commit: this task-list commit
 
-### [>] Task 09: Type-Check Dynamic Interface Knot Targets
+### [x] Task 09: Type-Check Dynamic Interface Knot Targets
 
 Goal: Make `{route}::target` type-check as `->` when `route` has an interface type declaring the target knot.
 
@@ -425,8 +425,8 @@ Validation commands:
 - Implementation commit: `38cda122 Type check dynamic interface targets`
 - Focused validation: `cargo fmt --all --check`; `cargo test -p ink-compiler analysis::expression_types`; `cargo test -p ink-compiler analysis::targets`; `cargo test -p ink-compiler analysis::modules`; `cargo test -p ink-test --test diagnostics interface`
 - Full validation: `make gate`
-- Review/fix commits: pending
-- Completion record commit: pending
+- Review/fix commits: `6e143761 Preserve dynamic divert argument checks`; post-review validation: `cargo fmt --all --check`; `cargo test -p ink-compiler analysis::expression_types`; `cargo test -p ink-compiler analysis::targets`; `cargo test -p ink-compiler analysis::modules`; `cargo test -p ink-test --test diagnostics interface`; `make gate`
+- Completion record commit: this task-list commit
 
 ### [ ] Task 10: Type-Check Dynamic Interface Function Calls
 
