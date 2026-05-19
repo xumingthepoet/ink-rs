@@ -1,4 +1,4 @@
-Progress: 13/23
+Progress: 14/23
 
 # Interface-Typed Dynamic Module Access Active Plan
 
@@ -604,7 +604,7 @@ Commit record:
 - Review/fix commits: reviewed; no fix commits required; post-review validation: `cargo fmt --all --check`; `cargo test -p ink-compiler lower`; `cargo test -p ink-test --test compiler_snapshots interface`; `cargo test -p ink-story-json-format`; `cargo test -p ink-test --test diagnostics interface_dynamic_target_lowering_is_implemented`; `make gate`
 - Completion record commit: this task-list commit
 
-### [>] Task 14: Lower Dynamic Interface Function Calls
+### [x] Task 14: Lower Dynamic Interface Function Calls
 
 Goal: Emit typed format objects for dynamic interface function calls.
 
@@ -644,7 +644,7 @@ Commit record:
 - Implementation commit: `815dc7da Lower dynamic interface function calls`
 - Focused validation: `cargo fmt --all --check`; `cargo test -p ink-compiler lower`; `cargo test -p ink-test --test compiler_snapshots interface`; `cargo test -p ink-test --test functions`; `cargo test -p ink-test --test diagnostics interface_dynamic_function_lowering_is_implemented`
 - Full validation: `make gate`
-- Review/fix commits: pending
+- Review/fix commits: reviewed; no fix commits required; post-review validation: `cargo fmt --all --check`; `cargo test -p ink-compiler lower`; `cargo test -p ink-test --test compiler_snapshots interface`; `cargo test -p ink-test --test functions`; `cargo test -p ink-test --test diagnostics interface_dynamic_function_lowering_is_implemented`; `make gate`
 - Completion record commit: pending
 
 ### [ ] Task 15: Lower Interface Metadata And Document Compiled JSON Format
