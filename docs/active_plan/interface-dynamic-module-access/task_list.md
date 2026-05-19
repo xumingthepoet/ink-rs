@@ -1,4 +1,4 @@
-Progress: 18/23
+Progress: 19/23
 
 # Interface-Typed Dynamic Module Access Active Plan
 
@@ -827,7 +827,7 @@ Commit record:
 - Review/fix commits: reviewed; no fix commits required; post-review validation: `cargo fmt --all --check`; `cargo test -p ink-runtime dynamic_interface`; `cargo test -p ink-test --test functions interface`; `make gate`
 - Completion record commit: this task-list commit
 
-### [>] Task 19: Validate Save And Load For Interface Values
+### [x] Task 19: Validate Save And Load For Interface Values
 
 Goal: Pin save-state behavior for interface values, including arrays and structs.
 
@@ -867,8 +867,8 @@ Commit record:
 - Implementation commit: `3d520a93 Validate interface value save load behavior`
 - Focused validation: `cargo fmt --all --check`; `cargo test -p ink-runtime save`; `cargo test -p ink-test --test runtime_api interface`; `cargo test -p ink-test --test modules interface`
 - Full validation: `make gate`
-- Review/fix commits: pending
-- Completion record commit: pending
+- Review/fix commits: `a11c7fdc Cover interface default save restore values`; post-review validation: `cargo fmt --all --check`; `cargo test -p ink-runtime save`; `cargo test -p ink-test --test runtime_api interface`; `cargo test -p ink-test --test modules interface`; `make gate`
+- Completion record commit: this task-list commit
 
 ## Milestone 5: Fixtures, Public Docs, And Closeout
 
