@@ -149,6 +149,18 @@ fn interface_value_diagnostics_report_invalid_module_literals() {
 }
 
 #[test]
+fn interface_assignment_diagnostics_report_invalid_module_literals() {
+    let diagnostics = diagnostics_for_fixture("diagnostics/interface-assignments.ink");
+
+    for message in [
+        "Module literal 'right' requires a bare import in module 'game': FROM right",
+        "Module 'wrong' does not implement interface 'IItem'",
+    ] {
+        assert_diagnostic(&diagnostics, DiagnosticSeverity::Error, message);
+    }
+}
+
+#[test]
 fn interface_dynamic_target_diagnostics_report_invalid_member_access() {
     let diagnostics = diagnostics_for_fixture("diagnostics/interface-dynamic-targets.ink");
 
