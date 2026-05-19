@@ -517,6 +517,33 @@ mod tests {
     }
 
     #[test]
+    fn bare_module_imports_do_not_authorize_static_symbol_access() {
+        let story = parse_story(
+            "=== module game ===\n\
+             FROM items\n\
+             == main ==\n\
+             ~ items::helper()\n\
+             -> END\n\
+             === module items ===\n\
+             == function helper() => void ==\n\
+             ~ return",
+        );
+
+        let diagnostics = import_diagnostics(&story);
+
+        assert_eq!(diagnostics.len(), 2, "{diagnostics:#?}");
+        assert!(diagnostics.iter().any(|diagnostic| {
+            diagnostic.severity == DiagnosticSeverity::Error
+                && diagnostic.message
+                    == "Qualified reference 'items::helper' requires a direct import in module 'game': FROM items IMPORT helper"
+        }));
+        assert!(diagnostics.iter().any(|diagnostic| {
+            diagnostic.severity == DiagnosticSeverity::Warning
+                && diagnostic.message == "Imported module 'items' is never used"
+        }));
+    }
+
+    #[test]
     fn treats_existing_qualified_divert_paths_as_import_uses() {
         let story = parse_story(
             "=== module game ===\n\
