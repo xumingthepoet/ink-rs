@@ -175,6 +175,33 @@ fn interface_dynamic_target_lowering_reports_unimplemented_format() {
 }
 
 #[test]
+fn interface_dynamic_function_diagnostics_report_invalid_member_access() {
+    let diagnostics = diagnostics_for_fixture("diagnostics/interface-dynamic-functions.ink");
+
+    for message in [
+        "Dynamic interface function 'score' has base type string but expected interface",
+        "Interface 'IItem' does not declare member 'missing'",
+        "Interface 'IItem' member 'target' is a knot but dynamic function call requires a function",
+        "Dynamic interface function 'score' expects 1 arguments but got 0",
+        "Argument 'amount' for dynamic interface function 'score' has type string but expected int",
+    ] {
+        assert_diagnostic(&diagnostics, DiagnosticSeverity::Error, message);
+    }
+}
+
+#[test]
+fn interface_dynamic_function_lowering_reports_unimplemented_format() {
+    let diagnostics =
+        diagnostics_for_fixture("diagnostics/interface-dynamic-function-lowering.ink");
+
+    assert_diagnostic(
+        &diagnostics,
+        DiagnosticSeverity::Error,
+        "Dynamic interface function call lowering is not implemented yet",
+    );
+}
+
+#[test]
 fn imports_diagnostics_report_obsolete_import_syntax() {
     let diagnostics = diagnostics_for_fixture("diagnostics/imports-obsolete.ink");
 

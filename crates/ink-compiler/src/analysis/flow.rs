@@ -12,8 +12,10 @@ use super::{
     context::{EnumTypeIndex, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
     enums::{build_enum_type_index, is_enum_member_reference},
     expression_types::{
-        infer_binary_operator_type, infer_expression_type, typed_builtin_return_type,
+        infer_binary_operator_type, infer_expression_type_with_interfaces,
+        typed_builtin_return_type,
     },
+    interfaces::{build_interface_member_index, InterfaceMemberIndex},
     span::{first_span_in_weave, object_span},
     structs::build_struct_type_index,
     target_symbols::{build_target_symbol_index, resolve_target_symbol},
@@ -25,11 +27,13 @@ pub(super) fn flow_diagnostics(story: &Story) -> Vec<Diagnostic> {
     let struct_types = build_struct_type_index(story);
     let enum_types = build_enum_type_index(story);
     let target_symbols = build_target_symbol_index(story);
+    let interface_members = build_interface_member_index(story);
     let analysis = FlowAnalysisIndexes {
         variable_scopes: &variable_scopes,
         struct_types: &struct_types,
         enum_types: &enum_types,
         target_symbols: &target_symbols,
+        interface_members: &interface_members,
     };
     let mut diagnostics = Vec::new();
     check_global_var_declaration_scope(story, &mut diagnostics);
@@ -159,6 +163,7 @@ struct FlowAnalysisIndexes<'a> {
     struct_types: &'a StructTypeIndex,
     enum_types: &'a EnumTypeIndex,
     target_symbols: &'a TargetSymbolIndex,
+    interface_members: &'a InterfaceMemberIndex,
 }
 
 struct ConditionTypeChecker<'a> {
@@ -292,12 +297,13 @@ impl ConditionTypeChecker<'_> {
         let current_flow_path = context.current_flow_path.as_deref();
         let has_typed_signal = self.has_typed_signal(expression, context);
 
-        match infer_expression_type(
+        match infer_expression_type_with_interfaces(
             expression,
             self.analysis.variable_scopes,
             self.analysis.struct_types,
             self.analysis.enum_types,
             self.analysis.target_symbols,
+            self.analysis.interface_members,
             context.current_module.as_deref(),
             current_flow_path,
         ) {
@@ -323,12 +329,13 @@ impl ConditionTypeChecker<'_> {
         let current_flow_path = context.current_flow_path.as_deref();
         let has_typed_signal = self.has_typed_signal(condition, context);
 
-        match infer_expression_type(
+        match infer_expression_type_with_interfaces(
             condition,
             self.analysis.variable_scopes,
             self.analysis.struct_types,
             self.analysis.enum_types,
             self.analysis.target_symbols,
+            self.analysis.interface_members,
             context.current_module.as_deref(),
             current_flow_path,
         ) {
@@ -413,7 +420,7 @@ fn condition_type_signal(
         .is_some_and(|symbol| symbol.is_function() && symbol.has_typed_signature())
         .then_some(ConditionTypeSignal::Typed),
         Expression::DynamicInterfaceAccess { .. }
-        | Expression::DynamicInterfaceFunctionCall { .. } => None,
+        | Expression::DynamicInterfaceFunctionCall { .. } => Some(ConditionTypeSignal::Typed),
         Expression::FieldAccess { .. }
             if is_enum_member_reference(expression, enum_types, current_module) =>
         {
@@ -755,12 +762,13 @@ impl FunctionFlowControlVisitor<'_> {
         ret: &Return,
         context: &VisitContext,
     ) {
-        match infer_expression_type(
+        match infer_expression_type_with_interfaces(
             expression,
             self.analysis.variable_scopes,
             self.analysis.struct_types,
             self.analysis.enum_types,
             self.analysis.target_symbols,
+            self.analysis.interface_members,
             context.current_module.as_deref(),
             context.current_flow_path.as_deref(),
         ) {
@@ -1196,6 +1204,68 @@ mod tests {
         );
 
         assert_eq!(flow_diagnostics(&story), []);
+    }
+
+    #[test]
+    fn accepts_dynamic_interface_function_returns_and_conditions() {
+        let story = parse_story(
+            "=== interface IScorer ===\n\
+             == function score(amount: int) => int ==\n\
+             == function ready() => bool ==\n\
+             === module game ===\n\
+             FROM scorer\n\
+             VAR route: interface<IScorer> = scorer\n\
+             == main ==\n\
+             { if {route}::ready():\n\
+               -> END\n\
+             }\n\
+             -> END\n\
+             == function get_score() => int ==\n\
+             ~ return {route}::score(1)\n\
+             === module scorer implements IScorer ===\n\
+             == function score(amount: int) => int ==\n\
+             ~ return amount\n\
+             == function ready() => bool ==\n\
+             ~ return true",
+        );
+
+        assert_eq!(flow_diagnostics(&story), []);
+    }
+
+    #[test]
+    fn reports_dynamic_interface_function_flow_type_errors() {
+        let cases = [
+            (
+                "== function get_label() => string ==\n\
+                 ~ return {route}::score(1)",
+                "Function 'get_label' returns int but declared return type is string",
+            ),
+            (
+                "== main ==\n\
+                 { if {route}::score(1):\n\
+                   -> END\n\
+                 }\n\
+                 -> END",
+                "Conditional condition has type int but expected bool",
+            ),
+        ];
+
+        for (flow_source, expected_message) in cases {
+            let story = parse_story(&format!(
+                "=== interface IScorer ===\n\
+                 == function score(amount: int) => int ==\n\
+                 === module game ===\n\
+                 FROM scorer\n\
+                 VAR route: interface<IScorer> = scorer\n\
+                 {flow_source}\n\
+                 === module scorer implements IScorer ===\n\
+                 == function score(amount: int) => int ==\n\
+                 ~ return amount",
+            ));
+            let diagnostics = flow_diagnostics(&story);
+
+            assert_single_diagnostic(&diagnostics, DiagnosticSeverity::Error, expected_message);
+        }
     }
 
     #[test]

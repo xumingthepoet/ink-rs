@@ -207,9 +207,9 @@ fn infer_expression_type_in_context(
         Expression::DynamicInterfaceAccess { target, member } => {
             infer_dynamic_interface_target_type(target, member, context)
         }
-        Expression::DynamicInterfaceFunctionCall { member, .. } => Err(TypeInferenceError::new(
-            format!("Cannot infer return type for dynamic interface function '{member}' yet"),
-        )),
+        Expression::DynamicInterfaceFunctionCall { target, member, .. } => {
+            infer_dynamic_interface_function_call_type(target, member, context)
+        }
         Expression::Unary {
             operator,
             expression,
@@ -286,6 +286,43 @@ fn infer_dynamic_interface_target_type(
     }
 
     Ok(TypeName::divert_target())
+}
+
+fn infer_dynamic_interface_function_call_type(
+    target: &Expression,
+    member: &str,
+    context: &TypeInferenceContext<'_>,
+) -> Result<TypeName, TypeInferenceError> {
+    let Some(interface_members) = context.interface_members else {
+        return Err(TypeInferenceError::new(format!(
+            "Cannot infer return type for dynamic interface function '{member}' yet"
+        )));
+    };
+
+    let target_type = infer_expression_type_in_context(target, context)?;
+    let Some(interface_name) = target_type.as_interface_name() else {
+        return Err(TypeInferenceError::new(format!(
+            "Dynamic interface function '{member}' has base type {} but expected interface",
+            target_type.display_name()
+        )));
+    };
+
+    let Some(signature) = interface_members.member(interface_name, member) else {
+        return Err(TypeInferenceError::new(format!(
+            "Interface '{interface_name}' does not declare member '{member}'"
+        )));
+    };
+
+    if signature.kind() != &InterfaceMemberKind::Function {
+        return Err(TypeInferenceError::new(format!(
+            "Interface '{interface_name}' member '{member}' is a knot but dynamic function call requires a function"
+        )));
+    }
+
+    Ok(signature
+        .return_type()
+        .cloned()
+        .unwrap_or_else(TypeName::void))
 }
 
 pub(super) fn typed_builtin_return_type(name: &str) -> Option<TypeName> {
@@ -736,6 +773,18 @@ mod tests {
         Expression::DynamicInterfaceAccess {
             target: Box::new(target),
             member: member.to_string(),
+        }
+    }
+
+    fn dynamic_interface_call(
+        target: Expression,
+        member: &str,
+        args: Vec<Expression>,
+    ) -> Expression {
+        Expression::DynamicInterfaceFunctionCall {
+            target: Box::new(target),
+            member: member.to_string(),
+            args,
         }
     }
 
@@ -1229,6 +1278,114 @@ mod tests {
             (
                 dynamic_interface_access(variable("route"), "score"),
                 "Interface 'IItem' member 'score' is a function but dynamic target access requires a knot",
+            ),
+        ];
+
+        for (expression, expected_message) in cases {
+            let error = infer_expression_type_with_interfaces(
+                &expression,
+                &scopes,
+                &structs,
+                &enums,
+                &targets,
+                &interface_members,
+                Some("game"),
+                Some("main"),
+            )
+            .unwrap_err();
+
+            assert_eq!(error.message(), expected_message);
+        }
+    }
+
+    #[test]
+    fn infers_dynamic_interface_function_call_return_type() {
+        let story = parse_story(
+            "=== interface IItem ===\n\
+             == target(amount: int) ==\n\
+             == function score(amount: int) => int ==\n\
+             === module game ===\n\
+             STRUCT RouteState {\n\
+             current: interface<IItem>\n\
+             routes: interface<IItem>[]\n\
+             }\n\
+             VAR route: interface<IItem>\n\
+             VAR state: RouteState\n\
+             VAR routes: interface<IItem>[]\n\
+             == main ==\n\
+             -> END",
+        );
+        let scopes = build_variable_scope_index(&story);
+        let structs = build_struct_type_index(&story);
+        let enums = build_enum_type_index(&story);
+        let targets = build_target_symbol_index(&story);
+        let interface_members = build_interface_member_index(&story);
+        let cases = [
+            dynamic_interface_call(variable("route"), "score", vec![Expression::NumberInt(1)]),
+            dynamic_interface_call(
+                Expression::FieldAccess {
+                    base: Box::new(variable("state")),
+                    field: "current".to_string(),
+                },
+                "score",
+                vec![Expression::NumberInt(1)],
+            ),
+            dynamic_interface_call(
+                Expression::IndexAccess {
+                    base: Box::new(variable("routes")),
+                    index: Box::new(Expression::NumberInt(0)),
+                },
+                "score",
+                vec![Expression::NumberInt(1)],
+            ),
+        ];
+
+        for expression in cases {
+            assert_eq!(
+                infer_expression_type_with_interfaces(
+                    &expression,
+                    &scopes,
+                    &structs,
+                    &enums,
+                    &targets,
+                    &interface_members,
+                    Some("game"),
+                    Some("main")
+                ),
+                Ok(TypeName::int())
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_invalid_dynamic_interface_function_calls() {
+        let story = parse_story(
+            "=== interface IItem ===\n\
+             == target(amount: int) ==\n\
+             == function score(amount: int) => int ==\n\
+             === module game ===\n\
+             VAR route: interface<IItem>\n\
+             VAR label: string = \"x\"\n\
+             == main ==\n\
+             -> END",
+        );
+        let scopes = build_variable_scope_index(&story);
+        let structs = build_struct_type_index(&story);
+        let enums = build_enum_type_index(&story);
+        let targets = build_target_symbol_index(&story);
+        let interface_members = build_interface_member_index(&story);
+        let cases = [
+            (
+                dynamic_interface_call(variable("label"), "score", vec![Expression::NumberInt(1)]),
+                "Dynamic interface function 'score' has base type string but expected interface",
+            ),
+            (
+                dynamic_interface_call(variable("route"), "missing", vec![]),
+                "Interface 'IItem' does not declare member 'missing'",
+            ),
+            (
+                dynamic_interface_call(variable("route"), "target", vec![Expression::NumberInt(1)]),
+                "Interface 'IItem' member 'target' is a knot but dynamic function call requires a function",
             ),
         ];
 

@@ -337,16 +337,14 @@ impl<'a> InterfaceModuleLiteralUseCollector<'a> {
             .insert(module_name.to_string());
     }
 
-    fn check_dynamic_divert_target_arguments(
+    fn check_dynamic_interface_member_arguments(
         &mut self,
-        expression: &Expression,
+        target: &Expression,
+        member: &str,
+        expected_kind: &InterfaceMemberKind,
         arguments: &[Expression],
         context: &VisitContext,
     ) {
-        let Expression::DynamicInterfaceAccess { target, member } = expression else {
-            return;
-        };
-
         let Ok(target_type) = infer_expression_type_with_interfaces(
             target,
             self.variable_scopes,
@@ -366,7 +364,7 @@ impl<'a> InterfaceModuleLiteralUseCollector<'a> {
         let Some(signature) = self.interface_members.member(interface_name, member) else {
             return;
         };
-        if signature.kind() != &InterfaceMemberKind::Knot {
+        if signature.kind() != expected_kind {
             return;
         }
 
@@ -451,24 +449,53 @@ impl ParsedVisitor for InterfaceModuleLiteralUseCollector<'_> {
             Object::ConstantDeclaration(declaration) => self.check_constant(declaration, context),
             Object::VariableAssignment(assignment) => self.check_assignment(assignment, context),
             Object::Divert(divert) => {
-                if let DivertTarget::Dynamic(expression) = divert.target() {
-                    self.check_dynamic_divert_target_arguments(
-                        expression,
+                if let DivertTarget::Dynamic(Expression::DynamicInterfaceAccess {
+                    target,
+                    member,
+                }) = divert.target()
+                {
+                    self.check_dynamic_interface_member_arguments(
+                        target,
+                        member,
+                        &InterfaceMemberKind::Knot,
                         divert.arguments(),
                         context,
                     );
                 }
             }
             Object::TunnelOnwards(tunnel_onwards) => {
-                if let Some(DivertTarget::Dynamic(expression)) = tunnel_onwards.override_target() {
-                    self.check_dynamic_divert_target_arguments(
-                        expression,
+                if let Some(DivertTarget::Dynamic(Expression::DynamicInterfaceAccess {
+                    target,
+                    member,
+                })) = tunnel_onwards.override_target()
+                {
+                    self.check_dynamic_interface_member_arguments(
+                        target,
+                        member,
+                        &InterfaceMemberKind::Knot,
                         tunnel_onwards.arguments(),
                         context,
                     );
                 }
             }
             _ => {}
+        }
+    }
+
+    fn visit_expression(&mut self, expression: &Expression, context: &VisitContext) {
+        if let Expression::DynamicInterfaceFunctionCall {
+            target,
+            member,
+            args,
+        } = expression
+        {
+            self.check_dynamic_interface_member_arguments(
+                target,
+                member,
+                &InterfaceMemberKind::Function,
+                args,
+                context,
+            );
         }
     }
 }

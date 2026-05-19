@@ -564,6 +564,33 @@ mod tests {
     }
 
     #[test]
+    fn bare_module_imports_used_by_dynamic_interface_function_arguments_are_not_warned() {
+        let story = parse_story(
+            "=== interface IItem ===\n\
+             == target ==\n\
+             === interface IScorer ===\n\
+             == function score(item: interface<IItem>) => int ==\n\
+             === module game ===\n\
+             FROM left\n\
+             FROM scorer\n\
+             VAR route: interface<IScorer> = scorer\n\
+             == main ==\n\
+             ~ temp value: int = {route}::score(left)\n\
+             -> END\n\
+             === module scorer implements IScorer ===\n\
+             == function score(item: interface<IItem>) => int ==\n\
+             ~ return 1\n\
+             === module left implements IItem ===\n\
+             == target ==\n\
+             -> END",
+        );
+
+        let diagnostics = import_diagnostics(&story);
+
+        assert!(diagnostics.is_empty(), "{diagnostics:#?}");
+    }
+
+    #[test]
     fn bare_module_imports_do_not_authorize_static_symbol_access() {
         let story = parse_story(
             "=== module game ===\n\

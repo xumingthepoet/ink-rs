@@ -290,8 +290,8 @@ impl<'a> CallTargetChecker<'a> {
 
         match self.dynamic_interface_member_signature(target, member, span, context) {
             Some(signature) => {
-                self.check_dynamic_interface_target_arguments(
-                    member, arguments, &signature, span, context,
+                self.check_dynamic_interface_member_arguments(
+                    "target", member, arguments, &signature, span, context,
                 );
             }
             None => {
@@ -364,8 +364,95 @@ impl<'a> CallTargetChecker<'a> {
         Some(signature.clone())
     }
 
-    fn check_dynamic_interface_target_arguments(
+    fn check_dynamic_interface_function_call(
         &mut self,
+        target: &Expression,
+        member: &str,
+        arguments: &[Expression],
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) {
+        self.check_expression(target, span, context);
+
+        match self.dynamic_interface_function_signature(target, member, span, context) {
+            Some(signature) => {
+                self.check_dynamic_interface_member_arguments(
+                    "function", member, arguments, &signature, span, context,
+                );
+            }
+            None => {
+                for argument in arguments {
+                    self.check_expression(argument, span, context);
+                }
+            }
+        }
+    }
+
+    fn dynamic_interface_function_signature(
+        &mut self,
+        target: &Expression,
+        member: &str,
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) -> Option<InterfaceMemberSignature> {
+        let target_type = match infer_expression_type_with_interfaces(
+            target,
+            self.variable_scopes,
+            self.struct_types,
+            self.enum_types,
+            self.target_symbols,
+            self.interface_members,
+            self.current_module(context),
+            self.current_flow_path(context),
+        ) {
+            Ok(target_type) => target_type,
+            Err(error) => {
+                self.diagnostics.push(Diagnostic::error(
+                    span.clone(),
+                    format!(
+                        "Cannot type-check dynamic interface function '{member}': {}",
+                        error.message()
+                    ),
+                ));
+                return None;
+            }
+        };
+
+        let Some(interface_name) = target_type.as_interface_name() else {
+            self.diagnostics.push(Diagnostic::error(
+                span.clone(),
+                format!(
+                    "Dynamic interface function '{member}' has base type {} but expected interface",
+                    target_type.display_name()
+                ),
+            ));
+            return None;
+        };
+
+        let Some(signature) = self.interface_members.member(interface_name, member) else {
+            self.diagnostics.push(Diagnostic::error(
+                span.clone(),
+                format!("Interface '{interface_name}' does not declare member '{member}'"),
+            ));
+            return None;
+        };
+
+        if signature.kind() != &InterfaceMemberKind::Function {
+            self.diagnostics.push(Diagnostic::error(
+                span.clone(),
+                format!(
+                    "Interface '{interface_name}' member '{member}' is a knot but dynamic function call requires a function"
+                ),
+            ));
+            return None;
+        }
+
+        Some(signature.clone())
+    }
+
+    fn check_dynamic_interface_member_arguments(
+        &mut self,
+        member_kind: &str,
         member: &str,
         arguments: &[Expression],
         signature: &InterfaceMemberSignature,
@@ -377,7 +464,7 @@ impl<'a> CallTargetChecker<'a> {
             self.diagnostics.push(Diagnostic::error(
                 span.clone(),
                 format!(
-                    "Dynamic interface target '{member}' expects {} arguments but got {}",
+                    "Dynamic interface {member_kind} '{member}' expects {} arguments but got {}",
                     parameters.len(),
                     arguments.len()
                 ),
@@ -421,7 +508,7 @@ impl<'a> CallTargetChecker<'a> {
                     self.diagnostics.push(Diagnostic::error(
                         span.clone(),
                         format!(
-                            "Argument '{}' for dynamic interface target '{member}' has type {} but expected {}",
+                            "Argument '{}' for dynamic interface {member_kind} '{member}' has type {} but expected {}",
                             parameter.name(),
                             actual_type.display_name(),
                             expected_type.display_name()
@@ -437,7 +524,7 @@ impl<'a> CallTargetChecker<'a> {
                 Err(error) => self.diagnostics.push(Diagnostic::error(
                     span.clone(),
                     format!(
-                        "Cannot type-check argument '{}' for dynamic interface target '{member}': {}",
+                        "Cannot type-check argument '{}' for dynamic interface {member_kind} '{member}': {}",
                         parameter.name(),
                         error.message()
                     ),
@@ -484,15 +571,12 @@ impl<'a> CallTargetChecker<'a> {
                 }
                 self.check_expression(target, span, context);
             }
-            Expression::DynamicInterfaceFunctionCall { target, args, .. } => {
-                self.diagnostics.push(Diagnostic::error(
-                    span.clone(),
-                    "Dynamic interface function calls are not type-checked yet",
-                ));
-                self.check_expression(target, span, context);
-                for arg in args {
-                    self.check_expression(arg, span, context);
-                }
+            Expression::DynamicInterfaceFunctionCall {
+                target,
+                member,
+                args,
+            } => {
+                self.check_dynamic_interface_function_call(target, member, args, span, context);
             }
             Expression::ArrayLiteral(elements) => {
                 for element in elements {
@@ -1706,6 +1790,80 @@ mod tests {
         );
 
         assert_eq!(call_target_diagnostics(&story), []);
+    }
+
+    #[test]
+    fn accepts_dynamic_interface_function_calls() {
+        let story = parse_story(
+            "=== interface IItem ===\n\
+             == target ==\n\
+             === interface IScorer ===\n\
+             == function score(item: interface<IItem>, amount: int) => int ==\n\
+             === module game ===\n\
+             FROM left\n\
+             FROM scorer\n\
+             VAR route: interface<IScorer> = scorer\n\
+             == main ==\n\
+             ~ temp value: int = {route}::score(left, 3)\n\
+             -> END\n\
+             === module scorer implements IScorer ===\n\
+             == function score(item: interface<IItem>, amount: int) => int ==\n\
+             ~ return amount\n\
+             === module left implements IItem ===\n\
+             == target ==\n\
+             -> END",
+        );
+
+        assert_eq!(call_target_diagnostics(&story), []);
+    }
+
+    #[test]
+    fn reports_invalid_dynamic_interface_function_calls() {
+        let cases = [
+            (
+                "~ temp value: int = {label}::score(1)",
+                "Dynamic interface function 'score' has base type string but expected interface",
+            ),
+            (
+                "~ temp value: int = {route}::missing()",
+                "Interface 'IItem' does not declare member 'missing'",
+            ),
+            (
+                "~ temp value: int = {route}::target(1)",
+                "Interface 'IItem' member 'target' is a knot but dynamic function call requires a function",
+            ),
+            (
+                "~ temp value: int = {route}::score()",
+                "Dynamic interface function 'score' expects 1 arguments but got 0",
+            ),
+            (
+                "~ temp value: int = {route}::score(\"bad\")",
+                "Argument 'amount' for dynamic interface function 'score' has type string but expected int",
+            ),
+        ];
+
+        for (logic, expected_message) in cases {
+            let story = parse_story(&format!(
+                "=== interface IItem ===\n\
+                 == target(amount: int) ==\n\
+                 == function score(amount: int) => int ==\n\
+                 === module game ===\n\
+                 FROM left\n\
+                 VAR route: interface<IItem> = left\n\
+                 VAR label: string = \"x\"\n\
+                 == main ==\n\
+                 {logic}\n\
+                 -> END\n\
+                 === module left implements IItem ===\n\
+                 == target(amount: int) ==\n\
+                 -> END\n\
+                 == function score(amount: int) => int ==\n\
+                 ~ return amount",
+            ));
+            let diagnostics = call_target_diagnostics(&story);
+
+            assert_single_diagnostic(&diagnostics, DiagnosticSeverity::Error, expected_message);
+        }
     }
 
     #[test]
