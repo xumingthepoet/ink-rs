@@ -184,15 +184,8 @@ fn interface_dynamic_function_diagnostics_report_invalid_member_access() {
 }
 
 #[test]
-fn interface_dynamic_function_lowering_reports_unimplemented_format() {
-    let diagnostics =
-        diagnostics_for_fixture("diagnostics/interface-dynamic-function-lowering.ink");
-
-    assert_diagnostic(
-        &diagnostics,
-        DiagnosticSeverity::Error,
-        "Dynamic interface function call lowering is not implemented yet",
-    );
+fn interface_dynamic_function_lowering_is_implemented() {
+    let _ = compile_fixture("diagnostics/interface-dynamic-function-lowering.ink");
 }
 
 #[test]

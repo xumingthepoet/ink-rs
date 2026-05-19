@@ -52,6 +52,14 @@ fn interface_dynamic_targets_lower_to_format_tokens() {
             json!({"i->": "fallback", "interface": "IItem"}),
         ],
     );
+    assert_json_sequence(
+        &json,
+        &[
+            json!(5),
+            json!({"VAR?": "game::route"}),
+            json!({"i()": "score", "interface": "IItem", "args": 1}),
+        ],
+    );
 }
 
 fn assert_json_sequence(value: &serde_json::Value, sequence: &[serde_json::Value]) {

@@ -1,6 +1,7 @@
 === interface IItem ===
 == target(amount: int) ==
 == fallback ==
+== function score(amount: int) => int ==
 
 === module game ===
 FROM left
@@ -15,6 +16,9 @@ VAR routes: interface<IItem>[] = [left, right]
 == alt ==
 -> {{routes[1]}::fallback}
 
+== function calc() => int ==
+~ return {route}::score(5)
+
 === module left implements IItem ===
 == target(amount: int) ==
 -> END
@@ -22,9 +26,15 @@ VAR routes: interface<IItem>[] = [left, right]
 == fallback ==
 -> END
 
+== function score(amount: int) => int ==
+~ return amount
+
 === module right implements IItem ===
 == target(amount: int) ==
 -> END
 
 == fallback ==
 -> END
+
+== function score(amount: int) => int ==
+~ return amount + 1

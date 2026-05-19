@@ -165,8 +165,12 @@ fn lower_expression_into_with_constants(
         Expression::DynamicInterfaceAccess { target, member } => {
             lower_dynamic_interface_target_into(content, target, member, lowering);
         }
-        Expression::DynamicInterfaceFunctionCall { .. } => {
-            unreachable!("dynamic interface function calls must be rejected before lowering")
+        Expression::DynamicInterfaceFunctionCall {
+            target,
+            member,
+            args,
+        } => {
+            lower_dynamic_interface_function_call_into(content, target, member, args, lowering);
         }
         Expression::ArrayLiteral(_) | Expression::StructLiteral(_) => {
             if let Some(value) = lower_value_literal(
@@ -290,6 +294,22 @@ pub(super) fn dynamic_interface_knot_signature(
     (signature.kind() == &InterfaceMemberKind::Knot).then_some((interface_name, signature))
 }
 
+fn dynamic_interface_function_signature(
+    target: &Expression,
+    member: &str,
+    context: &LoweringContext<'_>,
+) -> Option<(String, InterfaceMemberSignature)> {
+    let interface_name = infer_lowered_expression_type(target, context)?
+        .as_interface_name()?
+        .to_string();
+    let signature = context
+        .interface_members()
+        .get(&interface_name)?
+        .get(member)?
+        .clone();
+    (signature.kind() == &InterfaceMemberKind::Function).then_some((interface_name, signature))
+}
+
 fn lower_dynamic_interface_target_into(
     content: &mut Vec<RuntimeObject>,
     target: &Expression,
@@ -303,6 +323,29 @@ fn lower_dynamic_interface_target_into(
     content.push(RuntimeObject::DynamicInterfaceTarget {
         interface: interface_name,
         member: member.to_string(),
+    });
+}
+
+fn lower_dynamic_interface_function_call_into(
+    content: &mut Vec<RuntimeObject>,
+    target: &Expression,
+    member: &str,
+    args: &[Expression],
+    lowering: &mut ExpressionLoweringContext<'_, '_>,
+) {
+    let (interface_name, signature) =
+        dynamic_interface_function_signature(target, member, lowering.context).expect(
+            "dynamic interface function must have an interface function signature after analysis",
+        );
+
+    for (index, arg) in args.iter().enumerate() {
+        lower_function_arg_into_parts(content, arg, signature.arguments().get(index), lowering);
+    }
+    lower_expression_into_with_constants(content, target, lowering);
+    content.push(RuntimeObject::DynamicInterfaceFunctionCall {
+        interface: interface_name,
+        member: member.to_string(),
+        args: args.len(),
     });
 }
 
@@ -337,6 +380,14 @@ fn infer_lowered_expression_type(
             .clone();
             Some(qualify_field_type_for_base(&field_type, &base_type))
         }
+        Expression::DynamicInterfaceFunctionCall { target, member, .. } => {
+            dynamic_interface_function_signature(target, member, context).map(|(_, signature)| {
+                signature
+                    .return_type()
+                    .cloned()
+                    .unwrap_or_else(TypeName::void)
+            })
+        }
         Expression::IndexAccess { base, .. } => infer_lowered_expression_type(base, context)?
             .array_element_type()
             .cloned(),
@@ -346,7 +397,6 @@ fn infer_lowered_expression_type(
         }
         Expression::ArrayLiteral(_)
         | Expression::StructLiteral(_)
-        | Expression::DynamicInterfaceFunctionCall { .. }
         | Expression::Binary { .. }
         | Expression::Unary { .. }
         | Expression::MultipleCondition(_) => None,
