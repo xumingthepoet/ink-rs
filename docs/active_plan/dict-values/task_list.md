@@ -32,7 +32,7 @@ Global forbidden shortcuts:
 
 ## Milestone 1: Source Model And Parser
 
-### [~] Task 01: Add Dict Type Names
+### [>] Task 01: Add Dict Type Names
 
 Goal: Represent and parse `Dict<K, V>` type names with `string` and `int` keys.
 
@@ -53,7 +53,13 @@ Modification boundaries: `crates/ink-compiler/src/parsed/type_name.rs`,
 
 Validation commands: `cargo test -p ink-compiler syntax::type_name`
 
-Commit record: pending
+Validation:
+
+- `cargo test -p ink-compiler syntax::type_name` passed.
+- `cargo fmt --all --check` passed.
+- `make gate` passed.
+
+Commit record: implementation `d777e817` (`Add Dict type name parsing`)
 
 ### [ ] Task 02: Add Dict Literal Parsed Nodes
 
