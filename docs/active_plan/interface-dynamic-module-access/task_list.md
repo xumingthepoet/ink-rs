@@ -872,7 +872,7 @@ Commit record:
 
 ## Milestone 5: Fixtures, Public Docs, And Closeout
 
-### [ ] Task 20: Add End-To-End Interface Fixtures
+### [~] Task 20: Add End-To-End Interface Fixtures
 
 Goal: Add integration fixtures that demonstrate the complete interface feature across compiler JSON and runtime execution.
 
