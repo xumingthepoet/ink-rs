@@ -872,7 +872,7 @@ Commit record:
 
 ## Milestone 5: Fixtures, Public Docs, And Closeout
 
-### [~] Task 20: Add End-To-End Interface Fixtures
+### [>] Task 20: Add End-To-End Interface Fixtures
 
 Goal: Add integration fixtures that demonstrate the complete interface feature across compiler JSON and runtime execution.
 
@@ -911,9 +911,9 @@ Validation commands:
 
 Commit record:
 
-- Implementation commit: pending
-- Focused validation: pending
-- Full validation: pending
+- Implementation commit: `d7041db7 Add end-to-end interface fixture coverage`
+- Focused validation: `cargo fmt --all --check`; `cargo test -p ink-test --test compiler_snapshots interface`; `cargo test -p ink-test --test modules interface`; `cargo test -p ink-test --test functions interface`
+- Full validation: `make gate`
 - Review/fix commits: pending
 - Completion record commit: pending
 
