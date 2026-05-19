@@ -285,6 +285,23 @@ fn public_parse_sources_accepts_one_source_with_multiple_modules() {
 }
 
 #[test]
+fn public_parse_sources_merges_interface_declarations() {
+    let output = Compiler::default().parse_sources(vec![
+        named_fixture("interface-only.ink", "interfaces.ink"),
+        named_fixture("declared-module.ink", "module.ink"),
+    ]);
+
+    assert!(!output.has_errors(), "{:#?}", output.diagnostics);
+    let story = output.artifact.expect("expected parsed story");
+    assert_eq!(interface_names(&story), vec!["IItem"]);
+    assert_eq!(
+        story.interfaces()[0].name_span().source_name.as_deref(),
+        Some("interfaces.ink")
+    );
+    assert_eq!(module_names(&story), vec!["declared"]);
+}
+
+#[test]
 fn public_diagnostics_expose_codes() {
     let output = Compiler::default().compile(unnamed_fixture("bad-inline.ink"));
 
@@ -309,6 +326,14 @@ fn unnamed_fixture(fixture_filename: &str) -> SourceInput {
 
 fn module_names(story: &ParsedStory) -> Vec<&str> {
     story.modules().iter().map(|module| module.name()).collect()
+}
+
+fn interface_names(story: &ParsedStory) -> Vec<&str> {
+    story
+        .interfaces()
+        .iter()
+        .map(|interface| interface.name())
+        .collect()
 }
 
 fn module_source_map(story: &ParsedStory) -> BTreeMap<String, Option<String>> {

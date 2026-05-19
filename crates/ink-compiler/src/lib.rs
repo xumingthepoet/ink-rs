@@ -28,6 +28,7 @@ pub use ink_story_json_format::{
 };
 pub use parsed::{
     Choice, ContentList, DefaultValue, Divert, DivertTarget, ImportDeclaration, ImportedName,
-    Module, Object, PrimitiveType, Story as ParsedStory, Text, TypeName, Weave,
+    InterfaceDeclaration, InterfaceMemberKind, InterfaceMemberSignature, Module, Object,
+    PrimitiveType, Story as ParsedStory, Text, TypeName, Weave,
 };
 pub use source::{eliminate_comments, SourceInput, SourceSpan};

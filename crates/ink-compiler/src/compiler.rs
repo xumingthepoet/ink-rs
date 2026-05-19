@@ -264,15 +264,17 @@ impl Compiler {
 fn merge_parsed_stories(stories: Vec<ParsedStory>) -> ParsedStory {
     let mut root_content = Vec::new();
     let mut flows = Vec::new();
+    let mut interfaces = Vec::new();
     let mut modules = Vec::new();
 
     for story in stories {
         root_content.extend(story.root_weave().content().iter().cloned());
         flows.extend(story.flows().iter().cloned());
+        interfaces.extend(story.interfaces().iter().cloned());
         modules.extend(story.modules().iter().cloned());
     }
 
-    ParsedStory::new_with_modules(root_content, flows, modules)
+    ParsedStory::new_with_modules_and_interfaces(root_content, flows, modules, interfaces)
 }
 
 fn diagnostics_have_errors(diagnostics: &[Diagnostic]) -> bool {
@@ -296,23 +298,19 @@ fn diagnostics_failed(diagnostics: &[Diagnostic], policy: DiagnosticsPolicy) -> 
 }
 
 fn explicit_module_diagnostic(source: &SourceFile) -> Option<Diagnostic> {
+    const MESSAGE: &str = "Source files must start with an explicit module or interface declaration (`=== module name ===` or `=== interface name ===`)";
+
     let Some(first_content) = source
         .lines
         .iter()
         .find(|line| !line.text.trim().is_empty())
     else {
-        return Some(Diagnostic::error(
-            SourceSpan::new(None, 1, 1),
-            "Source files must start with an explicit module declaration (`=== module name ===`)",
-        ));
+        return Some(Diagnostic::error(SourceSpan::new(None, 1, 1), MESSAGE));
     };
 
-    (!syntax::is_module_like_declaration_line(&first_content.text)).then(|| {
-        Diagnostic::error(
-            first_content.span.clone(),
-            "Source files must start with an explicit module declaration (`=== module name ===`)",
-        )
-    })
+    (!syntax::is_module_like_declaration_line(&first_content.text)
+        && !syntax::is_interface_like_declaration_line(&first_content.text))
+    .then(|| Diagnostic::error(first_content.span.clone(), MESSAGE))
 }
 
 #[cfg(test)]
@@ -330,7 +328,7 @@ mod tests {
         assert_eq!(output.diagnostics.len(), 1);
         assert_eq!(
             output.diagnostics[0].message,
-            "Source files must start with an explicit module declaration (`=== module name ===`)"
+            "Source files must start with an explicit module or interface declaration (`=== module name ===` or `=== interface name ===`)"
         );
     }
 

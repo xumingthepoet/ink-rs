@@ -1,10 +1,11 @@
 use super::{
-    Choice, Conditional, ContentList, Expression, Flow, ImportDeclaration, Module, Object, Story,
-    Weave,
+    Choice, Conditional, ContentList, Expression, Flow, ImportDeclaration, InterfaceDeclaration,
+    Module, Object, Story, Weave,
 };
 
 pub(crate) trait ParsedVisitor {
     fn visit_story(&mut self, _story: &Story, _context: &VisitContext) {}
+    fn visit_interface(&mut self, _interface: &InterfaceDeclaration, _context: &VisitContext) {}
     fn visit_module(&mut self, _module: &Module, _context: &VisitContext) {}
     fn visit_import(&mut self, _import: &ImportDeclaration, _context: &VisitContext) {}
     fn visit_flow(&mut self, _flow: &Flow, _context: &VisitContext) {}
@@ -76,6 +77,9 @@ where
     walk_weave(story.root_weave(), visitor, &context);
     for flow in story.flows() {
         walk_flow(flow, visitor, &context);
+    }
+    for interface in story.interfaces() {
+        visitor.visit_interface(interface, &context);
     }
     for module in story.modules() {
         walk_module(module, visitor, &context);
@@ -274,6 +278,7 @@ mod tests {
     #[derive(Default)]
     struct RecordingVisitor {
         saw_story: bool,
+        interfaces: Vec<String>,
         modules: Vec<String>,
         imports: Vec<String>,
         flows: Vec<String>,
@@ -296,6 +301,10 @@ mod tests {
                 context.parent_flow_path.clone(),
                 context.inside_function,
             ));
+        }
+
+        fn visit_interface(&mut self, interface: &InterfaceDeclaration, _context: &VisitContext) {
+            self.interfaces.push(interface.name().to_string());
         }
 
         fn visit_module(&mut self, module: &Module, context: &VisitContext) {
@@ -363,6 +372,21 @@ mod tests {
                 _ => "literal",
             });
         }
+    }
+
+    #[test]
+    fn walks_interfaces() {
+        let story = Story::new_with_modules_and_interfaces(
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            vec![InterfaceDeclaration::new("IItem", span(), span())],
+        );
+
+        let mut visitor = RecordingVisitor::default();
+        walk_story(&story, &mut visitor);
+
+        assert_eq!(visitor.interfaces, vec!["IItem"]);
     }
 
     #[test]

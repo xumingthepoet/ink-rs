@@ -1,9 +1,10 @@
-use super::{push_indent, Flow, Module, Weave};
+use super::{push_indent, Flow, InterfaceDeclaration, Module, Weave};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Story {
     root_weave: Weave,
     flows: Vec<Flow>,
+    interfaces: Vec<InterfaceDeclaration>,
     modules: Vec<Module>,
 }
 
@@ -17,9 +18,19 @@ impl Story {
         flows: Vec<Flow>,
         modules: Vec<Module>,
     ) -> Self {
+        Self::new_with_modules_and_interfaces(root_content, flows, modules, Vec::new())
+    }
+
+    pub fn new_with_modules_and_interfaces(
+        root_content: Vec<super::Object>,
+        flows: Vec<Flow>,
+        modules: Vec<Module>,
+        interfaces: Vec<InterfaceDeclaration>,
+    ) -> Self {
         Self {
             root_weave: Weave::new(root_content, 0),
             flows,
+            interfaces,
             modules,
         }
     }
@@ -30,6 +41,10 @@ impl Story {
 
     pub fn flows(&self) -> &[Flow] {
         &self.flows
+    }
+
+    pub fn interfaces(&self) -> &[InterfaceDeclaration] {
+        &self.interfaces
     }
 
     pub fn modules(&self) -> &[Module] {
@@ -48,6 +63,9 @@ impl Story {
         for flow in &self.flows {
             flow.write_parse_snapshot(&mut out, 2);
         }
+        for interface in &self.interfaces {
+            interface.write_parse_snapshot(&mut out, 2);
+        }
         for module in &self.modules {
             module.write_parse_snapshot(&mut out, 2);
         }
@@ -59,7 +77,8 @@ impl Story {
 mod tests {
     use crate::{
         parsed::{
-            Flow, FlowLevel, FlowParts, ImportDeclaration, ImportedName, Module, Object, Text,
+            Flow, FlowLevel, FlowParts, ImportDeclaration, ImportedName, InterfaceDeclaration,
+            Module, Object, Text,
         },
         source::SourceSpan,
     };
@@ -93,6 +112,25 @@ mod tests {
         assert_eq!(
             story.to_parse_snapshot(),
             "Story\n  Weave(baseIndent=0)\n    Gather(name=null, depth=1)\n    Divert(target=\"-> DONE\", empty=false, tunnel=false, thread=false)\n  Module(name=\"game\")\n    Import(from=\"items\", names=[\"sword\"])\n    Weave(baseIndent=0)\n      Text(\"Line.\")\n    Flow(level=Knot, name=\"main\", function=false)"
+        );
+    }
+
+    #[test]
+    fn parse_snapshot_includes_interfaces() {
+        let story = Story::new_with_modules_and_interfaces(
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            vec![InterfaceDeclaration::new(
+                "IItem",
+                span_at(1, 15),
+                span_at(1, 1),
+            )],
+        );
+
+        assert_eq!(
+            story.to_parse_snapshot(),
+            "Story\n  Weave(baseIndent=0)\n    Gather(name=null, depth=1)\n    Divert(target=\"-> DONE\", empty=false, tunnel=false, thread=false)\n  Interface(name=\"IItem\")"
         );
     }
 

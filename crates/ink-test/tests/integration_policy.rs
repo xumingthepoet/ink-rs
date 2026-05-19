@@ -135,7 +135,7 @@ fn legacy_fixture_path(root: &Path, path: &Path) -> Option<String> {
         .find(|line| !line.trim().is_empty())?
         .trim_start();
 
-    if first_content.starts_with("=== module ") {
+    if first_content.starts_with("=== module ") || first_content.starts_with("=== interface ") {
         return None;
     }
 

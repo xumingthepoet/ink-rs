@@ -3,7 +3,7 @@ use crate::source::SourceInput;
 use crate::{
     compiler::StageOutput,
     diagnostic::Diagnostic,
-    parsed::{Flow, FlowParts, ImportDeclaration, Module, Object, Story},
+    parsed::{Flow, FlowParts, ImportDeclaration, InterfaceDeclaration, Module, Object, Story},
     source::{SourceFile, SourceLine},
 };
 
@@ -12,7 +12,7 @@ use super::scan;
 use super::weave::group_weave_content;
 use super::{
     author_warning_statement, choice_statement, declaration, divert_statement, gather, import,
-    is_choice_continuation_boundary, knot, leading_whitespace_count, logic, module,
+    interface, is_choice_continuation_boundary, knot, leading_whitespace_count, logic, module,
     parse_choice_from_line, structure, text, text_statement, variable,
 };
 
@@ -109,6 +109,7 @@ impl Parser {
         let lines = self.source.lines.clone();
         let mut objects = Vec::new();
         let mut flows = Vec::new();
+        let mut interfaces = Vec::new();
         let mut modules = Vec::new();
         let mut active_module_index = None;
         let explicit_module_source = lines
@@ -125,6 +126,15 @@ impl Parser {
             }
 
             if line.text.trim() == "}" {
+                index += 1;
+                continue;
+            }
+
+            if interface::is_interface_like_declaration_line(&line.text) {
+                active_module_index = None;
+                if let Some(interface) = self.parse_interface_header(line) {
+                    interfaces.push(interface);
+                }
                 index += 1;
                 continue;
             }
@@ -252,7 +262,12 @@ impl Parser {
             index += 1;
         }
 
-        Story::new_with_modules(group_weave_content(objects), flows, modules)
+        Story::new_with_modules_and_interfaces(
+            group_weave_content(objects),
+            flows,
+            modules,
+            interfaces,
+        )
     }
 
     pub(super) fn parse_statement(&mut self, line: &SourceLine) -> Vec<Object> {
@@ -369,6 +384,17 @@ impl Parser {
         })
     }
 
+    fn parse_interface_header(&mut self, line: &SourceLine) -> Option<InterfaceDeclaration> {
+        let mut line_parser = RuleParser::new(line);
+        let declaration = line_parser.parse_rule(interface::parse_interface_declaration);
+        let had_error = line_parser.had_error();
+        self.diagnostics.extend(line_parser.finish());
+
+        declaration.filter(|_| !had_error).map(|declaration| {
+            InterfaceDeclaration::new(declaration.name, declaration.name_span, declaration.span)
+        })
+    }
+
     fn parse_import_declaration(
         &mut self,
         lines: &[SourceLine],
@@ -412,7 +438,9 @@ impl Parser {
                 continue;
             }
 
-            if module::is_module_like_declaration_line(&next_line.text) {
+            if module::is_module_like_declaration_line(&next_line.text)
+                || interface::is_interface_like_declaration_line(&next_line.text)
+            {
                 break;
             }
 
@@ -484,7 +512,9 @@ impl Parser {
                 continue;
             }
 
-            if module::is_module_like_declaration_line(&next_line.text) {
+            if module::is_module_like_declaration_line(&next_line.text)
+                || interface::is_interface_like_declaration_line(&next_line.text)
+            {
                 break;
             }
 
@@ -979,6 +1009,41 @@ mod tests {
     }
 
     #[test]
+    fn parses_interface_headers() {
+        let output = parse(SourceInput::new("=== interface IItem ==="));
+
+        assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
+        let story = output.artifact.expect("story should parse");
+        assert_eq!(story.interfaces().len(), 1);
+        assert_eq!(story.interfaces()[0].name(), "IItem");
+        assert_eq!(story.interfaces()[0].name_span().line, 1);
+        assert_eq!(story.interfaces()[0].name_span().column, 15);
+        assert_eq!(
+            story.to_parse_snapshot(),
+            "Story\n  Weave(baseIndent=0)\n    Gather(name=null, depth=1)\n    Divert(target=\"-> DONE\", empty=false, tunnel=false, thread=false)\n  Interface(name=\"IItem\")"
+        );
+    }
+
+    #[test]
+    fn parses_interfaces_as_top_level_peers_of_modules() {
+        let output = parse(SourceInput::new(
+            "=== module game ===\n\
+             == main ==\n\
+             -> DONE\n\
+             === interface IItem ===\n\
+             === module items ===",
+        ));
+
+        assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
+        let story = output.artifact.expect("story should parse");
+        assert_eq!(story.interfaces().len(), 1);
+        assert_eq!(story.interfaces()[0].name(), "IItem");
+        assert_eq!(story.modules().len(), 2);
+        assert_eq!(story.modules()[0].flows()[0].name(), "main");
+        assert_eq!(story.modules()[1].name(), "items");
+    }
+
+    #[test]
     fn parses_multiple_module_headers() {
         let output = parse(SourceInput::new(
             "=== module game ===\n\
@@ -1105,6 +1170,54 @@ mod tests {
                 "invalid module header should not be parsed as text: {source}"
             );
             assert!(story.flows().is_empty(), "{source}");
+        }
+    }
+
+    #[test]
+    fn rejects_invalid_interface_headers_without_falling_through_to_text() {
+        let cases = [
+            (
+                "== interface IItem ==",
+                "Interface declarations must use `=== interface name ===`",
+            ),
+            (
+                "= interface IItem",
+                "Interface declarations must use `=== interface name ===`",
+            ),
+            (
+                "=== Interface IItem ===",
+                "Interface declarations must use lowercase `interface`",
+            ),
+            (
+                "=== interface IItem(seed) ===",
+                "Interface declarations do not accept parameters",
+            ),
+            (
+                "=== interface game.IItem ===",
+                "Interface names must be single identifiers; hierarchical interface names are not supported",
+            ),
+            (
+                "=== interface 123 ===",
+                "Interface name must be a single identifier",
+            ),
+        ];
+
+        for (source, expected_message) in cases {
+            let output = parse(SourceInput::new(source));
+
+            assert_eq!(
+                output.diagnostics.len(),
+                1,
+                "{source}: {:#?}",
+                output.diagnostics
+            );
+            assert_eq!(output.diagnostics[0].message, expected_message);
+            let story = output.artifact.expect("story should still be returned");
+            assert!(story.interfaces().is_empty(), "{source}");
+            assert!(
+                story.root_weave().content().is_empty(),
+                "invalid interface header should not be parsed as text: {source}"
+            );
         }
     }
 

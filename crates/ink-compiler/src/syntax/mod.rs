@@ -6,6 +6,7 @@ mod error;
 mod expression;
 mod gather;
 mod import;
+mod interface;
 mod knot;
 mod logic;
 mod module;
@@ -20,6 +21,7 @@ mod weave;
 
 mod parser;
 
+pub(crate) use interface::is_interface_like_declaration_line;
 pub(crate) use module::is_module_like_declaration_line;
 #[cfg(test)]
 pub(crate) use parser::parse;
