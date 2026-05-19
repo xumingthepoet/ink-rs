@@ -1,4 +1,4 @@
-Progress: 19/23
+Progress: 20/23
 
 # Interface-Typed Dynamic Module Access Active Plan
 
@@ -872,7 +872,7 @@ Commit record:
 
 ## Milestone 5: Fixtures, Public Docs, And Closeout
 
-### [>] Task 20: Add End-To-End Interface Fixtures
+### [x] Task 20: Add End-To-End Interface Fixtures
 
 Goal: Add integration fixtures that demonstrate the complete interface feature across compiler JSON and runtime execution.
 
@@ -914,8 +914,8 @@ Commit record:
 - Implementation commit: `d7041db7 Add end-to-end interface fixture coverage`
 - Focused validation: `cargo fmt --all --check`; `cargo test -p ink-test --test compiler_snapshots interface`; `cargo test -p ink-test --test modules interface`; `cargo test -p ink-test --test functions interface`
 - Full validation: `make gate`
-- Review/fix commits: pending
-- Completion record commit: pending
+- Review/fix commits: `01cdb128 Add full interface end-to-end JSON snapshot`; post-review validation: `cargo fmt --all --check`; `cargo test -p ink-test --test compiler_snapshots interface`; `cargo test -p ink-test --test modules interface`; `cargo test -p ink-test --test functions interface`; `make gate`
+- Completion record commit: this task-list commit
 
 ### [ ] Task 21: Add Interface Diagnostics Fixtures
 
