@@ -60,6 +60,66 @@ fn interface_dynamic_targets_lower_to_format_tokens() {
             json!({"i()": "score", "interface": "IItem", "args": 1}),
         ],
     );
+    assert_eq!(
+        json["interfaces"]["IItem"],
+        json!({
+            "members": {
+                "fallback": "knot",
+                "score": "function",
+                "target": "knot"
+            },
+            "implementations": ["left", "right"]
+        })
+    );
+}
+
+#[test]
+fn interface_metadata_omits_uncompiled_implementations() {
+    use ink_compiler::{Compiler, DiagnosticSeverity, SourceInput};
+    use serde_json::{json, Value};
+
+    let source = r#"
+=== interface IItem ===
+== target ==
+
+=== module game ===
+FROM left
+VAR route: interface<IItem> = left
+== main ==
+-> {{route}::target}
+
+=== module left implements IItem ===
+== target ==
+-> END
+
+=== module unused implements IItem ===
+== target ==
+-> END
+"#;
+    let output = Compiler::default().compile(SourceInput::named(source, "inline-interface.ink"));
+    let errors = output
+        .diagnostics
+        .iter()
+        .filter(|diagnostic| diagnostic.severity == DiagnosticSeverity::Error)
+        .collect::<Vec<_>>();
+    assert!(
+        errors.is_empty(),
+        "compile should not emit errors: {errors:#?}"
+    );
+
+    let compiled = output.artifact.expect("expected compiled story");
+    let json: Value = serde_json::from_str(&compiled.json)
+        .unwrap_or_else(|error| panic!("compiled json must be valid: {error}"));
+
+    assert_eq!(
+        json["interfaces"]["IItem"],
+        json!({
+            "members": {
+                "target": "knot"
+            },
+            "implementations": ["left"]
+        })
+    );
 }
 
 fn assert_json_sequence(value: &serde_json::Value, sequence: &[serde_json::Value]) {

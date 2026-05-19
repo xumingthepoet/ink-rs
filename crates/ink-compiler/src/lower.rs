@@ -14,15 +14,16 @@ mod value;
 mod weave;
 
 use ink_story_json_format::{
-    Container, ControlCommand, InternalFunction, NamedContainer, Object as RuntimeObject,
-    Program as RuntimeProgram,
+    Container, ControlCommand, InterfaceDefinition,
+    InterfaceMemberKind as RuntimeInterfaceMemberKind, InternalFunction, NamedContainer,
+    Object as RuntimeObject, Program as RuntimeProgram,
 };
 
 use crate::{
     analysis::CheckedStory,
     compiler::StageOutput,
     diagnostic::Diagnostic,
-    parsed::{Choice, Object},
+    parsed::{Choice, InterfaceMemberKind, Object},
     source::SourceSpan,
 };
 
@@ -102,10 +103,53 @@ fn lower_module_story(
 
     let mut program = RuntimeProgram::new(root);
     program.internal_functions = collect_internal_functions(story);
+    program.interfaces = collect_interface_metadata(story);
 
     StageOutput {
         artifact: Some(program),
         diagnostics: Vec::new(),
+    }
+}
+
+fn collect_interface_metadata(story: &CheckedStory) -> BTreeMap<String, InterfaceDefinition> {
+    let mut interfaces = BTreeMap::new();
+    for interface in story.parsed.interfaces() {
+        let members = interface
+            .members()
+            .iter()
+            .map(|member| {
+                (
+                    member.name().to_string(),
+                    runtime_interface_member_kind(member.kind()),
+                )
+            })
+            .collect::<BTreeMap<_, _>>();
+        let implementations = story
+            .parsed
+            .modules()
+            .iter()
+            .filter(|module| story.module_reachability.is_reachable(module.name()))
+            .filter(|module| {
+                module
+                    .implemented_interfaces()
+                    .iter()
+                    .any(|implemented| implemented.name() == interface.name())
+            })
+            .map(|module| module.name().to_string())
+            .collect::<Vec<_>>();
+
+        interfaces.insert(
+            interface.name().to_string(),
+            InterfaceDefinition::new(members, implementations),
+        );
+    }
+    interfaces
+}
+
+fn runtime_interface_member_kind(kind: &InterfaceMemberKind) -> RuntimeInterfaceMemberKind {
+    match kind {
+        InterfaceMemberKind::Knot => RuntimeInterfaceMemberKind::Knot,
+        InterfaceMemberKind::Function => RuntimeInterfaceMemberKind::Function,
     }
 }
 

@@ -19,6 +19,15 @@ metadata. `inkVersion` is an integer that denotes the format version, and
             "argTypes": ["string"],
             "returnType": "string"
         }
+    },
+    "interfaces": {
+        "IItem": {
+            "members": {
+                "target": "knot",
+                "score": "function"
+            },
+            "implementations": ["left", "right"]
+        }
     }
 }
 ```
@@ -42,6 +51,14 @@ name. `path` is the runtime container path, `args` is the argument count,
 `argTypes` stores source type names, and `returnType` stores the declared return
 type. Runtime loading keeps this metadata separate from the runtime execution
 graph and uses it to validate `Story::call_internal`.
+
+`interfaces` is emitted when the source declares interfaces. Each key is an
+interface name. `members` maps member names to `"knot"` or `"function"`.
+`implementations` lists source module names that explicitly implement the
+interface and are present in the compiled story. Unreachable implementation
+modules are omitted because their containers are not compiled. Runtime loading
+keeps this metadata separate from the runtime execution graph and uses it to
+validate dynamic interface dispatch.
 
 ## Containers
 
@@ -95,6 +112,12 @@ Supported types:
     ```
 
     This represents an object value with `flags`, `hp`, and `name` fields. Static Ink source type names and field declarations are not serialized in story JSON or save JSON in this phase; only the runtime values are serialized.
+* **interface value**: represented as a runtime string containing the source
+  module name, using the same string value encoding as other strings. For
+  example, an `interface<IItem>` variable initialized with module `left` stores
+  the string value `"left"`. Interface values keep this string shape in compiled
+  story JSON and runtime save-state JSON; the compiled story's top-level
+  `interfaces` metadata supplies the validation contract for dynamic dispatch.
 * **divert target**: represents a variable divert target, for example as used in the following ink:
 
         -> somewhere
@@ -159,12 +182,27 @@ Diverts can take the following forms:
 * `{"f()": "path.to.func"}` - a function-call, which is defined as a divert that pushes an element to the callstack. Note that it doesn't necessarily correspond directly to an ink function, since choices use them internally too.
 * `{"->t->": "path.tunnel"}` - a tunnel, which works similarly to a function call by pushing an element to the callstack. The only difference is that the callstack is aware of the type of element that was pushed, for error checking.
 * `{"x()": "externalFuncName", "exArgs": 5}` - an external (game-side) function call, that optionally takes the specified number of arguments.
+* `{"i->": "target", "interface": "IItem"}` - construct a dynamic divert
+  target from an interface value already on the evaluation stack. The popped
+  string value must name a compiled module that implements `IItem`; the runtime
+  combines that module with member `target` and pushes a divert target value.
+* `{"i()": "score", "interface": "IItem", "args": 1}` - dispatch a dynamic
+  interface function call. The call arguments are evaluated first, then the
+  interface value is evaluated, and the instruction uses `args` to consume the
+  correct number of call arguments plus the interface value. The runtime
+  validates the module implementation and member kind with top-level
+  `interfaces` metadata before calling the resolved module function.
 
 Additionally, a `"c"` property set to `true` indicates that the divert is conditional, and should therefore pop a value off the evaluation stack to determine whether the divert should actually happen.
 
 Module external calls use source-qualified host binding names in the `"x()"`
 field, for example `{"x()": "audio::play", "exArgs": 1}`. They are not runtime
 container paths, so they keep the `::` separator.
+
+This document describes compiled story JSON. Runtime save-state JSON remains
+owned by the runtime layer; it serializes current runtime values, including
+interface values as strings, but does not duplicate the compiled story's
+`interfaces` metadata.
 
 ## Variable assignment
 
