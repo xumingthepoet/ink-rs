@@ -1,4 +1,4 @@
-Progress: 21/23
+Progress: 22/23
 
 # Interface-Typed Dynamic Module Access Active Plan
 
@@ -960,7 +960,7 @@ Commit record:
 - Review/fix commits: `85227a1b Use imported interface diagnostic helper symbol`; post-review validation: `cargo fmt --all --check`; `cargo test -p ink-test --test diagnostics interface`; `cargo test -p ink-test --test diagnostics imports`; `cargo test -p ink-compiler analysis`; `make gate`
 - Completion record commit: this task-list commit
 
-### [>] Task 22: Add Public Syntax Fixtures And Documentation
+### [x] Task 22: Add Public Syntax Fixtures And Documentation
 
 Goal: Add public-facing syntax fixtures and documentation for the latest supported interface and import syntax.
 
@@ -1003,8 +1003,8 @@ Commit record:
 - Implementation commit: `40432262 Document interface dynamic module access syntax`
 - Focused validation: `rg -n "FROM .*IMPORT|interface<|implements|dynamic interface|\\{\\{.*\\}::" docs/SyntaxUpdates.md docs/SyntaxReference.md`; `cargo test -p ink-test --test modules docs`; `cargo test -p ink-test --test compiler_snapshots interface`
 - Full validation: `make gate`
-- Review/fix commits: pending
-- Completion record commit: pending
+- Review/fix commits: `a333cc1d Clarify interface source file starts`; post-review validation: `rg -n "FROM .*IMPORT|interface<|implements|dynamic interface|\\{\\{.*\\}::" docs/SyntaxUpdates.md docs/SyntaxReference.md`; `cargo test -p ink-test --test modules docs`; `cargo test -p ink-test --test compiler_snapshots interface`; `make gate`
+- Completion record commit: this task-list commit
 
 ### [ ] Task 23: Archive Completed Plan
 
