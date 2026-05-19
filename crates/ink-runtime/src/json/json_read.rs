@@ -447,6 +447,7 @@ mod tests {
     };
     use crate::json::json_write;
     use crate::native_function_call::{NativeFunctionCall, Op};
+    use crate::story::Story;
     use serde_json::json;
 
     #[test]
@@ -534,6 +535,7 @@ mod tests {
                 .and_then(|interface| interface.member_kind("score")),
             Some(DynamicInterfaceMemberKind::Function)
         );
+        let _ = Story::new(json).expect("public Story loader should accept dynamic interfaces");
     }
 
     #[test]
