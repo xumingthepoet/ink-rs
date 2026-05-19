@@ -14,6 +14,7 @@ use super::{
         build_module_implementation_index, infer_expected_interface_expression_type,
         ModuleImplementationIndex,
     },
+    interfaces::{build_interface_member_index, InterfaceMemberIndex},
     modules::{build_module_import_index, ModuleImportIndex},
     structs::build_struct_type_index,
     target_symbols::build_target_symbol_index,
@@ -25,6 +26,7 @@ pub(super) fn variable_initializer_diagnostics(story: &Story) -> Vec<Diagnostic>
     let enum_types = build_enum_type_index(story);
     let variable_scopes = build_variable_scope_index(story);
     let target_symbols = build_target_symbol_index(story);
+    let interface_members = build_interface_member_index(story);
     let module_implementations = build_module_implementation_index(story);
     let module_imports = build_module_import_index(story);
     let mut checker = VariableInitializerChecker::new(
@@ -32,6 +34,7 @@ pub(super) fn variable_initializer_diagnostics(story: &Story) -> Vec<Diagnostic>
         &struct_types,
         &enum_types,
         &target_symbols,
+        &interface_members,
         &module_implementations,
         &module_imports,
     );
@@ -44,6 +47,7 @@ struct VariableInitializerChecker<'a> {
     struct_types: &'a StructTypeIndex,
     enum_types: &'a EnumTypeIndex,
     target_symbols: &'a TargetSymbolIndex,
+    interface_members: &'a InterfaceMemberIndex,
     module_implementations: &'a ModuleImplementationIndex,
     module_imports: &'a ModuleImportIndex,
     diagnostics: Vec<Diagnostic>,
@@ -55,6 +59,7 @@ impl<'a> VariableInitializerChecker<'a> {
         struct_types: &'a StructTypeIndex,
         enum_types: &'a EnumTypeIndex,
         target_symbols: &'a TargetSymbolIndex,
+        interface_members: &'a InterfaceMemberIndex,
         module_implementations: &'a ModuleImplementationIndex,
         module_imports: &'a ModuleImportIndex,
     ) -> Self {
@@ -63,6 +68,7 @@ impl<'a> VariableInitializerChecker<'a> {
             struct_types,
             enum_types,
             target_symbols,
+            interface_members,
             module_implementations,
             module_imports,
             diagnostics: Vec::new(),
@@ -101,6 +107,7 @@ impl<'a> VariableInitializerChecker<'a> {
             self.target_symbols,
             self.module_implementations,
             self.module_imports,
+            self.interface_members,
             context.current_module.as_deref(),
             context.current_flow_path.as_deref(),
         ) {
@@ -131,6 +138,7 @@ impl<'a> VariableInitializerChecker<'a> {
             self.struct_types,
             self.enum_types,
             self.target_symbols,
+            self.interface_members,
             context.current_module.as_deref(),
             context.current_flow_path.as_deref(),
         ) {
@@ -173,6 +181,7 @@ impl<'a> VariableInitializerChecker<'a> {
             self.target_symbols,
             self.module_implementations,
             self.module_imports,
+            self.interface_members,
             context.current_module.as_deref(),
             context.current_flow_path.as_deref(),
         ) {
@@ -207,6 +216,7 @@ impl<'a> VariableInitializerChecker<'a> {
             self.struct_types,
             self.enum_types,
             self.target_symbols,
+            self.interface_members,
             context.current_module.as_deref(),
             context.current_flow_path.as_deref(),
         ) {
@@ -452,6 +462,51 @@ mod tests {
         );
 
         assert_eq!(super::super::run_analysis_passes(&story), []);
+    }
+
+    #[test]
+    fn accepts_dynamic_interface_function_calls_in_typed_initializers() {
+        let story = parse_story(
+            "=== interface IItem ===\n\
+             == function score(amount: int) => int ==\n\
+             === module game ===\n\
+             FROM left\n\
+             VAR route: interface<IItem> = left\n\
+             VAR global_score: int = {route}::score(1)\n\
+             == main ==\n\
+             ~ temp local_score: int = {route}::score(2)\n\
+             -> END\n\
+             === module left implements IItem ===\n\
+             == function score(amount: int) => int ==\n\
+             ~ return amount",
+        );
+
+        assert_eq!(super::super::run_analysis_passes(&story), []);
+    }
+
+    #[test]
+    fn rejects_dynamic_interface_function_initializer_type_mismatches() {
+        let story = parse_story(
+            "=== interface IItem ===\n\
+             == function score(amount: int) => int ==\n\
+             === module game ===\n\
+             FROM left\n\
+             VAR route: interface<IItem> = left\n\
+             VAR label: string = {route}::score(1)\n\
+             == main ==\n\
+             -> END\n\
+             === module left implements IItem ===\n\
+             == function score(amount: int) => int ==\n\
+             ~ return amount",
+        );
+
+        let diagnostics = variable_initializer_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Initializer for variable 'label' has type int but declared type is string",
+        );
     }
 
     #[test]

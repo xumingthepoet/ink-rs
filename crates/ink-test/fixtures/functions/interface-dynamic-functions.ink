@@ -9,11 +9,9 @@ VAR route: interface<IItem> = left
 VAR alternates: interface<IItem>[] = [right]
 
 == main ==
-Score {get_score()}.
+~ temp score: int = {route}::score(3)
+Score {score}.
 -> END
-
-== function get_score() => int ==
-~ return {route}::score(3)
 
 === module left implements IItem ===
 == function score(amount: int) => int ==

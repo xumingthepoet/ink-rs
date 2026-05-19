@@ -17,9 +17,7 @@ use super::{
         VariableScopeIndex,
     },
     enums::{build_enum_type_index, is_enum_member_reference},
-    expression_types::{
-        infer_expression_type, infer_expression_type_with_interfaces, typed_builtin_return_type,
-    },
+    expression_types::{infer_expression_type, typed_builtin_return_type},
     interface_values::{
         build_module_implementation_index, collect_interface_module_literal_uses_for_story,
         infer_expected_interface_expression_type, InterfaceModuleLiteralUses,
@@ -250,7 +248,7 @@ impl<'a> CallTargetChecker<'a> {
         }
 
         self.check_expression(expression, span, context);
-        match infer_expression_type_with_interfaces(
+        match infer_expression_type(
             expression,
             self.variable_scopes,
             self.struct_types,
@@ -309,7 +307,7 @@ impl<'a> CallTargetChecker<'a> {
         span: &SourceSpan,
         context: &VisitContext,
     ) -> Option<InterfaceMemberSignature> {
-        let target_type = match infer_expression_type_with_interfaces(
+        let target_type = match infer_expression_type(
             target,
             self.variable_scopes,
             self.struct_types,
@@ -395,7 +393,7 @@ impl<'a> CallTargetChecker<'a> {
         span: &SourceSpan,
         context: &VisitContext,
     ) -> Option<InterfaceMemberSignature> {
-        let target_type = match infer_expression_type_with_interfaces(
+        let target_type = match infer_expression_type(
             target,
             self.variable_scopes,
             self.struct_types,
@@ -487,11 +485,12 @@ impl<'a> CallTargetChecker<'a> {
                 self.target_symbols,
                 self.module_implementations,
                 self.module_imports,
+                self.interface_members,
                 self.current_module(context),
                 self.current_flow_path(context),
             )
             .unwrap_or_else(|| {
-                infer_expression_type_with_interfaces(
+                infer_expression_type(
                     argument,
                     self.variable_scopes,
                     self.struct_types,
@@ -551,7 +550,7 @@ impl<'a> CallTargetChecker<'a> {
                     target: target.clone(),
                     member: member.clone(),
                 };
-                if let Err(error) = infer_expression_type_with_interfaces(
+                if let Err(error) = infer_expression_type(
                     &dynamic_access,
                     self.variable_scopes,
                     self.struct_types,
@@ -735,6 +734,7 @@ impl<'a> CallTargetChecker<'a> {
             self.struct_types,
             self.enum_types,
             self.target_symbols,
+            self.interface_members,
             self.current_module(context),
             self.current_flow_path(context),
         ) {
@@ -763,6 +763,7 @@ impl<'a> CallTargetChecker<'a> {
             self.struct_types,
             self.enum_types,
             self.target_symbols,
+            self.interface_members,
             self.current_module(context),
             self.current_flow_path(context),
         ) {
@@ -801,6 +802,7 @@ impl<'a> CallTargetChecker<'a> {
             self.struct_types,
             self.enum_types,
             self.target_symbols,
+            self.interface_members,
             self.current_module(context),
             self.current_flow_path(context),
         ) {
@@ -859,6 +861,7 @@ impl<'a> CallTargetChecker<'a> {
                 self.struct_types,
                 self.enum_types,
                 self.target_symbols,
+                self.interface_members,
                 self.current_module(context),
                 self.current_flow_path(context),
             ) {

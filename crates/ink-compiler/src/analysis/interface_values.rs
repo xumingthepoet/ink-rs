@@ -9,9 +9,7 @@ use crate::parsed::{
 use super::{
     context::{EnumTypeIndex, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
     enums::build_enum_type_index,
-    expression_types::{
-        infer_expression_type, infer_expression_type_with_interfaces, TypeInferenceError,
-    },
+    expression_types::{infer_expression_type, TypeInferenceError},
     interfaces::{build_interface_member_index, InterfaceMemberIndex},
     modules::ModuleImportIndex,
     structs::{build_struct_type_index, resolve_struct_symbol},
@@ -59,6 +57,7 @@ pub(super) fn infer_expected_interface_expression_type(
     target_symbols: &TargetSymbolIndex,
     module_implementations: &ModuleImplementationIndex,
     module_imports: &ModuleImportIndex,
+    interface_members: &InterfaceMemberIndex,
     current_module: Option<&str>,
     current_flow_path: Option<&str>,
 ) -> Option<Result<TypeName, TypeInferenceError>> {
@@ -70,6 +69,7 @@ pub(super) fn infer_expected_interface_expression_type(
         struct_types,
         enum_types,
         target_symbols,
+        interface_members,
         current_module,
         current_flow_path,
     ) {
@@ -345,7 +345,7 @@ impl<'a> InterfaceModuleLiteralUseCollector<'a> {
         arguments: &[Expression],
         context: &VisitContext,
     ) {
-        let Ok(target_type) = infer_expression_type_with_interfaces(
+        let Ok(target_type) = infer_expression_type(
             target,
             self.variable_scopes,
             self.struct_types,
@@ -416,6 +416,7 @@ impl<'a> InterfaceModuleLiteralUseCollector<'a> {
                     self.struct_types,
                     self.enum_types,
                     self.target_symbols,
+                    self.interface_members,
                     context.current_module.as_deref(),
                     context.current_flow_path.as_deref(),
                 ) else {

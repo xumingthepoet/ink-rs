@@ -18,6 +18,7 @@ use super::{
         build_module_implementation_index, infer_expected_interface_expression_type,
         ModuleImplementationIndex,
     },
+    interfaces::{build_interface_member_index, InterfaceMemberIndex},
     modules::{build_module_import_index, ModuleImportIndex},
     structs::{build_struct_type_index, resolve_struct_symbol},
     target_symbols::build_target_symbol_index,
@@ -31,6 +32,7 @@ pub(super) fn struct_literal_diagnostics(story: &Story) -> Vec<Diagnostic> {
     let target_symbols = build_target_symbol_index(story);
     let module_implementations = build_module_implementation_index(story);
     let module_imports = build_module_import_index(story);
+    let interface_members = build_interface_member_index(story);
     let mut checker = StructLiteralChecker::new(
         &struct_types,
         &enum_types,
@@ -38,6 +40,7 @@ pub(super) fn struct_literal_diagnostics(story: &Story) -> Vec<Diagnostic> {
         &target_symbols,
         &module_implementations,
         &module_imports,
+        &interface_members,
     );
     walk_story(story, &mut checker);
     checker.diagnostics
@@ -50,6 +53,7 @@ struct StructLiteralChecker<'a> {
     target_symbols: &'a TargetSymbolIndex,
     module_implementations: &'a ModuleImplementationIndex,
     module_imports: &'a ModuleImportIndex,
+    interface_members: &'a InterfaceMemberIndex,
     diagnostics: Vec<Diagnostic>,
 }
 
@@ -61,6 +65,7 @@ impl<'a> StructLiteralChecker<'a> {
         target_symbols: &'a TargetSymbolIndex,
         module_implementations: &'a ModuleImplementationIndex,
         module_imports: &'a ModuleImportIndex,
+        interface_members: &'a InterfaceMemberIndex,
     ) -> Self {
         Self {
             struct_types,
@@ -69,6 +74,7 @@ impl<'a> StructLiteralChecker<'a> {
             target_symbols,
             module_implementations,
             module_imports,
+            interface_members,
             diagnostics: Vec::new(),
         }
     }
@@ -160,6 +166,7 @@ impl<'a> StructLiteralChecker<'a> {
                     self.struct_types,
                     self.enum_types,
                     self.target_symbols,
+                    self.interface_members,
                     context.current_module.as_deref(),
                     context.current_flow_path.as_deref(),
                 ) {
@@ -194,6 +201,7 @@ impl<'a> StructLiteralChecker<'a> {
             self.target_symbols,
             self.module_implementations,
             self.module_imports,
+            self.interface_members,
             context.current_module.as_deref(),
             context.current_flow_path.as_deref(),
         ) {
@@ -225,6 +233,7 @@ impl<'a> StructLiteralChecker<'a> {
             self.struct_types,
             self.enum_types,
             self.target_symbols,
+            self.interface_members,
             context.current_module.as_deref(),
             context.current_flow_path.as_deref(),
         ) {
@@ -435,6 +444,28 @@ mod tests {
              === module left implements IItem ===\n\
              == target ==\n\
              -> END",
+        );
+
+        assert_eq!(super::super::run_analysis_passes(&story), []);
+    }
+
+    #[test]
+    fn accepts_dynamic_interface_function_calls_in_struct_literals() {
+        let story = parse_story(
+            "=== interface IItem ===\n\
+             == function score(amount: int) => int ==\n\
+             === module game ===\n\
+             FROM left\n\
+             STRUCT Result {\n\
+             score: int\n\
+             }\n\
+             VAR route: interface<IItem> = left\n\
+             VAR result: Result = { score: {route}::score(1) }\n\
+             == main ==\n\
+             -> END\n\
+             === module left implements IItem ===\n\
+             == function score(amount: int) => int ==\n\
+             ~ return amount",
         );
 
         assert_eq!(super::super::run_analysis_passes(&story), []);

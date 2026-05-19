@@ -111,27 +111,6 @@ pub(super) fn infer_expression_type(
     struct_types: &StructTypeIndex,
     enum_types: &EnumTypeIndex,
     target_symbols: &TargetSymbolIndex,
-    current_module: Option<&str>,
-    current_flow_path: Option<&str>,
-) -> Result<TypeName, TypeInferenceError> {
-    let context = TypeInferenceContext {
-        variable_scopes,
-        struct_types,
-        enum_types,
-        target_symbols,
-        interface_members: None,
-        current_module,
-        current_flow_path,
-    };
-    infer_expression_type_in_context(expression, &context)
-}
-
-pub(super) fn infer_expression_type_with_interfaces(
-    expression: &Expression,
-    variable_scopes: &VariableScopeIndex,
-    struct_types: &StructTypeIndex,
-    enum_types: &EnumTypeIndex,
-    target_symbols: &TargetSymbolIndex,
     interface_members: &InterfaceMemberIndex,
     current_module: Option<&str>,
     current_flow_path: Option<&str>,
@@ -141,7 +120,7 @@ pub(super) fn infer_expression_type_with_interfaces(
         struct_types,
         enum_types,
         target_symbols,
-        interface_members: Some(interface_members),
+        interface_members,
         current_module,
         current_flow_path,
     };
@@ -153,7 +132,7 @@ struct TypeInferenceContext<'a> {
     struct_types: &'a StructTypeIndex,
     enum_types: &'a EnumTypeIndex,
     target_symbols: &'a TargetSymbolIndex,
-    interface_members: Option<&'a InterfaceMemberIndex>,
+    interface_members: &'a InterfaceMemberIndex,
     current_module: Option<&'a str>,
     current_flow_path: Option<&'a str>,
 }
@@ -259,12 +238,6 @@ fn infer_dynamic_interface_target_type(
     member: &str,
     context: &TypeInferenceContext<'_>,
 ) -> Result<TypeName, TypeInferenceError> {
-    let Some(interface_members) = context.interface_members else {
-        return Err(TypeInferenceError::new(format!(
-            "Cannot infer type for dynamic interface member '{member}' yet"
-        )));
-    };
-
     let target_type = infer_expression_type_in_context(target, context)?;
     let Some(interface_name) = target_type.as_interface_name() else {
         return Err(TypeInferenceError::new(format!(
@@ -273,7 +246,7 @@ fn infer_dynamic_interface_target_type(
         )));
     };
 
-    let Some(signature) = interface_members.member(interface_name, member) else {
+    let Some(signature) = context.interface_members.member(interface_name, member) else {
         return Err(TypeInferenceError::new(format!(
             "Interface '{interface_name}' does not declare member '{member}'"
         )));
@@ -293,12 +266,6 @@ fn infer_dynamic_interface_function_call_type(
     member: &str,
     context: &TypeInferenceContext<'_>,
 ) -> Result<TypeName, TypeInferenceError> {
-    let Some(interface_members) = context.interface_members else {
-        return Err(TypeInferenceError::new(format!(
-            "Cannot infer return type for dynamic interface function '{member}' yet"
-        )));
-    };
-
     let target_type = infer_expression_type_in_context(target, context)?;
     let Some(interface_name) = target_type.as_interface_name() else {
         return Err(TypeInferenceError::new(format!(
@@ -307,7 +274,7 @@ fn infer_dynamic_interface_function_call_type(
         )));
     };
 
-    let Some(signature) = interface_members.member(interface_name, member) else {
+    let Some(signature) = context.interface_members.member(interface_name, member) else {
         return Err(TypeInferenceError::new(format!(
             "Interface '{interface_name}' does not declare member '{member}'"
         )));
@@ -882,6 +849,7 @@ mod tests {
         let structs = build_struct_type_index(&story);
         let enums = build_enum_type_index(&story);
         let targets = build_target_symbol_index(&story);
+        let interface_members = build_interface_member_index(&story);
         let actor_state = Expression::FieldAccess {
             base: Box::new(qualified_reference("data", "actor")),
             field: "state".to_string(),
@@ -898,6 +866,7 @@ mod tests {
                 &structs,
                 &enums,
                 &targets,
+                &interface_members,
                 Some("game"),
                 Some("main")
             ),
@@ -910,6 +879,7 @@ mod tests {
                 &structs,
                 &enums,
                 &targets,
+                &interface_members,
                 Some("game"),
                 Some("main")
             ),
@@ -922,6 +892,7 @@ mod tests {
                 &structs,
                 &enums,
                 &targets,
+                &interface_members,
                 Some("game"),
                 Some("main")
             ),
@@ -934,6 +905,7 @@ mod tests {
                 &structs,
                 &enums,
                 &targets,
+                &interface_members,
                 Some("game"),
                 Some("main")
             ),
@@ -1039,6 +1011,7 @@ mod tests {
         let structs = build_struct_type_index(&story);
         let enums = build_enum_type_index(&story);
         let targets = build_target_symbol_index(&story);
+        let interface_members = build_interface_member_index(&story);
         let cases = [
             (
                 unary(UnaryOperator::Not, variable("next")),
@@ -1055,9 +1028,17 @@ mod tests {
         ];
 
         for (expression, expected_message) in cases {
-            let error =
-                infer_expression_type(&expression, &scopes, &structs, &enums, &targets, None, None)
-                    .unwrap_err();
+            let error = infer_expression_type(
+                &expression,
+                &scopes,
+                &structs,
+                &enums,
+                &targets,
+                &interface_members,
+                None,
+                None,
+            )
+            .unwrap_err();
 
             assert_eq!(error.message(), expected_message);
         }
@@ -1089,6 +1070,7 @@ mod tests {
         let structs = build_struct_type_index(&story);
         let enums = build_enum_type_index(&story);
         let targets = build_target_symbol_index(&story);
+        let interface_members = build_interface_member_index(&story);
         let expressions = [
             binary(
                 BinaryOperator::Equals,
@@ -1129,7 +1111,16 @@ mod tests {
 
         for expression in expressions {
             assert_eq!(
-                infer_expression_type(&expression, &scopes, &structs, &enums, &targets, None, None),
+                infer_expression_type(
+                    &expression,
+                    &scopes,
+                    &structs,
+                    &enums,
+                    &targets,
+                    &interface_members,
+                    None,
+                    None,
+                ),
                 Ok(TypeName::bool())
             );
         }
@@ -1146,6 +1137,7 @@ mod tests {
         let structs = build_struct_type_index(&story);
         let enums = build_enum_type_index(&story);
         let targets = build_target_symbol_index(&story);
+        let interface_members = build_interface_member_index(&story);
         let idle = Expression::FieldAccess {
             base: Box::new(variable("State")),
             field: "Idle".to_string(),
@@ -1156,7 +1148,16 @@ mod tests {
         };
 
         assert_eq!(
-            infer_expression_type(&idle, &scopes, &structs, &enums, &targets, None, None),
+            infer_expression_type(
+                &idle,
+                &scopes,
+                &structs,
+                &enums,
+                &targets,
+                &interface_members,
+                None,
+                None,
+            ),
             Ok(TypeName::struct_type("State"))
         );
         assert_eq!(
@@ -1166,6 +1167,7 @@ mod tests {
                 &structs,
                 &enums,
                 &targets,
+                &interface_members,
                 None,
                 None
             ),
@@ -1180,14 +1182,23 @@ mod tests {
         let structs = build_struct_type_index(&story);
         let enums = build_enum_type_index(&story);
         let targets = build_target_symbol_index(&story);
+        let interface_members = build_interface_member_index(&story);
         let missing = Expression::FieldAccess {
             base: Box::new(variable("State")),
             field: "Missing".to_string(),
         };
 
-        let error =
-            infer_expression_type(&missing, &scopes, &structs, &enums, &targets, None, None)
-                .unwrap_err();
+        let error = infer_expression_type(
+            &missing,
+            &scopes,
+            &structs,
+            &enums,
+            &targets,
+            &interface_members,
+            None,
+            None,
+        )
+        .unwrap_err();
 
         assert_eq!(error.message(), "Unknown member 'Missing' in enum 'State'");
     }
@@ -1234,7 +1245,7 @@ mod tests {
 
         for expression in cases {
             assert_eq!(
-                infer_expression_type_with_interfaces(
+                infer_expression_type(
                     &expression,
                     &scopes,
                     &structs,
@@ -1282,7 +1293,7 @@ mod tests {
         ];
 
         for (expression, expected_message) in cases {
-            let error = infer_expression_type_with_interfaces(
+            let error = infer_expression_type(
                 &expression,
                 &scopes,
                 &structs,
@@ -1342,7 +1353,7 @@ mod tests {
 
         for expression in cases {
             assert_eq!(
-                infer_expression_type_with_interfaces(
+                infer_expression_type(
                     &expression,
                     &scopes,
                     &structs,
@@ -1390,7 +1401,7 @@ mod tests {
         ];
 
         for (expression, expected_message) in cases {
-            let error = infer_expression_type_with_interfaces(
+            let error = infer_expression_type(
                 &expression,
                 &scopes,
                 &structs,
@@ -1422,6 +1433,7 @@ mod tests {
         let structs = build_struct_type_index(&story);
         let enums = build_enum_type_index(&story);
         let targets = build_target_symbol_index(&story);
+        let interface_members = build_interface_member_index(&story);
         let cases = [
             (
                 binary(
@@ -1442,9 +1454,17 @@ mod tests {
         ];
 
         for (expression, expected_message) in cases {
-            let error =
-                infer_expression_type(&expression, &scopes, &structs, &enums, &targets, None, None)
-                    .unwrap_err();
+            let error = infer_expression_type(
+                &expression,
+                &scopes,
+                &structs,
+                &enums,
+                &targets,
+                &interface_members,
+                None,
+                None,
+            )
+            .unwrap_err();
 
             assert_eq!(error.message(), expected_message);
         }
@@ -1474,6 +1494,7 @@ mod tests {
         let structs = build_struct_type_index(&story);
         let enums = build_enum_type_index(&story);
         let targets = build_target_symbol_index(&story);
+        let interface_members = build_interface_member_index(&story);
         let cases = [
             (
                 binary(
@@ -1524,9 +1545,17 @@ mod tests {
         ];
 
         for (expression, expected_message) in cases {
-            let error =
-                infer_expression_type(&expression, &scopes, &structs, &enums, &targets, None, None)
-                    .unwrap_err();
+            let error = infer_expression_type(
+                &expression,
+                &scopes,
+                &structs,
+                &enums,
+                &targets,
+                &interface_members,
+                None,
+                None,
+            )
+            .unwrap_err();
 
             assert_eq!(error.message(), expected_message);
         }

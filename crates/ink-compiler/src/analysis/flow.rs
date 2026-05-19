@@ -12,8 +12,7 @@ use super::{
     context::{EnumTypeIndex, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
     enums::{build_enum_type_index, is_enum_member_reference},
     expression_types::{
-        infer_binary_operator_type, infer_expression_type_with_interfaces,
-        typed_builtin_return_type,
+        infer_binary_operator_type, infer_expression_type, typed_builtin_return_type,
     },
     interfaces::{build_interface_member_index, InterfaceMemberIndex},
     span::{first_span_in_weave, object_span},
@@ -297,7 +296,7 @@ impl ConditionTypeChecker<'_> {
         let current_flow_path = context.current_flow_path.as_deref();
         let has_typed_signal = self.has_typed_signal(expression, context);
 
-        match infer_expression_type_with_interfaces(
+        match infer_expression_type(
             expression,
             self.analysis.variable_scopes,
             self.analysis.struct_types,
@@ -329,7 +328,7 @@ impl ConditionTypeChecker<'_> {
         let current_flow_path = context.current_flow_path.as_deref();
         let has_typed_signal = self.has_typed_signal(condition, context);
 
-        match infer_expression_type_with_interfaces(
+        match infer_expression_type(
             condition,
             self.analysis.variable_scopes,
             self.analysis.struct_types,
@@ -762,7 +761,7 @@ impl FunctionFlowControlVisitor<'_> {
         ret: &Return,
         context: &VisitContext,
     ) {
-        match infer_expression_type_with_interfaces(
+        match infer_expression_type(
             expression,
             self.analysis.variable_scopes,
             self.analysis.struct_types,

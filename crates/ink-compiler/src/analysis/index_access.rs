@@ -12,6 +12,7 @@ use super::{
     context::{EnumTypeIndex, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
     enums::build_enum_type_index,
     expression_types::infer_expression_type,
+    interfaces::{build_interface_member_index, InterfaceMemberIndex},
     structs::build_struct_type_index,
     target_symbols::build_target_symbol_index,
     variables::build_variable_scope_index,
@@ -22,11 +23,13 @@ pub(super) fn index_access_diagnostics(story: &Story) -> Vec<Diagnostic> {
     let enum_types = build_enum_type_index(story);
     let variable_scopes = build_variable_scope_index(story);
     let target_symbols = build_target_symbol_index(story);
+    let interface_members = build_interface_member_index(story);
     let mut checker = IndexAccessChecker::new(
         &struct_types,
         &enum_types,
         &variable_scopes,
         &target_symbols,
+        &interface_members,
     );
     walk_story(story, &mut checker);
     checker.diagnostics
@@ -37,6 +40,7 @@ struct IndexAccessChecker<'a> {
     enum_types: &'a EnumTypeIndex,
     variable_scopes: &'a VariableScopeIndex,
     target_symbols: &'a TargetSymbolIndex,
+    interface_members: &'a InterfaceMemberIndex,
     diagnostics: Vec<Diagnostic>,
     covered_index_access_ids: HashSet<usize>,
 }
@@ -47,12 +51,14 @@ impl<'a> IndexAccessChecker<'a> {
         enum_types: &'a EnumTypeIndex,
         variable_scopes: &'a VariableScopeIndex,
         target_symbols: &'a TargetSymbolIndex,
+        interface_members: &'a InterfaceMemberIndex,
     ) -> Self {
         Self {
             struct_types,
             enum_types,
             variable_scopes,
             target_symbols,
+            interface_members,
             diagnostics: Vec::new(),
             covered_index_access_ids: HashSet::new(),
         }
@@ -85,6 +91,7 @@ impl<'a> IndexAccessChecker<'a> {
             self.struct_types,
             self.enum_types,
             self.target_symbols,
+            self.interface_members,
             context.current_module.as_deref(),
             context.current_flow_path.as_deref(),
         ) {
@@ -215,6 +222,26 @@ mod tests {
         );
 
         assert_eq!(index_access_diagnostics(&story), []);
+    }
+
+    #[test]
+    fn resolves_index_reads_from_dynamic_interface_function_results() {
+        let story = parse_story(
+            "=== interface IItem ===\n\
+             == function scores() => int[] ==\n\
+             === module game ===\n\
+             FROM left\n\
+             VAR route: interface<IItem> = left\n\
+             VAR first: int = {route}::scores()[0]\n\
+             == main ==\n\
+             -> END\n\
+             === module left implements IItem ===\n\
+             VAR source_scores: int[] = [10]\n\
+             == function scores() => int[] ==\n\
+             ~ return source_scores",
+        );
+
+        assert_eq!(super::super::run_analysis_passes(&story), []);
     }
 
     #[test]
