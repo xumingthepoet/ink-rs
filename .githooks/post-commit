@@ -1,0 +1,24 @@
+#!/bin/sh
+set -u
+
+if ! command -v codegraph >/dev/null 2>&1; then
+    echo "codegraph not installed; skipping CodeGraph index update"
+    exit 0
+fi
+
+update_codegraph() {
+    if [ -f .codegraph/config.json ]; then
+        codegraph sync --quiet . || {
+            codegraph unlock . >/dev/null 2>&1 || true
+            codegraph sync --quiet .
+        }
+    else
+        codegraph init . >/dev/null && codegraph index --quiet .
+    fi
+}
+
+if ! update_codegraph; then
+    echo "CodeGraph index update failed; continuing after commit"
+fi
+
+exit 0
