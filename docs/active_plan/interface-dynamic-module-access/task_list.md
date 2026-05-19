@@ -195,7 +195,7 @@ Commit record:
 - Review/fix commits: reviewed; no fix commits required; post-review validation: `cargo test -p ink-compiler syntax::type_name`; `cargo test -p ink-compiler parsed::type_name`; `cargo test -p ink-compiler analysis`; `make gate`
 - Completion record commit: this task-list commit
 
-### [ ] Task 05: Parse Dynamic Interface Member Expressions
+### [~] Task 05: Parse Dynamic Interface Member Expressions
 
 Goal: Parse `{expr}::member` and `{expr}::member(args)` as expression forms for dynamic interface access.
 
