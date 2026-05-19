@@ -695,7 +695,7 @@ Commit record:
 
 ## Milestone 4: Runtime Execution And Save Behavior
 
-### [ ] Task 16: Load Dynamic Interface Format Objects Into Runtime
+### [~] Task 16: Load Dynamic Interface Format Objects Into Runtime
 
 Goal: Convert the new format crate dynamic interface objects and interface metadata into runtime execution objects.
 
