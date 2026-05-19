@@ -129,6 +129,8 @@ fn interface_end_to_end_fixture_lowers_dynamic_tokens() {
     use std::fs;
 
     let filename = "interface/end-to-end.ink";
+    common::assert_json_matches_fixture(filename);
+
     let source_path = ink_test::fixture_root().join(filename);
     let source = fs::read_to_string(&source_path)
         .unwrap_or_else(|error| panic!("failed to read {}: {error}", source_path.display()));
