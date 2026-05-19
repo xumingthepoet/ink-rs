@@ -261,9 +261,9 @@ before marking a change done is:
   broad project exploration or cross-crate file hunting.
 - Treat CodeGraph as a navigation index only; verify behavior in source and
   tests. Run CodeGraph commands sequentially to avoid SQLite lock noise.
-- The repo-local post-commit hook refreshes CodeGraph when configured via
-  `core.hooksPath=.githooks`; run `.githooks/post-commit` manually if the index
-  seems stale.
+- The repo-local Git hooks refresh CodeGraph when configured via
+  `core.hooksPath=.githooks`; run `.githooks/update-codegraph-index` manually
+  if the index seems stale.
 - Compare against the official C# implementation when debugging legacy parser or
   export differences that are still meant to be compatible.
 - Use conformance fixtures in `crates/ink-test/` to pin the intended language
