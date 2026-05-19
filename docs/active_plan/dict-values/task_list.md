@@ -169,7 +169,7 @@ Validation:
 
 Commit record: implementation `f6d534a3` (`Infer Dict index access types`)
 
-### [ ] Task 05: Validate Dict Assignment Targets
+### [~] Task 05: Validate Dict Assignment Targets
 
 Goal: Type-check indexed Dict assignments and compound lvalue chains.
 
