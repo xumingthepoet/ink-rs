@@ -1,4 +1,4 @@
-Progress: 15/23
+Progress: 16/23
 
 # Interface-Typed Dynamic Module Access Active Plan
 
@@ -695,7 +695,7 @@ Commit record:
 
 ## Milestone 4: Runtime Execution And Save Behavior
 
-### [>] Task 16: Load Dynamic Interface Format Objects Into Runtime
+### [x] Task 16: Load Dynamic Interface Format Objects Into Runtime
 
 Goal: Convert the new format crate dynamic interface objects and interface metadata into runtime execution objects.
 
@@ -737,8 +737,8 @@ Commit record:
 - Implementation commit: `4cb99adb Load dynamic interface runtime objects`
 - Focused validation: `cargo fmt --all --check`; `cargo check --workspace`; `cargo test -p ink-runtime json`; `cargo test -p ink-story-json-format`; `cargo test -p ink-test --test compiler_snapshots interface`
 - Full validation: `make gate`
-- Review/fix commits: pending
-- Completion record commit: pending
+- Review/fix commits: `b4664371 Cover public dynamic interface story loading`; post-review validation: `cargo fmt --all --check`; `cargo check --workspace`; `cargo test -p ink-runtime json`; `cargo test -p ink-story-json-format`; `cargo test -p ink-test --test compiler_snapshots interface`; `make gate`
+- Completion record commit: this task-list commit
 
 ### [ ] Task 17: Execute Dynamic Interface Knot Targets
 
