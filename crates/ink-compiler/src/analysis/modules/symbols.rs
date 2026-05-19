@@ -9,7 +9,7 @@ use crate::{
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum ModuleSymbolKind {
+pub(in crate::analysis) enum ModuleSymbolKind {
     Knot,
     Function,
     Constant,
@@ -20,7 +20,7 @@ pub(super) enum ModuleSymbolKind {
 }
 
 impl ModuleSymbolKind {
-    fn display_name(self) -> &'static str {
+    pub(in crate::analysis) fn display_name(self) -> &'static str {
         match self {
             Self::Knot => "knot",
             Self::Function => "function",
@@ -34,7 +34,7 @@ impl ModuleSymbolKind {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct ModuleSymbol {
+pub(in crate::analysis) struct ModuleSymbol {
     module: String,
     name: String,
     kind: ModuleSymbolKind,
@@ -45,16 +45,18 @@ pub(super) struct ModuleSymbol {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct ModuleSignature {
+pub(in crate::analysis) struct ModuleSignature {
     parameters: Vec<ModuleParameter>,
     return_type: TypeName,
     has_typed_signature: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct ModuleParameter {
+pub(in crate::analysis) struct ModuleParameter {
     name: String,
     declared_type: Option<TypeName>,
+    is_by_reference: bool,
+    is_divert_target: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -142,27 +144,27 @@ impl ModuleSymbol {
         self
     }
 
-    pub(super) fn module(&self) -> &str {
+    pub(in crate::analysis) fn module(&self) -> &str {
         &self.module
     }
 
-    pub(super) fn name(&self) -> &str {
+    pub(in crate::analysis) fn name(&self) -> &str {
         &self.name
     }
 
-    pub(super) fn kind(&self) -> ModuleSymbolKind {
+    pub(in crate::analysis) fn kind(&self) -> ModuleSymbolKind {
         self.kind
     }
 
-    pub(super) fn span(&self) -> &SourceSpan {
+    pub(in crate::analysis) fn span(&self) -> &SourceSpan {
         &self.span
     }
 
-    pub(super) fn declared_type(&self) -> Option<&TypeName> {
+    pub(in crate::analysis) fn declared_type(&self) -> Option<&TypeName> {
         self.declared_type.as_ref()
     }
 
-    pub(super) fn signature(&self) -> Option<&ModuleSignature> {
+    pub(in crate::analysis) fn signature(&self) -> Option<&ModuleSignature> {
         self.signature.as_ref()
     }
 
@@ -191,7 +193,7 @@ impl ModuleSignature {
                 .iter()
                 .zip(external.argument_types())
                 .map(|(name, declared_type)| {
-                    ModuleParameter::new(name.clone(), Some(declared_type.clone()))
+                    ModuleParameter::new(name.clone(), Some(declared_type.clone()), false, false)
                 })
                 .collect(),
             return_type: external.return_type().clone(),
@@ -199,37 +201,57 @@ impl ModuleSignature {
         }
     }
 
-    pub(super) fn parameters(&self) -> &[ModuleParameter] {
+    pub(in crate::analysis) fn parameters(&self) -> &[ModuleParameter] {
         &self.parameters
     }
 
-    pub(super) fn return_type(&self) -> &TypeName {
+    pub(in crate::analysis) fn return_type(&self) -> &TypeName {
         &self.return_type
     }
 
-    pub(super) fn has_typed_signature(&self) -> bool {
+    pub(in crate::analysis) fn has_typed_signature(&self) -> bool {
         self.has_typed_signature
     }
 }
 
 impl ModuleParameter {
-    fn new(name: impl Into<String>, declared_type: Option<TypeName>) -> Self {
+    fn new(
+        name: impl Into<String>,
+        declared_type: Option<TypeName>,
+        is_by_reference: bool,
+        is_divert_target: bool,
+    ) -> Self {
         Self {
             name: name.into(),
             declared_type,
+            is_by_reference,
+            is_divert_target,
         }
     }
 
     fn from_flow_argument(argument: &FlowArgument) -> Self {
-        Self::new(argument.name(), argument.declared_type().cloned())
+        Self::new(
+            argument.name(),
+            argument.declared_type().cloned(),
+            argument.is_by_reference(),
+            argument.is_divert_target(),
+        )
     }
 
-    pub(super) fn name(&self) -> &str {
+    pub(in crate::analysis) fn name(&self) -> &str {
         &self.name
     }
 
-    pub(super) fn declared_type(&self) -> Option<&TypeName> {
+    pub(in crate::analysis) fn declared_type(&self) -> Option<&TypeName> {
         self.declared_type.as_ref()
+    }
+
+    pub(in crate::analysis) fn is_by_reference(&self) -> bool {
+        self.is_by_reference
+    }
+
+    pub(in crate::analysis) fn is_divert_target(&self) -> bool {
+        self.is_divert_target
     }
 }
 
@@ -269,11 +291,11 @@ impl ModuleSymbolIndex {
             .push(symbol);
     }
 
-    pub(super) fn get(&self, module: &str, name: &str) -> Option<&ModuleSymbol> {
+    pub(in crate::analysis) fn get(&self, module: &str, name: &str) -> Option<&ModuleSymbol> {
         self.symbols_named(module, name).first()
     }
 
-    pub(super) fn symbols_named(&self, module: &str, name: &str) -> &[ModuleSymbol] {
+    pub(in crate::analysis) fn symbols_named(&self, module: &str, name: &str) -> &[ModuleSymbol] {
         self.symbols_by_module
             .get(module)
             .and_then(|symbols| symbols.get(name))

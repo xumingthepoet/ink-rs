@@ -3,10 +3,15 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::{
     diagnostic::Diagnostic,
     parsed::{
-        ContentList, ExternalDeclaration, Flow, InterfaceDeclaration, Object, Story, TypeName,
-        Weave,
+        ContentList, ExternalDeclaration, Flow, FlowArgument, ImplementedInterface,
+        InterfaceDeclaration, InterfaceMemberKind, InterfaceMemberSignature, Module, Object, Story,
+        TypeName, Weave,
     },
     source::SourceSpan,
+};
+
+use super::modules::{
+    ModuleParameter, ModuleSignature, ModuleSymbol, ModuleSymbolIndex, ModuleSymbolKind,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -30,6 +35,40 @@ pub(super) fn interface_diagnostics(story: &Story) -> Vec<Diagnostic> {
         &collect_non_interface_declarations(story),
     ));
     diagnostics.extend(unknown_interface_type_diagnostics(story, &index));
+    sort_diagnostics(&mut diagnostics);
+    diagnostics
+}
+
+pub(super) fn interface_implementation_diagnostics(
+    story: &Story,
+    module_symbols: &ModuleSymbolIndex,
+) -> Vec<Diagnostic> {
+    let interfaces = interface_declarations_by_name(story);
+    let mut diagnostics = Vec::new();
+
+    for module in story.modules() {
+        for implemented_interface in module.implemented_interfaces() {
+            let Some(interface) = interfaces.get(implemented_interface.name()) else {
+                diagnostics.push(Diagnostic::error(
+                    implemented_interface.span().clone(),
+                    format!(
+                        "Module '{}' implements unknown interface '{}'",
+                        module.name(),
+                        implemented_interface.name()
+                    ),
+                ));
+                continue;
+            };
+            validate_module_implementation(
+                module,
+                implemented_interface,
+                interface,
+                module_symbols,
+                &mut diagnostics,
+            );
+        }
+    }
+
     sort_diagnostics(&mut diagnostics);
     diagnostics
 }
@@ -116,6 +155,243 @@ fn unknown_interface_type_diagnostics(story: &Story, index: &InterfaceIndex) -> 
             )
         })
         .collect()
+}
+
+fn interface_declarations_by_name(story: &Story) -> BTreeMap<&str, &InterfaceDeclaration> {
+    let mut interfaces = BTreeMap::new();
+    for interface in story.interfaces() {
+        interfaces.entry(interface.name()).or_insert(interface);
+    }
+    interfaces
+}
+
+fn validate_module_implementation(
+    module: &Module,
+    implemented_interface: &ImplementedInterface,
+    interface: &InterfaceDeclaration,
+    module_symbols: &ModuleSymbolIndex,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    for member in interface.members() {
+        validate_interface_member_implementation(
+            module,
+            implemented_interface,
+            interface,
+            member,
+            module_symbols,
+            diagnostics,
+        );
+    }
+}
+
+fn validate_interface_member_implementation(
+    module: &Module,
+    implemented_interface: &ImplementedInterface,
+    interface: &InterfaceDeclaration,
+    member: &InterfaceMemberSignature,
+    module_symbols: &ModuleSymbolIndex,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    let candidates = module_symbols.symbols_named(module.name(), member.name());
+    let expected_kind = expected_module_symbol_kind(member.kind());
+    let Some(symbol) = candidates
+        .iter()
+        .find(|candidate| candidate.kind() == expected_kind)
+    else {
+        if let Some(candidate) = candidates.first() {
+            diagnostics.push(wrong_interface_member_kind_diagnostic(
+                module, interface, member, candidate,
+            ));
+        } else {
+            diagnostics.push(Diagnostic::error(
+                implemented_interface.span().clone(),
+                format!(
+                    "Module '{}' is missing {} '{}' required by interface '{}'",
+                    module.name(),
+                    interface_member_kind_name(member.kind()),
+                    member.name(),
+                    interface.name()
+                ),
+            ));
+        }
+        return;
+    };
+
+    let Some(signature) = symbol.signature() else {
+        diagnostics.push(wrong_interface_member_kind_diagnostic(
+            module, interface, member, symbol,
+        ));
+        return;
+    };
+    validate_member_signature(module, interface, member, symbol, signature, diagnostics);
+}
+
+fn wrong_interface_member_kind_diagnostic(
+    module: &Module,
+    interface: &InterfaceDeclaration,
+    member: &InterfaceMemberSignature,
+    symbol: &ModuleSymbol,
+) -> Diagnostic {
+    if member.kind() == &InterfaceMemberKind::Function
+        && symbol.kind() == ModuleSymbolKind::External
+    {
+        return Diagnostic::error(
+            symbol.span().clone(),
+            format!(
+                "External '{}' in module '{}' cannot implement function '{}' required by interface '{}'",
+                symbol.name(),
+                module.name(),
+                member.name(),
+                interface.name()
+            ),
+        );
+    }
+
+    Diagnostic::error(
+        symbol.span().clone(),
+        format!(
+            "Module '{}' defines {} '{}' but interface '{}' requires a {}",
+            module.name(),
+            symbol.kind().display_name(),
+            symbol.name(),
+            interface.name(),
+            interface_member_kind_name(member.kind())
+        ),
+    )
+}
+
+fn validate_member_signature(
+    module: &Module,
+    interface: &InterfaceDeclaration,
+    member: &InterfaceMemberSignature,
+    symbol: &ModuleSymbol,
+    signature: &ModuleSignature,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    if member.arguments().len() != signature.parameters().len() {
+        diagnostics.push(Diagnostic::error(
+            symbol.span().clone(),
+            format!(
+                "Module '{}' {} '{}' has {} parameters but interface '{}' requires {}",
+                module.name(),
+                interface_member_kind_name(member.kind()),
+                member.name(),
+                signature.parameters().len(),
+                interface.name(),
+                member.arguments().len()
+            ),
+        ));
+        return;
+    }
+
+    for (index, (expected, actual)) in member
+        .arguments()
+        .iter()
+        .zip(signature.parameters())
+        .enumerate()
+    {
+        validate_member_parameter(
+            module,
+            interface,
+            member,
+            symbol,
+            index,
+            expected,
+            actual,
+            diagnostics,
+        );
+    }
+
+    let expected_return_type = member.return_type().cloned().unwrap_or_else(TypeName::void);
+    if signature.return_type() != &expected_return_type {
+        diagnostics.push(Diagnostic::error(
+            symbol.span().clone(),
+            format!(
+                "Module '{}' {} '{}' returns {} but interface '{}' requires {}",
+                module.name(),
+                interface_member_kind_name(member.kind()),
+                member.name(),
+                signature.return_type(),
+                interface.name(),
+                expected_return_type
+            ),
+        ));
+    }
+}
+
+fn validate_member_parameter(
+    module: &Module,
+    interface: &InterfaceDeclaration,
+    member: &InterfaceMemberSignature,
+    symbol: &ModuleSymbol,
+    parameter_index: usize,
+    expected: &FlowArgument,
+    actual: &ModuleParameter,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    if expected.is_by_reference() != actual.is_by_reference()
+        || expected.is_divert_target() != actual.is_divert_target()
+    {
+        diagnostics.push(Diagnostic::error(
+            symbol.span().clone(),
+            format!(
+                "Module '{}' {} '{}' parameter {} is a {} parameter but interface '{}' requires a {} parameter",
+                module.name(),
+                interface_member_kind_name(member.kind()),
+                member.name(),
+                parameter_index + 1,
+                parameter_shape_name(actual.is_by_reference(), actual.is_divert_target()),
+                interface.name(),
+                parameter_shape_name(expected.is_by_reference(), expected.is_divert_target())
+            ),
+        ));
+    }
+
+    if actual.declared_type() != expected.declared_type() {
+        diagnostics.push(Diagnostic::error(
+            symbol.span().clone(),
+            format!(
+                "Module '{}' {} '{}' parameter {} has type {} but interface '{}' requires {}",
+                module.name(),
+                interface_member_kind_name(member.kind()),
+                member.name(),
+                parameter_index + 1,
+                optional_type_name(actual.declared_type()),
+                interface.name(),
+                optional_type_name(expected.declared_type())
+            ),
+        ));
+    }
+}
+
+fn expected_module_symbol_kind(kind: &InterfaceMemberKind) -> ModuleSymbolKind {
+    match kind {
+        InterfaceMemberKind::Knot => ModuleSymbolKind::Knot,
+        InterfaceMemberKind::Function => ModuleSymbolKind::Function,
+    }
+}
+
+fn interface_member_kind_name(kind: &InterfaceMemberKind) -> &'static str {
+    match kind {
+        InterfaceMemberKind::Knot => "knot",
+        InterfaceMemberKind::Function => "function",
+    }
+}
+
+fn parameter_shape_name(is_by_reference: bool, is_divert_target: bool) -> &'static str {
+    if is_divert_target {
+        "divert target"
+    } else if is_by_reference {
+        "reference"
+    } else {
+        "value"
+    }
+}
+
+fn optional_type_name(type_name: Option<&TypeName>) -> String {
+    type_name
+        .map(ToString::to_string)
+        .unwrap_or_else(|| "untyped".to_string())
 }
 
 #[derive(Debug, Clone)]
@@ -462,5 +738,119 @@ mod tests {
             DiagnosticSeverity::Error,
             "Interface 'IItem' conflicts with module 'IItem'",
         );
+    }
+
+    fn implementation_diagnostics(story: &Story) -> Vec<Diagnostic> {
+        let module_symbols = super::super::modules::build_module_symbol_index(story);
+        interface_implementation_diagnostics(story, &module_symbols)
+    }
+
+    #[test]
+    fn accepts_matching_module_interface_implementations() {
+        let story = parse_story(
+            "=== interface IItem ===\n\
+             == target(amount: int) ==\n\
+             === interface IOther ===\n\
+             == function score(amount: int) => int ==\n\
+             === module left implements IItem, IOther ===\n\
+             == target(amount: int) ==\n\
+             -> END\n\
+             == function score(amount: int) => int ==\n\
+             ~ return amount",
+        );
+
+        let diagnostics = implementation_diagnostics(&story);
+
+        assert!(diagnostics.is_empty(), "{diagnostics:#?}");
+    }
+
+    #[test]
+    fn reports_unknown_implemented_interfaces() {
+        let story = parse_story("=== module left implements IMissing ===");
+
+        let diagnostics = implementation_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Module 'left' implements unknown interface 'IMissing'",
+        );
+    }
+
+    #[test]
+    fn reports_missing_interface_members() {
+        let story = parse_story(
+            "=== interface IItem ===\n\
+             == target ==\n\
+             === module left implements IItem ===",
+        );
+
+        let diagnostics = implementation_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Module 'left' is missing knot 'target' required by interface 'IItem'",
+        );
+    }
+
+    #[test]
+    fn reports_wrong_member_kinds_and_external_implementations() {
+        let story = parse_story(
+            "=== interface IItem ===\n\
+             == target ==\n\
+             == function score() => int ==\n\
+             === module left implements IItem ===\n\
+             EXTERNAL score() => int\n\
+             == function target() => void ==\n\
+             ~ return",
+        );
+
+        let diagnostics = implementation_diagnostics(&story);
+
+        assert_eq!(diagnostics.len(), 2, "{diagnostics:#?}");
+        assert!(diagnostics.iter().any(|diagnostic| {
+            diagnostic.severity == DiagnosticSeverity::Error
+                && diagnostic.message
+                    == "Module 'left' defines function 'target' but interface 'IItem' requires a knot"
+        }));
+        assert!(diagnostics.iter().any(|diagnostic| {
+            diagnostic.severity == DiagnosticSeverity::Error
+                && diagnostic.message
+                    == "External 'score' in module 'left' cannot implement function 'score' required by interface 'IItem'"
+        }));
+    }
+
+    #[test]
+    fn reports_interface_signature_mismatches() {
+        let story = parse_story(
+            "=== interface IItem ===\n\
+             == target(amount: int, label: string) ==\n\
+             == function score(amount: int) => int ==\n\
+             === module left implements IItem ===\n\
+             == target(amount: string) ==\n\
+             -> END\n\
+             == function score(amount: string) => string ==\n\
+             ~ return amount",
+        );
+
+        let diagnostics = implementation_diagnostics(&story);
+
+        assert_eq!(diagnostics.len(), 3, "{diagnostics:#?}");
+        assert!(diagnostics.iter().any(|diagnostic| {
+            diagnostic.severity == DiagnosticSeverity::Error
+                && diagnostic.message
+                    == "Module 'left' knot 'target' has 1 parameters but interface 'IItem' requires 2"
+        }));
+        assert!(diagnostics.iter().any(|diagnostic| {
+            diagnostic.severity == DiagnosticSeverity::Error
+                && diagnostic.message
+                    == "Module 'left' function 'score' parameter 1 has type string but interface 'IItem' requires int"
+        }));
+        assert!(diagnostics.iter().any(|diagnostic| {
+            diagnostic.severity == DiagnosticSeverity::Error
+                && diagnostic.message
+                    == "Module 'left' function 'score' returns string but interface 'IItem' requires int"
+        }));
     }
 }

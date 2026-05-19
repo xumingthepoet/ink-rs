@@ -32,7 +32,7 @@ use field_access::field_access_diagnostics;
 use flow::flow_diagnostics;
 use index_access::index_access_diagnostics;
 use initializers::variable_initializer_diagnostics;
-use interfaces::interface_diagnostics;
+use interfaces::{interface_diagnostics, interface_implementation_diagnostics};
 use names::naming_diagnostics;
 use struct_literals::struct_literal_diagnostics;
 use structs::struct_type_diagnostics;
@@ -113,6 +113,10 @@ fn run_analysis_passes_with_modules(
     diagnostics.extend(struct_type_diagnostics(story));
     diagnostics.extend(interface_diagnostics(story));
     diagnostics.extend(modules::module_symbol_diagnostics(
+        story,
+        &module_analysis.symbols,
+    ));
+    diagnostics.extend(interface_implementation_diagnostics(
         story,
         &module_analysis.symbols,
     ));

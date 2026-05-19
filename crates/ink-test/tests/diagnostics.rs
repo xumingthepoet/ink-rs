@@ -118,6 +118,23 @@ fn interface_analysis_diagnostics_report_names_and_unknown_types() {
 }
 
 #[test]
+fn interface_implementation_diagnostics_report_contract_errors() {
+    let diagnostics = diagnostics_for_fixture("diagnostics/interface-implementation.ink");
+
+    for message in [
+        "Module 'unknown' implements unknown interface 'IMissing'",
+        "Module 'missing' is missing knot 'target' required by interface 'IItem'",
+        "Module 'wrongKind' defines function 'target' but interface 'IItem' requires a knot",
+        "Module 'wrongSignature' knot 'target' parameter 1 has type string but interface 'IItem' requires int",
+        "Module 'wrongSignature' function 'score' parameter 1 has type string but interface 'IItem' requires int",
+        "Module 'wrongSignature' function 'score' returns string but interface 'IItem' requires int",
+        "External 'score' in module 'externalImpl' cannot implement function 'score' required by interface 'IItem'",
+    ] {
+        assert_diagnostic(&diagnostics, DiagnosticSeverity::Error, message);
+    }
+}
+
+#[test]
 fn imports_diagnostics_report_obsolete_import_syntax() {
     let diagnostics = diagnostics_for_fixture("diagnostics/imports-obsolete.ink");
 

@@ -21,9 +21,10 @@ pub(in crate::analysis) use entry_point::{
 pub(in crate::analysis) use imports::module_import_diagnostics;
 pub use imports::{build_module_import_index, ModuleImportIndex};
 pub use symbols::ModuleSymbolIndex;
-#[cfg(test)]
-use symbols::ModuleSymbolKind;
-pub(in crate::analysis) use symbols::{build_module_symbol_index, module_symbol_diagnostics};
+pub(in crate::analysis) use symbols::{
+    build_module_symbol_index, module_symbol_diagnostics, ModuleParameter, ModuleSignature,
+    ModuleSymbol, ModuleSymbolKind,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(in crate::analysis) struct ModuleAnalysis {
