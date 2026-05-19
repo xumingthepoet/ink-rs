@@ -240,7 +240,7 @@ Commit record:
 
 ## Milestone 2: Interface Analysis And Type Semantics
 
-### [ ] Task 06: Index Interface Declarations And Names
+### [~] Task 06: Index Interface Declarations And Names
 
 Goal: Make interface declarations participate in compiler analysis with explicit namespace and duplicate diagnostics.
 
