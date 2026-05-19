@@ -212,6 +212,7 @@ impl<'a> ArrayLiteralChecker<'a> {
             }
             (TypeName::Struct(_), _)
             | (TypeName::QualifiedStruct(_), _)
+            | (TypeName::Interface { .. }, _)
             | (TypeName::Primitive(_), _) => {
                 self.check_exact_expression_type(
                     element,
@@ -396,7 +397,10 @@ impl<'a> ArrayLiteralChecker<'a> {
                         );
                     }
                 }
-                (StructLiteralMode::ArraysOnly, TypeName::Primitive(_) | TypeName::Void) => {}
+                (
+                    StructLiteralMode::ArraysOnly,
+                    TypeName::Primitive(_) | TypeName::Interface { .. } | TypeName::Void,
+                ) => {}
             }
         }
     }

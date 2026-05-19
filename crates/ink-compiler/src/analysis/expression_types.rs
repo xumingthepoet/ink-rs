@@ -583,7 +583,10 @@ fn is_numeric_type(type_name: &TypeName) -> bool {
 
 fn supports_equality(type_name: &TypeName) -> bool {
     match type_name {
-        TypeName::Primitive(_) | TypeName::Struct(_) | TypeName::QualifiedStruct(_) => true,
+        TypeName::Primitive(_)
+        | TypeName::Struct(_)
+        | TypeName::QualifiedStruct(_)
+        | TypeName::Interface { .. } => true,
         TypeName::Array(element_type) => supports_equality(element_type),
         TypeName::Void => false,
     }

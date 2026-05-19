@@ -129,7 +129,10 @@ pub(super) fn type_name_is_enum(
     match type_name {
         TypeName::Struct(name) => index.contains_key(&scoped_enum_name(current_module, name)),
         TypeName::QualifiedStruct(name) => index.contains_key(name.as_str()),
-        TypeName::Primitive(_) | TypeName::Void | TypeName::Array(_) => false,
+        TypeName::Primitive(_)
+        | TypeName::Interface { .. }
+        | TypeName::Void
+        | TypeName::Array(_) => false,
     }
 }
 

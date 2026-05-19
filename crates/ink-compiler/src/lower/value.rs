@@ -314,7 +314,10 @@ fn resolve_enum_definition_name_for_type(
                 .unwrap_or_else(|| name.clone()),
         ),
         TypeName::QualifiedStruct(name) => Some(name.as_str().to_string()),
-        TypeName::Primitive(_) | TypeName::Void | TypeName::Array(_) => None,
+        TypeName::Primitive(_)
+        | TypeName::Interface { .. }
+        | TypeName::Void
+        | TypeName::Array(_) => None,
     }
 }
 

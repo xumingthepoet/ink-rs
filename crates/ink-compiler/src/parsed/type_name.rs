@@ -1,14 +1,72 @@
-use std::fmt;
+use std::{
+    fmt,
+    hash::{Hash, Hasher},
+};
+
+use crate::source::SourceSpan;
 
 use super::QualifiedName;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone)]
 pub enum TypeName {
     Primitive(PrimitiveType),
     Struct(String),
     QualifiedStruct(QualifiedName),
+    Interface {
+        name: String,
+        name_span: SourceSpan,
+        span: SourceSpan,
+    },
     Void,
     Array(Box<TypeName>),
+}
+
+impl PartialEq for TypeName {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Primitive(left), Self::Primitive(right)) => left == right,
+            (Self::Struct(left), Self::Struct(right)) => left == right,
+            (Self::QualifiedStruct(left), Self::QualifiedStruct(right)) => left == right,
+            (Self::Interface { name: left, .. }, Self::Interface { name: right, .. }) => {
+                left == right
+            }
+            (Self::Void, Self::Void) => true,
+            (Self::Array(left), Self::Array(right)) => left == right,
+            _ => false,
+        }
+    }
+}
+
+impl Eq for TypeName {}
+
+impl Hash for TypeName {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        match self {
+            Self::Primitive(primitive) => {
+                0_u8.hash(state);
+                primitive.hash(state);
+            }
+            Self::Struct(name) => {
+                1_u8.hash(state);
+                name.hash(state);
+            }
+            Self::QualifiedStruct(name) => {
+                2_u8.hash(state);
+                name.hash(state);
+            }
+            Self::Interface { name, .. } => {
+                3_u8.hash(state);
+                name.hash(state);
+            }
+            Self::Void => {
+                4_u8.hash(state);
+            }
+            Self::Array(element_type) => {
+                5_u8.hash(state);
+                element_type.hash(state);
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -63,6 +121,18 @@ impl TypeName {
         Self::QualifiedStruct(name)
     }
 
+    pub fn interface_type(
+        name: impl Into<String>,
+        name_span: SourceSpan,
+        span: SourceSpan,
+    ) -> Self {
+        Self::Interface {
+            name: name.into(),
+            name_span,
+            span,
+        }
+    }
+
     pub fn array(element_type: TypeName) -> Self {
         Self::Array(Box::new(element_type))
     }
@@ -90,6 +160,27 @@ impl TypeName {
         }
     }
 
+    pub fn as_interface_name(&self) -> Option<&str> {
+        match self {
+            Self::Interface { name, .. } => Some(name),
+            _ => None,
+        }
+    }
+
+    pub fn interface_name_span(&self) -> Option<&SourceSpan> {
+        match self {
+            Self::Interface { name_span, .. } => Some(name_span),
+            _ => None,
+        }
+    }
+
+    pub fn interface_span(&self) -> Option<&SourceSpan> {
+        match self {
+            Self::Interface { span, .. } => Some(span),
+            _ => None,
+        }
+    }
+
     pub fn primitive_type(&self) -> Option<PrimitiveType> {
         match self {
             Self::Primitive(primitive) => Some(*primitive),
@@ -112,6 +203,7 @@ impl fmt::Display for TypeName {
             Self::Primitive(primitive) => primitive.fmt(formatter),
             Self::Struct(name) => formatter.write_str(name),
             Self::QualifiedStruct(name) => formatter.write_str(name.as_str()),
+            Self::Interface { name, .. } => write!(formatter, "interface<{name}>"),
             Self::Void => formatter.write_str("void"),
             Self::Array(element_type) => write!(formatter, "{element_type}[]"),
         }
@@ -147,6 +239,7 @@ impl DefaultValue {
             TypeName::QualifiedStruct(type_name) => Some(Self::Struct {
                 type_name: type_name.as_str().to_string(),
             }),
+            TypeName::Interface { .. } => None,
             TypeName::Void => None,
         }
     }
@@ -169,6 +262,8 @@ impl DefaultValue {
 
 #[cfg(test)]
 mod tests {
+    use crate::source::SourceSpan;
+
     use super::{DefaultValue, PrimitiveType, TypeName};
 
     #[test]
@@ -199,6 +294,32 @@ mod tests {
         assert_eq!(player_array.display_name(), "Player[]");
         assert_eq!(nested_int_array.display_name(), "int[][]");
         assert_eq!(nested_int_array.snapshot_name(), "int[][]");
+    }
+
+    #[test]
+    fn displays_interface_type_names() {
+        let interface_type = TypeName::interface_type("IItem", span_at(1, 11), span_at(1, 1));
+        let interface_array = TypeName::array(interface_type.clone());
+
+        assert_eq!(interface_type.display_name(), "interface<IItem>");
+        assert_eq!(interface_type.snapshot_name(), "interface<IItem>");
+        assert_eq!(interface_type.to_string(), "interface<IItem>");
+        assert_eq!(interface_array.display_name(), "interface<IItem>[]");
+        assert_eq!(interface_type.as_interface_name(), Some("IItem"));
+        assert_eq!(interface_type.interface_name_span(), Some(&span_at(1, 11)));
+        assert_eq!(interface_type.interface_span(), Some(&span_at(1, 1)));
+    }
+
+    #[test]
+    fn interface_type_equality_ignores_source_spans() {
+        let first = TypeName::interface_type("IItem", span_at(1, 11), span_at(1, 1));
+        let second = TypeName::interface_type("IItem", span_at(20, 5), span_at(20, 1));
+
+        assert_eq!(first, second);
+        assert_ne!(
+            first,
+            TypeName::interface_type("IOther", span_at(1, 11), span_at(1, 1))
+        );
     }
 
     #[test]
@@ -242,6 +363,10 @@ mod tests {
 
         assert_eq!(TypeName::void().default_value(), None);
         assert_eq!(TypeName::divert_target().default_value(), None);
+        assert_eq!(
+            TypeName::interface_type("IItem", span_at(1, 11), span_at(1, 1)).default_value(),
+            None
+        );
     }
 
     #[test]
@@ -277,5 +402,9 @@ mod tests {
         );
         assert_eq!(default_value.type_name(), TypeName::struct_type("Player"));
         assert!(default_value.is_abstract_struct());
+    }
+
+    fn span_at(line: usize, column: usize) -> SourceSpan {
+        SourceSpan::new(Some("types.ink".to_string()), line, column)
     }
 }

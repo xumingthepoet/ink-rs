@@ -205,7 +205,7 @@ fn referenced_named_type_names(
             vec![(name.as_str().to_string(), name.as_str().to_string())]
         }
         TypeName::Array(element_type) => referenced_named_type_names(element_type, current_module),
-        TypeName::Primitive(_) | TypeName::Void => Vec::new(),
+        TypeName::Primitive(_) | TypeName::Interface { .. } | TypeName::Void => Vec::new(),
     }
 }
 

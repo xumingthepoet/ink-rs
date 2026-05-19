@@ -25,6 +25,7 @@ pub(super) fn parse_type_name(parser: &mut RuleParser<'_>) -> Option<TypeName> {
                 "bool" => TypeName::bool(),
                 "string" => TypeName::string(),
                 "void" => TypeName::void(),
+                "interface" => parse_interface_type_name(parser, name_span)?,
                 _ => {
                     if parser.match_string("::").is_some() {
                         let Some((symbol, symbol_span)) = identifier_with_span(parser) else {
@@ -61,6 +62,55 @@ pub(super) fn parse_type_name(parser: &mut RuleParser<'_>) -> Option<TypeName> {
 
         Some(type_name)
     })
+}
+
+fn parse_interface_type_name(parser: &mut RuleParser<'_>, span: SourceSpan) -> Option<TypeName> {
+    if parser.match_string("<").is_none() {
+        parser.error("Interface type names must use `interface<Name>`");
+        parser.skip_to_end();
+        return None;
+    }
+
+    parser.skip_horizontal_whitespace();
+    let name_span = parser.current_span();
+    let Some(name) = parser.take_while(|ch| !ch.is_whitespace() && ch != '>') else {
+        parser.diagnostic(crate::diagnostic::Diagnostic::error(
+            name_span,
+            "Interface type names must include an interface name",
+        ));
+        parser.skip_to_end();
+        return None;
+    };
+
+    if name.contains('.') {
+        parser.diagnostic(crate::diagnostic::Diagnostic::error(
+            name_span,
+            "Interface type names must use a single interface identifier",
+        ));
+        parser.skip_to_end();
+        return None;
+    }
+
+    if !is_identifier(&name) {
+        parser.diagnostic(crate::diagnostic::Diagnostic::error(
+            name_span,
+            "Interface type names must use a single interface identifier",
+        ));
+        parser.skip_to_end();
+        return None;
+    }
+
+    parser.skip_horizontal_whitespace();
+    if parser.match_string(">").is_none() {
+        parser.diagnostic(crate::diagnostic::Diagnostic::error(
+            parser.current_span(),
+            "Interface type names must close with `>`",
+        ));
+        parser.skip_to_end();
+        return None;
+    }
+
+    Some(TypeName::interface_type(name, name_span, span))
 }
 
 fn identifier_with_span(parser: &mut RuleParser<'_>) -> Option<(String, SourceSpan)> {
@@ -154,6 +204,28 @@ mod tests {
     }
 
     #[test]
+    fn parses_interface_type_names_with_spans() {
+        let (parsed, remainder, diagnostics) = parse_type_name_text("interface<IItem>[]");
+
+        assert_eq!(remainder, "");
+        assert!(diagnostics.is_empty(), "{diagnostics:#?}");
+        let Some(TypeName::Array(element_type)) = parsed else {
+            panic!("expected array type");
+        };
+        let TypeName::Interface {
+            name,
+            name_span,
+            span,
+        } = element_type.as_ref()
+        else {
+            panic!("expected interface type");
+        };
+        assert_eq!(name, "IItem");
+        assert_eq!(span.column, 1);
+        assert_eq!(name_span.column, 11);
+    }
+
+    #[test]
     fn reports_invalid_type_syntax() {
         let cases = [
             ("", "Expected type name but saw end of line"),
@@ -161,6 +233,22 @@ mod tests {
             ("123", "Expected type name but saw '123'"),
             ("items::", "Expected symbol name after `items::`"),
             ("int[", "Expected ']' but saw end of line"),
+            (
+                "interface",
+                "Interface type names must use `interface<Name>`",
+            ),
+            (
+                "interface<>",
+                "Interface type names must include an interface name",
+            ),
+            (
+                "interface<123>",
+                "Interface type names must use a single interface identifier",
+            ),
+            (
+                "interface<IItem",
+                "Interface type names must close with `>`",
+            ),
         ];
 
         for (source, expected_message) in cases {
