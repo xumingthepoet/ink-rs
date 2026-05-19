@@ -132,6 +132,7 @@ pub(super) fn type_name_is_enum(
         TypeName::Primitive(_)
         | TypeName::Interface { .. }
         | TypeName::Void
+        | TypeName::Dict { .. }
         | TypeName::Array(_) => false,
     }
 }
@@ -144,6 +145,9 @@ pub(super) fn type_name_contains_enum(
     match type_name {
         TypeName::Array(element_type) => {
             type_name_contains_enum(element_type, index, current_module)
+        }
+        TypeName::Dict { value_type, .. } => {
+            type_name_contains_enum(value_type, index, current_module)
         }
         _ => type_name_is_enum(type_name, index, current_module),
     }

@@ -663,6 +663,7 @@ fn supports_equality(type_name: &TypeName) -> bool {
         | TypeName::QualifiedStruct(_)
         | TypeName::Interface { .. } => true,
         TypeName::Array(element_type) => supports_equality(element_type),
+        TypeName::Dict { value_type, .. } => supports_equality(value_type),
         TypeName::Void => false,
     }
 }

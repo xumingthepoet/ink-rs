@@ -458,6 +458,10 @@ fn qualify_type_name_for_module(type_name: &TypeName, module: &str) -> TypeName 
         TypeName::Array(element_type) => {
             TypeName::array(qualify_type_name_for_module(element_type, module))
         }
+        TypeName::Dict {
+            key_type,
+            value_type,
+        } => TypeName::dict(*key_type, qualify_type_name_for_module(value_type, module)),
         TypeName::Primitive(_)
         | TypeName::QualifiedStruct(_)
         | TypeName::Interface { .. }

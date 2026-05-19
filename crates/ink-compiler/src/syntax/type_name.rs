@@ -1,5 +1,5 @@
 use crate::{
-    parsed::{QualifiedName, TypeName},
+    parsed::{PrimitiveType, QualifiedName, TypeName},
     source::SourceSpan,
 };
 
@@ -26,6 +26,7 @@ pub(super) fn parse_type_name(parser: &mut RuleParser<'_>) -> Option<TypeName> {
                 "string" => TypeName::string(),
                 "void" => TypeName::void(),
                 "interface" => parse_interface_type_name(parser, name_span)?,
+                "Dict" => parse_dict_type_name(parser)?,
                 _ => {
                     if parser.match_string("::").is_some() {
                         let Some((symbol, symbol_span)) = identifier_with_span(parser) else {
@@ -62,6 +63,59 @@ pub(super) fn parse_type_name(parser: &mut RuleParser<'_>) -> Option<TypeName> {
 
         Some(type_name)
     })
+}
+
+fn parse_dict_type_name(parser: &mut RuleParser<'_>) -> Option<TypeName> {
+    if parser.match_string("<").is_none() {
+        parser.error("Dict type names must use `Dict<key, value>`");
+        parser.skip_to_end();
+        return None;
+    }
+
+    let key_type = parse_dict_key_type(parser)?;
+
+    parser.skip_horizontal_whitespace();
+    if parser.match_string(",").is_none() {
+        parser.diagnostic(crate::diagnostic::Diagnostic::error(
+            parser.current_span(),
+            "Dict type names must separate key and value types with `,`",
+        ));
+        parser.skip_to_end();
+        return None;
+    }
+
+    let value_type = parse_type_name(parser)?;
+
+    parser.skip_horizontal_whitespace();
+    if parser.match_string(">").is_none() {
+        parser.diagnostic(crate::diagnostic::Diagnostic::error(
+            parser.current_span(),
+            "Dict type names must close with `>`",
+        ));
+        parser.skip_to_end();
+        return None;
+    }
+
+    Some(TypeName::dict(key_type, value_type))
+}
+
+fn parse_dict_key_type(parser: &mut RuleParser<'_>) -> Option<PrimitiveType> {
+    let key_type = parse_type_name(parser)?;
+    match key_type {
+        TypeName::Primitive(PrimitiveType::String) => Some(PrimitiveType::String),
+        TypeName::Primitive(PrimitiveType::Int) => Some(PrimitiveType::Int),
+        _ => {
+            parser.diagnostic(crate::diagnostic::Diagnostic::error(
+                parser.current_span(),
+                format!(
+                    "Dict key type must be string or int, got {}",
+                    key_type.display_name()
+                ),
+            ));
+            parser.skip_to_end();
+            None
+        }
+    }
 }
 
 fn parse_interface_type_name(parser: &mut RuleParser<'_>, span: SourceSpan) -> Option<TypeName> {
@@ -226,6 +280,41 @@ mod tests {
     }
 
     #[test]
+    fn parses_dict_type_names() {
+        let cases = [
+            (
+                "Dict<string, int>",
+                TypeName::dict(crate::parsed::PrimitiveType::String, TypeName::int()),
+            ),
+            (
+                "Dict<int, string[]>",
+                TypeName::dict(
+                    crate::parsed::PrimitiveType::Int,
+                    TypeName::array(TypeName::string()),
+                ),
+            ),
+            (
+                "Dict<string, Dict<int, Player>>[]",
+                TypeName::array(TypeName::dict(
+                    crate::parsed::PrimitiveType::String,
+                    TypeName::dict(
+                        crate::parsed::PrimitiveType::Int,
+                        TypeName::struct_type("Player"),
+                    ),
+                )),
+            ),
+        ];
+
+        for (source, expected) in cases {
+            let (parsed, remainder, diagnostics) = parse_type_name_text(source);
+
+            assert_eq!(parsed, Some(expected));
+            assert_eq!(remainder, "");
+            assert!(diagnostics.is_empty(), "{diagnostics:#?}");
+        }
+    }
+
+    #[test]
     fn reports_invalid_type_syntax() {
         let cases = [
             ("", "Expected type name but saw end of line"),
@@ -249,6 +338,16 @@ mod tests {
                 "interface<IItem",
                 "Interface type names must close with `>`",
             ),
+            ("Dict", "Dict type names must use `Dict<key, value>`"),
+            (
+                "Dict<string int>",
+                "Dict type names must separate key and value types with `,`",
+            ),
+            (
+                "Dict<bool, int>",
+                "Dict key type must be string or int, got bool",
+            ),
+            ("Dict<string, int", "Dict type names must close with `>`"),
         ];
 
         for (source, expected_message) in cases {

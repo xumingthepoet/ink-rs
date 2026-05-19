@@ -567,6 +567,9 @@ fn collect_qualified_uses_in_type_name(
         TypeName::Array(element_type) => {
             collect_qualified_uses_in_type_name(current_module, element_type, uses)
         }
+        TypeName::Dict { value_type, .. } => {
+            collect_qualified_uses_in_type_name(current_module, value_type, uses)
+        }
         TypeName::Primitive(_)
         | TypeName::Struct(_)
         | TypeName::Interface { .. }

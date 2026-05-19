@@ -19,6 +19,10 @@ pub enum TypeName {
     },
     Void,
     Array(Box<TypeName>),
+    Dict {
+        key_type: PrimitiveType,
+        value_type: Box<TypeName>,
+    },
 }
 
 impl PartialEq for TypeName {
@@ -32,6 +36,16 @@ impl PartialEq for TypeName {
             }
             (Self::Void, Self::Void) => true,
             (Self::Array(left), Self::Array(right)) => left == right,
+            (
+                Self::Dict {
+                    key_type: left_key,
+                    value_type: left_value,
+                },
+                Self::Dict {
+                    key_type: right_key,
+                    value_type: right_value,
+                },
+            ) => left_key == right_key && left_value == right_value,
             _ => false,
         }
     }
@@ -65,6 +79,14 @@ impl Hash for TypeName {
                 5_u8.hash(state);
                 element_type.hash(state);
             }
+            Self::Dict {
+                key_type,
+                value_type,
+            } => {
+                6_u8.hash(state);
+                key_type.hash(state);
+                value_type.hash(state);
+            }
         }
     }
 }
@@ -75,8 +97,16 @@ pub enum DefaultValue {
     Float(f64),
     Bool(bool),
     String(String),
-    Array { element_type: Box<TypeName> },
-    Struct { type_name: String },
+    Array {
+        element_type: Box<TypeName>,
+    },
+    Dict {
+        key_type: PrimitiveType,
+        value_type: Box<TypeName>,
+    },
+    Struct {
+        type_name: String,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -137,6 +167,13 @@ impl TypeName {
         Self::Array(Box::new(element_type))
     }
 
+    pub fn dict(key_type: PrimitiveType, value_type: TypeName) -> Self {
+        Self::Dict {
+            key_type,
+            value_type: Box::new(value_type),
+        }
+    }
+
     pub fn display_name(&self) -> String {
         self.to_string()
     }
@@ -148,6 +185,16 @@ impl TypeName {
     pub fn array_element_type(&self) -> Option<&TypeName> {
         match self {
             Self::Array(element_type) => Some(element_type),
+            _ => None,
+        }
+    }
+
+    pub fn dict_key_value_types(&self) -> Option<(PrimitiveType, &TypeName)> {
+        match self {
+            Self::Dict {
+                key_type,
+                value_type,
+            } => Some((*key_type, value_type)),
             _ => None,
         }
     }
@@ -206,6 +253,10 @@ impl fmt::Display for TypeName {
             Self::Interface { name, .. } => write!(formatter, "interface<{name}>"),
             Self::Void => formatter.write_str("void"),
             Self::Array(element_type) => write!(formatter, "{element_type}[]"),
+            Self::Dict {
+                key_type,
+                value_type,
+            } => write!(formatter, "Dict<{key_type}, {value_type}>"),
         }
     }
 }
@@ -233,6 +284,13 @@ impl DefaultValue {
             TypeName::Array(element_type) => Some(Self::Array {
                 element_type: element_type.clone(),
             }),
+            TypeName::Dict {
+                key_type,
+                value_type,
+            } => Some(Self::Dict {
+                key_type: *key_type,
+                value_type: value_type.clone(),
+            }),
             TypeName::Struct(type_name) => Some(Self::Struct {
                 type_name: type_name.clone(),
             }),
@@ -251,6 +309,10 @@ impl DefaultValue {
             Self::Bool(_) => TypeName::bool(),
             Self::String(_) => TypeName::string(),
             Self::Array { element_type } => TypeName::array((**element_type).clone()),
+            Self::Dict {
+                key_type,
+                value_type,
+            } => TypeName::dict(*key_type, (**value_type).clone()),
             Self::Struct { type_name } => TypeName::struct_type(type_name.clone()),
         }
     }
@@ -297,6 +359,24 @@ mod tests {
     }
 
     #[test]
+    fn displays_dict_type_names() {
+        let scores = TypeName::dict(PrimitiveType::String, TypeName::int());
+        let nested = TypeName::dict(
+            PrimitiveType::Int,
+            TypeName::array(TypeName::dict(PrimitiveType::String, TypeName::bool())),
+        );
+
+        assert_eq!(scores.display_name(), "Dict<string, int>");
+        assert_eq!(scores.snapshot_name(), "Dict<string, int>");
+        assert_eq!(scores.to_string(), "Dict<string, int>");
+        assert_eq!(nested.display_name(), "Dict<int, Dict<string, bool>[]>");
+        assert_eq!(
+            scores.dict_key_value_types(),
+            Some((PrimitiveType::String, &TypeName::int()))
+        );
+    }
+
+    #[test]
     fn displays_interface_type_names() {
         let interface_type = TypeName::interface_type("IItem", span_at(1, 11), span_at(1, 1));
         let interface_array = TypeName::array(interface_type.clone());
@@ -339,6 +419,10 @@ mod tests {
         assert_eq!(
             TypeName::divert_target().primitive_type(),
             Some(PrimitiveType::DivertTarget)
+        );
+        assert_eq!(
+            TypeName::dict(PrimitiveType::Int, TypeName::string()).dict_key_value_types(),
+            Some((PrimitiveType::Int, &TypeName::string()))
         );
         assert!(TypeName::void().is_void());
         assert!(!TypeName::string().is_void());
@@ -385,6 +469,23 @@ mod tests {
             Some(DefaultValue::Array {
                 element_type: Box::new(int_array_type)
             })
+        );
+    }
+
+    #[test]
+    fn builds_dict_default_value_metadata() {
+        let dict_type = TypeName::dict(PrimitiveType::String, TypeName::array(TypeName::int()));
+
+        assert_eq!(
+            dict_type.default_value(),
+            Some(DefaultValue::Dict {
+                key_type: PrimitiveType::String,
+                value_type: Box::new(TypeName::array(TypeName::int()))
+            })
+        );
+        assert_eq!(
+            dict_type.default_value().map(|value| value.type_name()),
+            Some(dict_type)
         );
     }
 

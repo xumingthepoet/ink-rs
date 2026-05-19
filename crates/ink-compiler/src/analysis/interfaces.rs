@@ -576,6 +576,9 @@ fn collect_interface_type_references_in_type_name(
         TypeName::Array(element_type) => {
             collect_interface_type_references_in_type_name(element_type, references)
         }
+        TypeName::Dict { value_type, .. } => {
+            collect_interface_type_references_in_type_name(value_type, references)
+        }
         TypeName::Primitive(_)
         | TypeName::Struct(_)
         | TypeName::QualifiedStruct(_)

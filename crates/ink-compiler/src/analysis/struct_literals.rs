@@ -150,7 +150,9 @@ impl<'a> StructLiteralChecker<'a> {
                     context,
                 );
             }
-            (TypeName::Primitive(_), _) | (TypeName::Interface { .. }, _) => {
+            (TypeName::Primitive(_), _)
+            | (TypeName::Interface { .. }, _)
+            | (TypeName::Dict { .. }, _) => {
                 self.check_non_literal_expression(
                     expression,
                     expected_type,

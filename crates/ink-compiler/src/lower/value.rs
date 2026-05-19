@@ -185,6 +185,7 @@ fn runtime_composite_placeholder_for_type_with_seen(
     match type_name {
         TypeName::Interface { .. } => Some(RuntimeObject::String(String::new())),
         TypeName::Array(_) => Some(RuntimeObject::ValueArray(Vec::new())),
+        TypeName::Dict { .. } => None,
         TypeName::Struct(struct_name) => {
             let definition_name =
                 resolve_struct_definition_name(struct_name, module_name, struct_definitions)?;
@@ -291,6 +292,7 @@ fn runtime_default_value(
         DefaultValue::Bool(value) => Some(RuntimeObject::Bool(*value)),
         DefaultValue::String(value) => Some(RuntimeObject::String(value.clone())),
         DefaultValue::Array { .. } => Some(RuntimeObject::ValueArray(Vec::new())),
+        DefaultValue::Dict { .. } => None,
         DefaultValue::Struct { type_name } => {
             let definition_name =
                 resolve_struct_definition_name(type_name, module_name, struct_definitions)?;
@@ -470,6 +472,7 @@ fn resolve_enum_definition_name_for_type(
         TypeName::Primitive(_)
         | TypeName::Interface { .. }
         | TypeName::Void
+        | TypeName::Dict { .. }
         | TypeName::Array(_) => None,
     }
 }
