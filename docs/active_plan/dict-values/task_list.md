@@ -1,4 +1,4 @@
-Progress: 1/20
+Progress: 2/20
 
 # Typed Dict Values Task List
 
@@ -65,7 +65,7 @@ Validation:
 Commit record: implementation `d777e817` (`Add Dict type name parsing`); review
 fix `3ffdc426` (`Constrain Dict key type model`)
 
-### [>] Task 02: Add Dict Literal Parsed Nodes
+### [x] Task 02: Add Dict Literal Parsed Nodes
 
 Goal: Distinguish struct literals from Dict literals in the parsed expression
 model.
@@ -92,6 +92,9 @@ Validation:
 - `cargo test -p ink-compiler syntax::expression` passed.
 - `cargo fmt --all --check` passed.
 - `make gate` passed.
+- Review found no follow-up code fixes required; reran
+  `cargo test -p ink-compiler syntax::expression`, `cargo fmt --all --check`,
+  and `make gate`.
 
 Commit record: implementation `80057918` (`Add Dict literal parsed nodes`)
 
