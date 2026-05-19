@@ -1,4 +1,4 @@
-Progress: 2/23
+Progress: 3/23
 
 # Interface-Typed Dynamic Module Access Active Plan
 
@@ -98,7 +98,7 @@ Commit record:
 - Review/fix commits: reviewed; no fix commits required
 - Completion record commit: this task-list commit
 
-### [>] Task 03: Parse Module Implementation Clauses And New Import Syntax
+### [x] Task 03: Parse Module Implementation Clauses And New Import Syntax
 
 Goal: Support explicit module implementation clauses such as `=== module left implements IItem, IOther ===` and the new `FROM` import syntax.
 
@@ -149,8 +149,8 @@ Commit record:
 - Implementation commit: `8ceae72f Parse module implements and FROM imports`
 - Focused validation: `cargo test -p ink-compiler syntax::module`; `cargo test -p ink-compiler syntax::import`; `cargo test -p ink-compiler syntax::parser`; `cargo test -p ink-compiler parsed`; `cargo test -p ink-test --test compiler_snapshots modules` (matched 0 tests); `cargo test -p ink-test --test compiler_snapshots`; `cargo test -p ink-test --test diagnostics imports`
 - Full validation: `make gate`
-- Review/fix commits: pending
-- Completion record commit: pending
+- Review/fix commits: `7ff86ab3 Reject redundant module symbol imports`; post-review validation: `cargo test -p ink-compiler syntax::import`; `cargo test -p ink-compiler syntax::parser`; `cargo test -p ink-test --test diagnostics imports`; `make gate`
+- Completion record commit: this task-list commit
 
 ### [ ] Task 04: Parse Interface Type Names
 
