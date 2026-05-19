@@ -90,6 +90,21 @@ pub(super) fn lower_dynamic_composite_literal_into(
             content.extend(emitted);
             true
         }
+        (
+            Some(expected_type @ (TypeName::Struct(_) | TypeName::QualifiedStruct(_))),
+            Expression::EmptyCompositeLiteral,
+        ) => {
+            let Some(default_object) = runtime_composite_placeholder_for_type(
+                expected_type,
+                context.struct_definitions(),
+                context.enum_definitions(),
+                context.path_mode().current_module_name(),
+            ) else {
+                return false;
+            };
+            content.push(default_object);
+            true
+        }
         _ => false,
     }
 }

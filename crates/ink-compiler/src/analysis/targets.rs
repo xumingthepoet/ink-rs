@@ -587,6 +587,11 @@ impl<'a> CallTargetChecker<'a> {
                     self.check_expression(field.expression(), span, context);
                 }
             }
+            Expression::DictLiteral(entries) => {
+                for entry in entries {
+                    self.check_expression(entry.value(), span, context);
+                }
+            }
             Expression::FieldAccess { base, .. }
                 if !is_enum_member_reference(
                     expression,
@@ -626,7 +631,8 @@ impl<'a> CallTargetChecker<'a> {
             | Expression::String(_)
             | Expression::NumberInt(_)
             | Expression::NumberFloat(_)
-            | Expression::NumberBool(_) => {}
+            | Expression::NumberBool(_)
+            | Expression::EmptyCompositeLiteral => {}
         }
     }
 

@@ -138,8 +138,14 @@ impl<'a> StructLiteralChecker<'a> {
             (TypeName::Struct(struct_name), Expression::StructLiteral(fields)) => {
                 self.check_struct_literal(struct_name, fields, span, context);
             }
+            (TypeName::Struct(struct_name), Expression::EmptyCompositeLiteral) => {
+                self.check_struct_literal(struct_name, &[], span, context);
+            }
             (TypeName::QualifiedStruct(struct_name), Expression::StructLiteral(fields)) => {
                 self.check_struct_literal(struct_name.as_str(), fields, span, context);
+            }
+            (TypeName::QualifiedStruct(struct_name), Expression::EmptyCompositeLiteral) => {
+                self.check_struct_literal(struct_name.as_str(), &[], span, context);
             }
             (TypeName::Struct(_), _) | (TypeName::QualifiedStruct(_), _) => {
                 self.check_non_literal_expression(

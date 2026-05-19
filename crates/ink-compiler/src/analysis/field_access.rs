@@ -179,6 +179,11 @@ fn mark_field_accesses(expression: &Expression, field_access_ids: &mut HashSet<u
                 mark_field_accesses(field.expression(), field_access_ids);
             }
         }
+        Expression::DictLiteral(entries) => {
+            for entry in entries {
+                mark_field_accesses(entry.value(), field_access_ids);
+            }
+        }
         Expression::Binary { left, right, .. } => {
             mark_field_accesses(left, field_access_ids);
             mark_field_accesses(right, field_access_ids);
@@ -193,7 +198,8 @@ fn mark_field_accesses(expression: &Expression, field_access_ids: &mut HashSet<u
         | Expression::NumberBool(_)
         | Expression::DivertTarget(_)
         | Expression::VariableReference(_)
-        | Expression::QualifiedReference(_) => {}
+        | Expression::QualifiedReference(_)
+        | Expression::EmptyCompositeLiteral => {}
     }
 }
 

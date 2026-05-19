@@ -514,6 +514,11 @@ fn collect_qualified_uses_in_expression(
                 collect_qualified_uses_in_expression(current_module, field.expression(), uses);
             }
         }
+        Expression::DictLiteral(entries) => {
+            for entry in entries {
+                collect_qualified_uses_in_expression(current_module, entry.value(), uses);
+            }
+        }
         Expression::FieldAccess { base, .. } => {
             collect_qualified_uses_in_expression(current_module, base, uses);
         }
@@ -531,7 +536,8 @@ fn collect_qualified_uses_in_expression(
         Expression::String(_)
         | Expression::NumberBool(_)
         | Expression::NumberFloat(_)
-        | Expression::NumberInt(_) => {}
+        | Expression::NumberInt(_)
+        | Expression::EmptyCompositeLiteral => {}
     }
 }
 

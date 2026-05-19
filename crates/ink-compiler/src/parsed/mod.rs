@@ -32,7 +32,10 @@ pub use constant_declaration::ConstantDeclaration;
 pub use content_list::ContentList;
 pub use divert::{Divert, DivertTarget};
 pub use enum_declaration::{EnumDeclaration, EnumMember};
-pub use expression::{BinaryOperator, Expression, FloatLiteral, StructLiteralField, UnaryOperator};
+pub use expression::{
+    BinaryOperator, DictLiteralEntry, DictLiteralKey, Expression, FloatLiteral, StructLiteralField,
+    UnaryOperator,
+};
 pub use external_declaration::ExternalDeclaration;
 pub use flow::{Flow, FlowArgument, FlowLevel, FlowParts};
 pub use gather::Gather;

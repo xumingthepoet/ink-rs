@@ -45,6 +45,54 @@ impl StructLiteralField {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DictLiteralEntry {
+    key: DictLiteralKey,
+    value: Expression,
+}
+
+impl DictLiteralEntry {
+    pub fn new(key: DictLiteralKey, value: Expression) -> Self {
+        Self { key, value }
+    }
+
+    pub fn key(&self) -> &DictLiteralKey {
+        &self.key
+    }
+
+    pub fn value(&self) -> &Expression {
+        &self.value
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DictLiteralKey {
+    String(String),
+    Int(i32),
+}
+
+impl DictLiteralKey {
+    fn write_parse_snapshot(&self, out: &mut String) {
+        match self {
+            DictLiteralKey::String(value) => {
+                out.push('"');
+                out.push_str(&super::escape_snapshot_text(value));
+                out.push('"');
+            }
+            DictLiteralKey::Int(value) => out.push_str(&value.to_string()),
+        }
+    }
+
+    fn to_source_string(&self) -> String {
+        match self {
+            DictLiteralKey::String(value) => {
+                format!("\"{}\"", super::escape_snapshot_text(value))
+            }
+            DictLiteralKey::Int(value) => value.to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expression {
     String(String),
     StringContent(ContentList),
@@ -73,6 +121,8 @@ pub enum Expression {
     },
     ArrayLiteral(Vec<Expression>),
     StructLiteral(Vec<StructLiteralField>),
+    DictLiteral(Vec<DictLiteralEntry>),
+    EmptyCompositeLiteral,
     FieldAccess {
         base: Box<Expression>,
         field: String,
@@ -223,6 +273,21 @@ impl Expression {
                     field.expression().write_parse_snapshot(out, 0);
                 }
                 out.push(')');
+            }
+            Expression::DictLiteral(entries) => {
+                out.push_str("DictLiteral(");
+                for (index, entry) in entries.iter().enumerate() {
+                    if index > 0 {
+                        out.push_str(", ");
+                    }
+                    entry.key().write_parse_snapshot(out);
+                    out.push('=');
+                    entry.value().write_parse_snapshot(out, 0);
+                }
+                out.push(')');
+            }
+            Expression::EmptyCompositeLiteral => {
+                out.push_str("EmptyCompositeLiteral()");
             }
             Expression::FieldAccess { base, field } => {
                 if let Some(path) = self.dotted_path() {
@@ -403,6 +468,21 @@ fn expression_display(expression: &Expression) -> String {
                 .join(", ");
             format!("{{{fields}}}")
         }
+        Expression::DictLiteral(entries) => {
+            let entries = entries
+                .iter()
+                .map(|entry| {
+                    format!(
+                        "{}: {}",
+                        entry.key().to_source_string(),
+                        expression_display(entry.value())
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!("{{{entries}}}")
+        }
+        Expression::EmptyCompositeLiteral => "{}".to_string(),
         Expression::FieldAccess { base, field } => {
             format!("{}.{}", expression_display(base), field)
         }

@@ -172,7 +172,10 @@ fn lower_expression_into_with_constants(
         } => {
             lower_dynamic_interface_function_call_into(content, target, member, args, lowering);
         }
-        Expression::ArrayLiteral(_) | Expression::StructLiteral(_) => {
+        Expression::ArrayLiteral(_)
+        | Expression::StructLiteral(_)
+        | Expression::DictLiteral(_)
+        | Expression::EmptyCompositeLiteral => {
             if let Some(value) = lower_value_literal(
                 expression,
                 None,
@@ -397,6 +400,8 @@ fn infer_lowered_expression_type(
         }
         Expression::ArrayLiteral(_)
         | Expression::StructLiteral(_)
+        | Expression::DictLiteral(_)
+        | Expression::EmptyCompositeLiteral
         | Expression::Binary { .. }
         | Expression::Unary { .. }
         | Expression::MultipleCondition(_) => None,
@@ -503,7 +508,10 @@ pub(super) fn lower_expression_with_expected_type_into_with_constants(
 
     if matches!(
         expression,
-        Expression::ArrayLiteral(_) | Expression::StructLiteral(_)
+        Expression::ArrayLiteral(_)
+            | Expression::StructLiteral(_)
+            | Expression::DictLiteral(_)
+            | Expression::EmptyCompositeLiteral
     ) {
         if let Some(value) = lower_value_literal(
             expression,

@@ -52,9 +52,35 @@ pub(super) fn lower_value_literal(
                 path_mode,
             )
         }
+        (Some(TypeName::Struct(struct_name)), Expression::EmptyCompositeLiteral) => {
+            lower_struct_literal(
+                &[],
+                struct_name,
+                struct_definitions,
+                enum_definitions,
+                constants,
+                global_variables,
+                choice_labels,
+                global_labels,
+                path_mode,
+            )
+        }
         (Some(TypeName::QualifiedStruct(struct_name)), Expression::StructLiteral(fields)) => {
             lower_struct_literal(
                 fields,
+                struct_name.as_str(),
+                struct_definitions,
+                enum_definitions,
+                constants,
+                global_variables,
+                choice_labels,
+                global_labels,
+                path_mode,
+            )
+        }
+        (Some(TypeName::QualifiedStruct(struct_name)), Expression::EmptyCompositeLiteral) => {
+            lower_struct_literal(
+                &[],
                 struct_name.as_str(),
                 struct_definitions,
                 enum_definitions,
@@ -116,7 +142,9 @@ pub(super) fn lower_value_literal(
         | (_, Expression::IndexAccess { .. })
         | (_, Expression::Binary { .. })
         | (_, Expression::Unary { .. })
-        | (_, Expression::MultipleCondition(_)) => None,
+        | (_, Expression::MultipleCondition(_))
+        | (_, Expression::DictLiteral(_))
+        | (_, Expression::EmptyCompositeLiteral) => None,
     }
 }
 

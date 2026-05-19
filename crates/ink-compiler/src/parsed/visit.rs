@@ -244,6 +244,11 @@ where
                 walk_expression(field.expression(), visitor, &expression_context);
             }
         }
+        Expression::DictLiteral(entries) => {
+            for entry in entries {
+                walk_expression(entry.value(), visitor, &expression_context);
+            }
+        }
         Expression::FieldAccess { base, .. } => walk_expression(base, visitor, &expression_context),
         Expression::IndexAccess { base, index } => {
             walk_expression(base, visitor, &expression_context);
@@ -267,7 +272,8 @@ where
         | Expression::NumberBool(_)
         | Expression::DivertTarget(_)
         | Expression::VariableReference(_)
-        | Expression::QualifiedReference(_) => {}
+        | Expression::QualifiedReference(_)
+        | Expression::EmptyCompositeLiteral => {}
     }
 }
 
@@ -377,6 +383,8 @@ mod tests {
                 Expression::FunctionCall { .. } => "function_call",
                 Expression::MultipleCondition(_) => "multiple_condition",
                 Expression::StructLiteral(_) => "struct",
+                Expression::DictLiteral(_) => "dict",
+                Expression::EmptyCompositeLiteral => "empty_composite",
                 Expression::StringContent(_) => "string_content",
                 Expression::Unary { .. } => "unary",
                 Expression::VariableReference(_) => "variable",

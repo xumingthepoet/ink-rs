@@ -98,6 +98,8 @@ pub(super) fn infer_primitive_expression_type(
         )),
         Expression::ArrayLiteral(_)
         | Expression::StructLiteral(_)
+        | Expression::DictLiteral(_)
+        | Expression::EmptyCompositeLiteral
         | Expression::FieldAccess { .. }
         | Expression::IndexAccess { .. } => Err(TypeInferenceError::new(
             "Expression does not have a primitive type",
@@ -224,7 +226,9 @@ fn infer_expression_type_in_context(
         | Expression::QualifiedReference(_)
         | Expression::DivertTarget(_)
         | Expression::ArrayLiteral(_)
-        | Expression::StructLiteral(_) => infer_primitive_expression_type(
+        | Expression::StructLiteral(_)
+        | Expression::DictLiteral(_)
+        | Expression::EmptyCompositeLiteral => infer_primitive_expression_type(
             expression,
             context.variable_scopes,
             context.current_module,

@@ -163,6 +163,15 @@ impl<'a> ArrayLiteralChecker<'a> {
                     StructLiteralMode::ArraysOnly,
                 );
             }
+            (TypeName::Struct(struct_name), Expression::EmptyCompositeLiteral) => {
+                self.check_struct_literal(
+                    struct_name,
+                    &[],
+                    span,
+                    context,
+                    StructLiteralMode::ArraysOnly,
+                );
+            }
             (_, Expression::ArrayLiteral(_)) => {
                 self.diagnostics.push(Diagnostic::error(
                     span.clone(),
@@ -222,10 +231,22 @@ impl<'a> ArrayLiteralChecker<'a> {
                     StructLiteralMode::Full,
                 );
             }
+            (TypeName::Struct(struct_name), Expression::EmptyCompositeLiteral) => {
+                self.check_struct_literal(struct_name, &[], span, context, StructLiteralMode::Full);
+            }
             (TypeName::QualifiedStruct(struct_name), Expression::StructLiteral(fields)) => {
                 self.check_struct_literal(
                     struct_name.as_str(),
                     fields,
+                    span,
+                    context,
+                    StructLiteralMode::Full,
+                );
+            }
+            (TypeName::QualifiedStruct(struct_name), Expression::EmptyCompositeLiteral) => {
+                self.check_struct_literal(
+                    struct_name.as_str(),
+                    &[],
                     span,
                     context,
                     StructLiteralMode::Full,

@@ -389,7 +389,9 @@ fn condition_type_signal(
         | Expression::NumberFloat(_)
         | Expression::NumberBool(_)
         | Expression::ArrayLiteral(_)
-        | Expression::StructLiteral(_) => Some(ConditionTypeSignal::LiteralOnly),
+        | Expression::StructLiteral(_)
+        | Expression::DictLiteral(_)
+        | Expression::EmptyCompositeLiteral => Some(ConditionTypeSignal::LiteralOnly),
         Expression::VariableReference(name) => matches!(
             variable_scopes.visible_variable_declared_type(name, current_module, current_flow_path),
             Some(Some(_))

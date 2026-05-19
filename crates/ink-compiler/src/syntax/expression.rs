@@ -1,8 +1,8 @@
 use crate::{
     diagnostic::{Diagnostic, DiagnosticCode},
     parsed::{
-        BinaryOperator, ContentList, Expression, FloatLiteral, Object, QualifiedName,
-        StructLiteralField, UnaryOperator,
+        BinaryOperator, ContentList, DictLiteralEntry, DictLiteralKey, Expression, FloatLiteral,
+        Object, QualifiedName, StructLiteralField, UnaryOperator,
     },
     source::SourceSpan,
 };
@@ -225,6 +225,18 @@ enum ExpressionParseErrorKind {
     ExpectedCommaOrStructCloseBrace {
         found: Option<String>,
     },
+    ExpectedCompositeLiteralKey {
+        found: Option<String>,
+    },
+    ExpectedDictLiteralKey {
+        found: Option<String>,
+    },
+    ExpectedDictEntryColon {
+        found: Option<String>,
+    },
+    ExpectedCommaOrDictCloseBrace {
+        found: Option<String>,
+    },
     ExpectedFieldName {
         found: Option<String>,
     },
@@ -304,6 +316,27 @@ impl ExpressionParseError {
             ExpressionParseErrorKind::ExpectedCommaOrStructCloseBrace { found } => {
                 format!(
                     "expected `,` or `}}` in struct literal{}",
+                    found_clause(found)
+                )
+            }
+            ExpressionParseErrorKind::ExpectedCompositeLiteralKey { found } => {
+                format!(
+                    "expected struct field name or Dict literal key{}",
+                    found_clause(found)
+                )
+            }
+            ExpressionParseErrorKind::ExpectedDictLiteralKey { found } => {
+                format!(
+                    "expected string or int key in Dict literal{}",
+                    found_clause(found)
+                )
+            }
+            ExpressionParseErrorKind::ExpectedDictEntryColon { found } => {
+                format!("expected `:` after Dict literal key{}", found_clause(found))
+            }
+            ExpressionParseErrorKind::ExpectedCommaOrDictCloseBrace { found } => {
+                format!(
+                    "expected `,` or `}}` in Dict literal{}",
                     found_clause(found)
                 )
             }
@@ -803,7 +836,7 @@ impl<'a> TokenExpressionParser<'a> {
                 if self.current_brace_pair_is_dynamic_interface_target() {
                     self.parse_dynamic_interface_target()
                 } else {
-                    self.parse_struct_literal()
+                    self.parse_braced_literal()
                 }
             }
             other => Err(ExpressionParseError::new(
@@ -1087,11 +1120,39 @@ impl<'a> TokenExpressionParser<'a> {
         Ok(Expression::ArrayLiteral(elements))
     }
 
+    fn parse_braced_literal(&mut self) -> Result<Expression, ExpressionParseError> {
+        if self.match_kind(|kind| matches!(kind, ExpressionTokenKind::CloseBrace)) {
+            return Ok(Expression::EmptyCompositeLiteral);
+        }
+
+        match self.peek().map(|token| &token.kind) {
+            Some(ExpressionTokenKind::Identifier(_)) => self.parse_struct_literal(),
+            Some(ExpressionTokenKind::StringLiteral(_))
+            | Some(ExpressionTokenKind::IntLiteral(_)) => self.parse_dict_literal(),
+            Some(ExpressionTokenKind::Operator(operator))
+                if operator == "-" && self.next_token_is_int_literal() =>
+            {
+                self.parse_dict_literal()
+            }
+            Some(kind) => {
+                let token = self.peek().expect("kind came from peek");
+                Err(ExpressionParseError::new(
+                    ExpressionParseErrorKind::ExpectedCompositeLiteralKey {
+                        found: Some(describe_token_kind(kind)),
+                    },
+                    token.span.clone(),
+                ))
+            }
+            None => Err(
+                self.error_at_eof(ExpressionParseErrorKind::ExpectedCompositeLiteralKey {
+                    found: None,
+                }),
+            ),
+        }
+    }
+
     fn parse_struct_literal(&mut self) -> Result<Expression, ExpressionParseError> {
         let mut fields = Vec::new();
-        if self.match_kind(|kind| matches!(kind, ExpressionTokenKind::CloseBrace)) {
-            return Ok(Expression::StructLiteral(fields));
-        }
 
         loop {
             let Some(token) = self.advance() else {
@@ -1136,6 +1197,92 @@ impl<'a> TokenExpressionParser<'a> {
         }
 
         Ok(Expression::StructLiteral(fields))
+    }
+
+    fn parse_dict_literal(&mut self) -> Result<Expression, ExpressionParseError> {
+        let mut entries = Vec::new();
+
+        loop {
+            let key = self.parse_dict_literal_key()?;
+            self.expect_kind(
+                |kind| matches!(kind, ExpressionTokenKind::Colon),
+                |found| ExpressionParseErrorKind::ExpectedDictEntryColon { found },
+            )?;
+            let value = self.parse_expression(0)?;
+            entries.push(DictLiteralEntry::new(key, value));
+
+            if self.match_kind(|kind| matches!(kind, ExpressionTokenKind::Comma)) {
+                continue;
+            }
+            self.expect_kind(
+                |kind| matches!(kind, ExpressionTokenKind::CloseBrace),
+                |found| ExpressionParseErrorKind::ExpectedCommaOrDictCloseBrace { found },
+            )?;
+            break;
+        }
+
+        Ok(Expression::DictLiteral(entries))
+    }
+
+    fn parse_dict_literal_key(&mut self) -> Result<DictLiteralKey, ExpressionParseError> {
+        let Some(token) = self.advance() else {
+            return Err(
+                self.error_at_eof(ExpressionParseErrorKind::ExpectedDictLiteralKey { found: None })
+            );
+        };
+        let kind = token.kind.clone();
+        match kind {
+            ExpressionTokenKind::StringLiteral(value) => Ok(DictLiteralKey::String(value)),
+            ExpressionTokenKind::IntLiteral(value) => {
+                value.parse::<i32>().map(DictLiteralKey::Int).map_err(|_| {
+                    ExpressionParseError::new(
+                        ExpressionParseErrorKind::InvalidIntegerLiteral { value },
+                        token.span.clone(),
+                    )
+                })
+            }
+            ExpressionTokenKind::Operator(operator) if operator == "-" => {
+                let Some(value_token) = self.advance() else {
+                    return Err(self.error_at_eof(
+                        ExpressionParseErrorKind::ExpectedDictLiteralKey { found: None },
+                    ));
+                };
+                let value_kind = value_token.kind.clone();
+                let ExpressionTokenKind::IntLiteral(value) = value_kind else {
+                    return Err(ExpressionParseError::new(
+                        ExpressionParseErrorKind::ExpectedDictLiteralKey {
+                            found: Some(describe_token_kind(&value_kind)),
+                        },
+                        value_token.span.clone(),
+                    ));
+                };
+                let parsed = value.parse::<i32>().map_err(|_| {
+                    ExpressionParseError::new(
+                        ExpressionParseErrorKind::InvalidIntegerLiteral {
+                            value: format!("-{value}"),
+                        },
+                        token.span.clone(),
+                    )
+                })?;
+                parsed
+                    .checked_neg()
+                    .map(DictLiteralKey::Int)
+                    .ok_or_else(|| {
+                        ExpressionParseError::new(
+                            ExpressionParseErrorKind::InvalidIntegerLiteral {
+                                value: format!("-{value}"),
+                            },
+                            token.span.clone(),
+                        )
+                    })
+            }
+            other => Err(ExpressionParseError::new(
+                ExpressionParseErrorKind::ExpectedDictLiteralKey {
+                    found: Some(describe_token_kind(&other)),
+                },
+                token.span.clone(),
+            )),
+        }
     }
 
     fn parse_divert_target(&mut self) -> Result<Expression, ExpressionParseError> {
@@ -1196,6 +1343,12 @@ impl<'a> TokenExpressionParser<'a> {
 
     fn peek(&self) -> Option<&'a ExpressionToken> {
         self.tokens.get(self.index)
+    }
+
+    fn next_token_is_int_literal(&self) -> bool {
+        self.tokens
+            .get(self.index + 1)
+            .is_some_and(|token| matches!(token.kind, ExpressionTokenKind::IntLiteral(_)))
     }
 
     fn advance(&mut self) -> Option<&'a ExpressionToken> {
@@ -1433,7 +1586,7 @@ mod tests {
                 "[player, companion]",
                 "ArrayLiteral(VariableReference(player), VariableReference(companion))",
             ),
-            ("{}", "StructLiteral()"),
+            ("{}", "EmptyCompositeLiteral()"),
             (
                 "{ hp: 10, name: \"Ada\" }",
                 r#"StructLiteral(hp=Number(10), name=String("Ada"))"#,
@@ -1441,6 +1594,12 @@ mod tests {
             (
                 "{ stats: { hp: 10 }, inventory: [] }",
                 "StructLiteral(stats=StructLiteral(hp=Number(10)), inventory=ArrayLiteral())",
+            ),
+            (r#"{"a": 1}"#, r#"DictLiteral("a"=Number(1))"#),
+            (r#"{1: "a"}"#, r#"DictLiteral(1=String("a"))"#),
+            (
+                r#"{"stats": {1: "a"}}"#,
+                r#"DictLiteral("stats"=DictLiteral(1=String("a")))"#,
             ),
             ("-> knot.stitch", "DivertTarget(-> knot.stitch)"),
             ("items::sword", "QualifiedReference(items::sword)"),
@@ -1724,7 +1883,7 @@ mod tests {
                 "[player, companion]",
                 "ArrayLiteral(VariableReference(player), VariableReference(companion))",
             ),
-            ("{}", "StructLiteral()"),
+            ("{}", "EmptyCompositeLiteral()"),
             (
                 "{ hp: 10, name: \"Ada\" }",
                 r#"StructLiteral(hp=Number(10), name=String("Ada"))"#,
@@ -1732,6 +1891,12 @@ mod tests {
             (
                 "{ stats: { hp: 10 }, inventory: [] }",
                 "StructLiteral(stats=StructLiteral(hp=Number(10)), inventory=ArrayLiteral())",
+            ),
+            (r#"{"a": 1}"#, r#"DictLiteral("a"=Number(1))"#),
+            (r#"{1: "a"}"#, r#"DictLiteral(1=String("a"))"#),
+            (
+                r#"{"stats": {1: "a"}}"#,
+                r#"DictLiteral("stats"=DictLiteral(1=String("a")))"#,
             ),
             ("-> knot.stitch", "DivertTarget(-> knot.stitch)"),
             ("items::sword", "QualifiedReference(items::sword)"),
@@ -1836,6 +2001,26 @@ mod tests {
                 "{hp: 1 mp: 2}",
                 "expected `,` or `}` in struct literal, found `mp`",
                 8,
+            ),
+            (
+                r#"{"hp" 1}"#,
+                "expected `:` after Dict literal key, found `1`",
+                7,
+            ),
+            (
+                r#"{"hp": 1 mp: 2}"#,
+                "expected `,` or `}` in Dict literal, found `mp`",
+                10,
+            ),
+            (
+                r#"{"hp": 1, mp: 2}"#,
+                "expected string or int key in Dict literal, found `mp`",
+                11,
+            ),
+            (
+                r#"{hp: 1, "mp": 2}"#,
+                "expected field name in struct literal, found `string literal`",
+                9,
             ),
             (
                 "state.",
