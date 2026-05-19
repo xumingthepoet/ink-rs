@@ -1,4 +1,4 @@
-Progress: 2/20
+Progress: 3/20
 
 # Typed Dict Values Task List
 
@@ -100,7 +100,7 @@ Commit record: implementation `80057918` (`Add Dict literal parsed nodes`)
 
 ## Milestone 2: Type Analysis
 
-### [>] Task 03: Validate Dict Literal Types
+### [x] Task 03: Validate Dict Literal Types
 
 Goal: Type-check Dict literals against expected `Dict<K, V>` declarations.
 
@@ -127,8 +127,13 @@ Validation:
 - `cargo test -p ink-test diagnostics` passed.
 - `cargo fmt --all --check` passed.
 - `make gate` passed.
+- Review fix: covered Dict fields nested inside struct literal expected types,
+  then reran `cargo test -p ink-compiler analysis`,
+  `cargo test -p ink-test diagnostics`, `cargo fmt --all --check`, and
+  `make gate`.
 
-Commit record: implementation `d258c6b9` (`Validate Dict literal types`)
+Commit record: implementation `d258c6b9` (`Validate Dict literal types`);
+review fix `cbbb5d42` (`Cover Dict fields nested in structs`)
 
 ### [ ] Task 04: Infer Dict Index Access
 
