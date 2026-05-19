@@ -1,4 +1,4 @@
-Progress: 22/23
+Progress: 23/23
 
 # Interface-Typed Dynamic Module Access Active Plan
 
@@ -1006,7 +1006,7 @@ Commit record:
 - Review/fix commits: `a333cc1d Clarify interface source file starts`; post-review validation: `rg -n "FROM .*IMPORT|interface<|implements|dynamic interface|\\{\\{.*\\}::" docs/SyntaxUpdates.md docs/SyntaxReference.md`; `cargo test -p ink-test --test modules docs`; `cargo test -p ink-test --test compiler_snapshots interface`; `make gate`
 - Completion record commit: this task-list commit
 
-### [~] Task 23: Archive Completed Plan
+### [x] Task 23: Archive Completed Plan
 
 Goal: Move this active plan to `docs/finished_plans/` after all implementation tasks are complete and validated.
 
@@ -1041,8 +1041,8 @@ Validation commands:
 
 Commit record:
 
-- Implementation commit: pending
-- Focused validation: pending
-- Full validation: pending
-- Review/fix commits: pending
-- Completion record commit: pending
+- Implementation commit: this task-list commit
+- Focused validation: `test ! -e docs/active_plan/interface-dynamic-module-access`; `test -f docs/finished_plans/interface-dynamic-module-access/task_list.md`; `git status --short`
+- Full validation: not required for archive-only closeout after Task 22 `make gate`
+- Review/fix commits: reviewed; no fix commits required
+- Completion record commit: this task-list commit
