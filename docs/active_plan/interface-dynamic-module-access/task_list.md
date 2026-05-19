@@ -240,7 +240,7 @@ Commit record:
 
 ## Milestone 2: Interface Analysis And Type Semantics
 
-### [~] Task 06: Index Interface Declarations And Names
+### [>] Task 06: Index Interface Declarations And Names
 
 Goal: Make interface declarations participate in compiler analysis with explicit namespace and duplicate diagnostics.
 
@@ -288,9 +288,9 @@ Validation commands:
 
 Commit record:
 
-- Implementation commit: pending
-- Focused validation: pending
-- Full validation: pending
+- Implementation commit: `ec81ead8 Index interface declarations and module imports`
+- Focused validation: `cargo fmt --all --check`; `cargo test -p ink-compiler analysis::interfaces`; `cargo test -p ink-compiler analysis::modules`; `cargo test -p ink-compiler analysis::names`; `cargo test -p ink-compiler analysis`; `cargo test -p ink-test --test compiler_snapshots modules`; `cargo test -p ink-test --test diagnostics interface`; `cargo test -p ink-test --test diagnostics imports`
+- Full validation: `make gate`
 - Review/fix commits: pending
 - Completion record commit: pending
 
