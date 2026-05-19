@@ -12,6 +12,7 @@ use crate::{
     container::Container,
     control_command::{CommandType, ControlCommand},
     divert::Divert,
+    dynamic_interface::{DynamicInterfaceFunctionCall, DynamicInterfaceTarget},
     glue::Glue,
     native_function_call::NativeFunctionCall,
     object::RTObject,
@@ -91,6 +92,24 @@ fn runtime_object_to_format_object(object: Rc<dyn RTObject>) -> Result<format::O
 
     if let Some(f) = object.as_any().downcast_ref::<NativeFunctionCall>() {
         return Ok(format::Object::NativeFunction(f.format_function()));
+    }
+
+    if let Some(target) = object.as_any().downcast_ref::<DynamicInterfaceTarget>() {
+        return Ok(format::Object::DynamicInterfaceTarget {
+            interface: target.interface().to_string(),
+            member: target.member().to_string(),
+        });
+    }
+
+    if let Some(call) = object
+        .as_any()
+        .downcast_ref::<DynamicInterfaceFunctionCall>()
+    {
+        return Ok(format::Object::DynamicInterfaceFunctionCall {
+            interface: call.interface().to_string(),
+            member: call.member().to_string(),
+            args: call.args(),
+        });
     }
 
     if let Ok(var_ref) = object.clone().into_any().downcast::<VariableReference>() {

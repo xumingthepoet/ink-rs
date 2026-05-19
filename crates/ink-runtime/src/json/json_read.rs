@@ -7,17 +7,33 @@ use ink_story_json_format as format;
 use serde_json::{Map, Value as JsonValue};
 
 use crate::{
-    choice::Choice, choice_point::ChoicePoint, container::Container,
-    control_command::ControlCommand, divert::Divert, glue::Glue,
-    native_function_call::NativeFunctionCall, object::RTObject, path::Path, push_pop::PushPopType,
-    story::INK_VERSION_CURRENT, story_error::StoryError, tag::Tag, value::Value,
-    value_type::ValueType, variable_assigment::VariableAssignment,
-    variable_reference::VariableReference, void::Void,
+    choice::Choice,
+    choice_point::ChoicePoint,
+    container::Container,
+    control_command::ControlCommand,
+    divert::Divert,
+    dynamic_interface::{
+        DynamicInterfaceFunctionCall, DynamicInterfaceRegistry, DynamicInterfaceTarget,
+    },
+    glue::Glue,
+    native_function_call::NativeFunctionCall,
+    object::RTObject,
+    path::Path,
+    push_pop::PushPopType,
+    story::INK_VERSION_CURRENT,
+    story_error::StoryError,
+    tag::Tag,
+    value::Value,
+    value_type::ValueType,
+    variable_assigment::VariableAssignment,
+    variable_reference::VariableReference,
+    void::Void,
 };
 
 pub(crate) struct LoadedProgram {
     pub(crate) main_content_container: Rc<Container>,
     pub(crate) internal_functions: BTreeMap<String, format::InternalFunction>,
+    pub(crate) dynamic_interfaces: DynamicInterfaceRegistry,
 }
 
 #[cfg(test)]
@@ -42,6 +58,7 @@ pub(crate) fn load_program_from_string(s: &str) -> Result<LoadedProgram, StoryEr
     Ok(LoadedProgram {
         main_content_container,
         internal_functions: program.internal_functions,
+        dynamic_interfaces: DynamicInterfaceRegistry::from_format(program.interfaces),
     })
 }
 
@@ -115,17 +132,17 @@ fn format_object_to_runtime(object: &format::Object) -> Result<Rc<dyn RTObject>,
                 args: *args,
             },
         ))),
-        format::Object::DynamicInterfaceTarget { interface, member } => Err(StoryError::BadJson(
-            format!(
-                "Dynamic interface target instruction {interface}::{member} is not supported by this runtime yet"
-            ),
+        format::Object::DynamicInterfaceTarget { interface, member } => Ok(Rc::new(
+            DynamicInterfaceTarget::new(interface.clone(), member.clone()),
         )),
         format::Object::DynamicInterfaceFunctionCall {
             interface,
             member,
-            ..
-        } => Err(StoryError::BadJson(format!(
-            "Dynamic interface function instruction {interface}::{member} is not supported by this runtime yet"
+            args,
+        } => Ok(Rc::new(DynamicInterfaceFunctionCall::new(
+            interface.clone(),
+            member.clone(),
+            *args,
         ))),
         format::Object::ConditionalDivert { target } => Ok(Rc::new(format_divert_to_runtime(
             format::Object::ConditionalDivert {
@@ -425,6 +442,9 @@ fn tag_string<'a>(value: &'a JsonValue, field: &str, index: usize) -> Result<&'a
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::dynamic_interface::{
+        DynamicInterfaceFunctionCall, DynamicInterfaceMemberKind, DynamicInterfaceTarget,
+    };
     use crate::json::json_write;
     use crate::native_function_call::{NativeFunctionCall, Op};
     use serde_json::json;
@@ -461,6 +481,59 @@ mod tests {
             .expect("first root object should be a native function");
 
         assert_eq!(function.op, Op::Len);
+    }
+
+    #[test]
+    fn loads_dynamic_interface_objects_and_metadata() {
+        let json = r#"{
+            "inkVersion": 1,
+            "root": [
+                "^left",
+                {"i->": "target", "interface": "IItem"},
+                {"i()": "score", "interface": "IItem", "args": 1},
+                "done",
+                null
+            ],
+            "interfaces": {
+                "IItem": {
+                    "members": {
+                        "target": "knot",
+                        "score": "function"
+                    },
+                    "implementations": ["left", "right"]
+                }
+            }
+        }"#;
+
+        let loaded = load_program_from_string(json).expect("story JSON should load");
+        let target = loaded.main_content_container.content[1]
+            .as_any()
+            .downcast_ref::<DynamicInterfaceTarget>()
+            .expect("target instruction should load");
+        let call = loaded.main_content_container.content[2]
+            .as_any()
+            .downcast_ref::<DynamicInterfaceFunctionCall>()
+            .expect("function instruction should load");
+
+        assert_eq!(target.interface(), "IItem");
+        assert_eq!(target.member(), "target");
+        assert_eq!(call.interface(), "IItem");
+        assert_eq!(call.member(), "score");
+        assert_eq!(call.args(), 1);
+        assert_eq!(
+            loaded
+                .dynamic_interfaces
+                .interface("IItem")
+                .and_then(|interface| interface.member_kind("target")),
+            Some(DynamicInterfaceMemberKind::Knot)
+        );
+        assert_eq!(
+            loaded
+                .dynamic_interfaces
+                .interface("IItem")
+                .and_then(|interface| interface.member_kind("score")),
+            Some(DynamicInterfaceMemberKind::Function)
+        );
     }
 
     #[test]

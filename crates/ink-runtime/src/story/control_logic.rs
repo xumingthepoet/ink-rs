@@ -2,6 +2,9 @@ use crate::{
     container::Container,
     control_command::{CommandType, ControlCommand},
     divert::Divert,
+    dynamic_interface::{
+        DynamicInterfaceFunctionCall, DynamicInterfaceMemberKind, DynamicInterfaceTarget,
+    },
     native_function_call::NativeFunctionCall,
     object::RTObject,
     path::Path,
@@ -590,6 +593,71 @@ impl Story {
             return Ok(true);
         }
 
+        if let Some(target) = content_obj
+            .as_ref()
+            .as_any()
+            .downcast_ref::<DynamicInterfaceTarget>()
+        {
+            self.validate_dynamic_interface_member(
+                target.interface(),
+                target.member(),
+                DynamicInterfaceMemberKind::Knot,
+            )?;
+            return Err(StoryError::InvalidStoryState(format!(
+                "Dynamic interface target execution is not implemented yet: {}::{}",
+                target.interface(),
+                target.member()
+            )));
+        }
+
+        if let Some(call) = content_obj
+            .as_ref()
+            .as_any()
+            .downcast_ref::<DynamicInterfaceFunctionCall>()
+        {
+            self.validate_dynamic_interface_member(
+                call.interface(),
+                call.member(),
+                DynamicInterfaceMemberKind::Function,
+            )?;
+            return Err(StoryError::InvalidStoryState(format!(
+                "Dynamic interface function execution is not implemented yet: {}::{}",
+                call.interface(),
+                call.member()
+            )));
+        }
+
         Ok(false)
+    }
+
+    fn validate_dynamic_interface_member(
+        &self,
+        interface: &str,
+        member: &str,
+        expected_kind: DynamicInterfaceMemberKind,
+    ) -> Result<(), StoryError> {
+        let definition = self
+            .dynamic_interfaces
+            .interface(interface)
+            .ok_or_else(|| {
+                StoryError::InvalidStoryState(format!(
+                    "Dynamic interface {interface} is missing from metadata"
+                ))
+            })?;
+        if definition.implementations().is_empty() {
+            return Err(StoryError::InvalidStoryState(format!(
+                "Dynamic interface {interface} has no compiled implementations"
+            )));
+        }
+
+        match definition.member_kind(member) {
+            Some(kind) if kind == expected_kind => Ok(()),
+            Some(kind) => Err(StoryError::InvalidStoryState(format!(
+                "Dynamic interface member {interface}::{member} has kind {kind:?}, expected {expected_kind:?}"
+            ))),
+            None => Err(StoryError::InvalidStoryState(format!(
+                "Dynamic interface member {interface}::{member} is missing from metadata"
+            ))),
+        }
     }
 }

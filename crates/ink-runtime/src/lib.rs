@@ -51,6 +51,7 @@ mod choice_point;
 mod container;
 mod control_command;
 mod divert;
+mod dynamic_interface;
 mod flow;
 mod glue;
 mod json;

@@ -1,6 +1,7 @@
 //! [`Story`] is the entry point to load and run an Ink story.
 use crate::{
     container::Container,
+    dynamic_interface::DynamicInterfaceRegistry,
     story::{
         errors::ErrorHandler, external_functions::ExternalFunctionDef,
         internal_functions::InternalFunctionDef,
@@ -36,6 +37,7 @@ pub struct Story {
     pub(crate) saw_lookahead_unsafe_function_after_new_line: bool,
     pub(crate) externals: HashMap<String, ExternalFunctionDef>,
     pub(crate) internal_functions: HashMap<String, InternalFunctionDef>,
+    pub(crate) dynamic_interfaces: DynamicInterfaceRegistry,
 }
 
 struct CSharpRandom {
@@ -134,6 +136,7 @@ mod misc {
             let internal_functions = super::internal_functions::load_internal_function_defs(
                 loaded_program.internal_functions,
             )?;
+            let dynamic_interfaces = loaded_program.dynamic_interfaces;
 
             let mut story = Story {
                 main_content_container: main_content_container.clone(),
@@ -150,6 +153,7 @@ mod misc {
                 allow_external_function_fallbacks: false,
                 externals: HashMap::with_capacity(0),
                 internal_functions,
+                dynamic_interfaces,
             };
 
             story.reset_globals()?;
