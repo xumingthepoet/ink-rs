@@ -518,6 +518,26 @@ mod tests {
     }
 
     #[test]
+    fn bare_module_imports_used_by_interface_values_are_not_warned() {
+        let story = parse_story(
+            "=== interface IItem ===\n\
+             == target ==\n\
+             === module game ===\n\
+             FROM left\n\
+             VAR route: interface<IItem> = left\n\
+             == main ==\n\
+             -> END\n\
+             === module left implements IItem ===\n\
+             == target ==\n\
+             -> END",
+        );
+
+        let diagnostics = import_diagnostics(&story);
+
+        assert!(diagnostics.is_empty(), "{diagnostics:#?}");
+    }
+
+    #[test]
     fn bare_module_imports_do_not_authorize_static_symbol_access() {
         let story = parse_story(
             "=== module game ===\n\

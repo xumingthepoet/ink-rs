@@ -10,6 +10,11 @@ use super::{
     context::{EnumTypeIndex, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
     enums::{build_enum_type_index, type_name_is_enum},
     expression_types::infer_expression_type,
+    interface_values::{
+        build_module_implementation_index, infer_expected_interface_expression_type,
+        ModuleImplementationIndex,
+    },
+    modules::{build_module_import_index, ModuleImportIndex},
     structs::build_struct_type_index,
     target_symbols::build_target_symbol_index,
     variables::build_variable_scope_index,
@@ -20,11 +25,15 @@ pub(super) fn variable_initializer_diagnostics(story: &Story) -> Vec<Diagnostic>
     let enum_types = build_enum_type_index(story);
     let variable_scopes = build_variable_scope_index(story);
     let target_symbols = build_target_symbol_index(story);
+    let module_implementations = build_module_implementation_index(story);
+    let module_imports = build_module_import_index(story);
     let mut checker = VariableInitializerChecker::new(
         &variable_scopes,
         &struct_types,
         &enum_types,
         &target_symbols,
+        &module_implementations,
+        &module_imports,
     );
     walk_story(story, &mut checker);
     checker.diagnostics
@@ -35,6 +44,8 @@ struct VariableInitializerChecker<'a> {
     struct_types: &'a StructTypeIndex,
     enum_types: &'a EnumTypeIndex,
     target_symbols: &'a TargetSymbolIndex,
+    module_implementations: &'a ModuleImplementationIndex,
+    module_imports: &'a ModuleImportIndex,
     diagnostics: Vec<Diagnostic>,
 }
 
@@ -44,12 +55,16 @@ impl<'a> VariableInitializerChecker<'a> {
         struct_types: &'a StructTypeIndex,
         enum_types: &'a EnumTypeIndex,
         target_symbols: &'a TargetSymbolIndex,
+        module_implementations: &'a ModuleImplementationIndex,
+        module_imports: &'a ModuleImportIndex,
     ) -> Self {
         Self {
             variable_scopes,
             struct_types,
             enum_types,
             target_symbols,
+            module_implementations,
+            module_imports,
             diagnostics: Vec::new(),
         }
     }
@@ -76,6 +91,39 @@ impl<'a> VariableInitializerChecker<'a> {
             }
             return;
         };
+
+        if let Some(result) = infer_expected_interface_expression_type(
+            expression,
+            declared_type,
+            self.variable_scopes,
+            self.struct_types,
+            self.enum_types,
+            self.target_symbols,
+            self.module_implementations,
+            self.module_imports,
+            context.current_module.as_deref(),
+            context.current_flow_path.as_deref(),
+        ) {
+            match result {
+                Ok(actual_type) if &actual_type != declared_type => {
+                    self.diagnostics.push(type_mismatch_diagnostic(
+                        assignment,
+                        declared_type,
+                        &actual_type,
+                    ));
+                }
+                Ok(_) => {}
+                Err(error) => self.diagnostics.push(Diagnostic::error(
+                    assignment.span().clone(),
+                    format!(
+                        "Cannot type-check initializer for variable '{}': {}",
+                        assignment.name(),
+                        error.message()
+                    ),
+                )),
+            }
+            return;
+        }
 
         match infer_expression_type(
             expression,
@@ -116,6 +164,43 @@ impl<'a> VariableInitializerChecker<'a> {
     }
 
     fn check_constant(&mut self, declaration: &ConstantDeclaration, context: &VisitContext) {
+        if let Some(result) = infer_expected_interface_expression_type(
+            declaration.expression(),
+            declaration.declared_type(),
+            self.variable_scopes,
+            self.struct_types,
+            self.enum_types,
+            self.target_symbols,
+            self.module_implementations,
+            self.module_imports,
+            context.current_module.as_deref(),
+            context.current_flow_path.as_deref(),
+        ) {
+            match result {
+                Ok(actual_type) if &actual_type != declaration.declared_type() => {
+                    self.diagnostics.push(Diagnostic::error(
+                        declaration.span().clone(),
+                        format!(
+                            "Initializer for constant '{}' has type {} but declared type is {}",
+                            declaration.name(),
+                            actual_type.display_name(),
+                            declaration.declared_type().display_name()
+                        ),
+                    ));
+                }
+                Ok(_) => {}
+                Err(error) => self.diagnostics.push(Diagnostic::error(
+                    declaration.span().clone(),
+                    format!(
+                        "Cannot type-check initializer for constant '{}': {}",
+                        declaration.name(),
+                        error.message()
+                    ),
+                )),
+            }
+            return;
+        }
+
         match infer_expression_type(
             declaration.expression(),
             self.variable_scopes,
@@ -349,6 +434,110 @@ mod tests {
             &diagnostics,
             DiagnosticSeverity::Error,
             "Variable 'next' of type -> cannot be default-initialized",
+        );
+    }
+
+    #[test]
+    fn accepts_interface_module_literal_initializers() {
+        let story = parse_story(
+            "=== interface IItem ===\n\
+             == target ==\n\
+             === module left implements IItem ===\n\
+             CONST default_route: interface<IItem> = left\n\
+             VAR route: interface<IItem> = left\n\
+             == main ==\n\
+             -> END\n\
+             == target ==\n\
+             -> END",
+        );
+
+        assert_eq!(super::super::run_analysis_passes(&story), []);
+    }
+
+    #[test]
+    fn reports_missing_import_for_interface_module_literal_initializers() {
+        let story = parse_story(
+            "=== interface IItem ===\n\
+             == target ==\n\
+             === module game ===\n\
+             VAR route: interface<IItem> = left\n\
+             == main ==\n\
+             -> END\n\
+             === module left implements IItem ===\n\
+             == target ==\n\
+             -> END",
+        );
+
+        let diagnostics = variable_initializer_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Cannot type-check initializer for variable 'route': Module literal 'left' requires a bare import in module 'game': FROM left",
+        );
+    }
+
+    #[test]
+    fn rejects_interface_default_initializers() {
+        let story = parse_story(
+            "=== interface IItem ===\n\
+             == target ==\n\
+             === module game ===\n\
+             VAR route: interface<IItem>\n\
+             == main ==\n\
+             -> END",
+        );
+
+        let diagnostics = variable_initializer_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Variable 'route' of type interface<IItem> cannot be default-initialized",
+        );
+    }
+
+    #[test]
+    fn rejects_non_implementing_modules_as_interface_initializers() {
+        let story = parse_story(
+            "=== interface IItem ===\n\
+             == target ==\n\
+             === module game ===\n\
+             FROM left\n\
+             VAR route: interface<IItem> = left\n\
+             == main ==\n\
+             -> END\n\
+             === module left ===\n\
+             == target ==\n\
+             -> END",
+        );
+
+        let diagnostics = variable_initializer_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Cannot type-check initializer for variable 'route': Module 'left' does not implement interface 'IItem'",
+        );
+    }
+
+    #[test]
+    fn rejects_plain_strings_as_interface_initializers() {
+        let story = parse_story(
+            "=== interface IItem ===\n\
+             == target ==\n\
+             === module game ===\n\
+             VAR route: interface<IItem> = \"left\"\n\
+             == main ==\n\
+             -> END",
+        );
+
+        let diagnostics = variable_initializer_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Initializer for variable 'route' has type string but declared type is interface<IItem>",
         );
     }
 

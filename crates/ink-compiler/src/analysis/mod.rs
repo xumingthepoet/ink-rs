@@ -8,6 +8,7 @@ mod field_access;
 mod flow;
 mod index_access;
 mod initializers;
+mod interface_values;
 mod interfaces;
 mod modules;
 mod names;
@@ -176,6 +177,7 @@ mod tests {
         ("flow.rs", include_str!("flow.rs")),
         ("index_access.rs", include_str!("index_access.rs")),
         ("initializers.rs", include_str!("initializers.rs")),
+        ("interface_values.rs", include_str!("interface_values.rs")),
         ("interfaces.rs", include_str!("interfaces.rs")),
         ("names.rs", include_str!("names.rs")),
         ("span.rs", include_str!("span.rs")),

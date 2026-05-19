@@ -10,6 +10,11 @@ use super::{
     context::{EnumTypeIndex, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
     enums::{build_enum_type_index, type_name_is_enum},
     expression_types::infer_expression_type,
+    interface_values::{
+        build_module_implementation_index, infer_expected_interface_expression_type,
+        ModuleImplementationIndex,
+    },
+    modules::{build_module_import_index, ModuleImportIndex},
     structs::{build_struct_type_index, resolve_struct_symbol},
     target_symbols::build_target_symbol_index,
     type_names::{qualify_type_name_for_module, type_name_module},
@@ -21,11 +26,15 @@ pub(super) fn variable_assignment_diagnostics(story: &Story) -> Vec<Diagnostic> 
     let enum_types = build_enum_type_index(story);
     let variable_scopes = build_variable_scope_index(story);
     let target_symbols = build_target_symbol_index(story);
+    let module_implementations = build_module_implementation_index(story);
+    let module_imports = build_module_import_index(story);
     let mut checker = VariableAssignmentChecker::new(
         &variable_scopes,
         &struct_types,
         &enum_types,
         &target_symbols,
+        &module_implementations,
+        &module_imports,
     );
     walk_story(story, &mut checker);
     checker.diagnostics
@@ -36,6 +45,8 @@ struct VariableAssignmentChecker<'a> {
     struct_types: &'a StructTypeIndex,
     enum_types: &'a EnumTypeIndex,
     target_symbols: &'a TargetSymbolIndex,
+    module_implementations: &'a ModuleImplementationIndex,
+    module_imports: &'a ModuleImportIndex,
     diagnostics: Vec<Diagnostic>,
 }
 
@@ -45,12 +56,16 @@ impl<'a> VariableAssignmentChecker<'a> {
         struct_types: &'a StructTypeIndex,
         enum_types: &'a EnumTypeIndex,
         target_symbols: &'a TargetSymbolIndex,
+        module_implementations: &'a ModuleImplementationIndex,
+        module_imports: &'a ModuleImportIndex,
     ) -> Self {
         Self {
             variable_scopes,
             struct_types,
             enum_types,
             target_symbols,
+            module_implementations,
+            module_imports,
             diagnostics: Vec::new(),
         }
     }
@@ -269,6 +284,41 @@ impl<'a> VariableAssignmentChecker<'a> {
         span: &crate::source::SourceSpan,
         context: &VisitContext,
     ) {
+        if let Some(result) = infer_expected_interface_expression_type(
+            expression,
+            &declared_type,
+            self.variable_scopes,
+            self.struct_types,
+            self.enum_types,
+            self.target_symbols,
+            self.module_implementations,
+            self.module_imports,
+            context.current_module.as_deref(),
+            context.current_flow_path.as_deref(),
+        ) {
+            match result {
+                Ok(actual_type) if actual_type != declared_type => {
+                    self.diagnostics.push(Diagnostic::error(
+                        span.clone(),
+                        format!(
+                            "Assignment to variable '{name}' has type {} but declared type is {}",
+                            actual_type.display_name(),
+                            declared_type.display_name()
+                        ),
+                    ));
+                }
+                Ok(_) => {}
+                Err(error) => self.diagnostics.push(Diagnostic::error(
+                    span.clone(),
+                    format!(
+                        "Cannot type-check assignment to variable '{name}': {}",
+                        error.message()
+                    ),
+                )),
+            }
+            return;
+        }
+
         match infer_assignable_primitive_type(
             &declared_type,
             expression,
@@ -435,6 +485,63 @@ mod tests {
         );
 
         assert_eq!(variable_assignment_diagnostics(&story), []);
+    }
+
+    #[test]
+    fn accepts_interface_module_literal_and_copy_assignments() {
+        let story = parse_story(
+            "=== interface IItem ===\n\
+             == target ==\n\
+             === module game ===\n\
+             FROM left\n\
+             STRUCT Holder {\n\
+             next: interface<IItem>\n\
+             }\n\
+             VAR route: interface<IItem> = left\n\
+             VAR routes: interface<IItem>[] = [left]\n\
+             VAR holder: Holder = { next: left }\n\
+             == main ==\n\
+             ~ temp local: interface<IItem> = route\n\
+             ~ route = left\n\
+             ~ route = local\n\
+             ~ routes[0] = left\n\
+             ~ holder.next = left\n\
+             -> END\n\
+             === module left implements IItem ===\n\
+             == target ==\n\
+             -> END",
+        );
+
+        assert_eq!(super::super::run_analysis_passes(&story), []);
+    }
+
+    #[test]
+    fn rejects_non_implementing_modules_in_interface_assignments() {
+        let story = parse_story(
+            "=== interface IItem ===\n\
+             == target ==\n\
+             === module game ===\n\
+             FROM good\n\
+             FROM left\n\
+             VAR route: interface<IItem> = good\n\
+             == main ==\n\
+             ~ route = left\n\
+             -> END\n\
+             === module good implements IItem ===\n\
+             == target ==\n\
+             -> END\n\
+             === module left ===\n\
+             == target ==\n\
+             -> END",
+        );
+
+        let diagnostics = variable_assignment_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Cannot type-check assignment to variable 'route': Module 'left' does not implement interface 'IItem'",
+        );
     }
 
     #[test]

@@ -14,7 +14,7 @@ pub(super) struct TypeInferenceError {
 }
 
 impl TypeInferenceError {
-    fn new(message: impl Into<String>) -> Self {
+    pub(super) fn new(message: impl Into<String>) -> Self {
         Self {
             message: message.into(),
         }

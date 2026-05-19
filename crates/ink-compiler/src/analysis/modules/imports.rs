@@ -10,6 +10,7 @@ use crate::{
 };
 
 use super::{sort_diagnostics, ModuleSymbolIndex};
+use crate::analysis::interface_values::collect_interface_module_literal_uses_for_story;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ModuleImportIndex {
@@ -47,6 +48,7 @@ pub(in crate::analysis) fn module_import_diagnostics(
 ) -> Vec<Diagnostic> {
     let qualified_uses = collect_qualified_uses(story);
     let qualified_use_sets = qualified_use_sets_by_module(&qualified_uses);
+    let interface_module_literal_uses = collect_interface_module_literal_uses_for_story(story);
     let mut diagnostics = Vec::new();
 
     for module in story.modules() {
@@ -75,10 +77,13 @@ pub(in crate::analysis) fn module_import_diagnostics(
             }
 
             if import.is_module_import() {
-                diagnostics.push(Diagnostic::warning(
-                    import.source_module_span().clone(),
-                    format!("Imported module '{}' is never used", import.source_module()),
-                ));
+                if !interface_module_literal_uses.uses_module(module.name(), import.source_module())
+                {
+                    diagnostics.push(Diagnostic::warning(
+                        import.source_module_span().clone(),
+                        format!("Imported module '{}' is never used", import.source_module()),
+                    ));
+                }
                 continue;
             }
 

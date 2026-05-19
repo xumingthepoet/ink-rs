@@ -17,6 +17,9 @@ use super::{
     },
     enums::{build_enum_type_index, is_enum_member_reference},
     expression_types::{infer_expression_type, typed_builtin_return_type},
+    interface_values::{
+        collect_interface_module_literal_uses_for_story, InterfaceModuleLiteralUses,
+    },
     span::object_span,
     structs::build_struct_type_index,
     target_symbols::{
@@ -31,11 +34,13 @@ pub(super) fn call_target_diagnostics(story: &Story) -> Vec<Diagnostic> {
     let variable_scopes = build_variable_scope_index(story);
     let struct_types = build_struct_type_index(story);
     let enum_types = build_enum_type_index(story);
+    let interface_module_literal_uses = collect_interface_module_literal_uses_for_story(story);
     let mut checker = CallTargetChecker::new(
         &target_symbols,
         &variable_scopes,
         &struct_types,
         &enum_types,
+        &interface_module_literal_uses,
     );
     walk_story(story, &mut checker);
     checker.diagnostics
@@ -46,6 +51,7 @@ struct CallTargetChecker<'a> {
     variable_scopes: &'a VariableScopeIndex,
     struct_types: &'a StructTypeIndex,
     enum_types: &'a EnumTypeIndex,
+    interface_module_literal_uses: &'a InterfaceModuleLiteralUses,
     diagnostics: Vec<Diagnostic>,
     flow_contexts_by_path: HashMap<String, FlowContext>,
 }
@@ -56,12 +62,14 @@ impl<'a> CallTargetChecker<'a> {
         variable_scopes: &'a VariableScopeIndex,
         struct_types: &'a StructTypeIndex,
         enum_types: &'a EnumTypeIndex,
+        interface_module_literal_uses: &'a InterfaceModuleLiteralUses,
     ) -> Self {
         Self {
             target_symbols,
             variable_scopes,
             struct_types,
             enum_types,
+            interface_module_literal_uses,
             diagnostics: Vec::new(),
             flow_contexts_by_path: HashMap::new(),
         }
@@ -314,10 +322,10 @@ impl<'a> CallTargetChecker<'a> {
                 self.check_divert_target_value(target, span, context);
             }
             Expression::VariableReference(name) => {
-                self.check_variable_reference(name, span, context);
+                self.check_variable_reference(expression, name, span, context);
             }
             Expression::QualifiedReference(name) => {
-                self.check_variable_reference(name.as_str(), span, context);
+                self.check_variable_reference(expression, name.as_str(), span, context);
             }
             Expression::StringContent(_)
             | Expression::String(_)
@@ -582,7 +590,20 @@ impl<'a> CallTargetChecker<'a> {
         }
     }
 
-    fn check_variable_reference(&mut self, name: &str, span: &SourceSpan, context: &VisitContext) {
+    fn check_variable_reference(
+        &mut self,
+        expression: &Expression,
+        name: &str,
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) {
+        if self
+            .interface_module_literal_uses
+            .contains_expression(expression)
+        {
+            return;
+        }
+
         let current_flow_path = self.current_flow_path(context);
         if name.contains("::")
             && self

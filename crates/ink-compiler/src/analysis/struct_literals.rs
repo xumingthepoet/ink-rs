@@ -14,6 +14,11 @@ use super::{
     context::{EnumTypeIndex, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
     enums::{build_enum_type_index, type_name_contains_enum},
     expression_types::infer_expression_type,
+    interface_values::{
+        build_module_implementation_index, infer_expected_interface_expression_type,
+        ModuleImplementationIndex,
+    },
+    modules::{build_module_import_index, ModuleImportIndex},
     structs::{build_struct_type_index, resolve_struct_symbol},
     target_symbols::build_target_symbol_index,
     variables::build_variable_scope_index,
@@ -24,11 +29,15 @@ pub(super) fn struct_literal_diagnostics(story: &Story) -> Vec<Diagnostic> {
     let enum_types = build_enum_type_index(story);
     let variable_scopes = build_variable_scope_index(story);
     let target_symbols = build_target_symbol_index(story);
+    let module_implementations = build_module_implementation_index(story);
+    let module_imports = build_module_import_index(story);
     let mut checker = StructLiteralChecker::new(
         &struct_types,
         &enum_types,
         &variable_scopes,
         &target_symbols,
+        &module_implementations,
+        &module_imports,
     );
     walk_story(story, &mut checker);
     checker.diagnostics
@@ -39,6 +48,8 @@ struct StructLiteralChecker<'a> {
     enum_types: &'a EnumTypeIndex,
     variable_scopes: &'a VariableScopeIndex,
     target_symbols: &'a TargetSymbolIndex,
+    module_implementations: &'a ModuleImplementationIndex,
+    module_imports: &'a ModuleImportIndex,
     diagnostics: Vec<Diagnostic>,
 }
 
@@ -48,12 +59,16 @@ impl<'a> StructLiteralChecker<'a> {
         enum_types: &'a EnumTypeIndex,
         variable_scopes: &'a VariableScopeIndex,
         target_symbols: &'a TargetSymbolIndex,
+        module_implementations: &'a ModuleImplementationIndex,
+        module_imports: &'a ModuleImportIndex,
     ) -> Self {
         Self {
             struct_types,
             enum_types,
             variable_scopes,
             target_symbols,
+            module_implementations,
+            module_imports,
             diagnostics: Vec::new(),
         }
     }
@@ -170,6 +185,40 @@ impl<'a> StructLiteralChecker<'a> {
         span: &SourceSpan,
         context: &VisitContext,
     ) {
+        if let Some(result) = infer_expected_interface_expression_type(
+            expression,
+            expected_type,
+            self.variable_scopes,
+            self.struct_types,
+            self.enum_types,
+            self.target_symbols,
+            self.module_implementations,
+            self.module_imports,
+            context.current_module.as_deref(),
+            context.current_flow_path.as_deref(),
+        ) {
+            match result {
+                Ok(actual_type) if &actual_type != expected_type => {
+                    self.diagnostics.push(type_mismatch_diagnostic(
+                        context_name,
+                        expected_type,
+                        &actual_type,
+                        span,
+                    ));
+                }
+                Ok(_) => {}
+                Err(error) => self.diagnostics.push(Diagnostic::error(
+                    span.clone(),
+                    format!(
+                        "Cannot type-check value for '{}': {}",
+                        context_name,
+                        error.message()
+                    ),
+                )),
+            }
+            return;
+        }
+
         match infer_expression_type(
             expression,
             self.variable_scopes,
@@ -368,6 +417,77 @@ mod tests {
         );
 
         assert_eq!(super::super::run_analysis_passes(&story), []);
+    }
+
+    #[test]
+    fn accepts_interface_module_literals_in_struct_fields() {
+        let story = parse_story(
+            "=== interface IItem ===\n\
+             == target ==\n\
+             === module game ===\n\
+             FROM left\n\
+             STRUCT Route {\n\
+             next: interface<IItem>\n\
+             }\n\
+             VAR route: Route = { next: left }\n\
+             == main ==\n\
+             -> END\n\
+             === module left implements IItem ===\n\
+             == target ==\n\
+             -> END",
+        );
+
+        assert_eq!(super::super::run_analysis_passes(&story), []);
+    }
+
+    #[test]
+    fn rejects_non_implementing_modules_in_interface_struct_fields() {
+        let story = parse_story(
+            "=== interface IItem ===\n\
+             == target ==\n\
+             === module game ===\n\
+             FROM left\n\
+             STRUCT Route {\n\
+             next: interface<IItem>\n\
+             }\n\
+             VAR route: Route = { next: left }\n\
+             == main ==\n\
+             -> END\n\
+             === module left ===\n\
+             == target ==\n\
+             -> END",
+        );
+
+        let diagnostics = struct_literal_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Cannot type-check value for 'Route.next': Module 'left' does not implement interface 'IItem'",
+        );
+    }
+
+    #[test]
+    fn rejects_missing_interface_struct_fields_without_defaults() {
+        let story = parse_story(
+            "=== interface IItem ===\n\
+             == target ==\n\
+             === module game ===\n\
+             STRUCT Route {\n\
+             next: interface<IItem>\n\
+             }\n\
+             VAR route: Route = {}\n\
+             == main ==\n\
+             -> END",
+        );
+
+        let diagnostics = struct_literal_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Missing field 'next' in struct literal for 'Route' cannot be default-initialized",
+        );
     }
 
     #[test]

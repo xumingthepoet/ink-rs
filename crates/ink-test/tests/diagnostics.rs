@@ -135,6 +135,20 @@ fn interface_implementation_diagnostics_report_contract_errors() {
 }
 
 #[test]
+fn interface_value_diagnostics_report_invalid_module_literals() {
+    let diagnostics = diagnostics_for_fixture("diagnostics/interface-values.ink");
+
+    for message in [
+        "Module literal 'left' requires a bare import in module 'game': FROM left",
+        "Unknown module 'missing' for interface value",
+        "Module 'wrong' does not implement interface 'IItem'",
+        "Variable 'defaultRoute' of type interface<IItem> cannot be default-initialized",
+    ] {
+        assert_diagnostic(&diagnostics, DiagnosticSeverity::Error, message);
+    }
+}
+
+#[test]
 fn imports_diagnostics_report_obsolete_import_syntax() {
     let diagnostics = diagnostics_for_fixture("diagnostics/imports-obsolete.ink");
 
