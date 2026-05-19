@@ -27,6 +27,16 @@ fn module_import_example_runs() {
 }
 
 #[test]
+fn docs_interface_dynamic_access_runs() {
+    let compiled = compile_fixture("modules/docs-interface-dynamic-access.ink");
+
+    assert_story_output(
+        &compiled,
+        "Default fare 4.\nSwitched fare 5.\nRight route 2.\n",
+    );
+}
+
+#[test]
 fn qualified_function_and_external_calls_run() {
     let compiled = compile_fixture("modules/module-qualified-calls.ink");
 

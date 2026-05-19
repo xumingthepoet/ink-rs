@@ -432,6 +432,86 @@ Modules can declare explicit interface implementations in the module header:
 	== destination ==
 	-> END
 
+Interfaces declare signatures only. A knot signature requires an implementing
+module to provide a knot with the same name and parameters. A function
+signature requires an implementing function with the same parameters and return
+type. A module can implement more than one interface:
+
+	=== module express implements IRoute, IInspectable ===
+
+An interface value stores the selected implementation module for a declared
+interface. Use `interface<Name>` in type positions:
+
+	VAR route: interface<IRoute> = left
+	VAR backups: interface<IRoute>[] = [left, right]
+
+Module names used as interface values are module literals. The current module
+must import each implementation module with a bare module import:
+
+	FROM left
+	FROM right
+
+`FROM right IMPORT arrive` authorizes static `right::arrive` references, but it
+does not authorize `right` as an interface value. Use both import forms when a
+module is needed both as a value and as a static symbol source.
+
+Dynamic interface knot targets use a braced interface expression followed by
+`::member`. The dynamic divert form wraps that target expression in the normal
+dynamic-divert braces:
+
+	-> {{route}::destination}
+	-> {{route}::arrive}(2)
+
+Dynamic interface function calls are ordinary expressions:
+
+	{route}::fare(base_price)
+
+For example:
+
+	=== interface IRoute ===
+	== arrive(stops: int) ==
+	== function fare(base: int) => int ==
+
+	=== module game ===
+	FROM left
+	FROM right
+	FROM rates IMPORT base
+
+	VAR route: interface<IRoute> = left
+
+	== main ==
+	Default fare {current_fare()}.
+	~ route = right
+	Switched fare {current_fare()}.
+	-> {{route}::arrive}(2)
+
+	== function current_fare() => int ==
+	~ return {route}::fare(rates::base)
+
+	=== module rates ===
+	VAR base: int = 3
+
+	=== module left implements IRoute ===
+	== arrive(stops: int) ==
+	Left route {stops}.
+	-> END
+
+	== function fare(base: int) => int ==
+	~ return base + 1
+
+	=== module right implements IRoute ===
+	== arrive(stops: int) ==
+	Right route {stops}.
+	-> END
+
+	== function fare(base: int) => int ==
+	~ return base + 2
+
+Interface values are string-backed runtime values containing the implementation
+module name. They can be assigned, stored in arrays and structs, and saved in
+the existing save JSON string/array/object shapes. Dynamic access validates at
+use time that the stored module name implements the required interface member.
+
 ### Knots can be subdivided
 
 As stories get longer, they become more confusing to keep organised without some additional structure.

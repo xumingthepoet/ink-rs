@@ -24,6 +24,36 @@ Each entry should include:
 - migration guidance
 - tests
 
+## 2026-05-20: Interface-Typed Dynamic Module Access
+
+- status: supported
+- upstream behavior: upstream Ink does not have explicit module interfaces,
+  interface-typed module values, or dynamic dispatch through module values.
+- ink-rs behavior: `=== interface IItem ===` declares signature-only knot and
+  function members. `=== module left implements IItem, IOther ===` explicitly
+  declares implementations. `interface<IItem>` is the supported type for module
+  values constrained by an interface; plain `module` is not a supported source
+  type. Module literals require `FROM module`, while static qualified access
+  still requires `FROM module IMPORT symbol`. Dynamic knot access uses
+  `-> {{route}::target}` or `-> {{route}::target}(arg)`, and dynamic interface
+  function calls use `{route}::score(arg)`.
+- documentation effect: `SyntaxReference.md` documents only the current
+  interface, implementation, import, interface value, dynamic target, and
+  dynamic function syntax. Save behavior is described as string-backed runtime
+  values using existing string, array, and object save JSON shapes.
+- rationale: explicit interfaces keep dynamic module access type-checked while
+  still letting story state choose an implementation at runtime. Bare module
+  imports distinguish module literals from static symbol allow-lists.
+- migration guidance: use `interface<IItem>` variables and explicit
+  `implements` clauses for dynamic module dispatch. Replace any experimental
+  module-value import workaround with `FROM module`, and keep
+  `FROM module IMPORT symbol` only for static `module::symbol` references.
+- tests: interface parser, analysis, lowering, runtime, save/load, diagnostics,
+  compiler snapshot, and documentation-facing fixtures cover interface
+  declarations, module implementations, interface values in arrays and structs,
+  dynamic knot targets, dynamic function calls, save JSON, and import
+  diagnostics.
+
 ## 2026-05-04: ENUM Declarations And Values
 
 - status: supported
