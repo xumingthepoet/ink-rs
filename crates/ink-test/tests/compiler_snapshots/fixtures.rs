@@ -9,6 +9,75 @@ macro_rules! fixture {
     };
 }
 
+#[test]
+fn interface_dynamic_targets_lower_to_format_tokens() {
+    use ink_compiler::{Compiler, SourceInput};
+    use serde_json::{json, Value};
+    use std::fs;
+
+    let filename = "interface/dynamic-targets.ink";
+    let source_path = ink_test::fixture_root().join(filename);
+    let source = fs::read_to_string(&source_path)
+        .unwrap_or_else(|error| panic!("failed to read {}: {error}", source_path.display()));
+    let output = Compiler::default().compile(SourceInput::named(source, filename));
+
+    assert!(
+        output.diagnostics.is_empty(),
+        "compile for {filename} should not emit diagnostics: {:#?}",
+        output.diagnostics
+    );
+
+    let compiled = output.artifact.expect("expected compiled story");
+    let json: Value = serde_json::from_str(&compiled.json)
+        .unwrap_or_else(|error| panic!("compiled json for {filename} must be valid: {error}"));
+
+    assert_json_sequence(
+        &json,
+        &[
+            json!("ev"),
+            json!(3),
+            json!({"VAR?": "game::route"}),
+            json!({"i->": "target", "interface": "IItem"}),
+            json!({"temp=": "$divertTarget"}),
+            json!("/ev"),
+            json!({"->": "$divertTarget", "var": true}),
+        ],
+    );
+    assert_json_sequence(
+        &json,
+        &[
+            json!({"VAR?": "game::routes"}),
+            json!(1),
+            json!("INDEX"),
+            json!({"i->": "fallback", "interface": "IItem"}),
+        ],
+    );
+}
+
+fn assert_json_sequence(value: &serde_json::Value, sequence: &[serde_json::Value]) {
+    assert!(
+        json_contains_sequence(value, sequence),
+        "expected JSON sequence {sequence:#?} in {value:#}"
+    );
+}
+
+fn json_contains_sequence(value: &serde_json::Value, sequence: &[serde_json::Value]) -> bool {
+    match value {
+        serde_json::Value::Array(items) => {
+            items
+                .windows(sequence.len())
+                .any(|window| window == sequence)
+                || items
+                    .iter()
+                    .any(|item| json_contains_sequence(item, sequence))
+        }
+        serde_json::Value::Object(map) => map
+            .values()
+            .any(|item| json_contains_sequence(item, sequence)),
+        _ => false,
+    }
+}
+
 fixture!(text_oneline, "text/oneline.ink");
 fixture!(text_twolines, "text/twolines.ink");
 fixture!(knot_multi_line, "knots/multi-line.ink");

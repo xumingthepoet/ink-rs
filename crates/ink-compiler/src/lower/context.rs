@@ -2,7 +2,10 @@ use std::collections::{HashMap, HashSet};
 
 use crate::parsed::TypeName;
 
-use super::indexes::{ConstantValues, EnumDefinitions, ExternalSignatures, StructDefinitions};
+use super::indexes::{
+    ConstantValues, EnumDefinitions, ExternalSignatures, InterfaceMemberSignatures,
+    StructDefinitions,
+};
 use super::path::{child_path, module_scoped_source_path_to_runtime_path, LabelIndex};
 
 pub(super) struct LoweringContext<'a> {
@@ -12,6 +15,7 @@ pub(super) struct LoweringContext<'a> {
     global_variables: &'a HashSet<String>,
     global_variable_types: &'a HashMap<String, TypeName>,
     external_signatures: &'a ExternalSignatures,
+    interface_members: &'a InterfaceMemberSignatures,
     constants: &'a ConstantValues,
     struct_definitions: &'a StructDefinitions,
     enum_definitions: &'a EnumDefinitions,
@@ -25,6 +29,7 @@ impl<'a> LoweringContext<'a> {
         global_variables: &'a HashSet<String>,
         global_variable_types: &'a HashMap<String, TypeName>,
         external_signatures: &'a ExternalSignatures,
+        interface_members: &'a InterfaceMemberSignatures,
         constants: &'a ConstantValues,
         struct_definitions: &'a StructDefinitions,
         enum_definitions: &'a EnumDefinitions,
@@ -36,6 +41,7 @@ impl<'a> LoweringContext<'a> {
             global_variables,
             global_variable_types,
             external_signatures,
+            interface_members,
             constants,
             struct_definitions,
             enum_definitions,
@@ -66,6 +72,10 @@ impl<'a> LoweringContext<'a> {
         self.external_signatures
     }
 
+    pub(super) fn interface_members(&self) -> &InterfaceMemberSignatures {
+        self.interface_members
+    }
+
     pub(super) fn constants(&self) -> &ConstantValues {
         self.constants
     }
@@ -86,6 +96,7 @@ impl<'a> LoweringContext<'a> {
             global_variables: self.global_variables,
             global_variable_types: self.global_variable_types,
             external_signatures: self.external_signatures,
+            interface_members: self.interface_members,
             constants: self.constants,
             struct_definitions: self.struct_definitions,
             enum_definitions: self.enum_definitions,
@@ -104,6 +115,7 @@ impl<'a> LoweringContext<'a> {
             global_variables: self.global_variables,
             global_variable_types: self.global_variable_types,
             external_signatures: self.external_signatures,
+            interface_members: self.interface_members,
             constants: self.constants,
             struct_definitions: self.struct_definitions,
             enum_definitions: self.enum_definitions,

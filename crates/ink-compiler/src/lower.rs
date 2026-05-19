@@ -86,13 +86,12 @@ struct DynamicInterfaceLoweringChecker {
 }
 
 impl DynamicInterfaceLoweringChecker {
-    fn check_dynamic_target_expression(&mut self, expression: &Expression, span: &SourceSpan) {
-        if matches!(expression, Expression::DynamicInterfaceAccess { .. }) {
-            self.diagnostics.push(Diagnostic::error(
-                span.clone(),
-                "Dynamic interface target lowering is not implemented yet",
-            ));
-        } else if matches!(expression, Expression::DynamicInterfaceFunctionCall { .. }) {
+    fn check_dynamic_interface_function_expression(
+        &mut self,
+        expression: &Expression,
+        span: &SourceSpan,
+    ) {
+        if matches!(expression, Expression::DynamicInterfaceFunctionCall { .. }) {
             self.diagnostics.push(Diagnostic::error(
                 span.clone(),
                 "Dynamic interface function call lowering is not implemented yet",
@@ -106,12 +105,15 @@ impl ParsedVisitor for DynamicInterfaceLoweringChecker {
         match object {
             Object::Divert(divert) => {
                 if let DivertTarget::Dynamic(expression) = divert.target() {
-                    self.check_dynamic_target_expression(expression, divert.span());
+                    self.check_dynamic_interface_function_expression(expression, divert.span());
                 }
             }
             Object::TunnelOnwards(tunnel_onwards) => {
                 if let Some(DivertTarget::Dynamic(expression)) = tunnel_onwards.override_target() {
-                    self.check_dynamic_target_expression(expression, tunnel_onwards.span());
+                    self.check_dynamic_interface_function_expression(
+                        expression,
+                        tunnel_onwards.span(),
+                    );
                 }
             }
             _ => {}
@@ -119,7 +121,7 @@ impl ParsedVisitor for DynamicInterfaceLoweringChecker {
     }
 
     fn visit_expression(&mut self, expression: &Expression, _context: &VisitContext) {
-        self.check_dynamic_target_expression(expression, &SourceSpan::new(None, 1, 1));
+        self.check_dynamic_interface_function_expression(expression, &SourceSpan::new(None, 1, 1));
     }
 }
 
@@ -304,6 +306,7 @@ fn lower_global_declarations(
             &indexes.global_variables,
             &indexes.global_variable_types,
             &indexes.external_signatures,
+            &indexes.interface_members,
             &indexes.constants,
             &indexes.struct_definitions,
             &indexes.enum_definitions,
@@ -341,6 +344,7 @@ fn estimated_choice_content_len(
     let global_labels = LabelIndex::new();
     let external_signatures = HashMap::new();
     let global_variable_types = HashMap::new();
+    let interface_members = HashMap::new();
     let context = LoweringContext::new(
         ChoicePathMode::Root,
         &choice_labels,
@@ -348,6 +352,7 @@ fn estimated_choice_content_len(
         global_variables,
         &global_variable_types,
         &external_signatures,
+        &interface_members,
         constants,
         struct_definitions,
         enum_definitions,
@@ -372,6 +377,7 @@ fn estimated_runtime_len_for_label_collection(
     let global_labels = LabelIndex::new();
     let external_signatures = HashMap::new();
     let global_variable_types = HashMap::new();
+    let interface_members = HashMap::new();
     let context = LoweringContext::new(
         ChoicePathMode::Root,
         &choice_labels,
@@ -379,6 +385,7 @@ fn estimated_runtime_len_for_label_collection(
         global_variables,
         &global_variable_types,
         &external_signatures,
+        &interface_members,
         constants,
         struct_definitions,
         enum_definitions,

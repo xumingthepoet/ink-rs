@@ -5,7 +5,9 @@ use ink_story_json_format::{ControlCommand, Object as RuntimeObject};
 use crate::parsed::{Divert, DivertTarget, Expression, Return, TunnelOnwards};
 
 use super::context::LoweringContext;
-use super::expression::{lower_expression_into, lower_function_arg_into};
+use super::expression::{
+    dynamic_interface_knot_signature, lower_expression_into, lower_function_arg_into,
+};
 use super::indexes::CallSignature;
 
 pub(super) fn lower_tail_recursive_return_into(
@@ -168,9 +170,12 @@ fn push_dynamic_divert_with_context(
     const DYNAMIC_DIVERT_TARGET_TEMP: &str = "$divertTarget";
 
     content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
-    for argument in &dynamic_target.divert_arguments {
-        lower_expression_into(content, argument, context, false);
-    }
+    lower_dynamic_divert_arguments_into(
+        content,
+        &dynamic_target.expression,
+        &dynamic_target.divert_arguments,
+        context,
+    );
     lower_expression_into(content, &dynamic_target.expression, context, false);
     content.push(RuntimeObject::VariableAssignment(
         DYNAMIC_DIVERT_TARGET_TEMP.to_string(),
@@ -201,8 +206,21 @@ pub(super) fn lower_tunnel_onwards_into(
     context: &LoweringContext<'_>,
 ) {
     content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
-    for argument in tunnel_onwards.arguments() {
-        lower_expression_into(content, argument, context, false);
+    let dynamic_override = tunnel_onwards
+        .override_target()
+        .and_then(|target| match target {
+            DivertTarget::Dynamic(expression) => Some(expression),
+            _ => None,
+        });
+    if let Some(expression) = dynamic_override {
+        lower_dynamic_divert_arguments_into(
+            content,
+            expression,
+            tunnel_onwards.arguments(),
+            context,
+        );
+    } else {
+        lower_plain_divert_arguments_into(content, tunnel_onwards.arguments(), context);
     }
     if let Some(target) = tunnel_onwards.override_target() {
         match target {
@@ -224,6 +242,40 @@ pub(super) fn lower_tunnel_onwards_into(
     }
     content.push(RuntimeObject::ControlCommand(ControlCommand::EvalEnd));
     content.push(RuntimeObject::ControlCommand(ControlCommand::PopTunnel));
+}
+
+fn lower_dynamic_divert_arguments_into(
+    content: &mut Vec<RuntimeObject>,
+    target: &Expression,
+    arguments: &[Expression],
+    context: &LoweringContext<'_>,
+) {
+    let Some((_, signature)) = dynamic_interface_knot_signature(target, context) else {
+        lower_plain_divert_arguments_into(content, arguments, context);
+        return;
+    };
+
+    let mut visiting_constants = HashSet::new();
+    for (index, argument) in arguments.iter().enumerate() {
+        lower_function_arg_into(
+            content,
+            argument,
+            signature.arguments().get(index),
+            context,
+            false,
+            &mut visiting_constants,
+        );
+    }
+}
+
+fn lower_plain_divert_arguments_into(
+    content: &mut Vec<RuntimeObject>,
+    arguments: &[Expression],
+    context: &LoweringContext<'_>,
+) {
+    for argument in arguments {
+        lower_expression_into(content, argument, context, false);
+    }
 }
 
 fn lower_tunnel_onwards_path_target_into(

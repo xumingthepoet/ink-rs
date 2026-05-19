@@ -2,7 +2,11 @@ use std::collections::HashSet;
 
 use ink_story_json_format::{ControlCommand, NativeFunction, Object as RuntimeObject};
 
-use crate::parsed::{AssignmentTarget, BinaryOperator, Expression, FlowArgument, TypeName};
+use crate::parsed::{
+    AssignmentTarget, BinaryOperator, Expression, FlowArgument, InterfaceMemberKind,
+    InterfaceMemberSignature, QualifiedName, TypeName,
+};
+use crate::source::SourceSpan;
 
 use super::assignment::{
     collect_assignment_path, lower_assignment_path_update_value_into,
@@ -14,6 +18,7 @@ use super::indexes::{CallSignature, ConstantValue, ConstantValues, ExternalSigna
 use super::path::{module_scoped_source_path_to_runtime_path, source_path_to_runtime_path};
 use super::value::{
     lower_enum_member_expression_value, lower_value_literal, resolve_divert_target_value,
+    struct_field_definitions_for_type,
 };
 use super::weave::lower_content_list_into_context;
 
@@ -157,9 +162,11 @@ fn lower_expression_into_with_constants(
         Expression::QualifiedFunctionCall { name, args } => {
             lower_function_call_into(content, name.as_str(), args, lowering);
         }
-        Expression::DynamicInterfaceAccess { .. }
-        | Expression::DynamicInterfaceFunctionCall { .. } => {
-            unreachable!("dynamic interface expressions must be rejected before lowering")
+        Expression::DynamicInterfaceAccess { target, member } => {
+            lower_dynamic_interface_target_into(content, target, member, lowering);
+        }
+        Expression::DynamicInterfaceFunctionCall { .. } => {
+            unreachable!("dynamic interface function calls must be rejected before lowering")
         }
         Expression::ArrayLiteral(_) | Expression::StructLiteral(_) => {
             if let Some(value) = lower_value_literal(
@@ -263,6 +270,154 @@ fn lower_constant_expression_into(
     }
 
     lower_expression_into_with_constants(content, constant.expression(), &mut constant_lowering);
+}
+
+pub(super) fn dynamic_interface_knot_signature(
+    expression: &Expression,
+    context: &LoweringContext<'_>,
+) -> Option<(String, InterfaceMemberSignature)> {
+    let Expression::DynamicInterfaceAccess { target, member } = expression else {
+        return None;
+    };
+    let interface_name = infer_lowered_expression_type(target, context)?
+        .as_interface_name()?
+        .to_string();
+    let signature = context
+        .interface_members()
+        .get(&interface_name)?
+        .get(member)?
+        .clone();
+    (signature.kind() == &InterfaceMemberKind::Knot).then_some((interface_name, signature))
+}
+
+fn lower_dynamic_interface_target_into(
+    content: &mut Vec<RuntimeObject>,
+    target: &Expression,
+    member: &str,
+    lowering: &mut ExpressionLoweringContext<'_, '_>,
+) {
+    let interface_name = infer_lowered_expression_type(target, lowering.context)
+        .and_then(|type_name| type_name.as_interface_name().map(str::to_string))
+        .expect("dynamic interface target base must have interface type after analysis");
+    lower_expression_into_with_constants(content, target, lowering);
+    content.push(RuntimeObject::DynamicInterfaceTarget {
+        interface: interface_name,
+        member: member.to_string(),
+    });
+}
+
+fn infer_lowered_expression_type(
+    expression: &Expression,
+    context: &LoweringContext<'_>,
+) -> Option<TypeName> {
+    match expression {
+        Expression::String(_) | Expression::StringContent(_) => Some(TypeName::string()),
+        Expression::NumberInt(_) => Some(TypeName::int()),
+        Expression::NumberFloat(_) => Some(TypeName::float()),
+        Expression::NumberBool(_) => Some(TypeName::bool()),
+        Expression::DivertTarget(_) | Expression::DynamicInterfaceAccess { .. } => {
+            Some(TypeName::divert_target())
+        }
+        Expression::VariableReference(name) => visible_variable_or_constant_type(name, context),
+        Expression::QualifiedReference(name) => context
+            .constants()
+            .get(name.as_str())
+            .map(|constant| qualify_type_for_qualified_name(constant.declared_type(), name))
+            .or_else(|| context.global_variable_types().get(name.as_str()).cloned()),
+        Expression::FieldAccess { base, field } => {
+            let base_type = infer_lowered_expression_type(base, context)?;
+            let field_type = struct_field_definitions_for_type(
+                &base_type,
+                context.struct_definitions(),
+                context.path_mode().current_module_name(),
+            )?
+            .iter()
+            .find(|(field_name, _)| field_name == field)?
+            .1
+            .clone();
+            Some(qualify_field_type_for_base(&field_type, &base_type))
+        }
+        Expression::IndexAccess { base, .. } => infer_lowered_expression_type(base, context)?
+            .array_element_type()
+            .cloned(),
+        Expression::FunctionCall { name, .. } => callable_return_type(name, context),
+        Expression::QualifiedFunctionCall { name, .. } => {
+            callable_return_type(name.as_str(), context)
+        }
+        Expression::ArrayLiteral(_)
+        | Expression::StructLiteral(_)
+        | Expression::DynamicInterfaceFunctionCall { .. }
+        | Expression::Binary { .. }
+        | Expression::Unary { .. }
+        | Expression::MultipleCondition(_) => None,
+    }
+}
+
+fn visible_variable_or_constant_type(
+    name: &str,
+    context: &LoweringContext<'_>,
+) -> Option<TypeName> {
+    if let Some(local_type) = context.path_mode().local_variable_type(name) {
+        return Some(local_type.clone());
+    }
+    if let Some(constant_name) =
+        resolve_constant_name(name, context.path_mode(), context.constants())
+    {
+        return context
+            .constants()
+            .get(constant_name.as_str())
+            .map(|constant| constant.declared_type().clone());
+    }
+
+    let runtime_name =
+        resolve_runtime_variable_name(name, context.path_mode(), context.global_variables());
+    context.global_variable_types().get(&runtime_name).cloned()
+}
+
+fn callable_return_type(name: &str, context: &LoweringContext<'_>) -> Option<TypeName> {
+    let resolved_name =
+        resolve_callable_name(name, context.external_signatures(), context.path_mode());
+    context
+        .external_signatures()
+        .get(resolved_name.as_str())
+        .map(|signature| match signature {
+            CallSignature::External { return_type, .. }
+            | CallSignature::Ink { return_type, .. } => name
+                .split_once("::")
+                .map(|(module, _)| qualify_type_name_for_module(return_type, module))
+                .unwrap_or_else(|| return_type.clone()),
+        })
+}
+
+fn qualify_field_type_for_base(field_type: &TypeName, base_type: &TypeName) -> TypeName {
+    match base_type {
+        TypeName::QualifiedStruct(name) => qualify_type_name_for_module(field_type, name.module()),
+        _ => field_type.clone(),
+    }
+}
+
+fn qualify_type_for_qualified_name(type_name: &TypeName, name: &QualifiedName) -> TypeName {
+    qualify_type_name_for_module(type_name, name.module())
+}
+
+fn qualify_type_name_for_module(type_name: &TypeName, module: &str) -> TypeName {
+    match type_name {
+        TypeName::Struct(name) => {
+            TypeName::qualified_struct_type(qualified_type_name(module, name))
+        }
+        TypeName::Array(element_type) => {
+            TypeName::array(qualify_type_name_for_module(element_type, module))
+        }
+        TypeName::Primitive(_)
+        | TypeName::QualifiedStruct(_)
+        | TypeName::Interface { .. }
+        | TypeName::Void => type_name.clone(),
+    }
+}
+
+fn qualified_type_name(module: &str, name: &str) -> QualifiedName {
+    let span = SourceSpan::new(None, 1, 1);
+    QualifiedName::new(module, span.clone(), name, span)
 }
 
 pub(super) fn lower_expression_with_expected_type_into_with_constants(

@@ -2,8 +2,8 @@ mod support;
 
 use ink_compiler::DiagnosticSeverity;
 use support::compiler::{
-    assert_diagnostic, assert_fixture_compile_errors, compile_fixture_error_messages,
-    diagnostics_for_fixture,
+    assert_diagnostic, assert_fixture_compile_errors, compile_fixture,
+    compile_fixture_error_messages, diagnostics_for_fixture,
 };
 
 #[test]
@@ -164,14 +164,8 @@ fn interface_dynamic_target_diagnostics_report_invalid_member_access() {
 }
 
 #[test]
-fn interface_dynamic_target_lowering_reports_unimplemented_format() {
-    let diagnostics = diagnostics_for_fixture("diagnostics/interface-dynamic-lowering.ink");
-
-    assert_diagnostic(
-        &diagnostics,
-        DiagnosticSeverity::Error,
-        "Dynamic interface target lowering is not implemented yet",
-    );
+fn interface_dynamic_target_lowering_is_implemented() {
+    let _ = compile_fixture("diagnostics/interface-dynamic-lowering.ink");
 }
 
 #[test]

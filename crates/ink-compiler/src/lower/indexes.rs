@@ -1,8 +1,8 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::parsed::{
-    Choice, ContentList, Expression, Flow, FlowArgument, Object, Story, TypeName,
-    VariableAssignment,
+    Choice, ContentList, Expression, Flow, FlowArgument, InterfaceMemberSignature, Object, Story,
+    TypeName, VariableAssignment,
 };
 
 use super::labels::build_label_index;
@@ -16,6 +16,7 @@ pub(super) struct LoweringIndexes<'a> {
     pub(super) global_variable_types: HashMap<String, TypeName>,
     pub(super) variable_declarations: Vec<VariableDeclaration<'a>>,
     pub(super) external_signatures: ExternalSignatures,
+    pub(super) interface_members: InterfaceMemberSignatures,
     pub(super) struct_definitions: StructDefinitions,
     pub(super) enum_definitions: EnumDefinitions,
 }
@@ -54,6 +55,7 @@ impl<'a> LoweringIndexes<'a> {
             &estimator,
         );
         let external_signatures = build_external_signatures(story);
+        let interface_members = build_interface_member_signatures(story);
 
         Self {
             constants,
@@ -62,6 +64,7 @@ impl<'a> LoweringIndexes<'a> {
             global_variable_types,
             variable_declarations,
             external_signatures,
+            interface_members,
             struct_definitions,
             enum_definitions,
         }
@@ -69,6 +72,8 @@ impl<'a> LoweringIndexes<'a> {
 }
 
 pub(super) type ExternalSignatures = HashMap<String, CallSignature>;
+pub(super) type InterfaceMemberSignatures =
+    HashMap<String, HashMap<String, InterfaceMemberSignature>>;
 pub(super) type StructDefinitions = HashMap<String, Vec<(String, crate::parsed::TypeName)>>;
 pub(super) type EnumDefinitions = HashMap<String, Vec<String>>;
 pub(super) type ConstantValues = HashMap<String, ConstantValue>;
@@ -242,6 +247,19 @@ fn build_global_variable_types(
                 .map(|declared_type| (declaration.runtime_name().to_string(), declared_type))
         })
         .collect()
+}
+
+fn build_interface_member_signatures(story: &Story) -> InterfaceMemberSignatures {
+    let mut signatures = HashMap::new();
+    for interface in story.interfaces() {
+        let members = interface
+            .members()
+            .iter()
+            .map(|member| (member.name().to_string(), member.clone()))
+            .collect::<HashMap<_, _>>();
+        signatures.insert(interface.name().to_string(), members);
+    }
+    signatures
 }
 
 fn build_struct_definitions(story: &Story) -> StructDefinitions {
