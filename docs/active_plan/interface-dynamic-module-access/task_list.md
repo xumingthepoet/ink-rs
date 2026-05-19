@@ -294,7 +294,7 @@ Commit record:
 - Review/fix commits: `f214cb49 Cover bare module import static access`; post-review validation: `cargo fmt --all --check`; `cargo test -p ink-compiler analysis::interfaces`; `cargo test -p ink-compiler analysis::modules`; `cargo test -p ink-compiler analysis::names`; `cargo test -p ink-compiler analysis`; `cargo test -p ink-test --test compiler_snapshots modules`; `cargo test -p ink-test --test diagnostics interface`; `cargo test -p ink-test --test diagnostics imports`; `make gate`
 - Completion record commit: this task-list commit
 
-### [~] Task 07: Validate Module Interface Implementations
+### [>] Task 07: Validate Module Interface Implementations
 
 Goal: Check that every `implements` clause references existing interfaces and that modules implement all required members.
 
@@ -333,9 +333,9 @@ Validation commands:
 
 Commit record:
 
-- Implementation commit: pending
-- Focused validation: pending
-- Full validation: pending
+- Implementation commit: `20be2aa5 Validate module interface implementations`
+- Focused validation: `cargo fmt --all --check`; `cargo test -p ink-compiler analysis::interfaces`; `cargo test -p ink-compiler analysis`; `cargo test -p ink-test --test diagnostics interface`
+- Full validation: `make gate`
 - Review/fix commits: pending
 - Completion record commit: pending
 
