@@ -1204,7 +1204,7 @@ mod tests {
     fn qualified_module_function_calls_are_type_checked() {
         let story = parse_story(
             "=== module game ===\n\
-             IMPORT add FROM math\n\
+             FROM math IMPORT add\n\
              == main ==\n\
              ~ temp total: int = math::add(1, 2)\n\
              -> END\n\
@@ -1220,7 +1220,7 @@ mod tests {
     fn qualified_module_function_calls_use_declaring_module_named_types() {
         let story = parse_story(
             "=== module game ===\n\
-             IMPORT State, echo, DEFAULT_STATE FROM data\n\
+             FROM data IMPORT State, echo, DEFAULT_STATE\n\
              == main ==\n\
              ~ temp state: data::State = data::echo(data::DEFAULT_STATE)\n\
              -> END\n\
@@ -1238,7 +1238,7 @@ mod tests {
     fn qualified_module_function_calls_report_argument_type_errors() {
         let story = parse_story(
             "=== module game ===\n\
-             IMPORT add FROM math\n\
+             FROM math IMPORT add\n\
              == main ==\n\
              ~ temp total: int = math::add(1, \"two\")\n\
              -> END\n\
@@ -1260,7 +1260,7 @@ mod tests {
     fn qualified_external_calls_are_type_checked() {
         let story = parse_story(
             "=== module game ===\n\
-             IMPORT play FROM audio\n\
+             FROM audio IMPORT play\n\
              == main ==\n\
              ~ temp code: int = audio::play(\"intro\")\n\
              -> END\n\
@@ -1318,7 +1318,7 @@ mod tests {
     fn module_diverts_reject_cross_module_direct_stitch_paths() {
         let story = parse_story(
             "=== module game ===\n\
-             IMPORT scene FROM items\n\
+             FROM items IMPORT scene\n\
              == main ==\n\
              -> items::scene.intro\n\
              === module items ===\n\
@@ -1340,7 +1340,7 @@ mod tests {
     fn module_diverts_accept_cross_module_parent_knots_for_target_resolution() {
         let story = parse_story(
             "=== module game ===\n\
-             IMPORT scene FROM items\n\
+             FROM items IMPORT scene\n\
              == main ==\n\
              -> items::scene\n\
              === module items ===\n\
@@ -1356,7 +1356,7 @@ mod tests {
     fn module_tunnel_onwards_reject_cross_module_direct_stitch_paths() {
         let story = parse_story(
             "=== module game ===\n\
-             IMPORT scene FROM items\n\
+             FROM items IMPORT scene\n\
              == main ==\n\
              -> tunnel ->-> items::scene.intro\n\
              == tunnel ==\n\

@@ -1,5 +1,5 @@
 === module game ===
-IMPORT sword FROM items
+FROM items IMPORT sword
 
 == main ==
 -> END

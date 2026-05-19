@@ -734,7 +734,7 @@ mod tests {
     fn infers_qualified_global_named_types_in_declaring_module_scope() {
         let story = parse_story(
             "=== module game ===\n\
-             IMPORT actor, DEFAULT_STATE, State FROM data\n\
+             FROM data IMPORT actor, DEFAULT_STATE, State\n\
              == main ==\n\
              -> DONE\n\
              === module data ===\n\

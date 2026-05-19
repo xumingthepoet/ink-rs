@@ -58,15 +58,13 @@ The host compiler receives every source file as an explicit source input. Each
 module name may appear only once in a compilation, so repeating the same
 `=== module name ===` in another file is an error rather than a way to extend
 that module. A module can use another module's knots, functions, constants,
-globals, structs, or externals only after an explicit `IMPORT`, and
-cross-module references use `module::symbol`.
+globals, structs, or externals only after an explicit `FROM module IMPORT ...`,
+and cross-module references use `module::symbol`.
 
 For example:
 
 	=== module game ===
-	IMPORT {
-		price, describe,
-	} FROM shop
+	FROM shop IMPORT price, describe
 	VAR gold: int = 5
 
 	== main ==
@@ -398,7 +396,7 @@ two different source inputs is a duplicate-module error. The caller passes
 every source file explicitly.
 
 	=== module travel ===
-	IMPORT ticket_price FROM shop
+	FROM shop IMPORT ticket_price
 
 	== main ==
 	We boarded the train.
@@ -416,14 +414,23 @@ Imports are exact allow-lists. Importing `ticket_price` from `shop` permits
 `shop::ticket_price`; it does not make `ticket_price` visible unqualified, and
 it does not re-export anything imported by `shop`.
 
-An import list can use braces when a module exposes many names. Inside the
-braces, names may be separated by commas, newlines, or both. A trailing comma is
-allowed so the list can be edited without changing the previous line.
+Use a comma-separated import list when a module exposes multiple symbols:
 
-	IMPORT {
-		ticket_price, route_name, describe_stop,
-		route_status, next_departure,
-	} FROM shop
+	FROM shop IMPORT ticket_price, route_name, describe_stop, route_status, next_departure
+
+A bare module import creates a module dependency without authorizing any static
+symbol access:
+
+	FROM shop
+
+Modules can declare explicit interface implementations in the module header:
+
+	=== interface IRoute ===
+	== destination ==
+
+	=== module travel implements IRoute ===
+	== destination ==
+	-> END
 
 ### Knots can be subdivided
 
@@ -1259,7 +1266,7 @@ An omitted enum initializer defaults to the first declared member, so the
 and use the qualified form:
 
 	=== module game ===
-	IMPORT State FROM data
+	FROM data IMPORT State
 
 	== main ==
 	{data::State.Idle}

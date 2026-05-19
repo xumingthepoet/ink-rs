@@ -1,5 +1,5 @@
 === module game ===
-IMPORT target FROM routes
+FROM routes IMPORT target
 
 == main ==
 ~ temp next: -> = -> routes::target

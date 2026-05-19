@@ -355,7 +355,7 @@ mod tests {
     fn accepts_imported_qualified_struct_literals() {
         let story = parse_story(
             "=== module game ===\n\
-             IMPORT Item FROM items\n\
+             FROM items IMPORT Item\n\
              VAR item: items::Item = { hp: 1 }\n\
              == main ==\n\
              -> DONE\n\
@@ -374,7 +374,7 @@ mod tests {
     fn reports_wrong_type_for_imported_qualified_struct_literals() {
         let story = parse_story(
             "=== module game ===\n\
-             IMPORT Item FROM items\n\
+             FROM items IMPORT Item\n\
              VAR item: items::Item = { hp: \"full\" }\n\
              == main ==\n\
              -> DONE\n\

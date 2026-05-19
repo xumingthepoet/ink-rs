@@ -173,16 +173,16 @@ fn qualified_import_use_diagnostics(
 
         if !import_index.allows(current_module, key.0, key.1) {
             diagnostics.push(Diagnostic::error(
-                qualified_use.span.clone(),
-                format!(
-                    "Qualified reference '{}::{}' requires a direct import in module '{}': IMPORT {} FROM {}",
+                    qualified_use.span.clone(),
+                    format!(
+                    "Qualified reference '{}::{}' requires a direct import in module '{}': FROM {} IMPORT {}",
                     qualified_use.source_module,
                     qualified_use.symbol,
                     current_module,
-                    qualified_use.symbol,
-                    qualified_use.source_module
+                    qualified_use.source_module,
+                    qualified_use.symbol
                 ),
-            ));
+                ));
         }
     }
 

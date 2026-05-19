@@ -222,7 +222,7 @@ mod tests {
     fn accepts_imported_qualified_constant_initializers() {
         let story = parse_story(
             "=== module game ===\n\
-             IMPORT MAX_SCORE FROM items\n\
+             FROM items IMPORT MAX_SCORE\n\
              VAR score: int = items::MAX_SCORE\n\
              == main ==\n\
              -> DONE\n\
@@ -239,7 +239,7 @@ mod tests {
     fn accepts_default_initializers_for_imported_qualified_struct_types() {
         let story = parse_story(
             "=== module game ===\n\
-             IMPORT Item FROM items\n\
+             FROM items IMPORT Item\n\
              VAR item: items::Item\n\
              == main ==\n\
              -> DONE\n\
@@ -258,7 +258,7 @@ mod tests {
     fn reports_wrong_type_for_imported_qualified_constant_initializers() {
         let story = parse_story(
             "=== module game ===\n\
-             IMPORT MAX_SCORE FROM items\n\
+             FROM items IMPORT MAX_SCORE\n\
              VAR score: string = items::MAX_SCORE\n\
              == main ==\n\
              -> DONE\n\

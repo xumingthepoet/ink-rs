@@ -1,6 +1,6 @@
 === module game ===
-IMPORT add FROM math
-IMPORT play FROM audio
+FROM math IMPORT add
+FROM audio IMPORT play
 
 == main ==
 {math::add(2, 3)}

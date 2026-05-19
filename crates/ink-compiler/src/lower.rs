@@ -441,7 +441,7 @@ mod tests {
     fn module_lowering_uses_checked_entry_point_and_reachability() {
         let source = concat!(
             "=== module game ===\n",
-            "IMPORT helper FROM support\n",
+            "FROM support IMPORT helper\n",
             "== main ==\n",
             "-> support::helper\n",
             "=== module support ===\n",
@@ -487,7 +487,7 @@ mod tests {
     fn module_lowering_json_contains_root_entry_and_reachable_module_containers() {
         let source = concat!(
             "=== module game ===\n",
-            "IMPORT helper FROM support\n",
+            "FROM support IMPORT helper\n",
             "== main ==\n",
             "Game.\n",
             "-> END\n",
@@ -540,7 +540,7 @@ mod tests {
     fn module_lowering_json_excludes_unreachable_module_globals() {
         let source = concat!(
             "=== module game ===\n",
-            "IMPORT helper FROM support\n",
+            "FROM support IMPORT helper\n",
             "== main ==\n",
             "-> support::helper\n",
             "=== module support ===\n",
@@ -578,7 +578,7 @@ mod tests {
             "== main ==\n",
             "-> END\n",
             "=== module host_api ===\n",
-            "IMPORT value FROM config\n",
+            "FROM config IMPORT value\n",
             "== INTERNAL read() => string ==\n",
             "~ return config::value()\n",
             "=== module config ===\n",
@@ -632,7 +632,7 @@ mod tests {
     fn module_global_initializer_lowering_uses_scoped_runtime_names() {
         let source = concat!(
             "=== module game ===\n",
-            "IMPORT helper FROM support\n",
+            "FROM support IMPORT helper\n",
             "== main ==\n",
             "-> support::helper\n",
             "=== module support ===\n",
@@ -710,7 +710,7 @@ mod tests {
     fn expression_lowering_context_preserves_current_expression_json() {
         let source = concat!(
             "=== module game ===\n",
-            "IMPORT add FROM math\n",
+            "FROM math IMPORT add\n",
             "STRUCT Stats {\n",
             "hp: int\n",
             "}\n",

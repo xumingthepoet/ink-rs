@@ -251,8 +251,8 @@ mod tests {
     fn records_acyclic_import_dependency_metadata_deterministically() {
         let story = parse_story(
             "=== module game ===\n\
-             IMPORT sword FROM items\n\
-             IMPORT play FROM audio\n\
+             FROM items IMPORT sword\n\
+             FROM audio IMPORT play\n\
              == main ==\n\
              -> END\n\
              === module items ===\n\
@@ -286,8 +286,8 @@ mod tests {
     fn import_dependency_metadata_is_source_order_independent() {
         let game = SourceInput::named(
             "=== module game ===\n\
-             IMPORT sword FROM items\n\
-             IMPORT play FROM audio\n\
+             FROM items IMPORT sword\n\
+             FROM audio IMPORT play\n\
              == main ==\n\
              -> END",
             "game.ink",
@@ -340,11 +340,11 @@ mod tests {
     fn reports_direct_import_cycles() {
         let story = parse_story(
             "=== module game ===\n\
-             IMPORT sword FROM items\n\
+             FROM items IMPORT sword\n\
              == main ==\n\
              -> END\n\
              === module items ===\n\
-             IMPORT main FROM game\n\
+             FROM game IMPORT main\n\
              == sword ==\n\
              -> END",
         );
@@ -364,15 +364,15 @@ mod tests {
     fn reports_transitive_import_cycles() {
         let story = parse_story(
             "=== module game ===\n\
-             IMPORT sword FROM items\n\
+             FROM items IMPORT sword\n\
              == main ==\n\
              -> END\n\
              === module items ===\n\
-             IMPORT play FROM audio\n\
+             FROM audio IMPORT play\n\
              == sword ==\n\
              -> END\n\
              === module audio ===\n\
-             IMPORT main FROM game\n\
+             FROM game IMPORT main\n\
              == play ==\n\
              -> END",
         );
@@ -392,7 +392,7 @@ mod tests {
     fn validates_missing_import_source_modules() {
         let story = parse_story(
             "=== module game ===\n\
-             IMPORT sword FROM missing\n\
+             FROM missing IMPORT sword\n\
              == main ==\n\
              -> END",
         );
@@ -412,7 +412,7 @@ mod tests {
     fn validates_missing_imported_symbols() {
         let story = parse_story(
             "=== module game ===\n\
-             IMPORT sword FROM items\n\
+             FROM items IMPORT sword\n\
              == main ==\n\
              -> END\n\
              === module items ===\n\
@@ -435,7 +435,7 @@ mod tests {
     fn rejects_stitch_imports() {
         let story = parse_story(
             "=== module game ===\n\
-             IMPORT intro FROM scenes\n\
+             FROM scenes IMPORT intro\n\
              == main ==\n\
              -> END\n\
              === module scenes ===\n\
@@ -458,7 +458,7 @@ mod tests {
     fn records_import_allow_lists_and_warns_for_unused_imports() {
         let story = parse_story(
             "=== module game ===\n\
-             IMPORT sword FROM items\n\
+             FROM items IMPORT sword\n\
              == main ==\n\
              -> END\n\
              === module items ===\n\
@@ -481,10 +481,37 @@ mod tests {
     }
 
     #[test]
+    fn bare_module_imports_create_dependencies_without_symbol_access() {
+        let story = parse_story(
+            "=== module game ===\n\
+             FROM items\n\
+             == main ==\n\
+             -> END\n\
+             === module items ===\n\
+             == sword ==\n\
+             -> END",
+        );
+
+        let checked = super::super::analyze(story);
+
+        assert!(!checked.has_errors(), "{:#?}", checked.diagnostics);
+        assert!(
+            checked.diagnostics.is_empty(),
+            "bare module imports should not create symbol-use warnings: {:#?}",
+            checked.diagnostics
+        );
+        let checked = checked.artifact.expect("expected checked story");
+        assert!(checked
+            .module_dependencies
+            .contains_dependency("game", "items"));
+        assert!(!checked.module_imports.allows("game", "items", "sword"));
+    }
+
+    #[test]
     fn treats_existing_qualified_divert_paths_as_import_uses() {
         let story = parse_story(
             "=== module game ===\n\
-             IMPORT sword FROM items\n\
+             FROM items IMPORT sword\n\
              == main ==\n\
              -> items::sword\n\
              === module items ===\n\
@@ -501,7 +528,7 @@ mod tests {
     fn accepts_directly_imported_qualified_references() {
         let story = parse_story(
             "=== module game ===\n\
-             IMPORT helper FROM items\n\
+             FROM items IMPORT helper\n\
              == main ==\n\
              ~ items::helper()\n\
              -> END\n\
@@ -533,7 +560,7 @@ mod tests {
         assert_eq!(diagnostics[0].severity, DiagnosticSeverity::Error);
         assert_eq!(
             diagnostics[0].message,
-            "Qualified reference 'items::helper' requires a direct import in module 'game': IMPORT helper FROM items"
+            "Qualified reference 'items::helper' requires a direct import in module 'game': FROM items IMPORT helper"
         );
     }
 
@@ -541,13 +568,13 @@ mod tests {
     fn rejects_transitive_only_qualified_import_access() {
         let story = parse_story(
             "=== module game ===\n\
-             IMPORT relay FROM bridge\n\
+             FROM bridge IMPORT relay\n\
              == main ==\n\
              ~ bridge::relay()\n\
              ~ items::helper()\n\
              -> END\n\
              === module bridge ===\n\
-             IMPORT helper FROM items\n\
+             FROM items IMPORT helper\n\
              == function relay() => void ==\n\
              ~ items::helper()\n\
              ~ return\n\
@@ -562,7 +589,7 @@ mod tests {
         assert_eq!(diagnostics[0].severity, DiagnosticSeverity::Error);
         assert_eq!(
             diagnostics[0].message,
-            "Qualified reference 'items::helper' requires a direct import in module 'game': IMPORT helper FROM items"
+            "Qualified reference 'items::helper' requires a direct import in module 'game': FROM items IMPORT helper"
         );
     }
 
@@ -570,7 +597,7 @@ mod tests {
     fn rejects_imports_from_wrong_module_for_qualified_use() {
         let story = parse_story(
             "=== module game ===\n\
-             IMPORT helper FROM audio\n\
+             FROM audio IMPORT helper\n\
              == main ==\n\
              ~ audio::helper()\n\
              -> END\n\
@@ -626,7 +653,7 @@ mod tests {
         assert_eq!(diagnostics[0].severity, DiagnosticSeverity::Error);
         assert_eq!(
             diagnostics[0].message,
-            "Qualified reference 'items::helper' requires a direct import in module 'game': IMPORT helper FROM items"
+            "Qualified reference 'items::helper' requires a direct import in module 'game': FROM items IMPORT helper"
         );
     }
 
@@ -634,7 +661,7 @@ mod tests {
     fn qualified_struct_type_references_count_as_import_uses() {
         let story = parse_story(
             "=== module game ===\n\
-             IMPORT Item FROM items\n\
+             FROM items IMPORT Item\n\
              VAR item: items::Item\n\
              == main ==\n\
              -> END\n\
@@ -671,7 +698,7 @@ mod tests {
         assert_single_diagnostic(
             &diagnostics,
             DiagnosticSeverity::Error,
-            "Qualified reference 'items::Item' requires a direct import in module 'game': IMPORT Item FROM items",
+            "Qualified reference 'items::Item' requires a direct import in module 'game': FROM items IMPORT Item",
         );
     }
 
@@ -679,7 +706,7 @@ mod tests {
     fn qualified_enum_type_references_count_as_import_uses() {
         let story = parse_story(
             "=== module game ===\n\
-             IMPORT State FROM items\n\
+             FROM items IMPORT State\n\
              VAR state: items::State\n\
              == main ==\n\
              -> END\n\
@@ -731,7 +758,7 @@ mod tests {
              == main ==\n\
              -> END\n\
              === module host_api ===\n\
-             IMPORT value FROM config\n\
+             FROM config IMPORT value\n\
              == INTERNAL read() => string ==\n\
              ~ return config::value()\n\
              === module config ===\n\
@@ -953,7 +980,7 @@ mod tests {
     fn checked_story_records_module_symbol_metadata() {
         let story = parse_story(
             "=== module game ===\n\
-             IMPORT play FROM audio\n\
+             FROM audio IMPORT play\n\
              VAR score: int = 0\n\
              == main ==\n\
              -> END\n\

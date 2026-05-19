@@ -1,8 +1,8 @@
 === module game ===
-IMPORT level FROM left
-IMPORT level FROM right
-IMPORT play FROM audio
-IMPORT play FROM video
+FROM left IMPORT level
+FROM right IMPORT level
+FROM audio IMPORT play
+FROM video IMPORT play
 
 == main ==
 {audio::play("intro")}|{video::play("intro")}

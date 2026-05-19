@@ -375,8 +375,9 @@ impl Parser {
         self.diagnostics.extend(line_parser.finish());
 
         declaration.filter(|_| !had_error).map(|declaration| {
-            Module::new(
+            Module::new_with_implemented_interfaces(
                 declaration.name,
+                declaration.implemented_interfaces,
                 Vec::new(),
                 Vec::new(),
                 Vec::new(),
@@ -1269,53 +1270,58 @@ mod tests {
     }
 
     #[test]
-    fn parses_module_import_declarations() {
+    fn parses_module_implementation_clauses() {
         let output = parse(SourceInput::new(
-            "=== module game ===\n\
-             IMPORT sword, heal FROM items",
+            "=== interface IItem ===\n\
+             === module left implements IItem, IOther ===",
         ));
 
         assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
         let story = output.artifact.expect("story should parse");
         assert_eq!(story.modules().len(), 1);
-        let imports = story.modules()[0].imports();
-        assert_eq!(imports.len(), 1);
-        assert_eq!(imports[0].source_module(), "items");
-        assert_eq!(imports[0].imported_names()[0].name(), "sword");
-        assert_eq!(imports[0].imported_names()[1].name(), "heal");
+        assert_eq!(
+            story.modules()[0]
+                .implemented_interfaces()
+                .iter()
+                .map(|interface| interface.name())
+                .collect::<Vec<_>>(),
+            vec!["IItem", "IOther"]
+        );
         assert_eq!(
             story.to_parse_snapshot(),
-            "Story\n  Weave(baseIndent=0)\n    Gather(name=null, depth=1)\n    Divert(target=\"-> DONE\", empty=false, tunnel=false, thread=false)\n  Module(name=\"game\")\n    Import(from=\"items\", names=[\"sword\", \"heal\"])"
+            "Story\n  Weave(baseIndent=0)\n    Gather(name=null, depth=1)\n    Divert(target=\"-> DONE\", empty=false, tunnel=false, thread=false)\n  Interface(name=\"IItem\")\n  Module(name=\"left\", implements=[\"IItem\", \"IOther\"])"
         );
     }
 
     #[test]
-    fn parses_multiline_module_import_declarations() {
+    fn parses_module_import_declarations() {
         let output = parse(SourceInput::new(
             "=== module game ===\n\
-             IMPORT {\n\
-                 sword, heal, shield,\n\
-                 mend,\n\
-             } FROM items",
+             FROM items\n\
+             FROM routes IMPORT start, heal",
         ));
 
         assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
         let story = output.artifact.expect("story should parse");
         assert_eq!(story.modules().len(), 1);
         let imports = story.modules()[0].imports();
-        assert_eq!(imports.len(), 1);
+        assert_eq!(imports.len(), 2);
         assert_eq!(imports[0].source_module(), "items");
+        assert!(imports[0].is_module_import());
+        assert!(imports[0].imported_names().is_empty());
+        assert_eq!(imports[1].source_module(), "routes");
+        assert!(imports[1].is_symbol_import());
         assert_eq!(
-            imports[0]
+            imports[1]
                 .imported_names()
                 .iter()
                 .map(|name| name.name())
                 .collect::<Vec<_>>(),
-            vec!["sword", "heal", "shield", "mend"]
+            vec!["start", "heal"]
         );
         assert_eq!(
             story.to_parse_snapshot(),
-            "Story\n  Weave(baseIndent=0)\n    Gather(name=null, depth=1)\n    Divert(target=\"-> DONE\", empty=false, tunnel=false, thread=false)\n  Module(name=\"game\")\n    Import(from=\"items\", names=[\"sword\", \"heal\", \"shield\", \"mend\"])"
+            "Story\n  Weave(baseIndent=0)\n    Gather(name=null, depth=1)\n    Divert(target=\"-> DONE\", empty=false, tunnel=false, thread=false)\n  Module(name=\"game\")\n    Import(from=\"items\", module=true)\n    Import(from=\"routes\", names=[\"start\", \"heal\"])"
         );
     }
 
@@ -1323,9 +1329,9 @@ mod tests {
     fn attaches_imports_to_active_module() {
         let output = parse(SourceInput::new(
             "=== module game ===\n\
-             IMPORT start FROM flow\n\
+             FROM flow IMPORT start\n\
              === module items ===\n\
-             IMPORT sword FROM gear",
+             FROM gear IMPORT sword",
         ));
 
         assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
@@ -1361,6 +1367,10 @@ mod tests {
             (
                 "=== module 123 ===",
                 "Module name must be a single identifier",
+            ),
+            (
+                "=== module game implements IItem, IItem ===",
+                "Module implementation clauses must not repeat interface 'IItem'",
             ),
         ];
 
@@ -1436,40 +1446,48 @@ mod tests {
     fn rejects_invalid_module_import_declarations() {
         let cases = [
             (
-                "=== module game ===\nimport sword FROM items",
+                "=== module game ===\nfrom items IMPORT sword",
+                "Import declarations must use uppercase `FROM`",
+            ),
+            (
+                "=== module game ===\nFROM items import sword",
                 "Import declarations must use uppercase `IMPORT`",
             ),
             (
-                "=== module game ===\nIMPORT sword from items",
-                "Import declarations must use uppercase `FROM`",
+                "=== module game ===\nFROM ",
+                "FROM declarations must include a source module name",
             ),
             (
-                "=== module game ===\nIMPORT FROM items",
-                "IMPORT declarations must name at least one symbol before FROM",
+                "=== module game ===\nFROM items IMPORT ",
+                "FROM ... IMPORT declarations must name at least one symbol",
             ),
             (
-                "=== module game ===\nIMPORT sword AS blade FROM items",
+                "=== module game ===\nFROM items IMPORT sword AS blade",
                 "Import aliases are not supported in the first module-support phase",
             ),
             (
-                "=== module game ===\nIMPORT function play FROM audio",
+                "=== module game ===\nFROM audio IMPORT function play",
                 "IMPORT names do not include kind annotations",
             ),
             (
-                "=== module game ===\nIMPORT sword,",
+                "=== module game ===\nFROM items IMPORT sword,",
                 "IMPORT declarations must include an imported symbol name after ','",
             ),
             (
-                "=== module game ===\nIMPORT {\n}",
-                "IMPORT declarations must include FROM moduleName",
+                "=== module game ===\nFROM items IMPORT items",
+                "Module literals must be imported with `FROM items`, not `FROM items IMPORT items`",
             ),
             (
-                "=== module game ===\nIMPORT {\n  sword\n} from items",
-                "Import declarations must use uppercase `FROM`",
+                "=== module game ===\nIMPORT sword FROM items",
+                "Old import syntax `IMPORT sword FROM items` has been replaced by `FROM items IMPORT sword`",
             ),
             (
-                "=== module game ===\nIMPORT {\n  sword blade\n} FROM items",
-                "Expected ',' or end of line after imported name but saw 'blade'",
+                "=== module game ===\nIMPORT items FROM items",
+                "Module literals must be imported with `FROM items`; `IMPORT items FROM items` is obsolete",
+            ),
+            (
+                "=== module game ===\nIMPORT {\n  sword\n} FROM items",
+                "Old import syntax `IMPORT symbol FROM module` has been replaced by `FROM module IMPORT symbol`",
             ),
         ];
 
@@ -1493,7 +1511,7 @@ mod tests {
     fn explicit_modules_own_top_level_declarations_and_flows() {
         let output = parse(SourceInput::new(
             "=== module game ===\n\
-             IMPORT sword FROM items\n\
+             FROM items IMPORT sword\n\
              CONST START: int = 1\n\
              VAR score: int = 0\n\
              STRUCT Player { hp: int }\n\

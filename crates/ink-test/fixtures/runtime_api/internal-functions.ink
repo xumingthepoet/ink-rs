@@ -38,7 +38,7 @@ This should not be output.
 ~ return "private"
 
 === module host_config ===
-IMPORT default_value FROM config_data
+FROM config_data IMPORT default_value
 
 VAR reads: int = 0
 

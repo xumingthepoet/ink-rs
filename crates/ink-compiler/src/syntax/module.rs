@@ -1,4 +1,6 @@
-use crate::source::SourceSpan;
+use std::collections::BTreeSet;
+
+use crate::{parsed::ImplementedInterface, source::SourceSpan};
 
 use super::{is_identifier, is_identifier_continue, rule::RuleParser};
 
@@ -6,6 +8,7 @@ use super::{is_identifier, is_identifier_continue, rule::RuleParser};
 pub(super) struct ModuleDecl {
     pub(super) name: String,
     pub(super) name_span: SourceSpan,
+    pub(super) implemented_interfaces: Vec<ImplementedInterface>,
     pub(super) span: SourceSpan,
 }
 
@@ -104,6 +107,8 @@ pub(super) fn parse_module_declaration(parser: &mut RuleParser<'_>) -> Option<Mo
         return None;
     }
 
+    let implemented_interfaces = parse_optional_implementation_clause(parser)?;
+
     let suffix = parser.parse_rule(|parser| parser.take_while(|ch| ch == '='));
     if suffix.is_none_or(|suffix| suffix.chars().count() != 3) {
         parser.diagnostic(crate::diagnostic::Diagnostic::error(
@@ -127,8 +132,157 @@ pub(super) fn parse_module_declaration(parser: &mut RuleParser<'_>) -> Option<Mo
     Some(ModuleDecl {
         name,
         name_span,
+        implemented_interfaces,
         span,
     })
+}
+
+fn parse_optional_implementation_clause(
+    parser: &mut RuleParser<'_>,
+) -> Option<Vec<ImplementedInterface>> {
+    parser.skip_horizontal_whitespace();
+    if parser.line_remainder().starts_with('=') {
+        return Some(Vec::new());
+    }
+
+    let keyword_span = parser.current_span();
+    let Some(keyword) = parser.take_while(is_identifier_continue) else {
+        return Some(Vec::new());
+    };
+
+    if !keyword.eq_ignore_ascii_case("implements") {
+        parser.diagnostic(crate::diagnostic::Diagnostic::error(
+            keyword_span,
+            format!("Expected `implements` or `===` after module name but saw '{keyword}'"),
+        ));
+        parser.skip_to_end();
+        return None;
+    }
+
+    if keyword != "implements" {
+        parser.diagnostic(crate::diagnostic::Diagnostic::error(
+            keyword_span,
+            "Module implementation clauses must use lowercase `implements`",
+        ));
+        parser.skip_to_end();
+        return None;
+    }
+
+    parser.expect(
+        "whitespace after 'implements'",
+        parse_horizontal_whitespace,
+        |parser| parser.skip_to_end(),
+    )?;
+
+    parse_implemented_interfaces(parser)
+}
+
+fn parse_implemented_interfaces(parser: &mut RuleParser<'_>) -> Option<Vec<ImplementedInterface>> {
+    let mut interfaces = Vec::new();
+    let mut seen = BTreeSet::new();
+
+    loop {
+        parser.skip_horizontal_whitespace();
+        let remainder = parser.line_remainder();
+        if remainder.starts_with('=') {
+            if interfaces.is_empty() {
+                parser.diagnostic(crate::diagnostic::Diagnostic::error(
+                    parser.current_span(),
+                    "Module implementation clauses must include at least one interface name",
+                ));
+                parser.skip_to_end();
+                return None;
+            }
+            return Some(interfaces);
+        }
+
+        if remainder.is_empty() {
+            parser.diagnostic(crate::diagnostic::Diagnostic::error(
+                parser.current_span(),
+                "Module declarations must use `=== module name ===`",
+            ));
+            parser.skip_to_end();
+            return None;
+        }
+
+        let interface_span = parser.current_span();
+        let Some(name) = parser.take_while(|ch| !ch.is_whitespace() && ch != ',' && ch != '=')
+        else {
+            parser.diagnostic(crate::diagnostic::Diagnostic::error(
+                parser.current_span(),
+                "Module implementation clauses must include an interface name",
+            ));
+            parser.skip_to_end();
+            return None;
+        };
+
+        if name.contains('(') || name.contains(')') {
+            parser.diagnostic(crate::diagnostic::Diagnostic::error(
+                interface_span,
+                "Module implementation clauses do not accept interface parameters",
+            ));
+            parser.skip_to_end();
+            return None;
+        }
+
+        if name.contains('.') {
+            parser.diagnostic(crate::diagnostic::Diagnostic::error(
+                interface_span,
+                "Implemented interface names must be single identifiers; hierarchical interface names are not supported",
+            ));
+            parser.skip_to_end();
+            return None;
+        }
+
+        if !is_identifier(&name) {
+            parser.diagnostic(crate::diagnostic::Diagnostic::error(
+                interface_span,
+                "Implemented interface name must be a single identifier",
+            ));
+            parser.skip_to_end();
+            return None;
+        }
+
+        if !seen.insert(name.clone()) {
+            parser.diagnostic(crate::diagnostic::Diagnostic::error(
+                interface_span,
+                format!("Module implementation clauses must not repeat interface '{name}'"),
+            ));
+            parser.skip_to_end();
+            return None;
+        }
+
+        interfaces.push(ImplementedInterface::new(name, interface_span));
+
+        parser.skip_horizontal_whitespace();
+        if parser.match_string(",").is_some() {
+            parser.skip_horizontal_whitespace();
+            if parser.line_remainder().is_empty() || parser.line_remainder().starts_with('=') {
+                parser.diagnostic(crate::diagnostic::Diagnostic::error(
+                    parser.current_span(),
+                    "Module implementation clauses must include an interface name after ','",
+                ));
+                parser.skip_to_end();
+                return None;
+            }
+            continue;
+        }
+
+        let remainder = parser.line_remainder();
+        if remainder.starts_with('=') {
+            return Some(interfaces);
+        }
+
+        parser.diagnostic(crate::diagnostic::Diagnostic::error(
+            parser.current_span(),
+            format!(
+                "Expected ',' or `===` after implemented interface name but saw '{}'",
+                remainder.trim()
+            ),
+        ));
+        parser.skip_to_end();
+        return None;
+    }
 }
 
 fn parse_horizontal_whitespace(parser: &mut RuleParser<'_>) -> Option<String> {
@@ -162,9 +316,36 @@ mod tests {
         assert!(diagnostics.is_empty(), "{diagnostics:#?}");
         let declaration = declaration.expect("expected module declaration");
         assert_eq!(declaration.name, "game");
+        assert!(declaration.implemented_interfaces.is_empty());
         assert_eq!(
             declaration.name_span,
             SourceSpan::new(Some("module.ink".to_string()), 1, 12)
+        );
+    }
+
+    #[test]
+    fn parses_module_header_with_implemented_interfaces() {
+        let (declaration, diagnostics) =
+            parse_module("=== module left implements IItem, IOther ===");
+
+        assert!(diagnostics.is_empty(), "{diagnostics:#?}");
+        let declaration = declaration.expect("expected module declaration");
+        assert_eq!(declaration.name, "left");
+        assert_eq!(
+            declaration
+                .implemented_interfaces
+                .iter()
+                .map(|interface| interface.name())
+                .collect::<Vec<_>>(),
+            vec!["IItem", "IOther"]
+        );
+        assert_eq!(
+            declaration.implemented_interfaces[0].span(),
+            &SourceSpan::new(Some("module.ink".to_string()), 1, 28)
+        );
+        assert_eq!(
+            declaration.implemented_interfaces[1].span(),
+            &SourceSpan::new(Some("module.ink".to_string()), 1, 35)
         );
     }
 
@@ -194,6 +375,30 @@ mod tests {
             (
                 "=== module 123 ===",
                 "Module name must be a single identifier",
+            ),
+            (
+                "=== module game Implements IItem ===",
+                "Module implementation clauses must use lowercase `implements`",
+            ),
+            (
+                "=== module game implements ===",
+                "Module implementation clauses must include at least one interface name",
+            ),
+            (
+                "=== module game implements IItem, ===",
+                "Module implementation clauses must include an interface name after ','",
+            ),
+            (
+                "=== module game implements game.IItem ===",
+                "Implemented interface names must be single identifiers; hierarchical interface names are not supported",
+            ),
+            (
+                "=== module game implements 123 ===",
+                "Implemented interface name must be a single identifier",
+            ),
+            (
+                "=== module game implements IItem, IItem ===",
+                "Module implementation clauses must not repeat interface 'IItem'",
             ),
         ];
 

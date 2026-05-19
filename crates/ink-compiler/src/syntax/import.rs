@@ -12,7 +12,7 @@ pub(super) fn is_import_like_declaration_line(line: &str) -> bool {
         .chars()
         .take_while(|ch| is_identifier_continue(*ch))
         .collect::<String>();
-    keyword.eq_ignore_ascii_case("IMPORT")
+    keyword.eq_ignore_ascii_case("FROM") || keyword.eq_ignore_ascii_case("IMPORT")
 }
 
 pub(super) fn parse_import_declaration(parser: &mut RuleParser<'_>) -> Option<ImportDeclaration> {
@@ -20,55 +20,37 @@ pub(super) fn parse_import_declaration(parser: &mut RuleParser<'_>) -> Option<Im
     let span = parser.current_span();
     let keyword_span = parser.current_span();
     let keyword = parser.take_while(is_identifier_continue)?;
-    if !keyword.eq_ignore_ascii_case("IMPORT") {
+
+    if keyword.eq_ignore_ascii_case("IMPORT") {
+        parser.diagnostic(obsolete_import_syntax_diagnostic(
+            keyword_span,
+            parser.line_remainder(),
+        ));
+        parser.skip_to_end();
         return None;
     }
 
-    if keyword != "IMPORT" {
+    if !keyword.eq_ignore_ascii_case("FROM") {
+        return None;
+    }
+
+    if keyword != "FROM" {
         parser.diagnostic(Diagnostic::error(
             keyword_span,
-            "Import declarations must use uppercase `IMPORT`",
-        ));
-        parser.skip_to_end();
-        return None;
-    }
-
-    parser.expect(
-        "whitespace after 'IMPORT'",
-        parse_horizontal_whitespace,
-        |parser| parser.skip_to_end(),
-    )?;
-    parser.skip_horizontal_whitespace();
-
-    let imported_names = parse_imported_names(parser)?;
-    parser.skip_horizontal_whitespace();
-
-    let from_span = parser.current_span();
-    let Some(from_keyword) = parser.take_while(is_identifier_continue) else {
-        parser.diagnostic(Diagnostic::error(
-            parser.current_span(),
-            "IMPORT declarations must include FROM moduleName",
-        ));
-        parser.skip_to_end();
-        return None;
-    };
-    if !from_keyword.eq_ignore_ascii_case("FROM") {
-        parser.diagnostic(Diagnostic::error(
-            from_span,
-            format!("Expected FROM in IMPORT declaration but saw '{from_keyword}'"),
-        ));
-        parser.skip_to_end();
-        return None;
-    }
-    if from_keyword != "FROM" {
-        parser.diagnostic(Diagnostic::error(
-            from_span,
             "Import declarations must use uppercase `FROM`",
         ));
         parser.skip_to_end();
         return None;
     }
 
+    if parser.line_remainder().is_empty() {
+        parser.diagnostic(Diagnostic::error(
+            parser.current_span(),
+            "FROM declarations must include a source module name",
+        ));
+        parser.skip_to_end();
+        return None;
+    }
     parser.expect(
         "whitespace after 'FROM'",
         parse_horizontal_whitespace,
@@ -80,7 +62,7 @@ pub(super) fn parse_import_declaration(parser: &mut RuleParser<'_>) -> Option<Im
     let Some(source_module) = parser.take_while(|ch| !ch.is_whitespace()) else {
         parser.diagnostic(Diagnostic::error(
             parser.current_span(),
-            "IMPORT declarations must include a source module name after FROM",
+            "FROM declarations must include a source module name",
         ));
         parser.skip_to_end();
         return None;
@@ -105,16 +87,74 @@ pub(super) fn parse_import_declaration(parser: &mut RuleParser<'_>) -> Option<Im
     }
 
     parser.skip_horizontal_whitespace();
+    if parser.line_remainder().is_empty() {
+        return Some(ImportDeclaration::module(
+            source_module,
+            source_module_span,
+            span,
+        ));
+    }
+
+    let import_keyword_span = parser.current_span();
+    let Some(import_keyword) = parser.take_while(is_identifier_continue) else {
+        parser.diagnostic(Diagnostic::error(
+            parser.current_span(),
+            format!(
+                "Expected `IMPORT` or end of line after source module but saw '{}'",
+                parser.line_remainder().trim()
+            ),
+        ));
+        parser.skip_to_end();
+        return None;
+    };
+
+    if !import_keyword.eq_ignore_ascii_case("IMPORT") {
+        parser.diagnostic(Diagnostic::error(
+            import_keyword_span,
+            format!(
+                "Expected `IMPORT` or end of line after source module but saw '{import_keyword}'"
+            ),
+        ));
+        parser.skip_to_end();
+        return None;
+    }
+
+    if import_keyword != "IMPORT" {
+        parser.diagnostic(Diagnostic::error(
+            import_keyword_span,
+            "Import declarations must use uppercase `IMPORT`",
+        ));
+        parser.skip_to_end();
+        return None;
+    }
+
+    if parser.line_remainder().is_empty() {
+        parser.diagnostic(Diagnostic::error(
+            parser.current_span(),
+            "FROM ... IMPORT declarations must name at least one symbol",
+        ));
+        parser.skip_to_end();
+        return None;
+    }
+    parser.expect(
+        "whitespace after 'IMPORT'",
+        parse_horizontal_whitespace,
+        |parser| parser.skip_to_end(),
+    )?;
+
+    let imported_names = parse_imported_names(parser, &source_module)?;
+    parser.skip_horizontal_whitespace();
+
     if !parser.line_remainder().is_empty() {
         parser.error(format!(
-            "Expected end of line after IMPORT declaration but saw '{}'",
+            "Expected end of line after FROM import declaration but saw '{}'",
             parser.line_remainder()
         ));
         parser.skip_to_end();
         return None;
     }
 
-    Some(ImportDeclaration::new(
+    Some(ImportDeclaration::symbols(
         imported_names,
         source_module,
         source_module_span,
@@ -127,19 +167,21 @@ pub(super) fn parse_import_declaration_lines(
     index: usize,
 ) -> (Option<ImportDeclaration>, Vec<Diagnostic>, usize) {
     let line = &lines[index];
-    if is_multiline_import_declaration_start(line) {
-        parse_multiline_import_declaration(lines, index)
+    let obsolete_multiline_import = is_obsolete_multiline_import_start(line);
+    let mut line_parser = RuleParser::new(line);
+    let declaration = line_parser.parse_rule(parse_import_declaration);
+    let had_error = line_parser.had_error();
+    let diagnostics = line_parser.finish();
+    let next_index = if obsolete_multiline_import {
+        consume_obsolete_multiline_import(lines, index)
     } else {
-        let mut line_parser = RuleParser::new(line);
-        let declaration = line_parser.parse_rule(parse_import_declaration);
-        let had_error = line_parser.had_error();
-        let diagnostics = line_parser.finish();
+        index + 1
+    };
 
-        (declaration.filter(|_| !had_error), diagnostics, index + 1)
-    }
+    (declaration.filter(|_| !had_error), diagnostics, next_index)
 }
 
-fn is_multiline_import_declaration_start(line: &SourceLine) -> bool {
+fn is_obsolete_multiline_import_start(line: &SourceLine) -> bool {
     let trimmed = line.text.trim_start();
     let keyword = trimmed
         .chars()
@@ -149,350 +191,29 @@ fn is_multiline_import_declaration_start(line: &SourceLine) -> bool {
         return false;
     }
     let rest = &trimmed[keyword.len()..];
-    if !rest.starts_with([' ', '\t']) {
-        return false;
-    }
-    rest.trim_start_matches([' ', '\t']).starts_with('{')
+    rest.starts_with([' ', '\t']) && rest.trim_start_matches([' ', '\t']).starts_with('{')
 }
 
-fn parse_multiline_import_declaration(
-    lines: &[SourceLine],
-    start_index: usize,
-) -> (Option<ImportDeclaration>, Vec<Diagnostic>, usize) {
-    let start_line = &lines[start_index];
-    let mut diagnostics = Vec::new();
-    let mut had_error = false;
-
-    let Some(opening) = parse_multiline_import_opening(start_line, &mut diagnostics) else {
-        return (None, diagnostics, start_index + 1);
-    };
-    if !opening.trailing.trim().is_empty() {
-        diagnostics.push(Diagnostic::error(
-            span_at(start_line, opening.trailing_byte_index),
-            format!(
-                "Expected end of line after multiline IMPORT opening but saw '{}'",
-                opening.trailing.trim()
-            ),
-        ));
-        return (None, diagnostics, start_index + 1);
-    }
-
-    let mut imported_names = Vec::new();
+fn consume_obsolete_multiline_import(lines: &[SourceLine], start_index: usize) -> usize {
     let mut index = start_index + 1;
     while index < lines.len() {
-        let line = &lines[index];
-        if line.text.trim_start().starts_with('}') {
-            if let Some(source_module) = parse_multiline_import_closing(line, &mut diagnostics) {
-                if imported_names.is_empty() {
-                    diagnostics.push(Diagnostic::error(
-                        opening.open_brace_span,
-                        "IMPORT declarations must name at least one symbol before FROM",
-                    ));
-                    had_error = true;
-                }
-                let declaration = (!had_error).then(|| {
-                    ImportDeclaration::new(
-                        imported_names,
-                        source_module.name,
-                        source_module.span,
-                        opening.import_span,
-                    )
-                });
-                return (declaration, diagnostics, index + 1);
-            }
-            return (None, diagnostics, index + 1);
-        }
-
-        if line.text.trim().is_empty() {
-            index += 1;
-            continue;
-        }
-
-        if !parse_multiline_import_names_line(line, &mut imported_names, &mut diagnostics) {
-            had_error = true;
+        if lines[index].text.trim_start().starts_with('}') {
+            return index + 1;
         }
         index += 1;
     }
-
-    diagnostics.push(Diagnostic::error(
-        opening.import_span,
-        "Multiline IMPORT declarations must close with `} FROM moduleName`",
-    ));
-    (None, diagnostics, index)
+    index
 }
 
-struct MultilineImportOpening<'a> {
-    import_span: SourceSpan,
-    open_brace_span: SourceSpan,
-    trailing: &'a str,
-    trailing_byte_index: usize,
-}
-
-fn parse_multiline_import_opening<'a>(
-    line: &'a SourceLine,
-    diagnostics: &mut Vec<Diagnostic>,
-) -> Option<MultilineImportOpening<'a>> {
-    let trimmed = line.text.trim_start();
-    let leading_bytes = line.text.len() - trimmed.len();
-    let keyword = trimmed
-        .chars()
-        .take_while(|ch| is_identifier_continue(*ch))
-        .collect::<String>();
-    let import_span = span_at(line, leading_bytes);
-
-    if keyword != "IMPORT" {
-        diagnostics.push(Diagnostic::error(
-            import_span,
-            "Import declarations must use uppercase `IMPORT`",
-        ));
-        return None;
-    }
-
-    let rest_byte_index = leading_bytes + keyword.len();
-    let rest = &line.text[rest_byte_index..];
-    if !rest.starts_with([' ', '\t']) {
-        diagnostics.push(Diagnostic::error(
-            span_at(line, rest_byte_index),
-            "Expected whitespace after 'IMPORT'",
-        ));
-        return None;
-    }
-
-    let after_whitespace = rest.trim_start_matches([' ', '\t']);
-    let open_brace_byte_index = line.text.len() - after_whitespace.len();
-    let after_open = after_whitespace.strip_prefix('{')?;
-    let trailing_byte_index = open_brace_byte_index + 1;
-
-    Some(MultilineImportOpening {
-        import_span,
-        open_brace_span: span_at(line, open_brace_byte_index),
-        trailing: after_open,
-        trailing_byte_index,
-    })
-}
-
-struct SourceModuleName {
-    name: String,
-    span: SourceSpan,
-}
-
-fn parse_multiline_import_closing(
-    line: &SourceLine,
-    diagnostics: &mut Vec<Diagnostic>,
-) -> Option<SourceModuleName> {
-    let trimmed = line.text.trim_start();
-    let leading_bytes = line.text.len() - trimmed.len();
-    let after_close = trimmed.strip_prefix('}')?;
-    let after_close_byte_index = leading_bytes + 1;
-    let after_whitespace = after_close.trim_start_matches([' ', '\t']);
-    let from_byte_index = line.text.len() - after_whitespace.len();
-
-    let from_keyword = after_whitespace
-        .chars()
-        .take_while(|ch| is_identifier_continue(*ch))
-        .collect::<String>();
-    if from_keyword.is_empty() {
-        diagnostics.push(Diagnostic::error(
-            span_at(line, after_close_byte_index),
-            "IMPORT declarations must include FROM moduleName",
-        ));
-        return None;
-    }
-
-    let from_span = span_at(line, from_byte_index);
-    if !from_keyword.eq_ignore_ascii_case("FROM") {
-        diagnostics.push(Diagnostic::error(
-            from_span,
-            format!("Expected FROM in IMPORT declaration but saw '{from_keyword}'"),
-        ));
-        return None;
-    }
-    if from_keyword != "FROM" {
-        diagnostics.push(Diagnostic::error(
-            from_span,
-            "Import declarations must use uppercase `FROM`",
-        ));
-        return None;
-    }
-
-    let after_from_byte_index = from_byte_index + from_keyword.len();
-    let after_from = &line.text[after_from_byte_index..];
-    if !after_from.starts_with([' ', '\t']) {
-        diagnostics.push(Diagnostic::error(
-            span_at(line, after_from_byte_index),
-            "Expected whitespace after 'FROM'",
-        ));
-        return None;
-    }
-
-    let source_module_text = after_from.trim_start_matches([' ', '\t']);
-    let source_module_byte_index = line.text.len() - source_module_text.len();
-    let Some(source_module) = source_module_text.split_whitespace().next() else {
-        diagnostics.push(Diagnostic::error(
-            span_at(line, source_module_byte_index),
-            "IMPORT declarations must include a source module name after FROM",
-        ));
-        return None;
-    };
-    let source_module_span = span_at(line, source_module_byte_index);
-    let trailing = &source_module_text[source_module.len()..];
-    if !trailing.trim().is_empty() {
-        diagnostics.push(Diagnostic::error(
-            span_at(line, source_module_byte_index + source_module.len()),
-            format!(
-                "Expected end of line after IMPORT declaration but saw '{}'",
-                trailing.trim()
-            ),
-        ));
-        return None;
-    }
-
-    if source_module.contains('.') {
-        diagnostics.push(Diagnostic::error(
-            source_module_span,
-            "Import source module must be a single identifier; hierarchical module names are not supported",
-        ));
-        return None;
-    }
-
-    if !is_identifier(source_module) {
-        diagnostics.push(Diagnostic::error(
-            source_module_span,
-            "Import source module must be a single identifier",
-        ));
-        return None;
-    }
-
-    Some(SourceModuleName {
-        name: source_module.to_string(),
-        span: source_module_span,
-    })
-}
-
-fn parse_multiline_import_names_line(
-    line: &SourceLine,
-    imported_names: &mut Vec<ImportedName>,
-    diagnostics: &mut Vec<Diagnostic>,
-) -> bool {
-    let mut had_error = false;
-    let mut cursor = 0;
-    let mut expect_name = true;
-
-    while cursor < line.text.len() {
-        let remainder = &line.text[cursor..];
-        let after_whitespace = remainder.trim_start_matches([' ', '\t']);
-        cursor = line.text.len() - after_whitespace.len();
-        if cursor >= line.text.len() {
-            break;
-        }
-
-        if line.text[cursor..].starts_with(',') {
-            if expect_name {
-                diagnostics.push(Diagnostic::error(
-                    span_at(line, cursor),
-                    "IMPORT declarations must include an imported symbol name before ','",
-                ));
-                had_error = true;
-            }
-            cursor += 1;
-            expect_name = true;
-            continue;
-        }
-
-        let name_start = cursor;
-        let name = line.text[cursor..]
-            .chars()
-            .take_while(|ch| !ch.is_whitespace() && *ch != ',')
-            .collect::<String>();
-        cursor += name.len();
-        let name_span = span_at(line, name_start);
-
-        if name.contains("::") || name.contains(':') {
-            diagnostics.push(Diagnostic::error(
-                name_span,
-                "IMPORT names must be unqualified identifiers",
-            ));
-            return false;
-        }
-
-        if !is_identifier(&name) {
-            diagnostics.push(Diagnostic::error(
-                name_span,
-                "IMPORT names must be single identifiers",
-            ));
-            return false;
-        }
-
-        let after_name = &line.text[cursor..];
-        let after_name_trimmed = after_name.trim_start_matches([' ', '\t']);
-        if after_name_trimmed
-            .strip_prefix("AS")
-            .or_else(|| after_name_trimmed.strip_prefix("as"))
-            .is_some_and(|rest| rest.is_empty() || rest.starts_with(char::is_whitespace))
-        {
-            diagnostics.push(Diagnostic::error(
-                span_at(line, line.text.len() - after_name_trimmed.len()),
-                "Import aliases are not supported in the first module-support phase",
-            ));
-            return false;
-        }
-
-        let next_token = after_name_trimmed
-            .split_whitespace()
-            .next()
-            .unwrap_or_default()
-            .to_string();
-        if is_import_kind_keyword(&name) && is_identifier(&next_token) {
-            diagnostics.push(Diagnostic::error(
-                name_span,
-                "IMPORT names do not include kind annotations",
-            ));
-            return false;
-        }
-
-        imported_names.push(ImportedName::new(name, name_span));
-        expect_name = false;
-
-        let after_whitespace = after_name.trim_start_matches([' ', '\t']);
-        cursor = line.text.len() - after_whitespace.len();
-        if cursor >= line.text.len() {
-            break;
-        }
-        if line.text[cursor..].starts_with(',') {
-            continue;
-        }
-
-        diagnostics.push(Diagnostic::error(
-            span_at(line, cursor),
-            format!(
-                "Expected ',' or end of line after imported name but saw '{}'",
-                line.text[cursor..].trim()
-            ),
-        ));
-        had_error = true;
-        break;
-    }
-
-    !had_error
-}
-
-fn span_at(line: &SourceLine, byte_index: usize) -> SourceSpan {
-    SourceSpan::new(
-        line.span.source_name.clone(),
-        line.span.line,
-        line.span.column + line.text[..byte_index].chars().count(),
-    )
-}
-
-fn parse_imported_names(parser: &mut RuleParser<'_>) -> Option<Vec<ImportedName>> {
-    if parser
-        .line_remainder()
-        .strip_prefix("FROM")
-        .is_some_and(|rest| rest.is_empty() || rest.starts_with(char::is_whitespace))
-    {
+fn parse_imported_names(
+    parser: &mut RuleParser<'_>,
+    source_module: &str,
+) -> Option<Vec<ImportedName>> {
+    parser.skip_horizontal_whitespace();
+    if parser.line_remainder().is_empty() {
         parser.diagnostic(Diagnostic::error(
             parser.current_span(),
-            "IMPORT declarations must name at least one symbol before FROM",
+            "FROM ... IMPORT declarations must name at least one symbol",
         ));
         parser.skip_to_end();
         return None;
@@ -502,6 +223,16 @@ fn parse_imported_names(parser: &mut RuleParser<'_>) -> Option<Vec<ImportedName>
     loop {
         parser.skip_horizontal_whitespace();
         let name_span = parser.current_span();
+
+        if parser.line_remainder().starts_with(',') {
+            parser.diagnostic(Diagnostic::error(
+                name_span,
+                "IMPORT declarations must include an imported symbol name before ','",
+            ));
+            parser.skip_to_end();
+            return None;
+        }
+
         let Some(name) = parser.take_while(|ch| !ch.is_whitespace() && ch != ',') else {
             parser.diagnostic(Diagnostic::error(
                 parser.current_span(),
@@ -529,6 +260,17 @@ fn parse_imported_names(parser: &mut RuleParser<'_>) -> Option<Vec<ImportedName>
             return None;
         }
 
+        if imported_names.is_empty() && name == source_module {
+            parser.diagnostic(Diagnostic::error(
+                name_span,
+                format!(
+                    "Module literals must be imported with `FROM {source_module}`, not `FROM {source_module} IMPORT {source_module}`"
+                ),
+            ));
+            parser.skip_to_end();
+            return None;
+        }
+
         imported_names.push(ImportedName::new(name.clone(), name_span.clone()));
         parser.skip_horizontal_whitespace();
 
@@ -546,17 +288,7 @@ fn parse_imported_names(parser: &mut RuleParser<'_>) -> Option<Vec<ImportedName>
         }
 
         let remainder = parser.line_remainder();
-        if remainder
-            .strip_prefix("FROM")
-            .is_some_and(|rest| rest.is_empty() || rest.starts_with(char::is_whitespace))
-        {
-            break;
-        }
-
-        if remainder
-            .strip_prefix("from")
-            .is_some_and(|rest| rest.is_empty() || rest.starts_with(char::is_whitespace))
-        {
+        if remainder.is_empty() {
             break;
         }
 
@@ -587,22 +319,47 @@ fn parse_imported_names(parser: &mut RuleParser<'_>) -> Option<Vec<ImportedName>
             return None;
         }
 
-        if remainder.is_empty() {
-            parser.diagnostic(Diagnostic::error(
-                parser.current_span(),
-                "IMPORT declarations must include FROM moduleName",
-            ));
-        } else {
-            parser.diagnostic(Diagnostic::error(
-                parser.current_span(),
-                format!("Expected ',' or FROM after imported name but saw '{remainder}'"),
-            ));
-        }
+        parser.diagnostic(Diagnostic::error(
+            parser.current_span(),
+            format!("Expected ',' or end of line after imported name but saw '{remainder}'"),
+        ));
         parser.skip_to_end();
         return None;
     }
 
     Some(imported_names)
+}
+
+fn obsolete_import_syntax_diagnostic(span: SourceSpan, remainder: &str) -> Diagnostic {
+    if let Some((names, source_module)) = obsolete_import_parts(remainder) {
+        if names == source_module && is_identifier(names) {
+            return Diagnostic::error(
+                span,
+                format!(
+                    "Module literals must be imported with `FROM {source_module}`; `IMPORT {names} FROM {source_module}` is obsolete"
+                ),
+            );
+        }
+
+        return Diagnostic::error(
+            span,
+            format!(
+                "Old import syntax `IMPORT {names} FROM {source_module}` has been replaced by `FROM {source_module} IMPORT {names}`"
+            ),
+        );
+    }
+
+    Diagnostic::error(
+        span,
+        "Old import syntax `IMPORT symbol FROM module` has been replaced by `FROM module IMPORT symbol`",
+    )
+}
+
+fn obsolete_import_parts(remainder: &str) -> Option<(&str, &str)> {
+    let trimmed = remainder.trim();
+    let (names, source_module) = trimmed.split_once(" FROM ")?;
+    let source_module = source_module.split_whitespace().next()?;
+    Some((names.trim(), source_module.trim()))
 }
 
 fn is_import_kind_keyword(name: &str) -> bool {
@@ -642,22 +399,40 @@ mod tests {
     }
 
     #[test]
-    fn parses_import_declaration() {
-        let (declaration, diagnostics) = parse_import("IMPORT sword, heal FROM items");
+    fn parses_symbol_import_declaration() {
+        let (declaration, diagnostics) = parse_import("FROM items IMPORT sword, heal");
 
         assert!(diagnostics.is_empty(), "{diagnostics:#?}");
         let declaration = declaration.expect("expected import declaration");
+        assert!(declaration.is_symbol_import());
+        assert!(!declaration.is_module_import());
         assert_eq!(declaration.source_module(), "items");
         assert_eq!(declaration.imported_names().len(), 2);
         assert_eq!(declaration.imported_names()[0].name(), "sword");
         assert_eq!(
             declaration.imported_names()[0].span(),
-            &SourceSpan::new(Some("module.ink".to_string()), 1, 8)
+            &SourceSpan::new(Some("module.ink".to_string()), 1, 19)
         );
         assert_eq!(declaration.imported_names()[1].name(), "heal");
         assert_eq!(
             declaration.source_module_span(),
-            &SourceSpan::new(Some("module.ink".to_string()), 1, 25)
+            &SourceSpan::new(Some("module.ink".to_string()), 1, 6)
+        );
+    }
+
+    #[test]
+    fn parses_module_import_declaration() {
+        let (declaration, diagnostics) = parse_import("FROM items");
+
+        assert!(diagnostics.is_empty(), "{diagnostics:#?}");
+        let declaration = declaration.expect("expected import declaration");
+        assert!(declaration.is_module_import());
+        assert!(!declaration.is_symbol_import());
+        assert_eq!(declaration.source_module(), "items");
+        assert!(declaration.imported_names().is_empty());
+        assert_eq!(
+            declaration.source_module_span(),
+            &SourceSpan::new(Some("module.ink".to_string()), 1, 6)
         );
     }
 
@@ -665,40 +440,64 @@ mod tests {
     fn rejects_invalid_import_forms() {
         let cases = [
             (
-                "import sword FROM items",
-                "Import declarations must use uppercase `IMPORT`",
-            ),
-            (
-                "IMPORT sword from items",
+                "from items IMPORT sword",
                 "Import declarations must use uppercase `FROM`",
             ),
             (
-                "IMPORT FROM items",
-                "IMPORT declarations must name at least one symbol before FROM",
+                "FROM items import sword",
+                "Import declarations must use uppercase `IMPORT`",
             ),
             (
-                "IMPORT sword",
-                "IMPORT declarations must include FROM moduleName",
+                "FROM",
+                "FROM declarations must include a source module name",
             ),
             (
-                "IMPORT sword AS blade FROM items",
+                "FROM ",
+                "FROM declarations must include a source module name",
+            ),
+            (
+                "FROM item.weapons",
+                "Import source module must be a single identifier; hierarchical module names are not supported",
+            ),
+            (
+                "FROM 123",
+                "Import source module must be a single identifier",
+            ),
+            (
+                "FROM items IMPORT",
+                "FROM ... IMPORT declarations must name at least one symbol",
+            ),
+            (
+                "FROM items IMPORT ",
+                "FROM ... IMPORT declarations must name at least one symbol",
+            ),
+            (
+                "FROM items IMPORT sword AS blade",
                 "Import aliases are not supported in the first module-support phase",
             ),
             (
-                "IMPORT function play FROM audio",
+                "FROM audio IMPORT function play",
                 "IMPORT names do not include kind annotations",
             ),
             (
-                "IMPORT sword,",
+                "FROM items IMPORT sword,",
                 "IMPORT declarations must include an imported symbol name after ','",
             ),
             (
-                "IMPORT items::sword FROM items",
+                "FROM items IMPORT items::sword",
                 "IMPORT names must be unqualified identifiers",
             ),
             (
-                "IMPORT sword FROM item.weapons",
-                "Import source module must be a single identifier; hierarchical module names are not supported",
+                "FROM items IMPORT items",
+                "Module literals must be imported with `FROM items`, not `FROM items IMPORT items`",
+            ),
+            (
+                "IMPORT sword FROM items",
+                "Old import syntax `IMPORT sword FROM items` has been replaced by `FROM items IMPORT sword`",
+            ),
+            (
+                "IMPORT items FROM items",
+                "Module literals must be imported with `FROM items`; `IMPORT items FROM items` is obsolete",
             ),
         ];
 

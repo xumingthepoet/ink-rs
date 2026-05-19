@@ -94,23 +94,45 @@ Each entry should include:
   fixtures use only `*`, and the removed-sequence diagnostic fixture still
   covers removed inline sequences from a `*` choice line.
 
+## 2026-05-19: FROM Imports And Module Implementation Clauses
+
+- status: supported/replaced
+- upstream behavior: upstream Ink uses source includes rather than explicit
+  module import allow-lists or interface implementation clauses.
+- ink-rs behavior: module imports now use leading `FROM`. `FROM module IMPORT
+  name, name` authorizes static qualified references such as `module::name`.
+  `FROM module` imports the module itself as a distinct dependency and does not
+  authorize static `module::symbol` access. The old `IMPORT name FROM module`
+  form is no longer current syntax and reports a migration diagnostic.
+  `=== module name implements IName, IOther ===` records explicit interface
+  implementation declarations on the parsed module.
+- documentation effect: `SyntaxReference.md` shows only `FROM` import syntax
+  and module implementation clauses as current syntax.
+- rationale: putting the source module first keeps static symbol imports and
+  bare module imports in one grammar family, while avoiding the old
+  `IMPORT module FROM module` workaround for module values.
+- migration guidance: replace `IMPORT target FROM left` with
+  `FROM left IMPORT target`. Replace block imports with a comma-separated
+  `FROM module IMPORT ...` line.
+- tests: parser tests cover bare imports, symbol imports, obsolete import
+  diagnostics, duplicate implemented interfaces, and parse snapshots for module
+  implementation clauses.
+
 ## 2026-04-30: Multiline Import Lists
 
-- status: supported
+- status: removed by the 2026-05-19 `FROM` import replacement
 - upstream behavior: upstream Ink uses source includes rather than explicit
   module import allow-lists.
-- ink-rs behavior: `IMPORT name, name FROM module` remains supported, and
-  modules may now use `IMPORT { ... } FROM module` block imports for long
-  allow-lists. Names inside the block may be separated by newlines, commas, or
-  both, and trailing commas are allowed.
-- documentation effect: `SyntaxReference.md` documents the block import form
-  as current syntax and shows compact comma-wrapped import lists.
+- ink-rs behavior: this older ink-rs-only form was replaced by
+  `FROM module IMPORT name, name`; block imports are no longer current syntax.
+- documentation effect: `SyntaxReference.md` no longer documents the block
+  import form as current syntax.
 - rationale: large modules can expose enough symbols that one-line import lists
   become hard to read.
-- migration guidance: none; this is an additive current syntax form.
-- tests: parser tests cover multiline import parsing, trailing commas, and
-  diagnostics. The module import fixture uses a comma-wrapped multiline import
-  list.
+- migration guidance: replace block imports with a comma-separated
+  `FROM module IMPORT ...` line.
+- tests: obsolete import syntax is covered by parser and integration
+  diagnostics.
 
 ## 2026-04-29: Explicit Multiline If And Switch Blocks
 
@@ -300,7 +322,7 @@ Each entry should include:
   the story entry point. Module-level direct content and module-level tags are
   rejected; content and tags belong inside knots or stitches. Source files are
   passed explicitly to the compiler, and `INCLUDE` is removed. Cross-module
-  access requires an `IMPORT name FROM module` declaration and qualified source
+  access requires a `FROM module IMPORT name` declaration and qualified source
   references such as `shop::price`. Module `VAR` and `EXTERNAL` runtime names
   are module-qualified, for example `shop::price` and `audio::play`.
 - documentation effect: `SyntaxReference.md` documents explicit modules

@@ -719,7 +719,7 @@ mod tests {
     fn accepts_qualified_imported_global_assignments() {
         let story = parse_story(
             "=== module game ===\n\
-             IMPORT score FROM state\n\
+             FROM state IMPORT score\n\
              == main ==\n\
              ~ state::score = 1\n\
              ~ state::score += 2\n\
@@ -738,7 +738,7 @@ mod tests {
     fn accepts_qualified_imported_enum_assignments() {
         let story = parse_story(
             "=== module game ===\n\
-             IMPORT State, state FROM data\n\
+             FROM data IMPORT State, state\n\
              == main ==\n\
              ~ data::state = data::State.Busy\n\
              -> END\n\
@@ -756,7 +756,7 @@ mod tests {
     fn rejects_assignment_to_qualified_constant() {
         let story = parse_story(
             "=== module game ===\n\
-             IMPORT LIMIT FROM state\n\
+             FROM state IMPORT LIMIT\n\
              == main ==\n\
              ~ state::LIMIT = 1\n\
              -> END\n\
@@ -779,7 +779,7 @@ mod tests {
     fn rejects_invalid_qualified_global_assignment_type() {
         let story = parse_story(
             "=== module game ===\n\
-             IMPORT score FROM state\n\
+             FROM state IMPORT score\n\
              == main ==\n\
              ~ state::score = \"high\"\n\
              -> END\n\
@@ -802,7 +802,7 @@ mod tests {
     fn rejects_invalid_qualified_global_compound_assignment_type() {
         let story = parse_story(
             "=== module game ===\n\
-             IMPORT score FROM state\n\
+             FROM state IMPORT score\n\
              == main ==\n\
              ~ state::score += 1.5\n\
              -> END\n\

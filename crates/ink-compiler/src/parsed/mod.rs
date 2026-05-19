@@ -39,7 +39,7 @@ pub use gather::Gather;
 pub use glue::Glue;
 pub use inc_dec::IncDec;
 pub use interface::{InterfaceDeclaration, InterfaceMemberKind, InterfaceMemberSignature};
-pub use module::{ImportDeclaration, ImportedName, Module};
+pub use module::{ImplementedInterface, ImportDeclaration, ImportedName, Module};
 pub use qualified_name::QualifiedName;
 pub use return_node::Return;
 pub use story::Story;

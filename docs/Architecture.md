@@ -254,8 +254,10 @@ diagnostic. Avoid ad hoc string splitting when `scan.rs`, `RuleParser`, or
 `expression.rs` can represent the syntax boundary.
 
 Explicit module syntax is parsed here. `=== module name ===` opens a module;
-`IMPORT ... FROM ...` lives at module top level; knots/functions live inside
-modules; direct module-level story content is a syntax error.
+`=== module name implements Interface ===` records explicit interface
+implementation clauses; `FROM module` and `FROM module IMPORT ...` live at
+module top level; knots/functions live inside modules; direct module-level
+story content is a syntax error.
 
 ### Parsed Model
 

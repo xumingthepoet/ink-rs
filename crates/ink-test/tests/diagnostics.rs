@@ -105,6 +105,17 @@ fn interface_body_diagnostics_reject_executable_content() {
 }
 
 #[test]
+fn imports_diagnostics_report_obsolete_import_syntax() {
+    let diagnostics = diagnostics_for_fixture("diagnostics/imports-obsolete.ink");
+
+    assert_diagnostic(
+        &diagnostics,
+        DiagnosticSeverity::Error,
+        "Old import syntax `IMPORT sword FROM items` has been replaced by `FROM items IMPORT sword`",
+    );
+}
+
+#[test]
 fn diagnostic_helper_asserts_error_messages() {
     let diagnostics = diagnostics_for_fixture("diagnostics/diagnostic-smoke.ink");
     assert_diagnostic(&diagnostics, DiagnosticSeverity::Error, "target not found");

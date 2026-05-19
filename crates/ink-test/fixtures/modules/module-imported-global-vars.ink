@@ -1,5 +1,5 @@
 === module game ===
-IMPORT score FROM state
+FROM state IMPORT score
 
 == main ==
 {state::score}

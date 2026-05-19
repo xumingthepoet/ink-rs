@@ -1,5 +1,5 @@
 === module game ===
-IMPORT target, tunnel, value FROM routes
+FROM routes IMPORT target, tunnel, value
 
 == main ==
 {routes::value()}

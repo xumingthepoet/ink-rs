@@ -1,5 +1,5 @@
 === module game ===
-IMPORT start FROM flow
+FROM flow IMPORT start
 
 == main ==
 -> flow::start
