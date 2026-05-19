@@ -98,7 +98,7 @@ Commit record:
 - Review/fix commits: reviewed; no fix commits required
 - Completion record commit: this task-list commit
 
-### [ ] Task 03: Parse Module Implementation Clauses And New Import Syntax
+### [>] Task 03: Parse Module Implementation Clauses And New Import Syntax
 
 Goal: Support explicit module implementation clauses such as `=== module left implements IItem, IOther ===` and the new `FROM` import syntax.
 
@@ -146,9 +146,9 @@ Validation commands:
 
 Commit record:
 
-- Implementation commit: pending
-- Focused validation: pending
-- Full validation: pending
+- Implementation commit: `8ceae72f Parse module implements and FROM imports`
+- Focused validation: `cargo test -p ink-compiler syntax::module`; `cargo test -p ink-compiler syntax::import`; `cargo test -p ink-compiler syntax::parser`; `cargo test -p ink-compiler parsed`; `cargo test -p ink-test --test compiler_snapshots modules` (matched 0 tests); `cargo test -p ink-test --test compiler_snapshots`; `cargo test -p ink-test --test diagnostics imports`
+- Full validation: `make gate`
 - Review/fix commits: pending
 - Completion record commit: pending
 
