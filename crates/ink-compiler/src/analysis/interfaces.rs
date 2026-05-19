@@ -765,6 +765,23 @@ mod tests {
     }
 
     #[test]
+    fn accepts_overlapping_identical_interface_member_requirements() {
+        let story = parse_story(
+            "=== interface IItem ===\n\
+             == target(amount: int) ==\n\
+             === interface IRoute ===\n\
+             == target(amount: int) ==\n\
+             === module left implements IItem, IRoute ===\n\
+             == target(amount: int) ==\n\
+             -> END",
+        );
+
+        let diagnostics = implementation_diagnostics(&story);
+
+        assert!(diagnostics.is_empty(), "{diagnostics:#?}");
+    }
+
+    #[test]
     fn reports_unknown_implemented_interfaces() {
         let story = parse_story("=== module left implements IMissing ===");
 
