@@ -2,13 +2,17 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::parsed::{
     visit::{walk_story, ParsedVisitor, VisitContext},
-    AssignmentTarget, ConstantDeclaration, Expression, Object, Story, TypeName, VariableAssignment,
+    AssignmentTarget, ConstantDeclaration, DivertTarget, Expression, InterfaceMemberKind, Object,
+    Story, TypeName, VariableAssignment,
 };
 
 use super::{
     context::{EnumTypeIndex, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
     enums::build_enum_type_index,
-    expression_types::{infer_expression_type, TypeInferenceError},
+    expression_types::{
+        infer_expression_type, infer_expression_type_with_interfaces, TypeInferenceError,
+    },
+    interfaces::{build_interface_member_index, InterfaceMemberIndex},
     modules::ModuleImportIndex,
     structs::{build_struct_type_index, resolve_struct_symbol},
     target_symbols::build_target_symbol_index,
@@ -103,6 +107,7 @@ pub(super) fn collect_interface_module_literal_uses_for_story(
     let variable_scopes = build_variable_scope_index(story);
     let target_symbols = build_target_symbol_index(story);
     let module_implementations = build_module_implementation_index(story);
+    let interface_members = build_interface_member_index(story);
 
     collect_interface_module_literal_uses(
         story,
@@ -111,6 +116,7 @@ pub(super) fn collect_interface_module_literal_uses_for_story(
         &enum_types,
         &target_symbols,
         &module_implementations,
+        &interface_members,
     )
 }
 
@@ -121,6 +127,7 @@ fn collect_interface_module_literal_uses(
     enum_types: &EnumTypeIndex,
     target_symbols: &TargetSymbolIndex,
     module_implementations: &ModuleImplementationIndex,
+    interface_members: &InterfaceMemberIndex,
 ) -> InterfaceModuleLiteralUses {
     let mut collector = InterfaceModuleLiteralUseCollector::new(
         variable_scopes,
@@ -128,6 +135,7 @@ fn collect_interface_module_literal_uses(
         enum_types,
         target_symbols,
         module_implementations,
+        interface_members,
     );
     walk_story(story, &mut collector);
     collector.uses
@@ -200,6 +208,7 @@ struct InterfaceModuleLiteralUseCollector<'a> {
     enum_types: &'a EnumTypeIndex,
     target_symbols: &'a TargetSymbolIndex,
     module_implementations: &'a ModuleImplementationIndex,
+    interface_members: &'a InterfaceMemberIndex,
     uses: InterfaceModuleLiteralUses,
 }
 
@@ -210,6 +219,7 @@ impl<'a> InterfaceModuleLiteralUseCollector<'a> {
         enum_types: &'a EnumTypeIndex,
         target_symbols: &'a TargetSymbolIndex,
         module_implementations: &'a ModuleImplementationIndex,
+        interface_members: &'a InterfaceMemberIndex,
     ) -> Self {
         Self {
             variable_scopes,
@@ -217,6 +227,7 @@ impl<'a> InterfaceModuleLiteralUseCollector<'a> {
             enum_types,
             target_symbols,
             module_implementations,
+            interface_members,
             uses: InterfaceModuleLiteralUses::default(),
         }
     }
@@ -326,6 +337,47 @@ impl<'a> InterfaceModuleLiteralUseCollector<'a> {
             .insert(module_name.to_string());
     }
 
+    fn check_dynamic_divert_target_arguments(
+        &mut self,
+        expression: &Expression,
+        arguments: &[Expression],
+        context: &VisitContext,
+    ) {
+        let Expression::DynamicInterfaceAccess { target, member } = expression else {
+            return;
+        };
+
+        let Ok(target_type) = infer_expression_type_with_interfaces(
+            target,
+            self.variable_scopes,
+            self.struct_types,
+            self.enum_types,
+            self.target_symbols,
+            self.interface_members,
+            context.current_module.as_deref(),
+            context.current_flow_path.as_deref(),
+        ) else {
+            return;
+        };
+
+        let Some(interface_name) = target_type.as_interface_name() else {
+            return;
+        };
+        let Some(signature) = self.interface_members.member(interface_name, member) else {
+            return;
+        };
+        if signature.kind() != &InterfaceMemberKind::Knot {
+            return;
+        }
+
+        for (argument, parameter) in arguments.iter().zip(signature.arguments()) {
+            let Some(expected_type) = parameter.declared_type() else {
+                continue;
+            };
+            self.check_expression_against_type(argument, expected_type, context);
+        }
+    }
+
     fn resolve_assignment_target_type(
         &self,
         target: &AssignmentTarget,
@@ -398,6 +450,24 @@ impl ParsedVisitor for InterfaceModuleLiteralUseCollector<'_> {
         match object {
             Object::ConstantDeclaration(declaration) => self.check_constant(declaration, context),
             Object::VariableAssignment(assignment) => self.check_assignment(assignment, context),
+            Object::Divert(divert) => {
+                if let DivertTarget::Dynamic(expression) = divert.target() {
+                    self.check_dynamic_divert_target_arguments(
+                        expression,
+                        divert.arguments(),
+                        context,
+                    );
+                }
+            }
+            Object::TunnelOnwards(tunnel_onwards) => {
+                if let Some(DivertTarget::Dynamic(expression)) = tunnel_onwards.override_target() {
+                    self.check_dynamic_divert_target_arguments(
+                        expression,
+                        tunnel_onwards.arguments(),
+                        context,
+                    );
+                }
+            }
             _ => {}
         }
     }

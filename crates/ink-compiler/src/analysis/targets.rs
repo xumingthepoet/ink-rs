@@ -4,7 +4,8 @@ use crate::{
     diagnostic::Diagnostic,
     parsed::{
         visit::{walk_story, ParsedVisitor, VisitContext},
-        DivertTarget, Expression, Flow, FlowArgument, Object, Story, TypeName,
+        DivertTarget, Expression, Flow, FlowArgument, InterfaceMemberKind,
+        InterfaceMemberSignature, Object, Story, TypeName,
     },
     source::SourceSpan,
     syntax::parse_initial_expression,
@@ -16,10 +17,16 @@ use super::{
         VariableScopeIndex,
     },
     enums::{build_enum_type_index, is_enum_member_reference},
-    expression_types::{infer_expression_type, typed_builtin_return_type},
-    interface_values::{
-        collect_interface_module_literal_uses_for_story, InterfaceModuleLiteralUses,
+    expression_types::{
+        infer_expression_type, infer_expression_type_with_interfaces, typed_builtin_return_type,
     },
+    interface_values::{
+        build_module_implementation_index, collect_interface_module_literal_uses_for_story,
+        infer_expected_interface_expression_type, InterfaceModuleLiteralUses,
+        ModuleImplementationIndex,
+    },
+    interfaces::{build_interface_member_index, InterfaceMemberIndex},
+    modules::{build_module_import_index, ModuleImportIndex},
     span::object_span,
     structs::build_struct_type_index,
     target_symbols::{
@@ -34,12 +41,18 @@ pub(super) fn call_target_diagnostics(story: &Story) -> Vec<Diagnostic> {
     let variable_scopes = build_variable_scope_index(story);
     let struct_types = build_struct_type_index(story);
     let enum_types = build_enum_type_index(story);
+    let interface_members = build_interface_member_index(story);
+    let module_implementations = build_module_implementation_index(story);
+    let module_imports = build_module_import_index(story);
     let interface_module_literal_uses = collect_interface_module_literal_uses_for_story(story);
     let mut checker = CallTargetChecker::new(
         &target_symbols,
         &variable_scopes,
         &struct_types,
         &enum_types,
+        &interface_members,
+        &module_implementations,
+        &module_imports,
         &interface_module_literal_uses,
     );
     walk_story(story, &mut checker);
@@ -51,6 +64,9 @@ struct CallTargetChecker<'a> {
     variable_scopes: &'a VariableScopeIndex,
     struct_types: &'a StructTypeIndex,
     enum_types: &'a EnumTypeIndex,
+    interface_members: &'a InterfaceMemberIndex,
+    module_implementations: &'a ModuleImplementationIndex,
+    module_imports: &'a ModuleImportIndex,
     interface_module_literal_uses: &'a InterfaceModuleLiteralUses,
     diagnostics: Vec<Diagnostic>,
     flow_contexts_by_path: HashMap<String, FlowContext>,
@@ -62,6 +78,9 @@ impl<'a> CallTargetChecker<'a> {
         variable_scopes: &'a VariableScopeIndex,
         struct_types: &'a StructTypeIndex,
         enum_types: &'a EnumTypeIndex,
+        interface_members: &'a InterfaceMemberIndex,
+        module_implementations: &'a ModuleImplementationIndex,
+        module_imports: &'a ModuleImportIndex,
         interface_module_literal_uses: &'a InterfaceModuleLiteralUses,
     ) -> Self {
         Self {
@@ -69,6 +88,9 @@ impl<'a> CallTargetChecker<'a> {
             variable_scopes,
             struct_types,
             enum_types,
+            interface_members,
+            module_implementations,
+            module_imports,
             interface_module_literal_uses,
             diagnostics: Vec::new(),
             flow_contexts_by_path: HashMap::new(),
@@ -218,19 +240,23 @@ impl<'a> CallTargetChecker<'a> {
     fn check_dynamic_divert_target(
         &mut self,
         expression: &Expression,
+        arguments: &[Expression],
         span: &SourceSpan,
         context: &VisitContext,
     ) {
-        self.check_expression(expression, span, context);
-        if expression_contains_dynamic_interface_access(expression) {
+        if let Expression::DynamicInterfaceAccess { target, member } = expression {
+            self.check_dynamic_interface_divert_target(target, member, arguments, span, context);
             return;
         }
-        match infer_expression_type(
+
+        self.check_expression(expression, span, context);
+        match infer_expression_type_with_interfaces(
             expression,
             self.variable_scopes,
             self.struct_types,
             self.enum_types,
             self.target_symbols,
+            self.interface_members,
             self.current_module(context),
             self.current_flow_path(context),
         ) {
@@ -252,6 +278,174 @@ impl<'a> CallTargetChecker<'a> {
         }
     }
 
+    fn check_dynamic_interface_divert_target(
+        &mut self,
+        target: &Expression,
+        member: &str,
+        arguments: &[Expression],
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) {
+        self.check_expression(target, span, context);
+
+        match self.dynamic_interface_member_signature(target, member, span, context) {
+            Some(signature) => {
+                self.check_dynamic_interface_target_arguments(
+                    member, arguments, &signature, span, context,
+                );
+            }
+            None => {
+                for argument in arguments {
+                    self.check_expression(argument, span, context);
+                }
+            }
+        }
+    }
+
+    fn dynamic_interface_member_signature(
+        &mut self,
+        target: &Expression,
+        member: &str,
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) -> Option<InterfaceMemberSignature> {
+        let target_type = match infer_expression_type_with_interfaces(
+            target,
+            self.variable_scopes,
+            self.struct_types,
+            self.enum_types,
+            self.target_symbols,
+            self.interface_members,
+            self.current_module(context),
+            self.current_flow_path(context),
+        ) {
+            Ok(target_type) => target_type,
+            Err(error) => {
+                self.diagnostics.push(Diagnostic::error(
+                    span.clone(),
+                    format!(
+                        "Cannot type-check dynamic interface target '{member}': {}",
+                        error.message()
+                    ),
+                ));
+                return None;
+            }
+        };
+
+        let Some(interface_name) = target_type.as_interface_name() else {
+            self.diagnostics.push(Diagnostic::error(
+                span.clone(),
+                format!(
+                    "Dynamic interface target '{member}' has base type {} but expected interface",
+                    target_type.display_name()
+                ),
+            ));
+            return None;
+        };
+
+        let Some(signature) = self.interface_members.member(interface_name, member) else {
+            self.diagnostics.push(Diagnostic::error(
+                span.clone(),
+                format!("Interface '{interface_name}' does not declare member '{member}'"),
+            ));
+            return None;
+        };
+
+        if signature.kind() != &InterfaceMemberKind::Knot {
+            self.diagnostics.push(Diagnostic::error(
+                span.clone(),
+                format!(
+                    "Interface '{interface_name}' member '{member}' is a function but dynamic target access requires a knot"
+                ),
+            ));
+            return None;
+        }
+
+        Some(signature.clone())
+    }
+
+    fn check_dynamic_interface_target_arguments(
+        &mut self,
+        member: &str,
+        arguments: &[Expression],
+        signature: &InterfaceMemberSignature,
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) {
+        let parameters = signature.arguments();
+        if arguments.len() != parameters.len() {
+            self.diagnostics.push(Diagnostic::error(
+                span.clone(),
+                format!(
+                    "Dynamic interface target '{member}' expects {} arguments but got {}",
+                    parameters.len(),
+                    arguments.len()
+                ),
+            ));
+            return;
+        }
+
+        for (argument, parameter) in arguments.iter().zip(parameters) {
+            let Some(expected_type) = parameter.declared_type() else {
+                self.check_expression(argument, span, context);
+                continue;
+            };
+
+            let argument_type = infer_expected_interface_expression_type(
+                argument,
+                expected_type,
+                self.variable_scopes,
+                self.struct_types,
+                self.enum_types,
+                self.target_symbols,
+                self.module_implementations,
+                self.module_imports,
+                self.current_module(context),
+                self.current_flow_path(context),
+            )
+            .unwrap_or_else(|| {
+                infer_expression_type_with_interfaces(
+                    argument,
+                    self.variable_scopes,
+                    self.struct_types,
+                    self.enum_types,
+                    self.target_symbols,
+                    self.interface_members,
+                    self.current_module(context),
+                    self.current_flow_path(context),
+                )
+            });
+
+            match argument_type {
+                Ok(actual_type) if actual_type != *expected_type => {
+                    self.diagnostics.push(Diagnostic::error(
+                        span.clone(),
+                        format!(
+                            "Argument '{}' for dynamic interface target '{member}' has type {} but expected {}",
+                            parameter.name(),
+                            actual_type.display_name(),
+                            expected_type.display_name()
+                        ),
+                    ));
+                    self.check_expression(argument, span, context);
+                }
+                Ok(_) => {
+                    if !is_interface_module_literal_argument(argument, expected_type) {
+                        self.check_expression(argument, span, context);
+                    }
+                }
+                Err(error) => self.diagnostics.push(Diagnostic::error(
+                    span.clone(),
+                    format!(
+                        "Cannot type-check argument '{}' for dynamic interface target '{member}': {}",
+                        parameter.name(),
+                        error.message()
+                    ),
+                )),
+            }
+        }
+    }
+
     fn check_expression(
         &mut self,
         expression: &Expression,
@@ -265,11 +459,29 @@ impl<'a> CallTargetChecker<'a> {
             Expression::QualifiedFunctionCall { name, args } => {
                 self.check_function_call(name.as_str(), args, span, context);
             }
-            Expression::DynamicInterfaceAccess { target, .. } => {
-                self.diagnostics.push(Diagnostic::error(
-                    span.clone(),
-                    "Dynamic interface member access is not type-checked yet",
-                ));
+            Expression::DynamicInterfaceAccess { target, member } => {
+                let dynamic_access = Expression::DynamicInterfaceAccess {
+                    target: target.clone(),
+                    member: member.clone(),
+                };
+                if let Err(error) = infer_expression_type_with_interfaces(
+                    &dynamic_access,
+                    self.variable_scopes,
+                    self.struct_types,
+                    self.enum_types,
+                    self.target_symbols,
+                    self.interface_members,
+                    self.current_module(context),
+                    self.current_flow_path(context),
+                ) {
+                    self.diagnostics.push(Diagnostic::error(
+                        span.clone(),
+                        format!(
+                            "Cannot type-check dynamic interface access: {}",
+                            error.message()
+                        ),
+                    ));
+                }
                 self.check_expression(target, span, context);
             }
             Expression::DynamicInterfaceFunctionCall { target, args, .. } => {
@@ -724,48 +936,6 @@ fn expression_root_variable_name(expression: &Expression) -> Option<&str> {
     }
 }
 
-fn expression_contains_dynamic_interface_access(expression: &Expression) -> bool {
-    match expression {
-        Expression::DynamicInterfaceAccess { .. }
-        | Expression::DynamicInterfaceFunctionCall { .. } => true,
-        Expression::StringContent(content) => content.objects().iter().any(|object| {
-            matches!(
-                object,
-                Object::Expression(expression) | Object::LogicLine(expression)
-                    if expression_contains_dynamic_interface_access(expression)
-            )
-        }),
-        Expression::FunctionCall { args, .. }
-        | Expression::QualifiedFunctionCall { args, .. }
-        | Expression::ArrayLiteral(args)
-        | Expression::MultipleCondition(args) => args
-            .iter()
-            .any(expression_contains_dynamic_interface_access),
-        Expression::StructLiteral(fields) => fields
-            .iter()
-            .any(|field| expression_contains_dynamic_interface_access(field.expression())),
-        Expression::FieldAccess { base, .. } => expression_contains_dynamic_interface_access(base),
-        Expression::IndexAccess { base, index } => {
-            expression_contains_dynamic_interface_access(base)
-                || expression_contains_dynamic_interface_access(index)
-        }
-        Expression::Binary { left, right, .. } => {
-            expression_contains_dynamic_interface_access(left)
-                || expression_contains_dynamic_interface_access(right)
-        }
-        Expression::Unary { expression, .. } => {
-            expression_contains_dynamic_interface_access(expression)
-        }
-        Expression::String(_)
-        | Expression::NumberInt(_)
-        | Expression::NumberFloat(_)
-        | Expression::NumberBool(_)
-        | Expression::DivertTarget(_)
-        | Expression::VariableReference(_)
-        | Expression::QualifiedReference(_) => false,
-    }
-}
-
 fn scoped_context_key(module: Option<&str>, flow_path: &str) -> String {
     module
         .map(|module| format!("{module}::{flow_path}"))
@@ -794,7 +964,12 @@ impl ParsedVisitor for CallTargetChecker<'_> {
                         "Empty diverts (->) are only valid on choices",
                     )),
                     DivertTarget::Dynamic(expression) => {
-                        self.check_dynamic_divert_target(expression, divert.span(), context);
+                        self.check_dynamic_divert_target(
+                            expression,
+                            divert.arguments(),
+                            divert.span(),
+                            context,
+                        );
                     }
                     DivertTarget::Path(_) | DivertTarget::QualifiedPath(_)
                         if !self.current_flow_is_function(context) =>
@@ -806,8 +981,10 @@ impl ParsedVisitor for CallTargetChecker<'_> {
                     | DivertTarget::Done
                     | DivertTarget::End => {}
                 }
-                for argument in divert.arguments() {
-                    self.check_expression(argument, divert.span(), context);
+                if !matches!(divert.target(), DivertTarget::Dynamic(_)) {
+                    for argument in divert.arguments() {
+                        self.check_expression(argument, divert.span(), context);
+                    }
                 }
             }
             Object::ConstantDeclaration(declaration) => {
@@ -854,6 +1031,7 @@ impl ParsedVisitor for CallTargetChecker<'_> {
                         DivertTarget::Dynamic(expression) => {
                             self.check_dynamic_divert_target(
                                 expression,
+                                tunnel_onwards.arguments(),
                                 tunnel_onwards.span(),
                                 context,
                             );
@@ -883,6 +1061,11 @@ impl ParsedVisitor for CallTargetChecker<'_> {
             | Object::Weave(_) => {}
         }
     }
+}
+
+fn is_interface_module_literal_argument(expression: &Expression, expected_type: &TypeName) -> bool {
+    expected_type.as_interface_name().is_some()
+        && matches!(expression, Expression::VariableReference(_))
 }
 
 fn resolve_current_flow_argument<'a>(
@@ -1461,5 +1644,115 @@ mod tests {
             DiagnosticSeverity::Error,
             "Cross-module direct stitch access is not allowed: 'items::scene.intro'. Import and reference the parent knot instead.",
         );
+    }
+
+    #[test]
+    fn accepts_dynamic_interface_divert_targets() {
+        let story = parse_story(
+            "=== interface IItem ===\n\
+             == target(amount: int) ==\n\
+             === module game ===\n\
+             FROM left\n\
+             STRUCT RouteState {\n\
+             current: interface<IItem>\n\
+             routes: interface<IItem>[]\n\
+             }\n\
+             VAR route: interface<IItem> = left\n\
+             VAR state: RouteState = { current: left, routes: [left] }\n\
+             VAR routes: interface<IItem>[] = [left]\n\
+             == main ==\n\
+             -> {{route}::target}(1)\n\
+             -> {{state.current}::target}(1)\n\
+             -> {{routes[0]}::target}(1)\n\
+             === module left implements IItem ===\n\
+             == target(amount: int) ==\n\
+             -> END",
+        );
+
+        assert_eq!(call_target_diagnostics(&story), []);
+    }
+
+    #[test]
+    fn accepts_interface_module_literals_as_dynamic_interface_target_arguments() {
+        let story = parse_story(
+            "=== interface IItem ===\n\
+             == target ==\n\
+             === interface IRouter ===\n\
+             == target(next: interface<IItem>) ==\n\
+             === module game ===\n\
+             FROM left\n\
+             FROM router\n\
+             VAR route: interface<IRouter> = router\n\
+             == main ==\n\
+             -> {{route}::target}(left)\n\
+             === module router implements IRouter ===\n\
+             == target(next: interface<IItem>) ==\n\
+             -> END\n\
+             === module left implements IItem ===\n\
+             == target ==\n\
+             -> END",
+        );
+
+        assert_eq!(call_target_diagnostics(&story), []);
+    }
+
+    #[test]
+    fn reports_invalid_dynamic_interface_divert_targets() {
+        let cases = [
+            (
+                "-> {{label}::target}",
+                "Dynamic interface target 'target' has base type string but expected interface",
+            ),
+            (
+                "-> {{route}::missing}",
+                "Interface 'IItem' does not declare member 'missing'",
+            ),
+            (
+                "-> {{route}::score}",
+                "Interface 'IItem' member 'score' is a function but dynamic target access requires a knot",
+            ),
+            (
+                "-> {{route}::target}",
+                "Dynamic interface target 'target' expects 1 arguments but got 0",
+            ),
+            (
+                "-> {{route}::target}(\"bad\")",
+                "Argument 'amount' for dynamic interface target 'target' has type string but expected int",
+            ),
+        ];
+
+        for (divert, expected_message) in cases {
+            let story = parse_story(&format!(
+                "=== interface IItem ===\n\
+                 == target(amount: int) ==\n\
+                 == function score() => int ==\n\
+                 === module game ===\n\
+                 FROM left\n\
+                 VAR route: interface<IItem> = left\n\
+                 VAR label: string = \"x\"\n\
+                 == main ==\n\
+                 {divert}\n\
+                 === module left implements IItem ===\n\
+                 == target(amount: int) ==\n\
+                 -> END\n\
+                 == function score() => int ==\n\
+                 ~ return 1",
+            ));
+            let diagnostics = call_target_diagnostics(&story);
+
+            assert_single_diagnostic(&diagnostics, DiagnosticSeverity::Error, expected_message);
+        }
+    }
+
+    #[test]
+    fn keeps_plain_dynamic_divert_targets_unchanged() {
+        let story = parse_story(
+            "VAR next: -> = -> done\n\
+             -> {next}\n\
+             == done ==\n\
+             -> END",
+        );
+
+        assert_eq!(call_target_diagnostics(&story), []);
     }
 }

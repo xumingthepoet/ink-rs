@@ -22,7 +22,10 @@ use crate::{
     analysis::CheckedStory,
     compiler::StageOutput,
     diagnostic::Diagnostic,
-    parsed::{Choice, Object},
+    parsed::{
+        visit::{walk_story, ParsedVisitor, VisitContext},
+        Choice, DivertTarget, Expression, Object,
+    },
     source::SourceSpan,
 };
 
@@ -60,7 +63,64 @@ pub(crate) fn lower(story: &CheckedStory) -> StageOutput<RuntimeProgram> {
         };
     }
 
+    let dynamic_interface_diagnostics = dynamic_interface_lowering_diagnostics(&story.parsed);
+    if !dynamic_interface_diagnostics.is_empty() {
+        return StageOutput {
+            artifact: None,
+            diagnostics: dynamic_interface_diagnostics,
+        };
+    }
+
     lower_module_story(story, &indexes)
+}
+
+fn dynamic_interface_lowering_diagnostics(story: &crate::parsed::Story) -> Vec<Diagnostic> {
+    let mut checker = DynamicInterfaceLoweringChecker::default();
+    walk_story(story, &mut checker);
+    checker.diagnostics
+}
+
+#[derive(Default)]
+struct DynamicInterfaceLoweringChecker {
+    diagnostics: Vec<Diagnostic>,
+}
+
+impl DynamicInterfaceLoweringChecker {
+    fn check_dynamic_target_expression(&mut self, expression: &Expression, span: &SourceSpan) {
+        if matches!(expression, Expression::DynamicInterfaceAccess { .. }) {
+            self.diagnostics.push(Diagnostic::error(
+                span.clone(),
+                "Dynamic interface target lowering is not implemented yet",
+            ));
+        } else if matches!(expression, Expression::DynamicInterfaceFunctionCall { .. }) {
+            self.diagnostics.push(Diagnostic::error(
+                span.clone(),
+                "Dynamic interface function call lowering is not implemented yet",
+            ));
+        }
+    }
+}
+
+impl ParsedVisitor for DynamicInterfaceLoweringChecker {
+    fn visit_object(&mut self, object: &Object, _context: &VisitContext) {
+        match object {
+            Object::Divert(divert) => {
+                if let DivertTarget::Dynamic(expression) = divert.target() {
+                    self.check_dynamic_target_expression(expression, divert.span());
+                }
+            }
+            Object::TunnelOnwards(tunnel_onwards) => {
+                if let Some(DivertTarget::Dynamic(expression)) = tunnel_onwards.override_target() {
+                    self.check_dynamic_target_expression(expression, tunnel_onwards.span());
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn visit_expression(&mut self, expression: &Expression, _context: &VisitContext) {
+        self.check_dynamic_target_expression(expression, &SourceSpan::new(None, 1, 1));
+    }
 }
 
 fn lower_module_story(

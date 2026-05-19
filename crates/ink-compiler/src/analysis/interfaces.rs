@@ -28,6 +28,11 @@ struct NamedDeclaration {
 
 pub(super) type InterfaceIndex = BTreeMap<String, InterfaceSymbol>;
 
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(super) struct InterfaceMemberIndex {
+    members_by_interface: BTreeMap<String, BTreeMap<String, Vec<InterfaceMemberSignature>>>,
+}
+
 pub(super) fn interface_diagnostics(story: &Story) -> Vec<Diagnostic> {
     let (index, mut diagnostics) = build_interface_index_with_diagnostics(story);
     diagnostics.extend(interface_name_conflict_diagnostics(
@@ -163,6 +168,38 @@ fn interface_declarations_by_name(story: &Story) -> BTreeMap<&str, &InterfaceDec
         interfaces.entry(interface.name()).or_insert(interface);
     }
     interfaces
+}
+
+pub(super) fn build_interface_member_index(story: &Story) -> InterfaceMemberIndex {
+    let mut index = InterfaceMemberIndex::default();
+
+    for interface in story.interfaces() {
+        let members = index
+            .members_by_interface
+            .entry(interface.name().to_string())
+            .or_default();
+        for member in interface.members() {
+            members
+                .entry(member.name().to_string())
+                .or_default()
+                .push(member.clone());
+        }
+    }
+
+    index
+}
+
+impl InterfaceMemberIndex {
+    pub(super) fn member(
+        &self,
+        interface_name: &str,
+        member_name: &str,
+    ) -> Option<&InterfaceMemberSignature> {
+        self.members_by_interface
+            .get(interface_name)
+            .and_then(|members| members.get(member_name))
+            .and_then(|members| members.first())
+    }
 }
 
 fn validate_module_implementation(

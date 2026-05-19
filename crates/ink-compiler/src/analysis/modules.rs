@@ -538,6 +538,32 @@ mod tests {
     }
 
     #[test]
+    fn bare_module_imports_used_by_dynamic_interface_target_arguments_are_not_warned() {
+        let story = parse_story(
+            "=== interface IItem ===\n\
+             == target ==\n\
+             === interface IRouter ===\n\
+             == target(next: interface<IItem>) ==\n\
+             === module game ===\n\
+             FROM left\n\
+             FROM router\n\
+             VAR route: interface<IRouter> = router\n\
+             == main ==\n\
+             -> {{route}::target}(left)\n\
+             === module router implements IRouter ===\n\
+             == target(next: interface<IItem>) ==\n\
+             -> END\n\
+             === module left implements IItem ===\n\
+             == target ==\n\
+             -> END",
+        );
+
+        let diagnostics = import_diagnostics(&story);
+
+        assert!(diagnostics.is_empty(), "{diagnostics:#?}");
+    }
+
+    #[test]
     fn bare_module_imports_do_not_authorize_static_symbol_access() {
         let story = parse_story(
             "=== module game ===\n\
