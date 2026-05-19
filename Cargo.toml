@@ -33,6 +33,7 @@ members = [
     "crates/ink-compiler",
     "crates/ink-story-json-format",
     "crates/ink-runtime",
+    "crates/ink-experiments",
     "crates/ink-test",
     "crates/ink-tools",
 ]
@@ -41,6 +42,7 @@ default-members = [
     "crates/ink-compiler",
     "crates/ink-story-json-format",
     "crates/ink-runtime",
+    "crates/ink-experiments",
     "crates/ink-test",
     "crates/ink-tools",
 ]
