@@ -386,7 +386,7 @@ Commit record:
 - Review/fix commits: `0c77459e Cover interface array default initializer`; post-review validation: `cargo fmt --all --check`; `cargo test -p ink-compiler analysis::initializers`; `cargo test -p ink-compiler analysis::assignments`; `cargo test -p ink-compiler analysis::array_literals`; `cargo test -p ink-compiler analysis::struct_literals`; `cargo test -p ink-compiler analysis`; `cargo test -p ink-test --test diagnostics interface`; `cargo test -p ink-test --test diagnostics imports`; `make gate`
 - Completion record commit: this task-list commit
 
-### [ ] Task 09: Type-Check Dynamic Interface Knot Targets
+### [~] Task 09: Type-Check Dynamic Interface Knot Targets
 
 Goal: Make `{route}::target` type-check as `->` when `route` has an interface type declaring the target knot.
 
