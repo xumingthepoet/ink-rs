@@ -122,6 +122,75 @@ VAR route: interface<IItem> = left
     );
 }
 
+#[test]
+fn interface_end_to_end_fixture_lowers_dynamic_tokens() {
+    use ink_compiler::{Compiler, SourceInput};
+    use serde_json::{json, Value};
+    use std::fs;
+
+    let filename = "interface/end-to-end.ink";
+    let source_path = ink_test::fixture_root().join(filename);
+    let source = fs::read_to_string(&source_path)
+        .unwrap_or_else(|error| panic!("failed to read {}: {error}", source_path.display()));
+    let output = Compiler::default().compile(SourceInput::named(source, filename));
+
+    assert!(
+        output.diagnostics.is_empty(),
+        "compile for {filename} should not emit diagnostics: {:#?}",
+        output.diagnostics
+    );
+
+    let compiled = output.artifact.expect("expected compiled story");
+    let json: Value = serde_json::from_str(&compiled.json)
+        .unwrap_or_else(|error| panic!("compiled json for {filename} must be valid: {error}"));
+
+    assert_json_sequence(
+        &json,
+        &[
+            json!({"VAR?": "bonus::value"}),
+            json!({"VAR?": "game::route"}),
+            json!({"i()": "score", "interface": "IItem", "args": 1}),
+        ],
+    );
+    assert_json_sequence(
+        &json,
+        &[
+            json!({"VAR?": "game::labeler"}),
+            json!({"i()": "label", "interface": "ILabel", "args": 0}),
+        ],
+    );
+    assert_json_sequence(
+        &json,
+        &[
+            json!(2),
+            json!({"VAR?": "game::route"}),
+            json!({"i->": "target", "interface": "IItem"}),
+            json!({"temp=": "$divertTarget"}),
+            json!("/ev"),
+            json!({"->": "$divertTarget", "var": true}),
+        ],
+    );
+    assert_eq!(
+        json["interfaces"]["IItem"],
+        json!({
+            "members": {
+                "score": "function",
+                "target": "knot"
+            },
+            "implementations": ["left", "right"]
+        })
+    );
+    assert_eq!(
+        json["interfaces"]["ILabel"],
+        json!({
+            "members": {
+                "label": "function"
+            },
+            "implementations": ["right"]
+        })
+    );
+}
+
 fn assert_json_sequence(value: &serde_json::Value, sequence: &[serde_json::Value]) {
     assert!(
         json_contains_sequence(value, sequence),

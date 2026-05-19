@@ -127,6 +127,16 @@ fn interface_dynamic_knot_targets_run() {
 }
 
 #[test]
+fn interface_end_to_end_routes_run() {
+    let compiled = compile_fixture("interface/end-to-end.ink");
+
+    assert_story_output(
+        &compiled,
+        "Bonus 3.\nDefault 13.\nArray 21.\nLabel right.\nSwitched 23.\nRight target 2.\n",
+    );
+}
+
+#[test]
 fn same_module_stitch_paths_run() {
     let compiled = compile_fixture("modules/module-same-module-stitch-paths.ink");
 
