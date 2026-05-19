@@ -115,6 +115,18 @@ fn format_object_to_runtime(object: &format::Object) -> Result<Rc<dyn RTObject>,
                 args: *args,
             },
         ))),
+        format::Object::DynamicInterfaceTarget { interface, member } => Err(StoryError::BadJson(
+            format!(
+                "Dynamic interface target instruction {interface}::{member} is not supported by this runtime yet"
+            ),
+        )),
+        format::Object::DynamicInterfaceFunctionCall {
+            interface,
+            member,
+            ..
+        } => Err(StoryError::BadJson(format!(
+            "Dynamic interface function instruction {interface}::{member} is not supported by this runtime yet"
+        ))),
         format::Object::ConditionalDivert { target } => Ok(Rc::new(format_divert_to_runtime(
             format::Object::ConditionalDivert {
                 target: target.clone(),

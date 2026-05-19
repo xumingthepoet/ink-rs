@@ -3,7 +3,10 @@ use std::collections::BTreeMap;
 use serde_json::{Map, Number, Value as JsonValue};
 
 use crate::{
-    Container, FormatError, InternalFunction, NamedContainer, NativeFunction, Object, Program,
+    Container, FormatError, InterfaceDefinition, InterfaceMemberKind, InternalFunction,
+    NamedContainer, NativeFunction, Object, Program, DYNAMIC_INTERFACE_ARGS_KEY,
+    DYNAMIC_INTERFACE_FUNCTION_KEY, DYNAMIC_INTERFACE_NAME_KEY, DYNAMIC_INTERFACE_TARGET_KEY,
+    INTERFACES_METADATA_KEY, INTERFACE_IMPLEMENTATIONS_KEY, INTERFACE_MEMBERS_KEY,
 };
 
 pub(crate) fn program_from_str(input: &str) -> Result<Program, FormatError> {
@@ -26,11 +29,16 @@ pub(crate) fn program_from_value(value: JsonValue) -> Result<Program, FormatErro
         Some(value) => internal_functions_from_value(value)?,
         None => BTreeMap::new(),
     };
+    let interfaces = match obj.get(INTERFACES_METADATA_KEY) {
+        Some(value) => interfaces_from_value(value)?,
+        None => BTreeMap::new(),
+    };
 
     Ok(Program {
         ink_version,
         root,
         internal_functions,
+        interfaces,
     })
 }
 
@@ -51,6 +59,12 @@ pub(crate) fn program_to_value(program: &Program) -> JsonValue {
         obj.insert(
             "internalFunctions".to_string(),
             internal_functions_to_value(&program.internal_functions),
+        );
+    }
+    if !program.interfaces.is_empty() {
+        obj.insert(
+            INTERFACES_METADATA_KEY.to_string(),
+            interfaces_to_value(&program.interfaces),
         );
     }
     JsonValue::Object(obj)
@@ -135,6 +149,98 @@ fn internal_functions_to_value(functions: &BTreeMap<String, InternalFunction>) -
             JsonValue::String(function.return_type.clone()),
         );
         obj.insert(name.clone(), JsonValue::Object(function_obj));
+    }
+    JsonValue::Object(obj)
+}
+
+fn interfaces_from_value(
+    value: &JsonValue,
+) -> Result<BTreeMap<String, InterfaceDefinition>, FormatError> {
+    let obj = value
+        .as_object()
+        .ok_or_else(|| FormatError::new("interfaces must be a JSON object"))?;
+    let mut interfaces = BTreeMap::new();
+    for (name, value) in obj {
+        interfaces.insert(name.clone(), interface_definition_from_value(name, value)?);
+    }
+    Ok(interfaces)
+}
+
+fn interface_definition_from_value(
+    name: &str,
+    value: &JsonValue,
+) -> Result<InterfaceDefinition, FormatError> {
+    let obj = value
+        .as_object()
+        .ok_or_else(|| FormatError::new(format!("interface '{name}' must be an object")))?;
+    let members_value = obj.get(INTERFACE_MEMBERS_KEY).ok_or_else(|| {
+        FormatError::new(format!(
+            "interface '{name}' is missing {INTERFACE_MEMBERS_KEY}"
+        ))
+    })?;
+    let implementations_value = obj.get(INTERFACE_IMPLEMENTATIONS_KEY).ok_or_else(|| {
+        FormatError::new(format!(
+            "interface '{name}' is missing {INTERFACE_IMPLEMENTATIONS_KEY}"
+        ))
+    })?;
+    Ok(InterfaceDefinition {
+        members: interface_members_from_value(name, members_value)?,
+        implementations: string_array_from_value(
+            implementations_value,
+            INTERFACE_IMPLEMENTATIONS_KEY,
+        )?,
+    })
+}
+
+fn interface_members_from_value(
+    interface_name: &str,
+    value: &JsonValue,
+) -> Result<BTreeMap<String, InterfaceMemberKind>, FormatError> {
+    let obj = value.as_object().ok_or_else(|| {
+        FormatError::new(format!(
+            "interface '{interface_name}' {INTERFACE_MEMBERS_KEY} must be a JSON object"
+        ))
+    })?;
+    let mut members = BTreeMap::new();
+    for (member, kind_value) in obj {
+        let kind_token = json_value_to_string(kind_value, INTERFACE_MEMBERS_KEY)?;
+        let kind = InterfaceMemberKind::from_token(kind_token).ok_or_else(|| {
+            FormatError::new(format!(
+                "interface '{interface_name}' member '{member}' has unsupported kind: {kind_token}"
+            ))
+        })?;
+        members.insert(member.clone(), kind);
+    }
+    Ok(members)
+}
+
+fn interfaces_to_value(interfaces: &BTreeMap<String, InterfaceDefinition>) -> JsonValue {
+    let mut obj = Map::new();
+    for (name, interface) in interfaces {
+        let mut interface_obj = Map::new();
+        interface_obj.insert(
+            INTERFACE_MEMBERS_KEY.to_string(),
+            interface_members_to_value(&interface.members),
+        );
+        interface_obj.insert(
+            INTERFACE_IMPLEMENTATIONS_KEY.to_string(),
+            JsonValue::Array(
+                interface
+                    .implementations
+                    .iter()
+                    .map(|implementation| JsonValue::String(implementation.clone()))
+                    .collect(),
+            ),
+        );
+        obj.insert(name.clone(), JsonValue::Object(interface_obj));
+    }
+    JsonValue::Object(obj)
+}
+
+fn interface_members_to_value(members: &BTreeMap<String, InterfaceMemberKind>) -> JsonValue {
+    let mut obj = Map::new();
+    for (member, kind) in members {
+        obj.insert(member.clone(), JsonValue::String(kind.token().to_string()));
     }
     JsonValue::Object(obj)
 }
@@ -272,6 +378,19 @@ pub(crate) fn object_to_value(object: &Object) -> JsonValue {
         Object::ExternalFunction { target, args } => {
             divert_to_value("x()", target, false, false, Some(*args))
         }
+        Object::DynamicInterfaceTarget { interface, member } => {
+            dynamic_interface_to_value(DYNAMIC_INTERFACE_TARGET_KEY, interface, member, None)
+        }
+        Object::DynamicInterfaceFunctionCall {
+            interface,
+            member,
+            args,
+        } => dynamic_interface_to_value(
+            DYNAMIC_INTERFACE_FUNCTION_KEY,
+            interface,
+            member,
+            Some(*args),
+        ),
         Object::ConditionalDivert { target } => divert_to_value("->", target, false, true, None),
         Object::DivertTarget(target) => {
             let mut obj = Map::new();
@@ -391,6 +510,10 @@ fn object_from_map(obj: &Map<String, JsonValue>) -> Result<Object, FormatError> 
         });
     }
 
+    if let Some(object) = dynamic_interface_from_map(obj)? {
+        return Ok(object);
+    }
+
     if let Some(object) = divert_from_map(obj)? {
         return Ok(object);
     }
@@ -471,6 +594,46 @@ fn divert_from_map(obj: &Map<String, JsonValue>) -> Result<Option<Object>, Forma
     Ok(None)
 }
 
+fn dynamic_interface_from_map(obj: &Map<String, JsonValue>) -> Result<Option<Object>, FormatError> {
+    if let Some(member) = obj.get(DYNAMIC_INTERFACE_TARGET_KEY) {
+        return Ok(Some(Object::DynamicInterfaceTarget {
+            interface: required_json_string(obj, DYNAMIC_INTERFACE_NAME_KEY)?.to_string(),
+            member: json_value_to_string(member, DYNAMIC_INTERFACE_TARGET_KEY)?.to_string(),
+        }));
+    }
+
+    if let Some(member) = obj.get(DYNAMIC_INTERFACE_FUNCTION_KEY) {
+        return Ok(Some(Object::DynamicInterfaceFunctionCall {
+            interface: required_json_string(obj, DYNAMIC_INTERFACE_NAME_KEY)?.to_string(),
+            member: json_value_to_string(member, DYNAMIC_INTERFACE_FUNCTION_KEY)?.to_string(),
+            args: required_usize(obj, DYNAMIC_INTERFACE_ARGS_KEY)?,
+        }));
+    }
+
+    Ok(None)
+}
+
+fn dynamic_interface_to_value(
+    key: &str,
+    interface: &str,
+    member: &str,
+    args: Option<usize>,
+) -> JsonValue {
+    let mut obj = Map::new();
+    obj.insert(key.to_string(), JsonValue::String(member.to_string()));
+    obj.insert(
+        DYNAMIC_INTERFACE_NAME_KEY.to_string(),
+        JsonValue::String(interface.to_string()),
+    );
+    if let Some(args) = args {
+        obj.insert(
+            DYNAMIC_INTERFACE_ARGS_KEY.to_string(),
+            JsonValue::Number(args.into()),
+        );
+    }
+    JsonValue::Object(obj)
+}
+
 fn divert_to_value(
     key: &str,
     target: &str,
@@ -549,6 +712,13 @@ fn required_json_string<'a>(
         .get(key)
         .ok_or_else(|| FormatError::new(format!("compiled story JSON is missing {key}")))?;
     json_value_to_string(value, key)
+}
+
+fn required_usize(obj: &Map<String, JsonValue>, key: &str) -> Result<usize, FormatError> {
+    let value = obj
+        .get(key)
+        .ok_or_else(|| FormatError::new(format!("compiled story JSON is missing {key}")))?;
+    json_value_to_usize(value, key)
 }
 
 fn json_value_to_string<'a>(value: &'a JsonValue, key: &str) -> Result<&'a str, FormatError> {
@@ -682,6 +852,93 @@ mod tests {
     }
 
     #[test]
+    fn roundtrips_interface_metadata() {
+        let input = json!({
+            "inkVersion": 1,
+            "root": ["done", null],
+            "interfaces": {
+                "IItem": {
+                    "members": {
+                        "score": "function",
+                        "target": "knot"
+                    },
+                    "implementations": ["left", "right"]
+                }
+            }
+        });
+
+        let program = program_from_value(input.clone()).expect("format should parse interfaces");
+
+        assert_eq!(program_to_value(&program), input);
+        assert_eq!(
+            program.interfaces["IItem"].members["target"],
+            InterfaceMemberKind::Knot
+        );
+        assert_eq!(
+            program.interfaces["IItem"].members["score"],
+            InterfaceMemberKind::Function
+        );
+        assert_eq!(
+            program.interfaces["IItem"].implementations,
+            vec!["left".to_string(), "right".to_string()]
+        );
+    }
+
+    #[test]
+    fn writes_interface_metadata_from_typed_model() {
+        let mut members = BTreeMap::new();
+        members.insert("target".to_string(), InterfaceMemberKind::Knot);
+        members.insert("score".to_string(), InterfaceMemberKind::Function);
+
+        let mut program = Program::new(Container::unnamed(vec![Object::ControlCommand(
+            ControlCommand::Done,
+        )]));
+        program.interfaces.insert(
+            "IItem".to_string(),
+            InterfaceDefinition::new(members, vec!["left".to_string(), "right".to_string()]),
+        );
+
+        assert_eq!(
+            program.to_json_value(),
+            json!({
+                "inkVersion": 1,
+                "root": ["done", null],
+                "interfaces": {
+                    "IItem": {
+                        "members": {
+                            "score": "function",
+                            "target": "knot"
+                        },
+                        "implementations": ["left", "right"]
+                    }
+                }
+            })
+        );
+    }
+
+    #[test]
+    fn rejects_unknown_interface_member_kind() {
+        let input = json!({
+            "inkVersion": 1,
+            "root": ["done", null],
+            "interfaces": {
+                "IItem": {
+                    "members": {
+                        "target": "room"
+                    },
+                    "implementations": ["left"]
+                }
+            }
+        });
+
+        let error = program_from_value(input).expect_err("metadata should be rejected");
+
+        assert!(error
+            .to_string()
+            .contains("interface 'IItem' member 'target' has unsupported kind: room"));
+    }
+
+    #[test]
     fn rejects_internal_function_metadata_with_mismatched_arg_count() {
         let input = json!({
             "inkVersion": 1,
@@ -725,6 +982,52 @@ mod tests {
             error.message(),
             "unsupported native function token: UNKNOWN_NATIVE"
         );
+    }
+
+    #[test]
+    fn roundtrips_dynamic_interface_instruction_objects() {
+        let target = Object::DynamicInterfaceTarget {
+            interface: "IItem".to_string(),
+            member: "target".to_string(),
+        };
+        let target_value = target.to_json_value();
+
+        assert_eq!(
+            target_value,
+            json!({
+                "i->": "target",
+                "interface": "IItem"
+            })
+        );
+        assert_eq!(Object::from_json_value(target_value).unwrap(), target);
+
+        let call = Object::DynamicInterfaceFunctionCall {
+            interface: "IItem".to_string(),
+            member: "score".to_string(),
+            args: 2,
+        };
+        let call_value = call.to_json_value();
+
+        assert_eq!(
+            call_value,
+            json!({
+                "i()": "score",
+                "interface": "IItem",
+                "args": 2
+            })
+        );
+        assert_eq!(Object::from_json_value(call_value).unwrap(), call);
+    }
+
+    #[test]
+    fn rejects_dynamic_interface_function_without_arg_count() {
+        let error = Object::from_json_value(json!({
+            "i()": "score",
+            "interface": "IItem"
+        }))
+        .unwrap_err();
+
+        assert_eq!(error.message(), "compiled story JSON is missing args");
     }
 
     #[test]

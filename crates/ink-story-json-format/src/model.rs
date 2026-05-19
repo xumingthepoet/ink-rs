@@ -9,6 +9,7 @@ pub struct Program {
     pub ink_version: i32,
     pub root: Container,
     pub internal_functions: BTreeMap<String, InternalFunction>,
+    pub interfaces: BTreeMap<String, InterfaceDefinition>,
 }
 
 impl Program {
@@ -17,6 +18,7 @@ impl Program {
             ink_version: INK_VERSION_CURRENT,
             root,
             internal_functions: BTreeMap::new(),
+            interfaces: BTreeMap::new(),
         }
     }
 
@@ -34,6 +36,68 @@ impl Program {
 
     pub fn to_json_value(&self) -> JsonValue {
         json::program_to_value(self)
+    }
+}
+
+/// Top-level compiled-story JSON key for interface runtime metadata.
+pub const INTERFACES_METADATA_KEY: &str = "interfaces";
+
+/// Interface metadata object key for declared member names and kinds.
+pub const INTERFACE_MEMBERS_KEY: &str = "members";
+
+/// Interface metadata object key for source module names implementing an interface.
+pub const INTERFACE_IMPLEMENTATIONS_KEY: &str = "implementations";
+
+/// Object key for constructing a dynamic interface divert target from a runtime interface value.
+pub const DYNAMIC_INTERFACE_TARGET_KEY: &str = "i->";
+
+/// Object key for dispatching a dynamic interface function call from a runtime interface value.
+pub const DYNAMIC_INTERFACE_FUNCTION_KEY: &str = "i()";
+
+/// Object key for the interface name on dynamic interface instruction objects.
+pub const DYNAMIC_INTERFACE_NAME_KEY: &str = "interface";
+
+/// Object key for the argument count on dynamic interface function instruction objects.
+pub const DYNAMIC_INTERFACE_ARGS_KEY: &str = "args";
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InterfaceDefinition {
+    pub members: BTreeMap<String, InterfaceMemberKind>,
+    pub implementations: Vec<String>,
+}
+
+impl InterfaceDefinition {
+    pub fn new(
+        members: BTreeMap<String, InterfaceMemberKind>,
+        implementations: Vec<String>,
+    ) -> Self {
+        Self {
+            members,
+            implementations,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InterfaceMemberKind {
+    Knot,
+    Function,
+}
+
+impl InterfaceMemberKind {
+    pub fn from_token(token: &str) -> Option<Self> {
+        match token {
+            "knot" => Some(Self::Knot),
+            "function" => Some(Self::Function),
+            _ => None,
+        }
+    }
+
+    pub fn token(self) -> &'static str {
+        match self {
+            Self::Knot => "knot",
+            Self::Function => "function",
+        }
     }
 }
 
@@ -137,11 +201,33 @@ pub enum Object {
     Container(Container),
     String(String),
     ControlCommand(ControlCommand),
-    Divert { target: String, variable: bool },
-    TunnelDivert { target: String, variable: bool },
-    FunctionDivert { target: String },
-    ExternalFunction { target: String, args: usize },
-    ConditionalDivert { target: String },
+    Divert {
+        target: String,
+        variable: bool,
+    },
+    TunnelDivert {
+        target: String,
+        variable: bool,
+    },
+    FunctionDivert {
+        target: String,
+    },
+    ExternalFunction {
+        target: String,
+        args: usize,
+    },
+    DynamicInterfaceTarget {
+        interface: String,
+        member: String,
+    },
+    DynamicInterfaceFunctionCall {
+        interface: String,
+        member: String,
+        args: usize,
+    },
+    ConditionalDivert {
+        target: String,
+    },
     DivertTarget(String),
     ReadCount(String),
     VariableAssignment(String),
@@ -149,10 +235,18 @@ pub enum Object {
     TempVariableReassignment(String),
     VariableReassignment(String),
     VariableReference(String),
-    VariablePointer { name: String, context_index: i32 },
-    ChoicePoint { target: String, flags: i32 },
+    VariablePointer {
+        name: String,
+        context_index: i32,
+    },
+    ChoicePoint {
+        target: String,
+        flags: i32,
+    },
     Glue,
-    Tag { is_start: bool },
+    Tag {
+        is_start: bool,
+    },
     Bool(bool),
     Int(i32),
     Float(f64),

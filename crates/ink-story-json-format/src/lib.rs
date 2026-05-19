@@ -9,7 +9,10 @@ mod model;
 
 pub use error::FormatError;
 pub use model::{
-    Container, ControlCommand, InternalFunction, NamedContainer, NativeFunction, Object, Program,
+    Container, ControlCommand, InterfaceDefinition, InterfaceMemberKind, InternalFunction,
+    NamedContainer, NativeFunction, Object, Program, DYNAMIC_INTERFACE_ARGS_KEY,
+    DYNAMIC_INTERFACE_FUNCTION_KEY, DYNAMIC_INTERFACE_NAME_KEY, DYNAMIC_INTERFACE_TARGET_KEY,
+    INTERFACES_METADATA_KEY, INTERFACE_IMPLEMENTATIONS_KEY, INTERFACE_MEMBERS_KEY,
 };
 
 /// The current compiled story JSON format version.
