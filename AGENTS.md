@@ -40,6 +40,7 @@ tracked repository directory.
 - `crates/ink-runtime`: runtime story engine
 - `crates/ink-compiler`: parser, parsed model, and JSON export pipeline
 - `crates/ink-story-json-format`: shared compiled story JSON format crate
+- `crates/ink-experiments`: executable language-surface experiments
 - `crates/ink-test`: conformance and integration tests
 - `docs/active_plan`: active implementation plan workspace
 - `docs/finished_plans`: completed implementation plans
@@ -95,6 +96,8 @@ tracked repository directory.
   complete, move it to `docs/finished_plans/`. Do not update `AGENTS.md` for
   each new plan unless the planning workflow itself changes.
 - Do not edit `docs/WritingWithInk.md`; it is the upstream C# snapshot.
+- When working under `crates/ink-experiments/`, read and follow
+  `crates/ink-experiments/README.md`.
 
 ## Active Plan Task Lists
 
