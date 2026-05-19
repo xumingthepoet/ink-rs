@@ -1,4 +1,6 @@
-use crate::parsed::{BinaryOperator, Expression, InterfaceMemberKind, TypeName, UnaryOperator};
+use crate::parsed::{
+    BinaryOperator, DictKeyType, Expression, InterfaceMemberKind, TypeName, UnaryOperator,
+};
 
 use super::{
     context::{EnumTypeIndex, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
@@ -399,19 +401,43 @@ fn infer_index_type(
     base_type: &TypeName,
     index_type: &TypeName,
 ) -> Result<TypeName, TypeInferenceError> {
-    if index_type != &TypeName::int() {
-        return Err(TypeInferenceError::new(format!(
-            "Index expression has type {} but expected int",
-            index_type.display_name()
-        )));
+    if let Some(element_type) = base_type.array_element_type() {
+        expect_index_type(index_type, &TypeName::int())?;
+        return Ok(element_type.clone());
     }
 
-    base_type.array_element_type().cloned().ok_or_else(|| {
-        TypeInferenceError::new(format!(
-            "Cannot index non-array type {}",
-            base_type.display_name()
-        ))
-    })
+    if let Some((key_type, value_type)) = base_type.dict_key_value_types() {
+        let expected_index_type = dict_key_expression_type(key_type);
+        expect_index_type(index_type, &expected_index_type)?;
+        return Ok(value_type.clone());
+    }
+
+    Err(TypeInferenceError::new(format!(
+        "Cannot index non-array/non-Dict type {}",
+        base_type.display_name()
+    )))
+}
+
+fn expect_index_type(
+    index_type: &TypeName,
+    expected_type: &TypeName,
+) -> Result<(), TypeInferenceError> {
+    if index_type == expected_type {
+        Ok(())
+    } else {
+        Err(TypeInferenceError::new(format!(
+            "Index expression has type {} but expected {}",
+            index_type.display_name(),
+            expected_type.display_name()
+        )))
+    }
+}
+
+fn dict_key_expression_type(key_type: DictKeyType) -> TypeName {
+    match key_type {
+        DictKeyType::String => TypeName::string(),
+        DictKeyType::Int => TypeName::int(),
+    }
 }
 
 fn infer_unary_type(

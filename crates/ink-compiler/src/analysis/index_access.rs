@@ -231,6 +231,28 @@ mod tests {
     }
 
     #[test]
+    fn resolves_dict_index_type_in_typed_initializer_context() {
+        let story = parse_story(
+            "VAR scores: Dict<string, int> = {\"ada\": 10}\n\
+             VAR first: int = scores[\"ada\"]\n\
+             -> DONE",
+        );
+
+        assert_eq!(super::super::run_analysis_passes(&story), []);
+    }
+
+    #[test]
+    fn resolves_nested_dict_and_array_index_chains() {
+        let story = parse_story(
+            "VAR table: Dict<int, Dict<string, int[]>> = {1: {\"scores\": [10]}}\n\
+             VAR first: int = table[1][\"scores\"][0]\n\
+             -> DONE",
+        );
+
+        assert_eq!(super::super::run_analysis_passes(&story), []);
+    }
+
+    #[test]
     fn resolves_index_reads_from_dynamic_interface_function_results() {
         let story = parse_story(
             "=== interface IItem ===\n\
@@ -268,6 +290,51 @@ mod tests {
     }
 
     #[test]
+    fn reports_string_array_index_expression() {
+        let story = parse_story(
+            "VAR items: int[] = [1]\n\
+             {items[\"0\"]}\n\
+             -> DONE",
+        );
+
+        let diagnostics = index_access_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Index expression has type string but expected int",
+        );
+    }
+
+    #[test]
+    fn reports_wrong_dict_key_type() {
+        let story = parse_story(
+            "VAR scores: Dict<string, int> = {\"ada\": 10}\n\
+             {scores[1]}\n\
+             -> DONE",
+        );
+
+        let diagnostics = index_access_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Index expression has type int but expected string",
+        );
+    }
+
+    #[test]
+    fn accepts_int_dict_keys() {
+        let story = parse_story(
+            "VAR scores: Dict<int, string> = {1: \"ada\"}\n\
+             VAR first: string = scores[1]\n\
+             -> DONE",
+        );
+
+        assert_eq!(super::super::run_analysis_passes(&story), []);
+    }
+
+    #[test]
     fn reports_indexing_non_array_values() {
         let story = parse_story(
             "VAR score: int = 1\n\
@@ -280,7 +347,7 @@ mod tests {
         assert_single_diagnostic(
             &diagnostics,
             DiagnosticSeverity::Error,
-            "Cannot index non-array type int",
+            "Cannot index non-array/non-Dict type int",
         );
     }
 
@@ -297,7 +364,7 @@ mod tests {
         assert_single_diagnostic(
             &diagnostics,
             DiagnosticSeverity::Error,
-            "Cannot index non-array type string",
+            "Cannot index non-array/non-Dict type string",
         );
     }
 }
