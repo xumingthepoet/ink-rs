@@ -827,7 +827,7 @@ Commit record:
 - Review/fix commits: reviewed; no fix commits required; post-review validation: `cargo fmt --all --check`; `cargo test -p ink-runtime dynamic_interface`; `cargo test -p ink-test --test functions interface`; `make gate`
 - Completion record commit: this task-list commit
 
-### [~] Task 19: Validate Save And Load For Interface Values
+### [>] Task 19: Validate Save And Load For Interface Values
 
 Goal: Pin save-state behavior for interface values, including arrays and structs.
 
@@ -864,9 +864,9 @@ Validation commands:
 
 Commit record:
 
-- Implementation commit: pending
-- Focused validation: pending
-- Full validation: pending
+- Implementation commit: `3d520a93 Validate interface value save load behavior`
+- Focused validation: `cargo fmt --all --check`; `cargo test -p ink-runtime save`; `cargo test -p ink-test --test runtime_api interface`; `cargo test -p ink-test --test modules interface`
+- Full validation: `make gate`
 - Review/fix commits: pending
 - Completion record commit: pending
 
