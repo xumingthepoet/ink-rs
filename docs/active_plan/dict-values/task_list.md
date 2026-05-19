@@ -1,4 +1,4 @@
-Progress: 3/20
+Progress: 4/20
 
 # Typed Dict Values Task List
 
@@ -135,7 +135,7 @@ Validation:
 Commit record: implementation `d258c6b9` (`Validate Dict literal types`);
 review fix `cbbb5d42` (`Cover Dict fields nested in structs`)
 
-### [>] Task 04: Infer Dict Index Access
+### [x] Task 04: Infer Dict Index Access
 
 Goal: Make `dict[key]` infer the Dict value type while preserving array index
 rules.
@@ -161,6 +161,11 @@ Validation:
 - First `make gate` run reached the final `ink-test` doc-test stage but failed
   by the 120s wrapper timeout with no failing tests reported.
 - Reran `make gate` after incremental compilation; passed.
+- Review found no retained code fixes required; reran
+  `cargo test -p ink-compiler analysis::index_access`, `cargo fmt --all --check`,
+  and `make gate`. The first review `make gate` rerun hit the same final
+  `ink-test` wrapper timeout with no failing tests reported; the hot rerun
+  passed.
 
 Commit record: implementation `f6d534a3` (`Infer Dict index access types`)
 
