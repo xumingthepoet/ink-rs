@@ -960,7 +960,7 @@ Commit record:
 - Review/fix commits: `85227a1b Use imported interface diagnostic helper symbol`; post-review validation: `cargo fmt --all --check`; `cargo test -p ink-test --test diagnostics interface`; `cargo test -p ink-test --test diagnostics imports`; `cargo test -p ink-compiler analysis`; `make gate`
 - Completion record commit: this task-list commit
 
-### [ ] Task 22: Add Public Syntax Fixtures And Documentation
+### [~] Task 22: Add Public Syntax Fixtures And Documentation
 
 Goal: Add public-facing syntax fixtures and documentation for the latest supported interface and import syntax.
 
