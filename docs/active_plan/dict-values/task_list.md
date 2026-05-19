@@ -100,7 +100,7 @@ Commit record: implementation `80057918` (`Add Dict literal parsed nodes`)
 
 ## Milestone 2: Type Analysis
 
-### [~] Task 03: Validate Dict Literal Types
+### [>] Task 03: Validate Dict Literal Types
 
 Goal: Type-check Dict literals against expected `Dict<K, V>` declarations.
 
@@ -121,7 +121,14 @@ diagnostic fixtures.
 Validation commands: `cargo test -p ink-compiler analysis` and
 `cargo test -p ink-test diagnostics`
 
-Commit record: pending
+Validation:
+
+- `cargo test -p ink-compiler analysis` passed.
+- `cargo test -p ink-test diagnostics` passed.
+- `cargo fmt --all --check` passed.
+- `make gate` passed.
+
+Commit record: implementation `d258c6b9` (`Validate Dict literal types`)
 
 ### [ ] Task 04: Infer Dict Index Access
 
