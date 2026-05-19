@@ -65,7 +65,7 @@ Validation:
 Commit record: implementation `d777e817` (`Add Dict type name parsing`); review
 fix `3ffdc426` (`Constrain Dict key type model`)
 
-### [ ] Task 02: Add Dict Literal Parsed Nodes
+### [~] Task 02: Add Dict Literal Parsed Nodes
 
 Goal: Distinguish struct literals from Dict literals in the parsed expression
 model.
