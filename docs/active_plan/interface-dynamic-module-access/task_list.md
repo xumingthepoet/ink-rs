@@ -339,7 +339,7 @@ Commit record:
 - Review/fix commits: `56501e11 Cover overlapping interface members`; post-review validation: `cargo fmt --all --check`; `cargo test -p ink-compiler analysis::interfaces`; `cargo test -p ink-compiler analysis`; `cargo test -p ink-test --test diagnostics interface`; `make gate`
 - Completion record commit: this task-list commit
 
-### [ ] Task 08: Type-Check Interface Values And Assignments
+### [~] Task 08: Type-Check Interface Values And Assignments
 
 Goal: Allow variables, temps, constants, arrays, and struct fields with `interface<IItem>` types while rejecting incompatible values.
 
