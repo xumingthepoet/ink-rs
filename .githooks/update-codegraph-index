@@ -10,13 +10,12 @@ fi
 
 update_codegraph() {
     if [ ! -f .codegraph/config.json ] || [ ! -f .codegraph/codegraph.db ]; then
-        codegraph init . >/dev/null && codegraph index --quiet .
-        return
+        codegraph init . >/dev/null
     fi
 
-    codegraph sync --quiet . || {
+    codegraph index --quiet . || {
         codegraph unlock . >/dev/null 2>&1 || true
-        codegraph sync --quiet .
+        codegraph index --quiet .
     }
 }
 
