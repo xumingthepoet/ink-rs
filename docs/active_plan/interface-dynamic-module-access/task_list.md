@@ -1,4 +1,4 @@
-Progress: 0/23
+Progress: 1/23
 
 # Interface-Typed Dynamic Module Access Active Plan
 
@@ -12,7 +12,7 @@ Progress: 0/23
 
 ## Milestone 1: Syntax And Parsed Model
 
-### [>] Task 01: Parse Interface Declarations
+### [x] Task 01: Parse Interface Declarations
 
 Goal: Add top-level `=== interface Name ===` declarations as parsed model objects without adding type checking or lowering yet.
 
@@ -52,8 +52,8 @@ Commit record:
 - Implementation commit: `3eef7024 Parse interface declarations`
 - Focused validation: `cargo test -p ink-compiler syntax::parser`; `cargo test -p ink-compiler parsed`; `cargo test -p ink-test --test compiler_snapshots`
 - Full validation: `make gate`
-- Review/fix commits: pending
-- Completion record commit: pending
+- Review/fix commits: reviewed; no fix commits required
+- Completion record commit: this task-list commit
 
 ### [ ] Task 02: Parse Interface Member Signatures
 
