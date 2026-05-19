@@ -93,6 +93,23 @@ fn interface_dynamic_knot_targets_run() {
     assert!(error
         .to_string()
         .contains("Module missing does not implement dynamic interface IItem"));
+
+    let saved = RuntimeStory::new(&compiled.json)
+        .expect("story should load")
+        .save_state()
+        .expect("story should save");
+    let mut saved: serde_json::Value = serde_json::from_str(&saved).expect("save should be JSON");
+    saved["variablesState"]["game::route"] = serde_json::json!("^missing");
+    let mut invalid_saved = RuntimeStory::new(&compiled.json).expect("story should load");
+    invalid_saved
+        .load_state(&saved.to_string())
+        .expect("modified save should load");
+    let error = invalid_saved
+        .continue_maximally()
+        .expect_err("invalid saved route should stop with a runtime error");
+    assert!(error
+        .to_string()
+        .contains("Module missing does not implement dynamic interface IItem"));
 }
 
 #[test]
