@@ -167,6 +167,8 @@ fn lower_expression_into_with_constants(
                 None,
                 context.struct_definitions(),
                 context.enum_definitions(),
+                context.constants(),
+                context.global_variables(),
                 context.choice_labels(),
                 context.global_labels(),
                 context.path_mode(),
@@ -250,6 +252,8 @@ fn lower_constant_expression_into(
         Some(constant.declared_type()),
         context.struct_definitions(),
         context.enum_definitions(),
+        context.constants(),
+        context.global_variables(),
         context.choice_labels(),
         context.global_labels(),
         context.path_mode(),
@@ -268,6 +272,26 @@ pub(super) fn lower_expression_with_expected_type_into_with_constants(
     lowering: &mut ExpressionLoweringContext<'_, '_>,
 ) -> bool {
     let context = lowering.context;
+    if expected_type
+        .and_then(TypeName::as_interface_name)
+        .is_some()
+    {
+        if let Some(value) = lower_value_literal(
+            expression,
+            expected_type,
+            context.struct_definitions(),
+            context.enum_definitions(),
+            context.constants(),
+            context.global_variables(),
+            context.choice_labels(),
+            context.global_labels(),
+            context.path_mode(),
+        ) {
+            content.push(value);
+            return true;
+        }
+    }
+
     if matches!(
         expression,
         Expression::ArrayLiteral(_) | Expression::StructLiteral(_)
@@ -277,6 +301,8 @@ pub(super) fn lower_expression_with_expected_type_into_with_constants(
             expected_type,
             context.struct_definitions(),
             context.enum_definitions(),
+            context.constants(),
+            context.global_variables(),
             context.choice_labels(),
             context.global_labels(),
             context.path_mode(),

@@ -65,6 +65,30 @@ fn nested_values_run() {
 }
 
 #[test]
+fn interface_values_lower_to_runtime_strings() {
+    let compiled = compile_fixture("typed/interface-values.ink");
+
+    assert_story_output(
+        &compiled,
+        "left|[left, right]|{route: right, routes: [left]}|right|right|[left, left]|{route: left, routes: [right]}\n",
+    );
+
+    let json = compiled.program.to_json_value();
+    assert_json_sequence(&json, vec![json!("^left"), json!({"VAR=": "game::route"})]);
+    assert_json_sequence(
+        &json,
+        vec![json!(["^left", "^right"]), json!({"VAR=": "game::routes"})],
+    );
+    assert_json_sequence(
+        &json,
+        vec![
+            json!({"route": "^right", "routes": ["^left"]}),
+            json!({"VAR=": "game::config"}),
+        ],
+    );
+}
+
+#[test]
 fn functions_return_typed_values() {
     let compiled = compile_fixture("typed/functions.ink");
     assert_story_output(&compiled, "5|Ada!|7\n2|3\n");

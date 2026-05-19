@@ -5,7 +5,7 @@ use crate::parsed::{Expression, TypeName};
 use super::expression::{
     lower_expression_with_expected_type_into_with_constants, ExpressionLoweringContext,
 };
-use super::value::{runtime_default_for_type, struct_field_definitions_for_type};
+use super::value::{runtime_composite_placeholder_for_type, struct_field_definitions_for_type};
 
 pub(super) fn lower_dynamic_composite_literal_into(
     content: &mut Vec<RuntimeObject>,
@@ -16,7 +16,7 @@ pub(super) fn lower_dynamic_composite_literal_into(
     let context = lowering.context();
     match (expected_type, expression) {
         (Some(TypeName::Array(element_type)), Expression::ArrayLiteral(elements)) => {
-            let Some(default_element) = runtime_default_for_type(
+            let Some(default_element) = runtime_composite_placeholder_for_type(
                 element_type,
                 context.struct_definitions(),
                 context.enum_definitions(),
@@ -50,7 +50,7 @@ pub(super) fn lower_dynamic_composite_literal_into(
                 TypeName::Struct(_) | TypeName::QualifiedStruct(_)
             ) =>
         {
-            let Some(default_object) = runtime_default_for_type(
+            let Some(default_object) = runtime_composite_placeholder_for_type(
                 expected_type,
                 context.struct_definitions(),
                 context.enum_definitions(),
