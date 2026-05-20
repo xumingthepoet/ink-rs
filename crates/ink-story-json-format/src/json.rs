@@ -1175,6 +1175,21 @@ mod tests {
     }
 
     #[test]
+    fn roundtrips_empty_dict_values_with_key_type() {
+        let string_dict = Object::ValueDict(DictValue::empty(DictKeyType::String));
+        let string_value = string_dict.to_json_value();
+
+        assert_eq!(string_value, json!(["dict", "string", []]));
+        assert_eq!(Object::from_json_value(string_value).unwrap(), string_dict);
+
+        let int_dict = Object::ValueDict(DictValue::empty(DictKeyType::Int));
+        let int_value = int_dict.to_json_value();
+
+        assert_eq!(int_value, json!(["dict", "int", []]));
+        assert_eq!(Object::from_json_value(int_value).unwrap(), int_dict);
+    }
+
+    #[test]
     fn roundtrips_nested_dict_values_with_arrays_and_objects() {
         let mut object_fields = BTreeMap::new();
         object_fields.insert("hp".to_string(), Object::Int(10));
