@@ -16,6 +16,9 @@ include = [
     "/docs/ink_JSON_runtime_format.md",
 ]
 
+[lib]
+doctest = false
+
 [features]
 default = ["runtime"]
 runtime = ["dep:ink-runtime"]

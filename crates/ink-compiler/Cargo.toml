@@ -8,6 +8,9 @@ repository.workspace = true
 keywords.workspace = true
 include = ["/Cargo.toml", "/src/**"]
 
+[lib]
+doctest = false
+
 [dependencies]
 ink-story-json-format = { version = "0.1.0", path = "../ink-story-json-format" }
 

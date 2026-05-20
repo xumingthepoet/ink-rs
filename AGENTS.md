@@ -191,9 +191,11 @@ tracked repository directory.
   `docs/active_plan/` to `docs/finished_plans/`.
 - Validate continuation work with the smallest relevant tests first, then
   `make gate` when the change is ready.
-- `make gate` is still the full project gate. If intentional language changes
-  make legacy C# compatibility tests obsolete, update or replace those tests as
-  part of the same language-change work rather than hiding failures.
+- `make gate` is the single project-level gate: formatting, standalone
+  workspace checking, workspace tests, and runnable doc-tests. If intentional
+  language changes make legacy C# compatibility tests obsolete, update or
+  replace those tests as part of the same language-change work rather than
+  hiding failures.
 
 ## Language Evolution Rules
 

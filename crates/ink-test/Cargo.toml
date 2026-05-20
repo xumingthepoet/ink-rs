@@ -4,6 +4,9 @@ version = "0.1.0"
 edition.workspace = true
 publish = false
 
+[lib]
+doctest = false
+
 [dependencies]
 ink_runtime = { package = "ink-runtime", path = "../ink-runtime" }
 ink_compiler = { package = "ink-compiler", path = "../ink-compiler" }

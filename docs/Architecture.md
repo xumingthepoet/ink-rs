@@ -634,15 +634,17 @@ cargo test --workspace
 make gate
 ```
 
-`make gate` is the project-level gate:
+`make gate` is the single project-level gate:
 
 ```text
 cargo fmt --all --check
 cargo check --workspace
-cargo test --workspace --exclude ink-test
-cargo test -p ink-test --test integration_policy
-cargo test -p ink-test
+cargo test --workspace --quiet
 ```
+
+Crates without runnable Rust doc examples disable Cargo's doctest harness in
+their manifests so `cargo test --workspace` keeps runnable doctest coverage
+without paying rustdoc startup cost for zero-doctest crates.
 
 If a change intentionally diverges from upstream Ink, update tests and
 maintained documentation in the same change. If the change is only a code
