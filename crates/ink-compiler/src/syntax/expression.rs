@@ -9,6 +9,10 @@ use crate::{
 
 use super::{is_identifier, is_identifier_continue, scan, text};
 
+mod token;
+
+use token::{binary_operator_rule, symbol_operator_text, ExpressionToken, ExpressionTokenKind};
+
 pub(super) fn parse_initial_expression(source: &str) -> Option<Expression> {
     match parse_token_expression(source.trim()) {
         Ok(expression) => Some(expression),
@@ -25,170 +29,6 @@ pub(super) fn parse_initial_expression_or_error(
 ) -> Result<Expression, Diagnostic> {
     parse_token_expression_at(source, base_span).map_err(|error| error.into_diagnostic())
 }
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct ExpressionToken {
-    kind: ExpressionTokenKind,
-    byte_index: usize,
-    span: SourceSpan,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum ExpressionTokenKind {
-    Identifier(String),
-    IntLiteral(String),
-    FloatLiteral(String),
-    StringLiteral(String),
-    Operator(String),
-    OpenParen,
-    CloseParen,
-    OpenBracket,
-    CloseBracket,
-    OpenBrace,
-    CloseBrace,
-    Colon,
-    DoubleColon,
-    Dot,
-    Comma,
-    Arrow,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct BinaryOperatorRule {
-    text: &'static str,
-    operator: BinaryOperator,
-    precedence: u8,
-    token_kind: OperatorTokenKind,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum OperatorTokenKind {
-    Symbol,
-    Word,
-}
-
-const BINARY_OPERATOR_RULES: &[BinaryOperatorRule] = &[
-    BinaryOperatorRule {
-        text: "&&",
-        operator: BinaryOperator::AndSymbol,
-        precedence: 1,
-        token_kind: OperatorTokenKind::Symbol,
-    },
-    BinaryOperatorRule {
-        text: "||",
-        operator: BinaryOperator::OrSymbol,
-        precedence: 1,
-        token_kind: OperatorTokenKind::Symbol,
-    },
-    BinaryOperatorRule {
-        text: "and",
-        operator: BinaryOperator::And,
-        precedence: 1,
-        token_kind: OperatorTokenKind::Word,
-    },
-    BinaryOperatorRule {
-        text: "or",
-        operator: BinaryOperator::Or,
-        precedence: 1,
-        token_kind: OperatorTokenKind::Word,
-    },
-    BinaryOperatorRule {
-        text: "==",
-        operator: BinaryOperator::Equals,
-        precedence: 2,
-        token_kind: OperatorTokenKind::Symbol,
-    },
-    BinaryOperatorRule {
-        text: "!=",
-        operator: BinaryOperator::NotEquals,
-        precedence: 2,
-        token_kind: OperatorTokenKind::Symbol,
-    },
-    BinaryOperatorRule {
-        text: ">=",
-        operator: BinaryOperator::GreaterThanOrEquals,
-        precedence: 2,
-        token_kind: OperatorTokenKind::Symbol,
-    },
-    BinaryOperatorRule {
-        text: "<=",
-        operator: BinaryOperator::LessThanOrEquals,
-        precedence: 2,
-        token_kind: OperatorTokenKind::Symbol,
-    },
-    BinaryOperatorRule {
-        text: ">",
-        operator: BinaryOperator::GreaterThan,
-        precedence: 2,
-        token_kind: OperatorTokenKind::Symbol,
-    },
-    BinaryOperatorRule {
-        text: "<",
-        operator: BinaryOperator::LessThan,
-        precedence: 2,
-        token_kind: OperatorTokenKind::Symbol,
-    },
-    BinaryOperatorRule {
-        text: "!?",
-        operator: BinaryOperator::Hasnt,
-        precedence: 3,
-        token_kind: OperatorTokenKind::Symbol,
-    },
-    BinaryOperatorRule {
-        text: "hasnt",
-        operator: BinaryOperator::Hasnt,
-        precedence: 4,
-        token_kind: OperatorTokenKind::Word,
-    },
-    BinaryOperatorRule {
-        text: "has",
-        operator: BinaryOperator::Has,
-        precedence: 4,
-        token_kind: OperatorTokenKind::Word,
-    },
-    BinaryOperatorRule {
-        text: "?",
-        operator: BinaryOperator::Has,
-        precedence: 4,
-        token_kind: OperatorTokenKind::Symbol,
-    },
-    BinaryOperatorRule {
-        text: "+",
-        operator: BinaryOperator::Add,
-        precedence: 5,
-        token_kind: OperatorTokenKind::Symbol,
-    },
-    BinaryOperatorRule {
-        text: "-",
-        operator: BinaryOperator::Subtract,
-        precedence: 5,
-        token_kind: OperatorTokenKind::Symbol,
-    },
-    BinaryOperatorRule {
-        text: "*",
-        operator: BinaryOperator::Multiply,
-        precedence: 6,
-        token_kind: OperatorTokenKind::Symbol,
-    },
-    BinaryOperatorRule {
-        text: "/",
-        operator: BinaryOperator::Divide,
-        precedence: 6,
-        token_kind: OperatorTokenKind::Symbol,
-    },
-    BinaryOperatorRule {
-        text: "mod",
-        operator: BinaryOperator::Modulo,
-        precedence: 6,
-        token_kind: OperatorTokenKind::Word,
-    },
-    BinaryOperatorRule {
-        text: "%",
-        operator: BinaryOperator::Modulo,
-        precedence: 6,
-        token_kind: OperatorTokenKind::Symbol,
-    },
-];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct ExpressionParseError {
@@ -600,11 +440,7 @@ fn token_at(
 }
 
 fn match_operator(source: &str) -> Option<&'static str> {
-    BINARY_OPERATOR_RULES
-        .iter()
-        .filter(|rule| rule.token_kind == OperatorTokenKind::Symbol)
-        .map(|rule| rule.text)
-        .find(|operator| source.starts_with(operator))
+    symbol_operator_text(source)
 }
 
 fn read_string_literal(source: &str, start: usize) -> (String, usize) {
@@ -737,13 +573,6 @@ fn classify_word_token(word: &str) -> ExpressionTokenKind {
     }
 
     ExpressionTokenKind::Identifier(word.to_string())
-}
-
-fn binary_operator_rule(text: &str) -> Option<BinaryOperatorRule> {
-    BINARY_OPERATOR_RULES
-        .iter()
-        .find(|rule| rule.text == text)
-        .copied()
 }
 
 struct TokenExpressionParser<'a> {
