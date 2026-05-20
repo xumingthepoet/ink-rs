@@ -1,4 +1,4 @@
-Progress: 9/20
+Progress: 10/20
 
 # Typed Dict Values Task List
 
@@ -351,7 +351,7 @@ Validation:
 
 Commit record: implementation `c069d330` (`Lower Dict index reads`)
 
-### [>] Task 10: Lower Dict Writes
+### [x] Task 10: Lower Dict Writes
 
 Goal: Emit runtime instructions for Dict indexed assignment and nested lvalue
 updates.
@@ -378,6 +378,11 @@ Validation:
 - Initial `make gate` reached the final doc-test stage but failed by the 120s
   wrapper timeout with no failing tests reported.
 - Reran `make gate` after incremental compilation; passed.
+- Review found no follow-up code fixes required; additionally checked existing
+  array index assignment tests after the index-cache change, then reran
+  `cargo test -p ink-test typed_values`,
+  `cargo test -p ink-test --test typed_values`, `cargo fmt --all --check`, and
+  `make gate`.
 
 Commit record: implementation `2d50da09` (`Lower Dict index writes`)
 
