@@ -1,4 +1,4 @@
-Progress: 1/24
+Progress: 2/24
 
 # Compiler Analysis Refactor Active Plan
 
@@ -59,7 +59,7 @@ no follow-up changes required.
 Commit record: Implementation commit `d250386c`; waiting-review record
 `598d1f60`; completion-record commit recorded by this task-list update.
 
-### [>] Task 02: Migrate target diagnostics to shared indexes
+### [x] Task 02: Migrate target diagnostics to shared indexes
 
 Goal: Make call target diagnostics consume `AnalysisIndexes` instead of
 rebuilding target, variable, struct, enum, interface, module import, module
@@ -82,9 +82,16 @@ Modification boundaries: Target diagnostics and shared analysis wiring only.
 Validation commands: `cargo test -p ink-compiler targets`; `cargo test -p ink-compiler analysis`; `make gate`.
 
 Validation record: `cargo test -p ink-compiler targets` passed;
-`cargo test -p ink-compiler analysis` passed; `make gate` passed.
+`cargo test -p ink-compiler analysis` passed; `make gate` passed. Review
+validation repeated after implementation review: `cargo test -p ink-compiler
+targets` passed; `cargo test -p ink-compiler analysis` passed; `make gate`
+passed.
 
-Commit record: Implementation commit `39d762cc`; completion-record commit TBD.
+Review record: Reviewed implementation commit `39d762cc` with `git show --check`;
+no follow-up changes required.
+
+Commit record: Implementation commit `39d762cc`; waiting-review record
+`b35af4dc`; completion-record commit recorded by this task-list update.
 
 ### [ ] Task 03: Migrate initializer and assignment diagnostics
 
