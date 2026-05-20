@@ -23,7 +23,7 @@ implementation commit can be recorded as `[>]`.
 
 ## Milestone 1: Runtime Story State Boundaries
 
-### [ ] Task 01: Split StoryState Error And Warning Handling
+### [~] Task 01: Split StoryState Error And Warning Handling
 
 Goal: Move current error and warning state helpers out of the large story state
 file into a dedicated runtime state concern.
