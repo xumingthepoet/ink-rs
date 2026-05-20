@@ -146,7 +146,7 @@ story_state::tests::malformed_native_call_underflow_returns_error`, and `make
 gate`. Review found no follow-up changes; completion validation passed with
 the same focused commands and `make gate`.
 
-### [ ] Task 05: Split StoryState Function Evaluation API
+### [~] Task 05: Split StoryState Function Evaluation API
 
 Goal: Isolate host-driven function evaluation state transitions from general
 story state.
