@@ -1,4 +1,4 @@
-Progress: 2/24
+Progress: 3/24
 
 # Compiler Analysis Refactor Active Plan
 
@@ -93,7 +93,7 @@ no follow-up changes required.
 Commit record: Implementation commit `39d762cc`; waiting-review record
 `b35af4dc`; completion-record commit recorded by this task-list update.
 
-### [>] Task 03: Migrate initializer and assignment diagnostics
+### [x] Task 03: Migrate initializer and assignment diagnostics
 
 Goal: Make initializer and assignment diagnostics consume `AnalysisIndexes`.
 
@@ -117,9 +117,16 @@ Validation commands: `cargo test -p ink-compiler initializers assignments`; `car
 
 Validation record: `cargo test -p ink-compiler initializers` passed;
 `cargo test -p ink-compiler assignments` passed; `cargo test -p ink-compiler
+analysis` passed; `make gate` passed. Review validation repeated after
+implementation review: `cargo test -p ink-compiler initializers` passed;
+`cargo test -p ink-compiler assignments` passed; `cargo test -p ink-compiler
 analysis` passed; `make gate` passed.
 
-Commit record: Implementation commit `60ace477`; completion-record commit TBD.
+Review record: Reviewed implementation commit `60ace477` with `git show --check`;
+no follow-up changes required.
+
+Commit record: Implementation commit `60ace477`; waiting-review record
+`0d326822`; completion-record commit recorded by this task-list update.
 
 ### [ ] Task 04: Migrate field/index/flow diagnostics
 
