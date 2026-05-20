@@ -276,7 +276,7 @@ review fix `69b0abdb` (`Cover empty Dict story JSON values`)
 
 ## Milestone 4: Lowering
 
-### [ ] Task 08: Lower Dict Defaults And Literals
+### [~] Task 08: Lower Dict Defaults And Literals
 
 Goal: Emit format Dict values for defaults, constants, global initializers, temp
 initializers, and nested literals.
