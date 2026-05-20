@@ -28,6 +28,8 @@ pub const INK_SAVE_STATE_VERSION: u32 = 2;
 
 static DEFAULT_FLOW_NAME: &str = "DEFAULT_FLOW";
 
+mod errors;
+
 pub(crate) struct StoryState {
     pub current_flow: Flow,
     pub did_safe_exit: bool,
@@ -81,10 +83,6 @@ impl StoryState {
         !self.get_current_pointer().is_null() && !self.has_error()
     }
 
-    pub fn has_error(&self) -> bool {
-        !self.current_errors.is_empty()
-    }
-
     /// String representation of the location where the story currently is.
     pub fn current_path_string(&self) -> Option<String> {
         let pointer = self.get_current_pointer();
@@ -127,18 +125,6 @@ impl StoryState {
 
     pub fn is_did_safe_exit(&self) -> bool {
         self.did_safe_exit
-    }
-
-    pub fn has_warning(&self) -> bool {
-        !self.current_warnings.is_empty()
-    }
-
-    pub fn get_current_errors(&self) -> &Vec<String> {
-        &self.current_errors
-    }
-
-    pub fn get_current_warnings(&self) -> &Vec<String> {
-        &self.current_warnings
     }
 
     pub fn get_output_stream(&self) -> &Vec<Rc<dyn RTObject>> {
@@ -1105,18 +1091,6 @@ impl StoryState {
         self.output_stream_dirty();
 
         Ok(())
-    }
-
-    pub(crate) fn add_error(&mut self, message: String, is_warning: bool) {
-        if !is_warning {
-            self.current_errors.push(message);
-        } else {
-            self.current_warnings.push(message);
-        }
-    }
-
-    pub(crate) fn reset_errors(&mut self) {
-        self.current_errors.clear();
     }
 }
 
