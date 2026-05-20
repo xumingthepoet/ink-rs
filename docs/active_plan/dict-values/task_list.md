@@ -169,7 +169,7 @@ Validation:
 
 Commit record: implementation `f6d534a3` (`Infer Dict index access types`)
 
-### [~] Task 05: Validate Dict Assignment Targets
+### [>] Task 05: Validate Dict Assignment Targets
 
 Goal: Type-check indexed Dict assignments and compound lvalue chains.
 
@@ -187,7 +187,13 @@ Modification boundaries: assignment analysis and focused diagnostics.
 
 Validation commands: `cargo test -p ink-compiler analysis`
 
-Commit record: pending
+Validation:
+
+- `cargo test -p ink-compiler analysis::assignments` passed.
+- `cargo fmt --all --check` passed.
+- `make gate` passed.
+
+Commit record: implementation `b289208d` (`Validate Dict assignment targets`)
 
 ### [ ] Task 06: Validate Dict Function And External Signatures
 
