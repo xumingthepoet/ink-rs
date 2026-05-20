@@ -1,17 +1,19 @@
 # Syntax Updates
 
-This file records intentional language documentation changes made by ink-rs.
+This file records intentional language and semantic changes made by ink-rs. It
+is a historical changelog, not the fastest way to learn current syntax.
 
 `WritingWithInk.md` is the immutable upstream C# documentation snapshot.
 Do not edit it for ink-rs language changes.
 
-`SyntaxReference.md` is the current ink-rs syntax reference. It should teach
-only the current language syntax and should not include removed syntax,
-migration notes, or compatibility explanations. Keep those historical details
-in this file.
+`LanguageOverview.md` is the short current-language entry point.
+`SyntaxReference.md` is the full current ink-rs syntax reference. It should
+teach only the current language syntax and should not include removed syntax,
+migration notes, or compatibility explanations. Keep those historical details in
+this file.
 
 When syntax or semantics change, update this file first, then apply the same
-change to `SyntaxReference.md`.
+change to `SyntaxReference.md` and, when relevant, `LanguageOverview.md`.
 
 Each entry should include:
 
@@ -396,7 +398,7 @@ Each entry should include:
   `module_imported_global_variable_reads_and_writes_run`, and
   `explicit_module_removed_root_behaviors_emit_diagnostics` in
   the behavior-focused files under `crates/ink-test/tests/`, plus module
-  parser, analysis, lowering, compiler API, fixture, C# compatibility
+  parser, analysis, lowering, compiler API, fixture, upstream-divergence
   divergence, and runtime-loading tests.
 
 ## 2026-04-28: Compiler Entry Requires Explicit Module Headers
@@ -489,8 +491,8 @@ Each entry should include:
   or host code. Replace multi-flow runtime usage with separate story instances
   or explicit story variables.
 - tests: dynamic divert parser, analysis, lowering, choice, save/load, removed
-  count diagnostics, C# compatibility divergence, compiler conformance, runtime
-  unit, and language integration tests updated with this change.
+  count diagnostics, upstream-divergence coverage, compiler conformance,
+  runtime unit, and language integration tests updated with this change.
 
 ## 2026-04-26: CONST Declarations Require Explicit Types
 

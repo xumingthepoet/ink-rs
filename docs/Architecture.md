@@ -64,7 +64,7 @@ work. It intentionally omits build output and most upstream reference internals.
 |-- AGENTS.md
 |   Stable repository instructions for agents.
 |-- Notes.md
-|   Ranked durable working notes for compiler/runtime/language work.
+|   Ranked durable working notes. Maintenance rules live in docs/workflows/.
 |-- Makefile
 |   Project gates: fmt, check, test, gate.
 |-- Cargo.toml
@@ -161,14 +161,19 @@ work. It intentionally omits build output and most upstream reference internals.
 |-- docs/
 |   |-- Architecture.md
 |   |   This repository map. Update it with structural changes.
+|   |-- LanguageOverview.md
+|   |   Short entry point for current ink-rs source syntax.
 |   |-- SyntaxUpdates.md
-|   |   Language and semantic changes from upstream.
+|   |   Historical language and semantic change log.
 |   |-- SyntaxReference.md
-|   |   Current supported syntax reference.
+|   |   Full current supported syntax reference.
 |   |-- WritingWithInk.md
 |   |   Upstream C# guide snapshot. Do not edit.
 |   |-- ink_JSON_runtime_format.md
 |   |   Compiled story JSON notes.
+|   |-- workflows/
+|   |   Standing workflow rules for active plans, validation, issue capture,
+|   |   and durable notes.
 |   |-- active_plan/
 |   |   Current implementation plan workspace.
 |   |-- finished_plans/
@@ -448,9 +453,9 @@ serializing incomplete execution internals.
 Owner: `crates/ink-test/`
 
 Integration tests are normal Cargo integration targets grouped by behavior.
-There is no aggregate origin/example-suite target. `make test` runs all
-workspace tests except `ink-test`, then `integration_policy`, then the whole
-`ink-test` package.
+There is no aggregate origin/example-suite target. `make test` runs
+`cargo test --workspace --quiet` through `tools/run-with-timeout`; `make gate`
+adds formatting and standalone workspace checking around that test run.
 
 ```text
 crates/ink-test/
@@ -537,6 +542,9 @@ cargo test -p ink-test --test integration_policy
 cargo test -p ink-test
 ```
 
+See `docs/workflows/validation.md` for the full validation policy, including
+how Cargo filters package-level test commands and what `make gate` covers.
+
 ## Tools, Docs, And Reference Code
 
 `crates/ink-tools/src/main.rs` provides the `ink_compile` binary. It currently
@@ -547,12 +555,20 @@ or sibling files.
 `editor/vscode-ink-rs/` owns editor syntax/package assets. Update it when a
 language syntax change should affect highlighting or editor examples.
 
-`docs/SyntaxUpdates.md` records language and semantic changes from
-upstream. `docs/SyntaxReference.md` is the maintained syntax reference users
-should read. Keep `SyntaxReference.md` focused on current supported syntax;
-removed syntax, migration notes, and compatibility explanations belong in
-`SyntaxUpdates.md`, issue records, diagnostics tests, or architecture notes. Do
-not edit `docs/WritingWithInk.md`.
+`docs/LanguageOverview.md` is the short current-language entry point.
+`docs/SyntaxReference.md` is the full maintained syntax reference.
+`docs/SyntaxUpdates.md` is the historical language and semantic change log.
+Keep `SyntaxReference.md` focused on current supported syntax; removed syntax,
+migration notes, and compatibility explanations belong in `SyntaxUpdates.md`,
+issue records, diagnostics tests, or architecture notes. Do not edit
+`docs/WritingWithInk.md`.
+
+Standing workflows live under `docs/workflows/`:
+
+- `active_plan.md`: active plan task-list and continuation rules
+- `validation.md`: focused validation and `make gate` policy
+- `issues.md`: deferred issue capture and solved-issue movement
+- `notes.md`: `Notes.md` ranking and maintenance rules
 
 The upstream C# implementation remains an external reference for
 legacy-compatible behavior questions, especially parser trial order, weave
@@ -605,8 +621,11 @@ For language or runtime behavior changes:
 7. Add or update behavior-grouped fixtures and tests under `crates/ink-test`.
 8. Update `docs/SyntaxUpdates.md` and
    `docs/SyntaxReference.md` for language or semantic changes.
-9. Update this `docs/Architecture.md` in the same change when the file tree,
-   module ownership, pipeline, routing table, or validation expectations change.
+9. Update `docs/LanguageOverview.md` when the short current-language entry point
+   would otherwise become incomplete or misleading.
+10. Update this `docs/Architecture.md` in the same change when the file tree,
+    module ownership, pipeline, routing table, or validation expectations
+    change.
 
 Forbidden shortcuts:
 
@@ -620,21 +639,8 @@ Forbidden shortcuts:
 
 ## Validation
 
-Start with the smallest relevant validation, then widen:
-
-```text
-cargo fmt --all --check
-cargo check --workspace
-cargo test -p ink-compiler <focused filter>
-cargo test -p ink-runtime <focused filter>
-cargo test -p ink-test --test <focused_target>
-cargo test -p ink-test --test integration_policy
-cargo test -p ink-test
-cargo test --workspace
-make gate
-```
-
-`make gate` is the single project-level gate:
+Start with the smallest relevant validation, then widen. `make gate` is the
+single project-level gate:
 
 ```text
 cargo fmt --all --check
@@ -642,9 +648,8 @@ cargo check --workspace
 cargo test --workspace --quiet
 ```
 
-Crates without runnable Rust doc examples disable Cargo's doctest harness in
-their manifests so `cargo test --workspace` keeps runnable doctest coverage
-without paying rustdoc startup cost for zero-doctest crates.
+See `docs/workflows/validation.md` for focused command examples, Cargo filter
+pitfalls, timeout behavior, and doctest policy.
 
 If a change intentionally diverges from upstream Ink, update tests and
 maintained documentation in the same change. If the change is only a code

@@ -35,6 +35,9 @@
 
 ## Introduction
 
+For a short current-language entry point, start with `LanguageOverview.md`.
+This file is the full maintained syntax reference for ink-rs.
+
 **ink** is a scripting language built around the idea of marking up pure-text with flow in order to produce interactive scripts.
 
 At its most basic, it can be used to write a Choose Your Own-style story, or a branching dialogue tree. But its real strength is in writing dialogues with lots of options and lots of recombination of the flow.
