@@ -703,7 +703,7 @@ unchanged.
 Commit record: Implementation commit `7f4bdc7b`; completion-record commit
 recorded by this task-list update.
 
-### [ ] Task 22: Add regression tests for diagnostic span accuracy
+### [>] Task 22: Add regression tests for diagnostic span accuracy
 
 Goal: Pin the diagnostic span improvements from Tasks 20 and 21.
 
@@ -721,7 +721,13 @@ Modification boundaries: Compiler analysis tests and minimal test support.
 
 Validation commands: `cargo test -p ink-compiler array_literals dict_literals struct_literals modules`; `make gate`.
 
-Commit record: Implementation commit TBD; completion-record commit TBD.
+Validation record: Focused validation passed via split Cargo filters because
+Cargo accepts one test filter per invocation: `cargo test -p ink-compiler
+array_literals`, `cargo test -p ink-compiler dict_literals`, `cargo test -p
+ink-compiler struct_literals`, `cargo test -p ink-compiler modules`; `make
+gate` passed.
+
+Commit record: Implementation commit `b4a8a9f1`; completion-record commit TBD.
 
 ### [ ] Task 23: Run focused validation and make gate
 
