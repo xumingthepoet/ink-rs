@@ -205,7 +205,7 @@ ink-test --test integration choices`, `cargo test -p ink-test --test
 integration flow`, and `make gate`. Review found no follow-up changes;
 completion validation passed with the same focused commands and `make gate`.
 
-### [ ] Task 07: Split StoryState Patch Lifecycle
+### [~] Task 07: Split StoryState Patch Lifecycle
 
 Goal: Give background-save and patch lifecycle code an owner separate from
 runtime save JSON.
