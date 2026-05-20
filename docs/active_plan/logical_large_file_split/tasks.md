@@ -508,7 +508,7 @@ completion validation passed with the same focused commands and `make gate`.
 
 ## Milestone 3: Analysis Target Boundaries
 
-### [~] Task 17: Split Target Checker Module Shell
+### [>] Task 17: Split Target Checker Module Shell
 
 Goal: Create a module boundary for target diagnostics without changing any
 checks yet.
@@ -531,7 +531,9 @@ declarations needed by Rust.
 Validation commands: `cargo fmt --all --check`; `cargo test -p ink-test --test
 integration diagnostics`; `make gate`.
 
-Commit record: pending.
+Commit record: implementation commit `6e898e83 Split target checker module
+shell`; validation passed with `cargo fmt --all --check`, `cargo test -p
+ink-test --test integration diagnostics`, and `make gate`.
 
 ### [ ] Task 18: Split Divert Target Checks
 
