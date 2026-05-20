@@ -1,0 +1,95 @@
+Camp is set at the edge of marsh and cedar.
+Roles are assigned:
+Nora: Scout
+Ike: Engineer
+Vale: Sentinel
+Rook: Medic
+Sera: Quartermaster
+Opening status --
+Nora (Scout): fatigue 3, morale 8
+Ike (Engineer): fatigue 4, morale 7
+Vale (Sentinel): fatigue 2, morale 9
+Rook (Medic): fatigue 5, morale 6
+Sera (Quartermaster): fatigue 3, morale 8
+Camp stores:
+Food: 48
+Water: 39
+Firewood: 16
+Medicine: 6
+Camp management - First watch with hazard storm.
+Supplies consumed:
+Food: 6
+Water: 6
+Firewood: 3
+Medicine: 0
+Nora (Scout) shifts to fatigue 5 and morale 9.
+Ike (Engineer) shifts to fatigue 7 and morale 7.
+Vale (Sentinel) shifts to fatigue 5 and morale 8.
+Rook (Medic) shifts to fatigue 7 and morale 6.
+Sera (Quartermaster) shifts to fatigue 6 and morale 7.
+Medicine usage after storm watch:
+First watch status --
+Nora (Scout): fatigue 5, morale 9
+Ike (Engineer): fatigue 7, morale 7
+Vale (Sentinel): fatigue 5, morale 8
+Rook (Medic): fatigue 7, morale 6
+Sera (Quartermaster): fatigue 6, morale 7
+Camp stores:
+Food: 42
+Water: 33
+Firewood: 13
+Medicine: 5
+Camp management - Second watch with hazard wolf_pack.
+Supplies consumed:
+Food: 7
+Water: 5
+Firewood: 1
+Medicine: 0
+Nora (Scout) shifts to fatigue 7 and morale 8.
+Ike (Engineer) shifts to fatigue 9 and morale 7.
+Vale (Sentinel) shifts to fatigue 7 and morale 9.
+Rook (Medic) shifts to fatigue 10 and morale 5.
+Sera (Quartermaster) shifts to fatigue 8 and morale 7.
+Medicine usage after wolf watch:
+Second watch status --
+Nora (Scout): fatigue 7, morale 8
+Ike (Engineer): fatigue 9, morale 7
+Vale (Sentinel): fatigue 7, morale 9
+Rook (Medic): fatigue 10, morale 5
+Sera (Quartermaster): fatigue 8, morale 7
+Camp stores:
+Food: 35
+Water: 28
+Firewood: 12
+Medicine: 5
+Camp management - Third watch with hazard flood.
+Supplies consumed:
+Food: 6
+Water: 5
+Firewood: 2
+Medicine: 0
+Nora (Scout) shifts to fatigue 10 and morale 8.
+Ike (Engineer) shifts to fatigue 11 and morale 8.
+Vale (Sentinel) shifts to fatigue 10 and morale 9.
+Rook (Medic) shifts to fatigue 12 and morale 5.
+Sera (Quartermaster) shifts to fatigue 11 and morale 6.
+Medicine usage after flood watch:
+Third watch status --
+Nora (Scout): fatigue 10, morale 8
+Ike (Engineer): fatigue 11, morale 8
+Vale (Sentinel): fatigue 10, morale 9
+Rook (Medic): fatigue 12, morale 5
+Sera (Quartermaster): fatigue 11, morale 6
+Camp stores:
+Food: 29
+Water: 23
+Firewood: 10
+Medicine: 4
+Final morale check:
+Exhausted explorers: 5
+Total fatigue load: 54
+Total morale level: 36
+The averages are 10 fatigue and 7 morale.
+A forced rest is required.
+You move camp to higher ground in the morning.
+Supply stocks are tight; rationing begins immediately.
