@@ -3,8 +3,8 @@ use std::collections::HashSet;
 use ink_story_json_format::{ControlCommand, NativeFunction, Object as RuntimeObject};
 
 use crate::parsed::{
-    AssignmentTarget, BinaryOperator, Expression, FlowArgument, InterfaceMemberKind,
-    InterfaceMemberSignature, QualifiedName, TypeName,
+    AssignmentTarget, Expression, FlowArgument, InterfaceMemberKind, InterfaceMemberSignature,
+    QualifiedName, TypeName,
 };
 use crate::source::SourceSpan;
 
@@ -14,13 +14,24 @@ use super::assignment::{
 };
 use super::composite_literal::lower_dynamic_composite_literal_into;
 use super::context::{ChoicePathMode, LoweringContext};
-use super::indexes::{CallSignature, ConstantValue, ConstantValues, ExternalSignatures};
+use super::indexes::{CallSignature, ConstantValue};
 use super::path::{module_scoped_source_path_to_runtime_path, source_path_to_runtime_path};
 use super::value::{
     lower_enum_member_expression_value, lower_value_literal, resolve_divert_target_value,
     struct_field_definitions_for_type,
 };
 use super::weave::lower_content_list_into_context;
+
+mod name_resolution;
+mod operators;
+
+use self::name_resolution::{
+    resolve_callable_name, resolve_constant_name, resolve_runtime_variable_name,
+};
+use self::operators::{
+    builtin_native_function, native_function_for_binary_operator,
+    native_function_for_unary_operator,
+};
 
 pub(super) fn lower_output_expression_into(
     content: &mut Vec<RuntimeObject>,
@@ -946,102 +957,4 @@ fn lower_function_arg_into_parts(
     }
 
     lower_expression_into_with_constants(content, arg, lowering);
-}
-
-fn native_function_for_binary_operator(operator: BinaryOperator) -> NativeFunction {
-    match operator {
-        BinaryOperator::And | BinaryOperator::AndSymbol => NativeFunction::And,
-        BinaryOperator::Or | BinaryOperator::OrSymbol => NativeFunction::Or,
-        BinaryOperator::Equals => NativeFunction::Equal,
-        BinaryOperator::NotEquals => NativeFunction::NotEquals,
-        BinaryOperator::GreaterThan => NativeFunction::Greater,
-        BinaryOperator::LessThan => NativeFunction::Less,
-        BinaryOperator::GreaterThanOrEquals => NativeFunction::GreaterThanOrEquals,
-        BinaryOperator::LessThanOrEquals => NativeFunction::LessThanOrEquals,
-        BinaryOperator::Has => NativeFunction::Has,
-        BinaryOperator::Hasnt => NativeFunction::Hasnt,
-        BinaryOperator::Add => NativeFunction::Add,
-        BinaryOperator::Subtract => NativeFunction::Subtract,
-        BinaryOperator::Multiply => NativeFunction::Multiply,
-        BinaryOperator::Divide => NativeFunction::Divide,
-        BinaryOperator::Modulo => NativeFunction::Mod,
-    }
-}
-
-fn native_function_for_unary_operator(operator: crate::parsed::UnaryOperator) -> NativeFunction {
-    match operator {
-        crate::parsed::UnaryOperator::Negate => NativeFunction::Negate,
-        crate::parsed::UnaryOperator::Not => NativeFunction::Not,
-    }
-}
-
-fn builtin_native_function(name: &str) -> Option<NativeFunction> {
-    match name {
-        "MIN" => Some(NativeFunction::Min),
-        "MAX" => Some(NativeFunction::Max),
-        "POW" => Some(NativeFunction::Pow),
-        "FLOOR" => Some(NativeFunction::Floor),
-        "CEILING" => Some(NativeFunction::Ceiling),
-        "INT" => Some(NativeFunction::Int),
-        "FLOAT" => Some(NativeFunction::Float),
-        "LEN" => Some(NativeFunction::Len),
-        "ARRAY_PUSH" => Some(NativeFunction::ArrayPush),
-        "ARRAY_INSERT" => Some(NativeFunction::ArrayInsert),
-        "DICT_HAS" => Some(NativeFunction::DictHas),
-        "DICT_SIZE" => Some(NativeFunction::DictSize),
-        "DICT_REMOVE" => Some(NativeFunction::DictRemove),
-        "DICT_KEYS" => Some(NativeFunction::DictKeys),
-        _ => None,
-    }
-}
-
-fn resolve_runtime_variable_name(
-    name: &str,
-    path_mode: &ChoicePathMode,
-    global_variables: &HashSet<String>,
-) -> String {
-    if name.contains("::") || path_mode.is_local_variable(name) {
-        return name.to_string();
-    }
-
-    path_mode
-        .current_module_name()
-        .map(|module_name| format!("{module_name}::{name}"))
-        .filter(|qualified_name| global_variables.contains(qualified_name))
-        .unwrap_or_else(|| name.to_string())
-}
-
-fn resolve_constant_name(
-    name: &str,
-    path_mode: &ChoicePathMode,
-    constants: &ConstantValues,
-) -> Option<String> {
-    if constants.contains_key(name) {
-        return Some(name.to_string());
-    }
-
-    if name.contains("::") {
-        return None;
-    }
-
-    path_mode
-        .current_module_name()
-        .map(|module_name| format!("{module_name}::{name}"))
-        .filter(|qualified_name| constants.contains_key(qualified_name))
-}
-
-fn resolve_callable_name(
-    name: &str,
-    external_signatures: &ExternalSignatures,
-    path_mode: &ChoicePathMode,
-) -> String {
-    if external_signatures.contains_key(name) || name.contains("::") {
-        return name.to_string();
-    }
-
-    path_mode
-        .current_module_name()
-        .map(|module_name| format!("{module_name}::{name}"))
-        .filter(|qualified_name| external_signatures.contains_key(qualified_name))
-        .unwrap_or_else(|| name.to_string())
 }
