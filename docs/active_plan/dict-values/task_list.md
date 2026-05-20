@@ -388,7 +388,7 @@ Commit record: implementation `2d50da09` (`Lower Dict index writes`)
 
 ## Milestone 5: Runtime Values
 
-### [ ] Task 11: Add Runtime Dict Value Type
+### [~] Task 11: Add Runtime Dict Value Type
 
 Goal: Represent Dict values in runtime-owned value data.
 
