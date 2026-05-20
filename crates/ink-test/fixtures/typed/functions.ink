@@ -3,7 +3,7 @@ STRUCT Player {
     hp: int
 }
 
-VAR party: Player[] = [{ hp: 7 }]
+VAR party: Player[] = [%Player{ hp: 7 }]
 VAR seed_values: int[] = [2, 3]
 
 == main ==

@@ -15,14 +15,14 @@ STRUCT Target {
 VAR actor_name: string = "Rin"
 VAR focus: int = 5
 VAR actions: Action[] = [
-    { name: "Strike", kind: "skill", enabled: true, needs_target: true },
-    { name: "Fireball", kind: "skill", enabled: false, needs_target: true },
-    { name: "Potion", kind: "item", enabled: true, needs_target: false }
+    %Action{ name: "Strike", kind: "skill", enabled: true, needs_target: true },
+    %Action{ name: "Fireball", kind: "skill", enabled: false, needs_target: true },
+    %Action{ name: "Potion", kind: "item", enabled: true, needs_target: false }
 ]
 VAR targets: Target[] = [
-    { name: "Slime A", hp: 12, alive: true },
-    { name: "Slime B", hp: 8, alive: true },
-    { name: "Slime C", hp: 0, alive: false }
+    %Target{ name: "Slime A", hp: 12, alive: true },
+    %Target{ name: "Slime B", hp: 8, alive: true },
+    %Target{ name: "Slime C", hp: 0, alive: false }
 ]
 
 == main ==

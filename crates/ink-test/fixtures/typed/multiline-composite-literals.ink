@@ -9,31 +9,31 @@ STRUCT Player {
     tags: string[]
 }
 VAR party: Player[] = [
-    {
+    %Player{
         name: "Ada",
-        stats: {
+        stats: %Stats{
             hp: 10,
             ready: true
         },
         tags: ["scout"]
     },
-    {
+    %Player{
         name: "Bea",
-        stats: {
+        stats: %Stats{
             hp: 8
         },
         tags: []
     }
 ]
-CONST fallback: Stats = {
+CONST fallback: Stats = %Stats{
     hp: 3,
     ready: true
 }
 CONST backups: Stats[] = [
-    {
+    %Stats{
         hp: 1
     },
-    {
+    %Stats{
         hp: 2,
         ready: true
     }

@@ -2,7 +2,7 @@ use crate::{
     diagnostic::{Diagnostic, DiagnosticCode},
     parsed::{
         BinaryOperator, ContentList, DictLiteralEntry, DictLiteralKey, Expression, FloatLiteral,
-        Object, QualifiedName, StructLiteralField, UnaryOperator,
+        Object, QualifiedName, StructLiteralField, TypeName, UnaryOperator,
     },
     source::SourceSpan,
 };
@@ -215,6 +215,15 @@ enum ExpressionParseErrorKind {
     ExpectedCommaOrArrayCloseBracket {
         found: Option<String>,
     },
+    LegacyEmptyCompositeLiteral,
+    LegacyStructLiteral,
+    LegacyDictLiteral,
+    ExpectedPercentLiteralTarget {
+        found: Option<String>,
+    },
+    ExpectedPercentLiteralOpenBrace {
+        found: Option<String>,
+    },
     ExpectedStructLiteralField {
         found: Option<String>,
     },
@@ -298,6 +307,27 @@ impl ExpressionParseError {
             ExpressionParseErrorKind::ExpectedCommaOrArrayCloseBracket { found } => {
                 format!(
                     "expected `,` or `]` in array literal{}",
+                    found_clause(found)
+                )
+            }
+            ExpressionParseErrorKind::LegacyEmptyCompositeLiteral => {
+                "Use `%Type{}` for structs or `%{}` for Dicts".to_string()
+            }
+            ExpressionParseErrorKind::LegacyStructLiteral => {
+                "Struct literals now use `%Type{...}`".to_string()
+            }
+            ExpressionParseErrorKind::LegacyDictLiteral => {
+                "Dict literals now use `%{...}`".to_string()
+            }
+            ExpressionParseErrorKind::ExpectedPercentLiteralTarget { found } => {
+                format!(
+                    "expected `{{` for a Dict literal or struct type name after `%`{}",
+                    found_clause(found)
+                )
+            }
+            ExpressionParseErrorKind::ExpectedPercentLiteralOpenBrace { found } => {
+                format!(
+                    "expected `{{` after struct literal type{}",
                     found_clause(found)
                 )
             }
@@ -806,6 +836,11 @@ impl<'a> TokenExpressionParser<'a> {
             }
             ExpressionTokenKind::Arrow => self.parse_divert_target(),
             ExpressionTokenKind::Operator(operator)
+                if operator == "%" && self.peek_is_percent_literal_target() =>
+            {
+                self.parse_percent_literal(token.span.clone())
+            }
+            ExpressionTokenKind::Operator(operator)
                 if matches!(operator.as_str(), "-" | "!" | "not") =>
             {
                 let unary_operator = match operator.as_str() {
@@ -1122,17 +1157,29 @@ impl<'a> TokenExpressionParser<'a> {
 
     fn parse_braced_literal(&mut self) -> Result<Expression, ExpressionParseError> {
         if self.match_kind(|kind| matches!(kind, ExpressionTokenKind::CloseBrace)) {
-            return Ok(Expression::EmptyCompositeLiteral);
+            return Err(ExpressionParseError::new(
+                ExpressionParseErrorKind::LegacyEmptyCompositeLiteral,
+                self.previous_span(),
+            ));
         }
 
         match self.peek().map(|token| &token.kind) {
-            Some(ExpressionTokenKind::Identifier(_)) => self.parse_struct_literal(),
+            Some(ExpressionTokenKind::Identifier(_)) => Err(ExpressionParseError::new(
+                ExpressionParseErrorKind::LegacyStructLiteral,
+                self.peek().expect("kind came from peek").span.clone(),
+            )),
             Some(ExpressionTokenKind::StringLiteral(_))
-            | Some(ExpressionTokenKind::IntLiteral(_)) => self.parse_dict_literal(),
+            | Some(ExpressionTokenKind::IntLiteral(_)) => Err(ExpressionParseError::new(
+                ExpressionParseErrorKind::LegacyDictLiteral,
+                self.peek().expect("kind came from peek").span.clone(),
+            )),
             Some(ExpressionTokenKind::Operator(operator))
                 if operator == "-" && self.next_token_is_int_literal() =>
             {
-                self.parse_dict_literal()
+                Err(ExpressionParseError::new(
+                    ExpressionParseErrorKind::LegacyDictLiteral,
+                    self.peek().expect("kind came from peek").span.clone(),
+                ))
             }
             Some(kind) => {
                 let token = self.peek().expect("kind came from peek");
@@ -1151,8 +1198,65 @@ impl<'a> TokenExpressionParser<'a> {
         }
     }
 
-    fn parse_struct_literal(&mut self) -> Result<Expression, ExpressionParseError> {
+    fn parse_percent_literal(
+        &mut self,
+        percent_span: SourceSpan,
+    ) -> Result<Expression, ExpressionParseError> {
+        if self.match_kind(|kind| matches!(kind, ExpressionTokenKind::OpenBrace)) {
+            return self.parse_dict_literal();
+        }
+
+        let type_name = match self.peek().map(|token| token.kind.clone()) {
+            Some(ExpressionTokenKind::Identifier(name)) => {
+                let type_span = self.advance().expect("peek checked token").span.clone();
+                if self.match_kind(|kind| matches!(kind, ExpressionTokenKind::DoubleColon)) {
+                    TypeName::qualified_struct_type(
+                        self.parse_qualified_name_after_module(&name, type_span)?,
+                    )
+                } else {
+                    if !is_identifier(&name) {
+                        return Err(ExpressionParseError::new(
+                            ExpressionParseErrorKind::ExpectedPercentLiteralTarget {
+                                found: Some(name),
+                            },
+                            type_span,
+                        ));
+                    }
+                    TypeName::struct_type(name)
+                }
+            }
+            Some(kind) => {
+                let span = self.peek().expect("kind came from peek").span.clone();
+                return Err(ExpressionParseError::new(
+                    ExpressionParseErrorKind::ExpectedPercentLiteralTarget {
+                        found: Some(describe_token_kind(&kind)),
+                    },
+                    span,
+                ));
+            }
+            None => {
+                return Err(ExpressionParseError::new(
+                    ExpressionParseErrorKind::ExpectedPercentLiteralTarget { found: None },
+                    percent_span,
+                ));
+            }
+        };
+
+        self.expect_kind(
+            |kind| matches!(kind, ExpressionTokenKind::OpenBrace),
+            |found| ExpressionParseErrorKind::ExpectedPercentLiteralOpenBrace { found },
+        )?;
+        self.parse_struct_literal(type_name)
+    }
+
+    fn parse_struct_literal(
+        &mut self,
+        type_name: TypeName,
+    ) -> Result<Expression, ExpressionParseError> {
         let mut fields = Vec::new();
+        if self.match_kind(|kind| matches!(kind, ExpressionTokenKind::CloseBrace)) {
+            return Ok(Expression::StructLiteral { type_name, fields });
+        }
 
         loop {
             let Some(token) = self.advance() else {
@@ -1196,11 +1300,14 @@ impl<'a> TokenExpressionParser<'a> {
             break;
         }
 
-        Ok(Expression::StructLiteral(fields))
+        Ok(Expression::StructLiteral { type_name, fields })
     }
 
     fn parse_dict_literal(&mut self) -> Result<Expression, ExpressionParseError> {
         let mut entries = Vec::new();
+        if self.match_kind(|kind| matches!(kind, ExpressionTokenKind::CloseBrace)) {
+            return Ok(Expression::DictLiteral(entries));
+        }
 
         loop {
             let key = self.parse_dict_literal_key()?;
@@ -1349,6 +1456,20 @@ impl<'a> TokenExpressionParser<'a> {
         self.tokens
             .get(self.index + 1)
             .is_some_and(|token| matches!(token.kind, ExpressionTokenKind::IntLiteral(_)))
+    }
+
+    fn peek_is_percent_literal_target(&self) -> bool {
+        matches!(
+            self.peek().map(|token| &token.kind),
+            Some(ExpressionTokenKind::OpenBrace | ExpressionTokenKind::Identifier(_))
+        )
+    }
+
+    fn previous_span(&self) -> SourceSpan {
+        self.tokens
+            .get(self.index.saturating_sub(1))
+            .map(|token| token.span.clone())
+            .unwrap_or_else(|| self.eof_span.clone())
     }
 
     fn advance(&mut self) -> Option<&'a ExpressionToken> {
@@ -1586,19 +1707,21 @@ mod tests {
                 "[player, companion]",
                 "ArrayLiteral(VariableReference(player), VariableReference(companion))",
             ),
-            ("{}", "EmptyCompositeLiteral()"),
+            ("%{}", "DictLiteral()"),
             (
-                "{ hp: 10, name: \"Ada\" }",
-                r#"StructLiteral(hp=Number(10), name=String("Ada"))"#,
+                "%Player{ hp: 10, name: \"Ada\" }",
+                r#"StructLiteral(Player, hp=Number(10), name=String("Ada"))"#,
             ),
+            ("%Player{}", "StructLiteral(Player)"),
+            ("%types::Player{}", "StructLiteral(types::Player)"),
             (
-                "{ stats: { hp: 10 }, inventory: [] }",
-                "StructLiteral(stats=StructLiteral(hp=Number(10)), inventory=ArrayLiteral())",
+                "%Player{ stats: %Stats{ hp: 10 }, inventory: [] }",
+                "StructLiteral(Player, stats=StructLiteral(Stats, hp=Number(10)), inventory=ArrayLiteral())",
             ),
-            (r#"{"a": 1}"#, r#"DictLiteral("a"=Number(1))"#),
-            (r#"{1: "a"}"#, r#"DictLiteral(1=String("a"))"#),
+            (r#"%{"a": 1}"#, r#"DictLiteral("a"=Number(1))"#),
+            (r#"%{1: "a"}"#, r#"DictLiteral(1=String("a"))"#),
             (
-                r#"{"stats": {1: "a"}}"#,
+                r#"%{"stats": %{1: "a"}}"#,
                 r#"DictLiteral("stats"=DictLiteral(1=String("a")))"#,
             ),
             ("-> knot.stitch", "DivertTarget(-> knot.stitch)"),
@@ -1731,16 +1854,18 @@ mod tests {
 
     #[test]
     fn tokenizer_covers_struct_literal_tokens() {
-        let tokens = tokenize_expression("{hp: 1}");
+        let tokens = tokenize_expression("%Player{hp: 1}");
 
         assert_eq!(
             tokens,
             vec![
-                token(ExpressionTokenKind::OpenBrace, 0, 1),
-                token(ExpressionTokenKind::Identifier("hp".to_string()), 1, 2),
-                token(ExpressionTokenKind::Colon, 3, 4),
-                token(ExpressionTokenKind::IntLiteral("1".to_string()), 5, 6),
-                token(ExpressionTokenKind::CloseBrace, 6, 7),
+                token(ExpressionTokenKind::Operator("%".to_string()), 0, 1),
+                token(ExpressionTokenKind::Identifier("Player".to_string()), 1, 2),
+                token(ExpressionTokenKind::OpenBrace, 7, 8),
+                token(ExpressionTokenKind::Identifier("hp".to_string()), 8, 9),
+                token(ExpressionTokenKind::Colon, 10, 11),
+                token(ExpressionTokenKind::IntLiteral("1".to_string()), 12, 13),
+                token(ExpressionTokenKind::CloseBrace, 13, 14),
             ]
         );
     }
@@ -1883,19 +2008,21 @@ mod tests {
                 "[player, companion]",
                 "ArrayLiteral(VariableReference(player), VariableReference(companion))",
             ),
-            ("{}", "EmptyCompositeLiteral()"),
+            ("%{}", "DictLiteral()"),
             (
-                "{ hp: 10, name: \"Ada\" }",
-                r#"StructLiteral(hp=Number(10), name=String("Ada"))"#,
+                "%Player{ hp: 10, name: \"Ada\" }",
+                r#"StructLiteral(Player, hp=Number(10), name=String("Ada"))"#,
             ),
+            ("%Player{}", "StructLiteral(Player)"),
+            ("%types::Player{}", "StructLiteral(types::Player)"),
             (
-                "{ stats: { hp: 10 }, inventory: [] }",
-                "StructLiteral(stats=StructLiteral(hp=Number(10)), inventory=ArrayLiteral())",
+                "%Player{ stats: %Stats{ hp: 10 }, inventory: [] }",
+                "StructLiteral(Player, stats=StructLiteral(Stats, hp=Number(10)), inventory=ArrayLiteral())",
             ),
-            (r#"{"a": 1}"#, r#"DictLiteral("a"=Number(1))"#),
-            (r#"{1: "a"}"#, r#"DictLiteral(1=String("a"))"#),
+            (r#"%{"a": 1}"#, r#"DictLiteral("a"=Number(1))"#),
+            (r#"%{1: "a"}"#, r#"DictLiteral(1=String("a"))"#),
             (
-                r#"{"stats": {1: "a"}}"#,
+                r#"%{"stats": %{1: "a"}}"#,
                 r#"DictLiteral("stats"=DictLiteral(1=String("a")))"#,
             ),
             ("-> knot.stitch", "DivertTarget(-> knot.stitch)"),
@@ -1993,35 +2120,38 @@ mod tests {
                 4,
             ),
             (
-                "{hp 1}",
+                "%Player{hp 1}",
                 "expected `:` after struct literal field `hp`, found `1`",
-                5,
+                12,
             ),
             (
-                "{hp: 1 mp: 2}",
+                "%Player{hp: 1 mp: 2}",
                 "expected `,` or `}` in struct literal, found `mp`",
+                15,
+            ),
+            (
+                r#"%{"hp" 1}"#,
+                "expected `:` after Dict literal key, found `1`",
                 8,
             ),
             (
-                r#"{"hp" 1}"#,
-                "expected `:` after Dict literal key, found `1`",
-                7,
-            ),
-            (
-                r#"{"hp": 1 mp: 2}"#,
+                r#"%{"hp": 1 mp: 2}"#,
                 "expected `,` or `}` in Dict literal, found `mp`",
-                10,
-            ),
-            (
-                r#"{"hp": 1, mp: 2}"#,
-                "expected string or int key in Dict literal, found `mp`",
                 11,
             ),
             (
-                r#"{hp: 1, "mp": 2}"#,
-                "expected field name in struct literal, found `string literal`",
-                9,
+                r#"%{"hp": 1, mp: 2}"#,
+                "expected string or int key in Dict literal, found `mp`",
+                12,
             ),
+            (
+                r#"%Player{hp: 1, "mp": 2}"#,
+                "expected field name in struct literal, found `string literal`",
+                16,
+            ),
+            ("{}", "Use `%Type{}` for structs or `%{}` for Dicts", 2),
+            ("{ hp: 1 }", "Struct literals now use `%Type{...}`", 3),
+            (r#"{"hp": 1}"#, "Dict literals now use `%{...}`", 2),
             (
                 "state.",
                 "expected field name after `.` before end of input",

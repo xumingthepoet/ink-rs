@@ -174,7 +174,7 @@ fn mark_field_accesses(expression: &Expression, field_access_ids: &mut HashSet<u
                 mark_field_accesses(arg, field_access_ids);
             }
         }
-        Expression::StructLiteral(fields) => {
+        Expression::StructLiteral { fields, .. } => {
             for field in fields {
                 mark_field_accesses(field.expression(), field_access_ids);
             }
@@ -198,8 +198,7 @@ fn mark_field_accesses(expression: &Expression, field_access_ids: &mut HashSet<u
         | Expression::NumberBool(_)
         | Expression::DivertTarget(_)
         | Expression::VariableReference(_)
-        | Expression::QualifiedReference(_)
-        | Expression::EmptyCompositeLiteral => {}
+        | Expression::QualifiedReference(_) => {}
     }
 }
 
@@ -215,7 +214,7 @@ mod tests {
             "STRUCT Player {\n\
              hp: int\n\
              }\n\
-             VAR player: Player = { hp: 10 }\n\
+             VAR player: Player = %Player{ hp: 10 }\n\
              VAR hp: int = player.hp\n\
              -> DONE",
         );
@@ -232,7 +231,7 @@ mod tests {
              STRUCT Player {\n\
              stats: Stats\n\
              }\n\
-             VAR player: Player = { stats: { hp: 10 } }\n\
+             VAR player: Player = %Player{ stats: %Stats{ hp: 10 } }\n\
              VAR hp: int = player.stats.hp\n\
              -> DONE",
         );
@@ -259,7 +258,7 @@ mod tests {
              -> END\n\
              === module left implements IItem ===\n\
              FROM types IMPORT Player\n\
-             VAR source_player: types::Player = { hp: 10 }\n\
+             VAR source_player: types::Player = %types::Player{ hp: 10 }\n\
              == function player() => types::Player ==\n\
              ~ return source_player",
         );
@@ -273,7 +272,7 @@ mod tests {
             "STRUCT Player {\n\
              hp: int\n\
              }\n\
-             VAR player: Player = { hp: 10 }\n\
+             VAR player: Player = %Player{ hp: 10 }\n\
              {player.mp}\n\
              -> DONE",
         );

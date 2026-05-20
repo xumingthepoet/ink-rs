@@ -4,7 +4,7 @@ STRUCT Player {
 }
 
 VAR grid: int[][] = [[1, 2], []]
-VAR party: Player[] = [{ hp: 4 }, { hp: 8 }]
+VAR party: Player[] = [%Player{ hp: 4 }, %Player{ hp: 8 }]
 VAR party_copy: Player[] = party
 
 == main ==

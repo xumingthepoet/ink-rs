@@ -1238,26 +1238,26 @@ use the type's default value.
 	VAR infection_ratio: float = 0.25
 	VAR discovered_clues: string[] = ["ticket", "cipher"]
 	VAR unopened_doors: int[]
-	VAR clue_scores: Dict<string, int> = {"ticket": 2}
+	VAR clue_scores: Dict<string, int> = %{"ticket": 2}
 	VAR retreat: -> = -> everybody_dies
 	VAR checkpoints: ->[] = [-> the_train]
 
-The primitive source types are `int`, `float`, `bool`, `string`, and `->`. The `->` type stores a divert target value such as `-> knot` or `-> knot.stitch`. Array types are written as `T[]`, so `string[]` means an array of strings, `int[][]` means an array of integer arrays, and `->[]` means an array of divert targets. Dict types are written as `Dict<string, V>` or `Dict<int, V>`, where `V` is any supported value type. Empty array and Dict literals are valid when the expected type is known, such as in `VAR unopened_doors: int[] = []` or `VAR clue_scores: Dict<string, int> = {}`.
+The primitive source types are `int`, `float`, `bool`, `string`, and `->`. The `->` type stores a divert target value such as `-> knot` or `-> knot.stitch`. Array types are written as `T[]`, so `string[]` means an array of strings, `int[][]` means an array of integer arrays, and `->[]` means an array of divert targets. Dict types are written as `Dict<string, V>` or `Dict<int, V>`, where `V` is any supported value type. Empty array and Dict literals are valid when the expected type is known, such as in `VAR unopened_doors: int[] = []` or `VAR clue_scores: Dict<string, int> = %{}`.
 
 Long `VAR` and `CONST` initializers can spread array and struct literals across
 multiple lines:
 
 	VAR party: Player[] = [
-		{
+		%Player{
 			name: "Ada",
-			stats: {
+			stats: %Stats{
 				hp: 10,
 				ready: true
 			}
 		},
-		{
+		%Player{
 			name: "Bea",
-			stats: {
+			stats: %Stats{
 				hp: 8,
 				ready: false
 			}
@@ -1268,7 +1268,7 @@ This multiline form is for module-level `VAR` and `CONST` declarations. Temporar
 declarations such as `~ temp player: Player = ...` are still single-line logic
 statements.
 
-### Structs and object values
+### Structs and struct values
 
 Story-specific value shapes can be declared with `STRUCT`. Struct fields also require explicit types.
 
@@ -1282,32 +1282,37 @@ Story-specific value shapes can be declared with `STRUCT`. Struct fields also re
 		stats: Stats
 	}
 
-	VAR current_player: Player = {
+	VAR current_player: Player = %Player{
 		name: "Ada",
-		stats: {
+		stats: %Stats{
 			hp: 10,
 			ready: true
 		}
 	}
 
 	VAR party: Player[] = [
-		{
+		%Player{
 			name: "Ada",
-			stats: {
+			stats: %Stats{
 				hp: 10,
 				ready: true
 			}
 		},
-		{
+		%Player{
 			name: "Bea",
-			stats: {
+			stats: %Stats{
 				hp: 8,
 				ready: false
 			}
 		}
 	]
 
-Struct literals can omit fields whose type has a default value; fields of type `->` must be provided explicitly. For multi-field object values, put each literal field on its own line and separate literal fields with commas. Struct declarations themselves stay one field per line without commas. Fields and array items can be read or assigned with normal logic lines:
+Struct literals always include the explicit struct type name, such as
+`%Player{...}` or `%Player{}`. They can omit fields whose type has a default
+value; fields of type `->` must be provided explicitly. For multi-field struct
+values, put each literal field on its own line and separate literal fields with
+commas. Struct declarations themselves stay one field per line without commas.
+Fields and array items can be read or assigned with normal logic lines:
 
 	{current_player.stats.hp}
 	~ current_player.stats.hp += 1
@@ -1320,13 +1325,14 @@ is part of the value's runtime shape, so integer keys are not converted to
 string field names. The value type can be primitive, enum, struct, array,
 another Dict, or any other supported value type.
 
-	VAR scores: Dict<string, int> = {"ada": 10, "grace": 11}
-	VAR names: Dict<int, string> = {1: "one"}
-	VAR nested: Dict<string, Dict<int, string>> = {"ada": {1: "ready"}}
+	VAR scores: Dict<string, int> = %{"ada": 10, "grace": 11}
+	VAR names: Dict<int, string> = %{1: "one"}
+	VAR nested: Dict<string, Dict<int, string>> = %{"ada": %{1: "ready"}}
 	VAR empty_scores: Dict<string, int>
 
 String-key Dict literals use quoted string keys. Int-key Dict literals use
-integer keys. Empty `{}` is valid only when the expected type is known, such as
+integer keys. A single Dict literal cannot mix string and int keys. Empty `%{}`
+is valid only when the expected type is known, such as
 in a typed declaration, assignment to a typed variable, or typed return context. An
 omitted Dict initializer defaults to an empty Dict with the declared key type.
 
@@ -1344,7 +1350,7 @@ must match the declared key type: `Dict<string, V>` requires a string key and
 Dicts can be stored in globals, temps, constants, arrays, and struct fields,
 and can be passed through function and external signatures:
 
-	CONST BASE_SCORES: Dict<string, int> = {"ada": 10}
+	CONST BASE_SCORES: Dict<string, int> = %{"ada": 10}
 
 	== function score_for(values: Dict<string, int>, key: string) => int ==
 	~ return values[key]

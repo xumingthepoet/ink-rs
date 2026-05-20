@@ -262,6 +262,16 @@ fn dict_typed_values_defaults_and_literals_are_lowered_to_json() {
 }
 
 #[test]
+fn composite_literal_arguments_run_at_runtime() {
+    let compiled = compile_fixture("typed/composite-literal-arguments.ink");
+
+    assert_story_output(
+        &compiled,
+        "Function 12. Dynamic 23.\nStatic 34.\nTunnel 56.\nOverride 67.\nOnward 78.\nTarget 45.\n",
+    );
+}
+
+#[test]
 fn array_literals_run_at_runtime() {
     let compiled = compile_fixture("typed/array-literals-runtime.ink");
 

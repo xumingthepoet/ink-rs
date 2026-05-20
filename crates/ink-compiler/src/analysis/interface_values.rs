@@ -278,10 +278,10 @@ impl<'a> InterfaceModuleLiteralUseCollector<'a> {
                     self.check_expression_against_type(entry.value(), value_type, context);
                 }
             }
-            (TypeName::Struct(struct_name), Expression::StructLiteral(fields)) => {
+            (TypeName::Struct(struct_name), Expression::StructLiteral { fields, .. }) => {
                 self.check_struct_literal(struct_name, fields, context);
             }
-            (TypeName::QualifiedStruct(struct_name), Expression::StructLiteral(fields)) => {
+            (TypeName::QualifiedStruct(struct_name), Expression::StructLiteral { fields, .. }) => {
                 self.check_struct_literal(struct_name.as_str(), fields, context);
             }
             _ => {}

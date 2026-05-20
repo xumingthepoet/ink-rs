@@ -476,7 +476,7 @@ impl<'a> CallTargetChecker<'a> {
                 continue;
             };
 
-            if matches!(argument, Expression::ArrayLiteral(_)) {
+            if is_composite_literal(argument) {
                 self.check_expression(argument, span, context);
                 continue;
             }
@@ -587,7 +587,7 @@ impl<'a> CallTargetChecker<'a> {
                     self.check_expression(element, span, context);
                 }
             }
-            Expression::StructLiteral(fields) => {
+            Expression::StructLiteral { fields, .. } => {
                 for field in fields {
                     self.check_expression(field.expression(), span, context);
                 }
@@ -636,8 +636,7 @@ impl<'a> CallTargetChecker<'a> {
             | Expression::String(_)
             | Expression::NumberInt(_)
             | Expression::NumberFloat(_)
-            | Expression::NumberBool(_)
-            | Expression::EmptyCompositeLiteral => {}
+            | Expression::NumberBool(_) => {}
         }
     }
 
@@ -866,7 +865,7 @@ impl<'a> CallTargetChecker<'a> {
             let expected_type = qualified_module
                 .map(|module| qualify_type_name_for_module(expected_type, module))
                 .unwrap_or_else(|| expected_type.clone());
-            if matches!(argument, Expression::ArrayLiteral(_)) {
+            if is_composite_literal(argument) {
                 continue;
             }
             match infer_expression_type(
@@ -1015,6 +1014,13 @@ fn is_mutable_lvalue(expression: &Expression) -> bool {
         | Expression::DynamicInterfaceFunctionCall { .. } => false,
         _ => false,
     }
+}
+
+fn is_composite_literal(expression: &Expression) -> bool {
+    matches!(
+        expression,
+        Expression::ArrayLiteral(_) | Expression::StructLiteral { .. } | Expression::DictLiteral(_)
+    )
 }
 
 fn is_runtime_builtin_function(name: &str) -> bool {
@@ -1230,9 +1236,9 @@ mod tests {
             "STRUCT Player {\n\
              hp: int\n\
              }\n\
-             VAR source_player: Player = { hp: 10 }\n\
+             VAR source_player: Player = %Player{ hp: 10 }\n\
              VAR source_scores: int[] = [1]\n\
-             VAR source_lookup: Dict<string, int> = {\"ada\": 10}\n\
+             VAR source_lookup: Dict<string, int> = %{\"ada\": 10}\n\
              VAR source_lookup_list: Dict<string, int>[] = [source_lookup]\n\
              VAR result: int = add(1, 2)\n\
              VAR copied_player: Player = echo_player(source_player)\n\
@@ -1265,9 +1271,9 @@ mod tests {
              EXTERNAL describe(player: Player, scores: int[]) => string\n\
              EXTERNAL copy_scores(scores: Dict<string, int>) => Dict<string, int>\n\
              VAR score: int = 1\n\
-             VAR source_player: Player = { hp: 10 }\n\
+             VAR source_player: Player = %Player{ hp: 10 }\n\
              VAR scores: int[] = [score]\n\
-             VAR score_lookup: Dict<string, int> = {\"ada\": 10}\n\
+             VAR score_lookup: Dict<string, int> = %{\"ada\": 10}\n\
              VAR adjusted_score: int = external_score(score) + LEN(scores)\n\
              VAR description: string = describe(source_player, scores)\n\
              VAR copied_scores: Dict<string, int> = copy_scores(score_lookup)\n\
@@ -1285,7 +1291,7 @@ mod tests {
              === module game ===\n\
              FROM scorer\n\
              VAR route: interface<IScorer> = scorer\n\
-             VAR source_scores: Dict<string, int> = {\"ada\": 10}\n\
+             VAR source_scores: Dict<string, int> = %{\"ada\": 10}\n\
              VAR copied_scores: Dict<string, int> = {route}::copy_scores(source_scores)\n\
              == main ==\n\
              -> END\n\
@@ -1359,7 +1365,7 @@ mod tests {
              hp: int\n\
              }\n\
              VAR score: int = 1\n\
-             VAR source_player: Player = { hp: 10 }\n\
+             VAR source_player: Player = %Player{ hp: 10 }\n\
              VAR scores: int[] = [score]\n\
              VAR players: Player[] = [source_player]\n\
              VAR nested_scores: int[][] = [scores]\n\
@@ -1391,7 +1397,7 @@ mod tests {
                 "STRUCT Player {\n\
                  hp: int\n\
                  }\n\
-                 VAR player: Player = { hp: 10 }\n\
+                 VAR player: Player = %Player{ hp: 10 }\n\
                  VAR count: int = LEN(player)\n\
                  -> DONE",
                 "Argument for builtin 'LEN' has type Player but expected array",
@@ -1438,7 +1444,7 @@ mod tests {
              hp: int\n\
              }\n\
              VAR score: int = 1\n\
-             VAR source_player: Player = { hp: 10 }\n\
+             VAR source_player: Player = %Player{ hp: 10 }\n\
              VAR scores: int[] = [score]\n\
              VAR players: Player[] = [source_player]\n\
              VAR nested_scores: int[][] = [scores]\n\
@@ -1802,7 +1808,7 @@ mod tests {
              routes: interface<IItem>[]\n\
              }\n\
              VAR route: interface<IItem> = left\n\
-             VAR state: RouteState = { current: left, routes: [left] }\n\
+             VAR state: RouteState = %RouteState{ current: left, routes: [left] }\n\
              VAR routes: interface<IItem>[] = [left]\n\
              == main ==\n\
              -> {{route}::target}(1)\n\

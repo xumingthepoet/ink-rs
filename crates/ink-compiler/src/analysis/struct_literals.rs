@@ -1,17 +1,18 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
 
 use crate::{
     diagnostic::Diagnostic,
     parsed::{
         visit::{walk_story, ParsedVisitor, VisitContext},
-        ConstantDeclaration, Expression, Object, Story, StructLiteralField, TypeName,
+        ConstantDeclaration, Divert, DivertTarget, Expression, InterfaceMemberKind,
+        InterfaceMemberSignature, Object, Story, StructLiteralField, TunnelOnwards, TypeName,
         VariableAssignment,
     },
     source::SourceSpan,
 };
 
 use super::{
-    context::{EnumTypeIndex, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
+    context::{EnumTypeIndex, FlowSymbol, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
     enums::{build_enum_type_index, type_name_contains_enum},
     expression_types::infer_expression_type,
     interface_values::{
@@ -21,7 +22,8 @@ use super::{
     interfaces::{build_interface_member_index, InterfaceMemberIndex},
     modules::{build_module_import_index, ModuleImportIndex},
     structs::{build_struct_type_index, resolve_struct_symbol},
-    target_symbols::build_target_symbol_index,
+    target_symbols::{build_target_symbol_index, resolve_target_symbol},
+    type_names::qualify_type_name_for_module,
     variables::build_variable_scope_index,
 };
 
@@ -55,6 +57,7 @@ struct StructLiteralChecker<'a> {
     module_imports: &'a ModuleImportIndex,
     interface_members: &'a InterfaceMemberIndex,
     diagnostics: Vec<Diagnostic>,
+    expected_expression_ids: HashSet<usize>,
 }
 
 impl<'a> StructLiteralChecker<'a> {
@@ -76,6 +79,7 @@ impl<'a> StructLiteralChecker<'a> {
             module_imports,
             interface_members,
             diagnostics: Vec::new(),
+            expected_expression_ids: HashSet::new(),
         }
     }
 
@@ -116,6 +120,190 @@ impl<'a> StructLiteralChecker<'a> {
         );
     }
 
+    fn check_divert_arguments(&mut self, divert: &Divert, context: &VisitContext) {
+        self.check_divert_target_arguments(
+            divert.target(),
+            divert.arguments(),
+            divert.span(),
+            context,
+        );
+    }
+
+    fn check_tunnel_onwards_arguments(
+        &mut self,
+        tunnel_onwards: &TunnelOnwards,
+        context: &VisitContext,
+    ) {
+        if let Some(target) = tunnel_onwards.override_target() {
+            self.check_divert_target_arguments(
+                target,
+                tunnel_onwards.arguments(),
+                tunnel_onwards.span(),
+                context,
+            );
+        }
+    }
+
+    fn check_divert_target_arguments(
+        &mut self,
+        target: &DivertTarget,
+        arguments: &[Expression],
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) {
+        match target {
+            DivertTarget::Path(target) => {
+                self.check_static_target_arguments(target, arguments, span, context);
+            }
+            DivertTarget::QualifiedPath(target) => {
+                self.check_static_target_arguments(target.as_str(), arguments, span, context);
+            }
+            DivertTarget::Dynamic(Expression::DynamicInterfaceAccess { target, member }) => {
+                if let Some(signature) = self.dynamic_interface_signature(
+                    target,
+                    member,
+                    InterfaceMemberKind::Knot,
+                    context,
+                ) {
+                    self.check_interface_signature_arguments(
+                        member, arguments, &signature, span, context,
+                    );
+                }
+            }
+            DivertTarget::Dynamic(_)
+            | DivertTarget::Done
+            | DivertTarget::End
+            | DivertTarget::Empty => {}
+        }
+    }
+
+    fn check_static_target_arguments(
+        &mut self,
+        target: &str,
+        arguments: &[Expression],
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) {
+        let Some(symbol) = resolve_target_symbol(
+            target,
+            context.current_module.as_deref(),
+            context.current_flow_path.as_deref(),
+            self.target_symbols,
+        )
+        .cloned() else {
+            return;
+        };
+
+        self.check_flow_symbol_arguments(target, arguments, &symbol, span, context);
+    }
+
+    fn check_function_call_arguments(
+        &mut self,
+        name: &str,
+        args: &[Expression],
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) {
+        let Some(symbol) = resolve_target_symbol(
+            name,
+            context.current_module.as_deref(),
+            context.current_flow_path.as_deref(),
+            self.target_symbols,
+        )
+        .cloned() else {
+            return;
+        };
+
+        self.check_flow_symbol_arguments(name, args, &symbol, span, context);
+    }
+
+    fn check_dynamic_interface_function_arguments(
+        &mut self,
+        target: &Expression,
+        member: &str,
+        args: &[Expression],
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) {
+        if let Some(signature) =
+            self.dynamic_interface_signature(target, member, InterfaceMemberKind::Function, context)
+        {
+            self.check_interface_signature_arguments(member, args, &signature, span, context);
+        }
+    }
+
+    fn check_flow_symbol_arguments(
+        &mut self,
+        target_name: &str,
+        arguments: &[Expression],
+        symbol: &FlowSymbol,
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) {
+        let qualified_module = target_name.split_once("::").map(|(module, _)| module);
+        for (argument, parameter) in arguments.iter().zip(symbol.arguments()) {
+            let Some(expected_type) = parameter.declared_type() else {
+                continue;
+            };
+            let expected_type = qualified_module
+                .map(|module| qualify_type_name_for_module(expected_type, module))
+                .unwrap_or_else(|| expected_type.clone());
+            self.check_expression_against_type(
+                argument,
+                &expected_type,
+                parameter.name(),
+                span,
+                context,
+            );
+        }
+    }
+
+    fn check_interface_signature_arguments(
+        &mut self,
+        member: &str,
+        arguments: &[Expression],
+        signature: &InterfaceMemberSignature,
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) {
+        for (argument, parameter) in arguments.iter().zip(signature.arguments()) {
+            let Some(expected_type) = parameter.declared_type() else {
+                continue;
+            };
+            let context_name = format!("{member}.{}", parameter.name());
+            self.check_expression_against_type(
+                argument,
+                expected_type,
+                &context_name,
+                span,
+                context,
+            );
+        }
+    }
+
+    fn dynamic_interface_signature(
+        &self,
+        target: &Expression,
+        member: &str,
+        expected_kind: InterfaceMemberKind,
+        context: &VisitContext,
+    ) -> Option<InterfaceMemberSignature> {
+        let target_type = infer_expression_type(
+            target,
+            self.variable_scopes,
+            self.struct_types,
+            self.enum_types,
+            self.target_symbols,
+            self.interface_members,
+            context.current_module.as_deref(),
+            context.current_flow_path.as_deref(),
+        )
+        .ok()?;
+        let interface_name = target_type.as_interface_name()?;
+        let signature = self.interface_members.member(interface_name, member)?;
+        (signature.kind() == &expected_kind).then(|| signature.clone())
+    }
+
     fn visible_declared_type(&self, name: &str, context: &VisitContext) -> Option<TypeName> {
         self.variable_scopes
             .visible_variable_declared_type(
@@ -134,18 +322,21 @@ impl<'a> StructLiteralChecker<'a> {
         span: &SourceSpan,
         context: &VisitContext,
     ) {
+        self.mark_expected_expression(expression);
         match (expected_type, expression) {
-            (TypeName::Struct(struct_name), Expression::StructLiteral(fields)) => {
-                self.check_struct_literal(struct_name, fields, span, context);
-            }
-            (TypeName::Struct(struct_name), Expression::EmptyCompositeLiteral) => {
-                self.check_struct_literal(struct_name, &[], span, context);
-            }
-            (TypeName::QualifiedStruct(struct_name), Expression::StructLiteral(fields)) => {
-                self.check_struct_literal(struct_name.as_str(), fields, span, context);
-            }
-            (TypeName::QualifiedStruct(struct_name), Expression::EmptyCompositeLiteral) => {
-                self.check_struct_literal(struct_name.as_str(), &[], span, context);
+            (
+                TypeName::Struct(_) | TypeName::QualifiedStruct(_),
+                Expression::StructLiteral { type_name, fields },
+            ) => {
+                if self.check_struct_literal_type_matches(
+                    type_name,
+                    expected_type,
+                    context_name,
+                    span,
+                    context,
+                ) {
+                    self.check_struct_literal_for_type(type_name, fields, span, context);
+                }
             }
             (TypeName::Struct(_), _) | (TypeName::QualifiedStruct(_), _) => {
                 self.check_non_literal_expression(
@@ -189,6 +380,42 @@ impl<'a> StructLiteralChecker<'a> {
             }
             (TypeName::Void, _) => {}
         }
+    }
+
+    fn check_struct_literal_for_type(
+        &mut self,
+        type_name: &TypeName,
+        fields: &[StructLiteralField],
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) {
+        let Some(struct_name) = type_name.as_struct_name() else {
+            return;
+        };
+        self.check_struct_literal(struct_name, fields, span, context);
+    }
+
+    fn check_struct_literal_type_matches(
+        &mut self,
+        actual_type: &TypeName,
+        expected_type: &TypeName,
+        context_name: &str,
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) -> bool {
+        if struct_type_key(actual_type, context.current_module.as_deref())
+            == struct_type_key(expected_type, context.current_module.as_deref())
+        {
+            return true;
+        }
+
+        self.diagnostics.push(type_mismatch_diagnostic(
+            context_name,
+            expected_type,
+            actual_type,
+            span,
+        ));
+        false
     }
 
     fn check_non_literal_expression(
@@ -344,15 +571,77 @@ impl<'a> StructLiteralChecker<'a> {
             }
         }
     }
+
+    fn mark_expected_expression(&mut self, expression: &Expression) {
+        self.expected_expression_ids
+            .insert(expression as *const Expression as usize);
+    }
 }
 
 impl ParsedVisitor for StructLiteralChecker<'_> {
     fn visit_object(&mut self, object: &Object, context: &VisitContext) {
         match object {
             Object::ConstantDeclaration(declaration) => self.check_constant(declaration, context),
+            Object::Divert(divert) => self.check_divert_arguments(divert, context),
+            Object::TunnelOnwards(tunnel_onwards) => {
+                self.check_tunnel_onwards_arguments(tunnel_onwards, context);
+            }
             Object::VariableAssignment(assignment) => self.check_assignment(assignment, context),
             _ => {}
         }
+    }
+
+    fn visit_expression(&mut self, expression: &Expression, context: &VisitContext) {
+        match expression {
+            Expression::FunctionCall { name, args } => self.check_function_call_arguments(
+                name,
+                args,
+                &SourceSpan::new(None, 1, 1),
+                context,
+            ),
+            Expression::QualifiedFunctionCall { name, args } => self.check_function_call_arguments(
+                name.as_str(),
+                args,
+                &SourceSpan::new(None, 1, 1),
+                context,
+            ),
+            Expression::DynamicInterfaceFunctionCall {
+                target,
+                member,
+                args,
+            } => self.check_dynamic_interface_function_arguments(
+                target,
+                member,
+                args,
+                &SourceSpan::new(None, 1, 1),
+                context,
+            ),
+            Expression::StructLiteral { type_name, fields }
+                if !self
+                    .expected_expression_ids
+                    .contains(&(expression as *const Expression as usize)) =>
+            {
+                self.check_struct_literal_for_type(
+                    type_name,
+                    fields,
+                    &SourceSpan::new(None, 1, 1),
+                    context,
+                );
+            }
+            _ => {}
+        }
+    }
+}
+
+fn struct_type_key(type_name: &TypeName, current_module: Option<&str>) -> Option<String> {
+    match type_name {
+        TypeName::Struct(name) => Some(
+            current_module
+                .map(|module| format!("{module}::{name}"))
+                .unwrap_or_else(|| name.to_string()),
+        ),
+        TypeName::QualifiedStruct(name) => Some(name.as_str().to_string()),
+        _ => None,
     }
 }
 
@@ -386,8 +675,8 @@ mod tests {
              hp: int\n\
              name: string\n\
              }\n\
-             CONST default_player: Player = { hp: 5, name: \"Lin\" }\n\
-             VAR player: Player = { hp: 10, name: \"Ada\" }\n\
+             CONST default_player: Player = %Player{ hp: 5, name: \"Lin\" }\n\
+             VAR player: Player = %Player{ hp: 10, name: \"Ada\" }\n\
              -> DONE",
         );
 
@@ -401,14 +690,14 @@ mod tests {
              STRUCT Item {\n\
              hp: int\n\
              }\n\
-             VAR item: Item = { hp: 1 }\n\
+             VAR item: Item = %Item{ hp: 1 }\n\
              == main ==\n\
              -> DONE\n\
              === module items ===\n\
              STRUCT Item {\n\
              label: string\n\
              }\n\
-             VAR item: Item = { label: \"sword\" }\n\
+             VAR item: Item = %Item{ label: \"sword\" }\n\
              == helper ==\n\
              -> DONE",
         );
@@ -421,7 +710,7 @@ mod tests {
         let story = parse_story(
             "=== module game ===\n\
              FROM items IMPORT Item\n\
-             VAR item: items::Item = { hp: 1 }\n\
+             VAR item: items::Item = %items::Item{ hp: 1 }\n\
              == main ==\n\
              -> DONE\n\
              === module items ===\n\
@@ -445,7 +734,7 @@ mod tests {
              STRUCT Route {\n\
              next: interface<IItem>\n\
              }\n\
-             VAR route: Route = { next: left }\n\
+             VAR route: Route = %Route{ next: left }\n\
              == main ==\n\
              -> END\n\
              === module left implements IItem ===\n\
@@ -467,7 +756,7 @@ mod tests {
              score: int\n\
              }\n\
              VAR route: interface<IItem> = left\n\
-             VAR result: Result = { score: {route}::score(1) }\n\
+             VAR result: Result = %Result{ score: {route}::score(1) }\n\
              == main ==\n\
              -> END\n\
              === module left implements IItem ===\n\
@@ -488,7 +777,7 @@ mod tests {
              STRUCT Route {\n\
              next: interface<IItem>\n\
              }\n\
-             VAR route: Route = { next: left }\n\
+             VAR route: Route = %Route{ next: left }\n\
              == main ==\n\
              -> END\n\
              === module left ===\n\
@@ -514,7 +803,7 @@ mod tests {
              STRUCT Route {\n\
              next: interface<IItem>\n\
              }\n\
-             VAR route: Route = {}\n\
+             VAR route: Route = %Route{}\n\
              == main ==\n\
              -> END",
         );
@@ -533,7 +822,7 @@ mod tests {
         let story = parse_story(
             "=== module game ===\n\
              FROM items IMPORT Item\n\
-             VAR item: items::Item = { hp: \"full\" }\n\
+             VAR item: items::Item = %items::Item{ hp: \"full\" }\n\
              == main ==\n\
              -> DONE\n\
              === module items ===\n\
@@ -560,7 +849,7 @@ mod tests {
              hp: int\n\
              inventory: int[]\n\
              }\n\
-             VAR player: Player = { hp: 10 }\n\
+             VAR player: Player = %Player{ hp: 10 }\n\
              -> DONE",
         );
 
@@ -574,7 +863,7 @@ mod tests {
              next: ->\n\
              visits: int\n\
              }\n\
-             VAR route: Route = { visits: 1 }\n\
+             VAR route: Route = %Route{ visits: 1 }\n\
              -> DONE",
         );
 
@@ -593,7 +882,7 @@ mod tests {
             "STRUCT Player {\n\
              hp: int\n\
              }\n\
-             VAR player: Player = { hp: 10, mp: 5 }\n\
+             VAR player: Player = %Player{ hp: 10, mp: 5 }\n\
              -> DONE",
         );
 
@@ -612,7 +901,7 @@ mod tests {
             "STRUCT Player {\n\
              hp: int\n\
              }\n\
-             VAR player: Player = { hp: 10, hp: 11 }\n\
+             VAR player: Player = %Player{ hp: 10, hp: 11 }\n\
              -> DONE",
         );
 
@@ -631,7 +920,7 @@ mod tests {
             "STRUCT Player {\n\
              hp: int\n\
              }\n\
-             VAR player: Player = { hp: \"full\" }\n\
+             VAR player: Player = %Player{ hp: \"full\" }\n\
              -> DONE",
         );
 
@@ -654,7 +943,7 @@ mod tests {
              stats: Stats\n\
              name: string\n\
              }\n\
-             VAR player: Player = { stats: { hp: 10 }, name: \"Ada\" }\n\
+             VAR player: Player = %Player{ stats: %Stats{ hp: 10 }, name: \"Ada\" }\n\
              -> DONE",
         );
 
@@ -667,8 +956,8 @@ mod tests {
             "STRUCT Player {\n\
              hp: int\n\
              }\n\
-             VAR player: Player = {}\n\
-             ~ player = { hp: \"full\" }\n\
+             VAR player: Player = %Player{}\n\
+             ~ player = %Player{ hp: \"full\" }\n\
              -> DONE",
         );
 
@@ -682,15 +971,21 @@ mod tests {
     }
 
     #[test]
-    fn does_not_infer_struct_type_from_field_names() {
+    fn checks_standalone_struct_literals_against_explicit_type() {
         let story = parse_story(
             "STRUCT Player {\n\
              hp: int\n\
              }\n\
-             { { hp: \"dynamic\" } }\n\
+             { %Player{ hp: \"dynamic\" } }\n\
              -> DONE",
         );
 
-        assert_eq!(struct_literal_diagnostics(&story), []);
+        let diagnostics = struct_literal_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Value for 'Player.hp' has type string but expected int",
+        );
     }
 }

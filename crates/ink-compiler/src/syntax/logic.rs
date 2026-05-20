@@ -47,7 +47,7 @@ pub(super) fn expression_contains_function_call(expr: &Expression) -> bool {
         Expression::ArrayLiteral(elements) => {
             elements.iter().any(expression_contains_function_call)
         }
-        Expression::StructLiteral(fields) => fields
+        Expression::StructLiteral { fields, .. } => fields
             .iter()
             .any(|field| expression_contains_function_call(field.expression())),
         Expression::DictLiteral(entries) => entries
@@ -64,7 +64,6 @@ pub(super) fn expression_contains_function_call(expr: &Expression) -> bool {
         Expression::MultipleCondition(expressions) => {
             expressions.iter().any(expression_contains_function_call)
         }
-        Expression::EmptyCompositeLiteral => false,
         _ => false,
     }
 }

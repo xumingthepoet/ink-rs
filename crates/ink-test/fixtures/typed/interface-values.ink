@@ -13,12 +13,12 @@ routes: interface<IItem>[]
 CONST default_route: interface<IItem> = right
 VAR route: interface<IItem> = left
 VAR routes: interface<IItem>[] = [left, right]
-VAR config: Config = { route: right, routes: [left] }
+VAR config: Config = %Config{ route: right, routes: [left] }
 
 == main ==
 ~ temp local: interface<IItem> = right
 ~ temp local_routes: interface<IItem>[] = [left, route]
-~ temp local_config: Config = { route: route, routes: [right] }
+~ temp local_config: Config = %Config{ route: route, routes: [right] }
 ~ route = right
 ~ routes[0] = right
 ~ config.route = left

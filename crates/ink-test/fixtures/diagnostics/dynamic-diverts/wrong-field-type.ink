@@ -2,7 +2,7 @@
 STRUCT Player {
 hp: int
 }
-VAR player: Player = { hp: 10 }
+VAR player: Player = %Player{ hp: 10 }
 
 == main ==
 -> {player.hp}

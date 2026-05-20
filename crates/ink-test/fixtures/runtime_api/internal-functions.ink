@@ -27,7 +27,7 @@ Ready.
 ~ return scores
 
 == INTERNAL build_player(hp: int) => Player ==
-~ temp player: Player = { hp: hp }
+~ temp player: Player = %Player{ hp: hp }
 ~ return player
 
 == INTERNAL noisy() => string ==

@@ -509,7 +509,7 @@ fn collect_qualified_uses_in_expression(
                 collect_qualified_uses_in_expression(current_module, element, uses);
             }
         }
-        Expression::StructLiteral(fields) => {
+        Expression::StructLiteral { fields, .. } => {
             for field in fields {
                 collect_qualified_uses_in_expression(current_module, field.expression(), uses);
             }
@@ -536,8 +536,7 @@ fn collect_qualified_uses_in_expression(
         Expression::String(_)
         | Expression::NumberBool(_)
         | Expression::NumberFloat(_)
-        | Expression::NumberInt(_)
-        | Expression::EmptyCompositeLiteral => {}
+        | Expression::NumberInt(_) => {}
     }
 }
 

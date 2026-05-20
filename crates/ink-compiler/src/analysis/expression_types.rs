@@ -99,9 +99,8 @@ pub(super) fn infer_primitive_expression_type(
             format!("Cannot infer return type for dynamic interface function '{member}' yet"),
         )),
         Expression::ArrayLiteral(_)
-        | Expression::StructLiteral(_)
+        | Expression::StructLiteral { .. }
         | Expression::DictLiteral(_)
-        | Expression::EmptyCompositeLiteral
         | Expression::FieldAccess { .. }
         | Expression::IndexAccess { .. } => Err(TypeInferenceError::new(
             "Expression does not have a primitive type",
@@ -219,6 +218,7 @@ fn infer_expression_type_in_context(
             let index_type = infer_expression_type_in_context(index, context)?;
             infer_index_type(&base_type, &index_type)
         }
+        Expression::StructLiteral { type_name, .. } => Ok(type_name.clone()),
         Expression::String(_)
         | Expression::StringContent(_)
         | Expression::NumberInt(_)
@@ -228,9 +228,7 @@ fn infer_expression_type_in_context(
         | Expression::QualifiedReference(_)
         | Expression::DivertTarget(_)
         | Expression::ArrayLiteral(_)
-        | Expression::StructLiteral(_)
-        | Expression::DictLiteral(_)
-        | Expression::EmptyCompositeLiteral => infer_primitive_expression_type(
+        | Expression::DictLiteral(_) => infer_primitive_expression_type(
             expression,
             context.variable_scopes,
             context.current_module,
@@ -1085,8 +1083,8 @@ mod tests {
              VAR other_score: int = 2\n\
              VAR first_target: -> = -> knot\n\
              VAR second_target: -> = -> other\n\
-             VAR source_player: Player = { hp: 10 }\n\
-             VAR other_player: Player = { hp: 20 }\n\
+             VAR source_player: Player = %Player{ hp: 10 }\n\
+             VAR other_player: Player = %Player{ hp: 20 }\n\
              VAR scores: int[] = [score]\n\
              VAR other_scores: int[] = [other_score]\n\
              VAR nested_scores: int[][] = [scores]\n\
@@ -1456,7 +1454,7 @@ mod tests {
              }\n\
              VAR score: int = 1\n\
              VAR ratio: float = 1.0\n\
-             VAR source_player: Player = { hp: 10 }\n\
+             VAR source_player: Player = %Player{ hp: 10 }\n\
              VAR scores: int[] = [score]\n\
              -> DONE",
         );
@@ -1509,8 +1507,8 @@ mod tests {
              }\n\
              ENUM State { Idle Busy }\n\
              VAR score: int = 1\n\
-             VAR source_player: Player = { hp: 10 }\n\
-             VAR other_player: Player = { hp: 20 }\n\
+             VAR source_player: Player = %Player{ hp: 10 }\n\
+             VAR other_player: Player = %Player{ hp: 20 }\n\
              VAR first_target: -> = -> knot\n\
              VAR second_target: -> = -> other\n\
              VAR scores: int[] = [score]\n\

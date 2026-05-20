@@ -6,9 +6,9 @@ STRUCT Bag {
 items: int[]
 }
 VAR items: int[] = [1, 2, 3, 4]
-VAR players: Player[] = [{ hp: 1 }, { hp: 2 }]
+VAR players: Player[] = [%Player{ hp: 1 }, %Player{ hp: 2 }]
 VAR nested: int[][] = [[1], [2, 3]]
-VAR bag: Bag = { items: [8, 9] }
+VAR bag: Bag = %Bag{ items: [8, 9] }
 
 == main ==
 before{ARRAY_REMOVE(items, 0)}after|{items[0]}|{LEN(items)}

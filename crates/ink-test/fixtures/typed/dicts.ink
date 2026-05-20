@@ -3,12 +3,12 @@ STRUCT Sheet {
 scores: Dict<string, int>
 }
 
-VAR scores: Dict<string, int> = {"ada": 10}
-VAR by_id: Dict<int, string> = {1: "one"}
-VAR nested: Dict<string, Dict<int, string>> = {"row": {1: "one"}}
-VAR score_tables: Dict<string, int>[] = [{"ada": 10}]
-VAR empty_scores: Dict<string, int> = {}
-VAR sheet: Sheet = { scores: {"ada": 10} }
+VAR scores: Dict<string, int> = %{"ada": 10}
+VAR by_id: Dict<int, string> = %{1: "one"}
+VAR nested: Dict<string, Dict<int, string>> = %{"row": %{1: "one"}}
+VAR score_tables: Dict<string, int>[] = [%{"ada": 10}]
+VAR empty_scores: Dict<string, int> = %{}
+VAR sheet: Sheet = %Sheet{ scores: %{"ada": 10} }
 
 == main ==
 {scores["ada"]}|{by_id[1]}|{nested["row"][1]}|{score_tables[0]["ada"]}|{sheet.scores["ada"]}

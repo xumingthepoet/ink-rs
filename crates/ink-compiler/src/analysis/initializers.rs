@@ -316,7 +316,7 @@ mod tests {
     #[test]
     fn accepts_dict_constants_and_array_values() {
         let story = parse_story(
-            "CONST default_scores: Dict<string, int> = {\"ada\": 10}\n\
+            "CONST default_scores: Dict<string, int> = %{\"ada\": 10}\n\
              VAR score_tables: Dict<string, int>[] = [default_scores]\n\
              VAR empty_by_id: Dict<int, string>\n\
              -> DONE",

@@ -85,21 +85,26 @@ Global `VAR`, `CONST`, function parameters and returns, `EXTERNAL`
 declarations, `INTERNAL` functions, temp variables, arrays, structs, and Dicts
 use explicit types.
 
+Struct values use explicit typed literals such as `%Player{hp: 10}` or
+`%Player{}`.
+
 Omitted global initializers use type-specific defaults when the type supports a
 default. Dict declarations without an initializer default to an empty Dict with
 the declared key type.
 
 ```ink
 VAR name: string = "Ada"
-VAR scores: Dict<string, int> = {"ada": 10}
-VAR slots: Dict<int, string> = {1: "ready"}
+VAR scores: Dict<string, int> = %{"ada": 10}
+VAR slots: Dict<int, string> = %{1: "ready"}
 VAR empty_scores: Dict<string, int>
 
-CONST BASE: Dict<string, int> = {"ada": 10}
+CONST BASE: Dict<string, int> = %{"ada": 10}
 ```
 
 Dict key type is part of the value. String-key Dicts use quoted string literal
-keys; int-key Dicts use integer literal keys. Reads and writes use index syntax:
+keys; int-key Dicts use integer literal keys, and a single Dict literal cannot
+mix key types. Empty Dict literals are written `%{}` when the expected type is
+known. Reads and writes use index syntax:
 
 ```ink
 ~ scores["ada"] = scores["ada"] + 1

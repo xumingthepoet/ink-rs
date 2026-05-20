@@ -9,12 +9,12 @@ STRUCT BattleResult {
     allies: Ally[]
 }
 
-VAR result: BattleResult = {
+VAR result: BattleResult = %BattleResult{
     encounter: "warehouse ambush",
     allies: [
-        { name: "Mira", victory_line: "No one touches our medic twice." },
-        { name: "Tao", victory_line: "Next time we bring fewer sparks." },
-        { name: "Nia", victory_line: "Mark the east door as unsafe." }
+        %Ally{ name: "Mira", victory_line: "No one touches our medic twice." },
+        %Ally{ name: "Tao", victory_line: "Next time we bring fewer sparks." },
+        %Ally{ name: "Nia", victory_line: "Mark the east door as unsafe." }
     ]
 }
 

@@ -63,10 +63,7 @@ pub(super) fn lower_value_literal(
             global_labels,
             path_mode,
         ),
-        (Some(TypeName::Dict { key_type, .. }), Expression::EmptyCompositeLiteral) => {
-            Some(runtime_empty_dict_for_key_type(*key_type))
-        }
-        (Some(TypeName::Struct(struct_name)), Expression::StructLiteral(fields)) => {
+        (Some(TypeName::Struct(struct_name)), Expression::StructLiteral { fields, .. }) => {
             lower_struct_literal(
                 fields,
                 struct_name,
@@ -79,45 +76,20 @@ pub(super) fn lower_value_literal(
                 path_mode,
             )
         }
-        (Some(TypeName::Struct(struct_name)), Expression::EmptyCompositeLiteral) => {
-            lower_struct_literal(
-                &[],
-                struct_name,
-                struct_definitions,
-                enum_definitions,
-                constants,
-                global_variables,
-                choice_labels,
-                global_labels,
-                path_mode,
-            )
-        }
-        (Some(TypeName::QualifiedStruct(struct_name)), Expression::StructLiteral(fields)) => {
-            lower_struct_literal(
-                fields,
-                struct_name.as_str(),
-                struct_definitions,
-                enum_definitions,
-                constants,
-                global_variables,
-                choice_labels,
-                global_labels,
-                path_mode,
-            )
-        }
-        (Some(TypeName::QualifiedStruct(struct_name)), Expression::EmptyCompositeLiteral) => {
-            lower_struct_literal(
-                &[],
-                struct_name.as_str(),
-                struct_definitions,
-                enum_definitions,
-                constants,
-                global_variables,
-                choice_labels,
-                global_labels,
-                path_mode,
-            )
-        }
+        (
+            Some(TypeName::QualifiedStruct(struct_name)),
+            Expression::StructLiteral { fields, .. },
+        ) => lower_struct_literal(
+            fields,
+            struct_name.as_str(),
+            struct_definitions,
+            enum_definitions,
+            constants,
+            global_variables,
+            choice_labels,
+            global_labels,
+            path_mode,
+        ),
         (Some(TypeName::Interface { .. }), Expression::VariableReference(name))
             if is_module_literal_reference(name, constants, global_variables, path_mode) =>
         {
@@ -147,17 +119,21 @@ pub(super) fn lower_value_literal(
             })
             .collect::<Option<Vec<_>>>()
             .map(RuntimeObject::ValueArray),
-        (None, Expression::StructLiteral(fields)) => lower_dynamic_struct_literal(
-            fields,
-            struct_definitions,
-            enum_definitions,
-            constants,
-            global_variables,
-            choice_labels,
-            global_labels,
-            path_mode,
-        ),
-        (Some(_), Expression::ArrayLiteral(_) | Expression::StructLiteral(_))
+        (None, Expression::StructLiteral { type_name, fields }) => {
+            let struct_name = type_name.as_struct_name()?;
+            lower_struct_literal(
+                fields,
+                struct_name,
+                struct_definitions,
+                enum_definitions,
+                constants,
+                global_variables,
+                choice_labels,
+                global_labels,
+                path_mode,
+            )
+        }
+        (Some(_), Expression::ArrayLiteral(_) | Expression::StructLiteral { .. })
         | (_, Expression::StringContent(_))
         | (_, Expression::VariableReference(_))
         | (_, Expression::QualifiedReference(_))
@@ -170,8 +146,7 @@ pub(super) fn lower_value_literal(
         | (_, Expression::Binary { .. })
         | (_, Expression::Unary { .. })
         | (_, Expression::MultipleCondition(_))
-        | (_, Expression::DictLiteral(_))
-        | (_, Expression::EmptyCompositeLiteral) => None,
+        | (_, Expression::DictLiteral(_)) => None,
     }
 }
 
@@ -499,36 +474,6 @@ fn lower_struct_literal(
         object_fields.insert(field_name.clone(), field_value);
     }
 
-    Some(RuntimeObject::ValueObject(object_fields))
-}
-
-fn lower_dynamic_struct_literal(
-    fields: &[StructLiteralField],
-    struct_definitions: &StructDefinitions,
-    enum_definitions: &EnumDefinitions,
-    constants: &ConstantValues,
-    global_variables: &HashSet<String>,
-    choice_labels: &LabelIndex,
-    global_labels: &LabelIndex,
-    path_mode: &ChoicePathMode,
-) -> Option<RuntimeObject> {
-    let mut object_fields = BTreeMap::new();
-    for field in fields {
-        object_fields.insert(
-            field.name().to_string(),
-            lower_value_literal(
-                field.expression(),
-                None,
-                struct_definitions,
-                enum_definitions,
-                constants,
-                global_variables,
-                choice_labels,
-                global_labels,
-                path_mode,
-            )?,
-        );
-    }
     Some(RuntimeObject::ValueObject(object_fields))
 }
 

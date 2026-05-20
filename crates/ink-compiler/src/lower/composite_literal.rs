@@ -47,7 +47,7 @@ pub(super) fn lower_dynamic_composite_literal_into(
             content.extend(emitted);
             true
         }
-        (Some(expected_type), Expression::StructLiteral(fields))
+        (Some(expected_type), Expression::StructLiteral { fields, .. })
             if matches!(
                 expected_type,
                 TypeName::Struct(_) | TypeName::QualifiedStruct(_)
@@ -94,21 +94,6 @@ pub(super) fn lower_dynamic_composite_literal_into(
             true
         }
         (
-            Some(expected_type @ (TypeName::Struct(_) | TypeName::QualifiedStruct(_))),
-            Expression::EmptyCompositeLiteral,
-        ) => {
-            let Some(default_object) = runtime_composite_placeholder_for_type(
-                expected_type,
-                context.struct_definitions(),
-                context.enum_definitions(),
-                context.path_mode().current_module_name(),
-            ) else {
-                return false;
-            };
-            content.push(default_object);
-            true
-        }
-        (
             Some(TypeName::Dict {
                 key_type,
                 value_type,
@@ -132,10 +117,6 @@ pub(super) fn lower_dynamic_composite_literal_into(
                 emitted.push(RuntimeObject::NativeFunction(NativeFunction::IndexWrite));
             }
             content.extend(emitted);
-            true
-        }
-        (Some(TypeName::Dict { key_type, .. }), Expression::EmptyCompositeLiteral) => {
-            content.push(runtime_empty_dict_for_key_type(*key_type));
             true
         }
         _ => false,
