@@ -6,13 +6,13 @@ STRUCT EnemyStatic {
     intro: string
 }
 
-VAR enemy_defs: Dict<int, EnemyStatic> = {
-    101: { name: "Slime", max_hp: 12, threat: 1, intro: "splits out of the grass" },
-    204: { name: "Ash Bat", max_hp: 9, threat: 2, intro: "drops from the rafters" },
-    305: { name: "Iron Warden", max_hp: 30, threat: 5, intro: "locks the gate" }
+VAR enemy_defs: Dict<int, EnemyStatic> = %{
+    101: %EnemyStatic{ name: "Slime", max_hp: 12, threat: 1, intro: "splits out of the grass" },
+    204: %EnemyStatic{ name: "Ash Bat", max_hp: 9, threat: 2, intro: "drops from the rafters" },
+    305: %EnemyStatic{ name: "Iron Warden", max_hp: 30, threat: 5, intro: "locks the gate" }
 }
 
-VAR current_hp: Dict<int, int> = {}
+VAR current_hp: Dict<int, int> = %{}
 
 == main ==
 -> start_battle([101, 204, 305])

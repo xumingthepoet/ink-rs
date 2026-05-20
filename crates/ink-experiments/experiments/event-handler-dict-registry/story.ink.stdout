@@ -1,0 +1,24 @@
+Registered 10: heal repeatable.
+Registered 20: ambush repeatable.
+Registered 30: treasure once.
+Registered 40: morale repeatable.
+Trigger 20: ambush for actor 7.
+Actor 7 is ambushed by 2 hidden archers.
+Event 20 emits child 10.
+Trigger 10: heal for actor 7.
+Healed actor 7 for 2.
+Event 20 emits child 40.
+Trigger 40: morale for actor 7.
+Actor 7 gains morale from the event chain.
+Trigger 30: treasure for actor 7.
+Actor 7 opens a sealed coffer.
+Unregistered 30; registry slot disabled.
+Event 30 emits child 40.
+Trigger 40: morale for actor 7.
+Actor 7 gains morale from the event chain.
+Skipped 30: not active.
+Unregistered 10; registry slot disabled.
+Skipped 10: not active.
+Registered 10: blessing repeatable.
+Trigger 10: blessing for actor 7.
+Actor 7 receives a replacement blessing for 4.
