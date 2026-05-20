@@ -1,8 +1,14 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 
-use ink_story_json_format::Object as RuntimeObject;
+use ink_story_json_format::{
+    DictKey as RuntimeDictKey, DictKeyType as RuntimeDictKeyType, DictValue,
+    Object as RuntimeObject,
+};
 
-use crate::parsed::{DefaultValue, Expression, StructLiteralField, TypeName};
+use crate::parsed::{
+    DefaultValue, DictKeyType, DictLiteralEntry, DictLiteralKey, Expression, StructLiteralField,
+    TypeName,
+};
 
 use super::{
     context::ChoicePathMode,
@@ -39,6 +45,27 @@ pub(super) fn lower_value_literal(
             })
             .collect::<Option<Vec<_>>>()
             .map(RuntimeObject::ValueArray),
+        (
+            Some(TypeName::Dict {
+                key_type,
+                value_type,
+            }),
+            Expression::DictLiteral(entries),
+        ) => lower_dict_literal(
+            entries,
+            *key_type,
+            value_type,
+            struct_definitions,
+            enum_definitions,
+            constants,
+            global_variables,
+            choice_labels,
+            global_labels,
+            path_mode,
+        ),
+        (Some(TypeName::Dict { key_type, .. }), Expression::EmptyCompositeLiteral) => {
+            Some(runtime_empty_dict_for_key_type(*key_type))
+        }
         (Some(TypeName::Struct(struct_name)), Expression::StructLiteral(fields)) => {
             lower_struct_literal(
                 fields,
@@ -213,7 +240,7 @@ fn runtime_composite_placeholder_for_type_with_seen(
     match type_name {
         TypeName::Interface { .. } => Some(RuntimeObject::String(String::new())),
         TypeName::Array(_) => Some(RuntimeObject::ValueArray(Vec::new())),
-        TypeName::Dict { .. } => None,
+        TypeName::Dict { key_type, .. } => Some(runtime_empty_dict_for_key_type(*key_type)),
         TypeName::Struct(struct_name) => {
             let definition_name =
                 resolve_struct_definition_name(struct_name, module_name, struct_definitions)?;
@@ -320,7 +347,7 @@ fn runtime_default_value(
         DefaultValue::Bool(value) => Some(RuntimeObject::Bool(*value)),
         DefaultValue::String(value) => Some(RuntimeObject::String(value.clone())),
         DefaultValue::Array { .. } => Some(RuntimeObject::ValueArray(Vec::new())),
-        DefaultValue::Dict { .. } => None,
+        DefaultValue::Dict { key_type, .. } => Some(runtime_empty_dict_for_key_type(*key_type)),
         DefaultValue::Struct { type_name } => {
             let definition_name =
                 resolve_struct_definition_name(type_name, module_name, struct_definitions)?;
@@ -351,6 +378,77 @@ fn runtime_default_value(
             visiting_structs.remove(&definition_name);
             Some(RuntimeObject::ValueObject(object_fields))
         }
+    }
+}
+
+fn lower_dict_literal(
+    entries: &[DictLiteralEntry],
+    key_type: DictKeyType,
+    value_type: &TypeName,
+    struct_definitions: &StructDefinitions,
+    enum_definitions: &EnumDefinitions,
+    constants: &ConstantValues,
+    global_variables: &HashSet<String>,
+    choice_labels: &LabelIndex,
+    global_labels: &LabelIndex,
+    path_mode: &ChoicePathMode,
+) -> Option<RuntimeObject> {
+    let mut dict_entries = BTreeMap::new();
+    for entry in entries {
+        let key = runtime_dict_key_for_literal(entry.key(), key_type)?;
+        let value = lower_value_literal(
+            entry.value(),
+            Some(value_type),
+            struct_definitions,
+            enum_definitions,
+            constants,
+            global_variables,
+            choice_labels,
+            global_labels,
+            path_mode,
+        )?;
+        dict_entries.insert(key, value);
+    }
+
+    DictValue::new(runtime_dict_key_type(key_type), dict_entries)
+        .ok()
+        .map(RuntimeObject::ValueDict)
+}
+
+pub(super) fn runtime_empty_dict_for_key_type(key_type: DictKeyType) -> RuntimeObject {
+    RuntimeObject::ValueDict(DictValue::empty(runtime_dict_key_type(key_type)))
+}
+
+pub(super) fn runtime_dict_key_object_for_literal(
+    key: &DictLiteralKey,
+    expected_type: DictKeyType,
+) -> Option<RuntimeObject> {
+    match (expected_type, key) {
+        (DictKeyType::String, DictLiteralKey::String(value)) => {
+            Some(RuntimeObject::String(value.clone()))
+        }
+        (DictKeyType::Int, DictLiteralKey::Int(value)) => Some(RuntimeObject::Int(*value)),
+        _ => None,
+    }
+}
+
+fn runtime_dict_key_for_literal(
+    key: &DictLiteralKey,
+    expected_type: DictKeyType,
+) -> Option<RuntimeDictKey> {
+    match (expected_type, key) {
+        (DictKeyType::String, DictLiteralKey::String(value)) => {
+            Some(RuntimeDictKey::String(value.clone()))
+        }
+        (DictKeyType::Int, DictLiteralKey::Int(value)) => Some(RuntimeDictKey::Int(*value)),
+        _ => None,
+    }
+}
+
+fn runtime_dict_key_type(key_type: DictKeyType) -> RuntimeDictKeyType {
+    match key_type {
+        DictKeyType::String => RuntimeDictKeyType::String,
+        DictKeyType::Int => RuntimeDictKeyType::Int,
     }
 }
 

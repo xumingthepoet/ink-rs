@@ -177,6 +177,72 @@ fn default_initializers_are_lowered_to_json() {
 }
 
 #[test]
+fn dict_typed_values_defaults_and_literals_are_lowered_to_json() {
+    let compiled = compile_fixture("typed/dict-literals-json.ink");
+    let json = compiled.program.to_json_value();
+    let empty_string_dict = json!(["dict", "string", []]);
+    let literal_scores = json!(["dict", "string", [["ada", 10], ["grace", 11]]]);
+    let base_scores = json!(["dict", "string", [["ada", 10]]]);
+    let literal_by_id = json!(["dict", "int", [[1, "^one"]]]);
+    let nested_scores = json!(["dict", "int", [[1, ["dict", "string", [["ada", 10]]]]]]);
+    let score_tables = json!([["dict", "string", [["ada", 10]]], ["dict", "string", []]]);
+    let sheet = json!({
+        "hp": 3,
+        "scores": ["dict", "string", [["luck", 7]]]
+    });
+
+    assert_json_sequence(
+        &json,
+        vec![
+            empty_string_dict.clone(),
+            json!({"VAR=": "game::default_scores"}),
+        ],
+    );
+    assert_json_sequence(
+        &json,
+        vec![
+            literal_scores.clone(),
+            json!({"VAR=": "game::literal_scores"}),
+        ],
+    );
+    assert_json_sequence(
+        &json,
+        vec![base_scores, json!({"VAR=": "game::copied_scores"})],
+    );
+    assert_json_sequence(
+        &json,
+        vec![literal_by_id, json!({"VAR=": "game::literal_by_id"})],
+    );
+    assert_json_sequence(
+        &json,
+        vec![nested_scores, json!({"VAR=": "game::nested_scores"})],
+    );
+    assert_json_sequence(
+        &json,
+        vec![score_tables, json!({"VAR=": "game::score_tables"})],
+    );
+    assert_json_sequence(&json, vec![sheet, json!({"VAR=": "game::sheet"})]);
+    assert_json_sequence(
+        &json,
+        vec![
+            json!("ev"),
+            json!(["dict", "int", []]),
+            json!("/ev"),
+            json!({"temp=": "local_default"}),
+        ],
+    );
+    assert_json_sequence(
+        &json,
+        vec![
+            json!("ev"),
+            json!(["dict", "int", [[2, "^two"]]]),
+            json!("/ev"),
+            json!({"temp=": "local_literal"}),
+        ],
+    );
+}
+
+#[test]
 fn array_literals_run_at_runtime() {
     let compiled = compile_fixture("typed/array-literals-runtime.ink");
 

@@ -5,7 +5,10 @@ use crate::parsed::{Expression, TypeName};
 use super::expression::{
     lower_expression_with_expected_type_into_with_constants, ExpressionLoweringContext,
 };
-use super::value::{runtime_composite_placeholder_for_type, struct_field_definitions_for_type};
+use super::value::{
+    runtime_composite_placeholder_for_type, runtime_dict_key_object_for_literal,
+    runtime_empty_dict_for_key_type, struct_field_definitions_for_type,
+};
 
 pub(super) fn lower_dynamic_composite_literal_into(
     content: &mut Vec<RuntimeObject>,
@@ -103,6 +106,36 @@ pub(super) fn lower_dynamic_composite_literal_into(
                 return false;
             };
             content.push(default_object);
+            true
+        }
+        (
+            Some(TypeName::Dict {
+                key_type,
+                value_type,
+            }),
+            Expression::DictLiteral(entries),
+        ) => {
+            let mut emitted = vec![runtime_empty_dict_for_key_type(*key_type)];
+            for entry in entries {
+                let Some(key) = runtime_dict_key_object_for_literal(entry.key(), *key_type) else {
+                    return false;
+                };
+                emitted.push(key);
+                if !lower_expression_with_expected_type_into_with_constants(
+                    &mut emitted,
+                    entry.value(),
+                    Some(value_type),
+                    lowering,
+                ) {
+                    return false;
+                }
+                emitted.push(RuntimeObject::NativeFunction(NativeFunction::IndexWrite));
+            }
+            content.extend(emitted);
+            true
+        }
+        (Some(TypeName::Dict { key_type, .. }), Expression::EmptyCompositeLiteral) => {
+            content.push(runtime_empty_dict_for_key_type(*key_type));
             true
         }
         _ => false,
