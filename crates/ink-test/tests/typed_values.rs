@@ -383,6 +383,107 @@ fn index_assignment_writes_array_items_at_runtime() {
 }
 
 #[test]
+fn dict_typed_values_index_writes_lower_to_set_index_tokens() {
+    let compiled = compile_fixture("typed/dict-index-writes-json.ink");
+    let json = compiled.program.to_json_value();
+
+    assert_json_sequence(
+        &json,
+        vec![
+            json!("str"),
+            json!("^bea"),
+            json!("/str"),
+            json!({"temp=": "$lvalue0"}),
+            json!({"VAR?": "game::scores"}),
+            json!({"VAR?": "$lvalue0"}),
+            json!(11),
+            json!("SET_INDEX"),
+            json!("/ev"),
+            json!({"VAR=": "game::scores", "re": true}),
+        ],
+    );
+    assert_json_sequence(
+        &json,
+        vec![
+            json!("str"),
+            json!("^ada"),
+            json!("/str"),
+            json!({"temp=": "$lvalue0"}),
+            json!({"VAR?": "game::scores"}),
+            json!({"VAR?": "$lvalue0"}),
+            json!(12),
+            json!("SET_INDEX"),
+            json!("/ev"),
+            json!({"VAR=": "game::scores", "re": true}),
+        ],
+    );
+    assert_json_sequence(
+        &json,
+        vec![
+            json!(1),
+            json!({"temp=": "$lvalue0"}),
+            json!("str"),
+            json!("^ada"),
+            json!("/str"),
+            json!({"temp=": "$lvalue1"}),
+            json!({"VAR?": "game::nested"}),
+            json!({"VAR?": "$lvalue0"}),
+            json!({"VAR?": "game::nested"}),
+            json!({"VAR?": "$lvalue0"}),
+            json!("INDEX"),
+            json!({"VAR?": "$lvalue1"}),
+            json!(13),
+            json!("SET_INDEX"),
+            json!("SET_INDEX"),
+            json!("/ev"),
+            json!({"VAR=": "game::nested", "re": true}),
+        ],
+    );
+    assert_json_sequence(
+        &json,
+        vec![
+            json!(0),
+            json!({"temp=": "$lvalue0"}),
+            json!("str"),
+            json!("^ada"),
+            json!("/str"),
+            json!({"temp=": "$lvalue1"}),
+            json!({"VAR?": "game::score_arrays"}),
+            json!({"VAR?": "$lvalue0"}),
+            json!({"VAR?": "game::score_arrays"}),
+            json!({"VAR?": "$lvalue0"}),
+            json!("INDEX"),
+            json!({"VAR?": "$lvalue1"}),
+            json!(14),
+            json!("SET_INDEX"),
+            json!("SET_INDEX"),
+            json!("/ev"),
+            json!({"VAR=": "game::score_arrays", "re": true}),
+        ],
+    );
+    assert_json_sequence(
+        &json,
+        vec![
+            json!("str"),
+            json!("^ada"),
+            json!("/str"),
+            json!({"temp=": "$lvalue0"}),
+            json!({"VAR?": "game::sheet"}),
+            json!("^scores"),
+            json!({"VAR?": "game::sheet"}),
+            json!("^scores"),
+            json!("FIELD"),
+            json!({"VAR?": "$lvalue0"}),
+            json!(15),
+            json!("SET_INDEX"),
+            json!("SET_FIELD"),
+            json!("/ev"),
+            json!({"VAR=": "game::sheet", "re": true}),
+        ],
+    );
+}
+
+#[test]
 fn index_assignment_copies_array_values_at_runtime() {
     let compiled = compile_fixture("typed/index-assignment-copy.ink");
 

@@ -282,10 +282,11 @@ pub(super) fn lower_variable_assignment_into(
             context.path_mode(),
             context.global_variables(),
         );
+        let cached_components = lower_cached_assignment_indexes_into(content, &components, context);
         lower_assignment_path_update_value_into(
             content,
             resolved_root_name.as_str(),
-            &components,
+            &cached_components,
             0,
             AssignmentUpdateValue::Expression {
                 expression,
@@ -338,9 +339,17 @@ fn assignment_target_type(
             .clone();
             Some(qualify_field_type_for_base(&field_type, &base_type))
         }
-        AssignmentTarget::IndexAccess { base, .. } => assignment_target_type(base, context)?
-            .array_element_type()
-            .cloned(),
+        AssignmentTarget::IndexAccess { base, .. } => {
+            let base_type = assignment_target_type(base, context)?;
+            base_type
+                .array_element_type()
+                .or_else(|| {
+                    base_type
+                        .dict_key_value_types()
+                        .map(|(_, value_type)| value_type)
+                })
+                .cloned()
+        }
     }
 }
 
