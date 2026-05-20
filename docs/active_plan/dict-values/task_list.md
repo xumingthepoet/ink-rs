@@ -276,7 +276,7 @@ review fix `69b0abdb` (`Cover empty Dict story JSON values`)
 
 ## Milestone 4: Lowering
 
-### [~] Task 08: Lower Dict Defaults And Literals
+### [>] Task 08: Lower Dict Defaults And Literals
 
 Goal: Emit format Dict values for defaults, constants, global initializers, temp
 initializers, and nested literals.
@@ -295,7 +295,19 @@ Modification boundaries: compiler lowering value paths and focused tests.
 
 Validation commands: `cargo test -p ink-test typed_values`
 
-Commit record: pending
+Validation:
+
+- `cargo test -p ink-test typed_values` passed.
+- `cargo test -p ink-test --test typed_values` passed.
+- `cargo fmt --all --check` passed.
+- Initial `make gate` reached the final doc-test stage but failed by the 120s
+  wrapper timeout with no failing tests reported.
+- Reran `make gate` after incremental compilation; passed.
+- Recorded deferred issue
+  `docs/issues_found/2026-05-20-duplicate-dict-literal-keys.md` for duplicate
+  Dict literal keys collapsing during lowering.
+
+Commit record: implementation `7a48f0a8` (`Lower Dict defaults and literals`)
 
 ### [ ] Task 09: Lower Dict Reads
 
