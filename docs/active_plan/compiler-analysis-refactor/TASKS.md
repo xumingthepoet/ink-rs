@@ -1,4 +1,4 @@
-Progress: 17/24
+Progress: 18/24
 
 # Compiler Analysis Refactor Active Plan
 
@@ -575,7 +575,7 @@ changes required.
 Commit record: Implementation commit `4eccc875`; completion-record commit
 recorded by this task-list update.
 
-### [ ] Task 18: Replace duplicated dispatch in struct literal checker
+### [x] Task 18: Replace duplicated dispatch in struct literal checker
 
 Goal: Use shared argument dispatch helpers in the struct literal checker.
 
@@ -593,7 +593,15 @@ Modification boundaries: Struct literal checker dispatch code only.
 
 Validation commands: `cargo test -p ink-compiler struct_literals`; `make gate`.
 
-Commit record: Implementation commit TBD; completion-record commit TBD.
+Validation record: `cargo test -p ink-compiler struct_literals` passed; `make
+gate` passed.
+
+Review record: Struct literal dispatch now calls shared static target,
+function-call, and dynamic interface signature helpers directly; no follow-up
+changes required.
+
+Commit record: Implementation commit `9653a059`; completion-record commit
+recorded by this task-list update.
 
 ## Milestone 4: Literal Visitor State And Spans
 
