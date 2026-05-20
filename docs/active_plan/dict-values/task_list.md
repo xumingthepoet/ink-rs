@@ -233,7 +233,7 @@ Commit record: implementation `ccfaf4c3` (`Cover Dict signature type positions`)
 
 ## Milestone 3: Format JSON
 
-### [~] Task 07: Add Format Dict Wire Model And Document Encoding
+### [>] Task 07: Add Format Dict Wire Model And Document Encoding
 
 Goal: Make `ink-story-json-format` own a reversible Dict value representation.
 
@@ -255,7 +255,18 @@ Modification boundaries: `crates/ink-story-json-format` and
 
 Validation commands: `cargo test -p ink-story-json-format`
 
-Commit record: pending
+Validation:
+
+- `cargo test -p ink-story-json-format` passed.
+- `cargo fmt --all --check` passed.
+- Initial `make gate` found that the new format `Object::ValueDict` variant
+  needed an explicit pre-runtime-support loader error branch in
+  `ink-runtime`; added that branch and reran validation.
+- Two subsequent `make gate` runs reached late `ink-test` stages but failed by
+  the 120s wrapper timeout with no failing tests reported.
+- Reran `make gate` after incremental compilation; passed.
+
+Commit record: implementation `57bd2bc8` (`Add Dict story JSON wire model`)
 
 ## Milestone 4: Lowering
 
