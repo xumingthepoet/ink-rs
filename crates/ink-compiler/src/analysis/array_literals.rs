@@ -13,12 +13,12 @@ use crate::{
 
 use super::{
     argument_resolution::{
-        resolve_function_call_expected_arguments, resolve_static_target_expected_arguments,
+        resolve_dynamic_interface_signature, resolve_function_call_expected_arguments,
+        resolve_static_target_expected_arguments, DynamicInterfaceSignatureInputs,
         FunctionCallArgumentResolution, ResolvedExpectedArguments,
     },
     context::{EnumTypeIndex, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
     enums::type_name_contains_enum,
-    expression_types::infer_expression_type,
     indexes::AnalysisIndexes,
     interface_values::{
         check_expression_type_with_expected, ExpectedTypeCheckError, ExpectedTypeInference,
@@ -105,6 +105,16 @@ impl<'a> ArrayLiteralChecker<'a> {
             target_symbols: self.target_symbols,
             module_implementations: self.module_implementations,
             module_imports: self.module_imports,
+            interface_members: self.interface_members,
+        }
+    }
+
+    fn dynamic_interface_signature_inputs(&self) -> DynamicInterfaceSignatureInputs<'_> {
+        DynamicInterfaceSignatureInputs {
+            variable_scopes: self.variable_scopes,
+            struct_types: self.struct_types,
+            enum_types: self.enum_types,
+            target_symbols: self.target_symbols,
             interface_members: self.interface_members,
         }
     }
@@ -299,20 +309,15 @@ impl<'a> ArrayLiteralChecker<'a> {
         expected_kind: InterfaceMemberKind,
         context: &VisitContext,
     ) -> Option<InterfaceMemberSignature> {
-        let target_type = infer_expression_type(
+        resolve_dynamic_interface_signature(
             target,
-            self.variable_scopes,
-            self.struct_types,
-            self.enum_types,
-            self.target_symbols,
-            self.interface_members,
+            member,
+            expected_kind,
+            self.dynamic_interface_signature_inputs(),
             context.current_module.as_deref(),
             context.current_flow_path.as_deref(),
         )
-        .ok()?;
-        let interface_name = target_type.as_interface_name()?;
-        let signature = self.interface_members.member(interface_name, member)?;
-        (signature.kind() == &expected_kind).then(|| signature.clone())
+        .ok()
     }
 
     fn visible_declared_type(&self, name: &str, context: &VisitContext) -> Option<TypeName> {

@@ -13,8 +13,9 @@ use crate::{
 
 use super::{
     argument_resolution::{
-        resolve_function_call_expected_arguments, FunctionCallArgumentResolution,
-        ResolvedExpectedArguments,
+        resolve_dynamic_interface_signature, resolve_function_call_expected_arguments,
+        DynamicInterfaceSignatureError, DynamicInterfaceSignatureInputs,
+        FunctionCallArgumentResolution, ResolvedExpectedArguments,
     },
     context::{EnumTypeIndex, FlowContext, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
     enums::is_enum_member_reference,
@@ -124,6 +125,16 @@ impl<'a> CallTargetChecker<'a> {
             self.flow_contexts_by_path
                 .get(&scoped_context_key(self.current_module(context), flow_path))
         })
+    }
+
+    fn dynamic_interface_signature_inputs(&self) -> DynamicInterfaceSignatureInputs<'_> {
+        DynamicInterfaceSignatureInputs {
+            variable_scopes: self.variable_scopes,
+            struct_types: self.struct_types,
+            enum_types: self.enum_types,
+            target_symbols: self.target_symbols,
+            interface_members: self.interface_members,
+        }
     }
 
     fn current_flow_arguments(&self, context: &VisitContext) -> Option<&[FlowArgument]> {
@@ -320,18 +331,16 @@ impl<'a> CallTargetChecker<'a> {
         span: &SourceSpan,
         context: &VisitContext,
     ) -> Option<InterfaceMemberSignature> {
-        let target_type = match infer_expression_type(
+        match resolve_dynamic_interface_signature(
             target,
-            self.variable_scopes,
-            self.struct_types,
-            self.enum_types,
-            self.target_symbols,
-            self.interface_members,
+            member,
+            InterfaceMemberKind::Knot,
+            self.dynamic_interface_signature_inputs(),
             self.current_module(context),
             self.current_flow_path(context),
         ) {
-            Ok(target_type) => target_type,
-            Err(error) => {
+            Ok(signature) => Some(signature),
+            Err(DynamicInterfaceSignatureError::Inference(error)) => {
                 self.diagnostics.push(Diagnostic::error(
                     span.clone(),
                     format!(
@@ -339,40 +348,35 @@ impl<'a> CallTargetChecker<'a> {
                         error.message()
                     ),
                 ));
-                return None;
+                None
             }
-        };
-
-        let Some(interface_name) = target_type.as_interface_name() else {
-            self.diagnostics.push(Diagnostic::error(
-                span.clone(),
-                format!(
+            Err(DynamicInterfaceSignatureError::NonInterface(target_type)) => {
+                self.diagnostics.push(Diagnostic::error(
+                    span.clone(),
+                    format!(
                     "Dynamic interface target '{member}' has base type {} but expected interface",
                     target_type.display_name()
                 ),
-            ));
-            return None;
-        };
-
-        let Some(signature) = self.interface_members.member(interface_name, member) else {
-            self.diagnostics.push(Diagnostic::error(
-                span.clone(),
-                format!("Interface '{interface_name}' does not declare member '{member}'"),
-            ));
-            return None;
-        };
-
-        if signature.kind() != &InterfaceMemberKind::Knot {
-            self.diagnostics.push(Diagnostic::error(
+                ));
+                None
+            }
+            Err(DynamicInterfaceSignatureError::MissingMember { interface_name }) => {
+                self.diagnostics.push(Diagnostic::error(
+                    span.clone(),
+                    format!("Interface '{interface_name}' does not declare member '{member}'"),
+                ));
+                None
+            }
+            Err(DynamicInterfaceSignatureError::WrongKind { interface_name }) => {
+                self.diagnostics.push(Diagnostic::error(
                 span.clone(),
                 format!(
                     "Interface '{interface_name}' member '{member}' is a function but dynamic target access requires a knot"
                 ),
             ));
-            return None;
+                None
+            }
         }
-
-        Some(signature.clone())
     }
 
     fn check_dynamic_interface_function_call(
@@ -406,18 +410,16 @@ impl<'a> CallTargetChecker<'a> {
         span: &SourceSpan,
         context: &VisitContext,
     ) -> Option<InterfaceMemberSignature> {
-        let target_type = match infer_expression_type(
+        match resolve_dynamic_interface_signature(
             target,
-            self.variable_scopes,
-            self.struct_types,
-            self.enum_types,
-            self.target_symbols,
-            self.interface_members,
+            member,
+            InterfaceMemberKind::Function,
+            self.dynamic_interface_signature_inputs(),
             self.current_module(context),
             self.current_flow_path(context),
         ) {
-            Ok(target_type) => target_type,
-            Err(error) => {
+            Ok(signature) => Some(signature),
+            Err(DynamicInterfaceSignatureError::Inference(error)) => {
                 self.diagnostics.push(Diagnostic::error(
                     span.clone(),
                     format!(
@@ -425,40 +427,35 @@ impl<'a> CallTargetChecker<'a> {
                         error.message()
                     ),
                 ));
-                return None;
+                None
             }
-        };
-
-        let Some(interface_name) = target_type.as_interface_name() else {
-            self.diagnostics.push(Diagnostic::error(
-                span.clone(),
-                format!(
+            Err(DynamicInterfaceSignatureError::NonInterface(target_type)) => {
+                self.diagnostics.push(Diagnostic::error(
+                    span.clone(),
+                    format!(
                     "Dynamic interface function '{member}' has base type {} but expected interface",
                     target_type.display_name()
                 ),
-            ));
-            return None;
-        };
-
-        let Some(signature) = self.interface_members.member(interface_name, member) else {
-            self.diagnostics.push(Diagnostic::error(
-                span.clone(),
-                format!("Interface '{interface_name}' does not declare member '{member}'"),
-            ));
-            return None;
-        };
-
-        if signature.kind() != &InterfaceMemberKind::Function {
-            self.diagnostics.push(Diagnostic::error(
+                ));
+                None
+            }
+            Err(DynamicInterfaceSignatureError::MissingMember { interface_name }) => {
+                self.diagnostics.push(Diagnostic::error(
+                    span.clone(),
+                    format!("Interface '{interface_name}' does not declare member '{member}'"),
+                ));
+                None
+            }
+            Err(DynamicInterfaceSignatureError::WrongKind { interface_name }) => {
+                self.diagnostics.push(Diagnostic::error(
                 span.clone(),
                 format!(
                     "Interface '{interface_name}' member '{member}' is a knot but dynamic function call requires a function"
                 ),
             ));
-            return None;
+                None
+            }
         }
-
-        Some(signature.clone())
     }
 
     fn check_dynamic_interface_member_arguments(

@@ -7,6 +7,7 @@ use crate::parsed::{
 };
 
 use super::{
+    argument_resolution::{resolve_dynamic_interface_signature, DynamicInterfaceSignatureInputs},
     context::{EnumTypeIndex, FlowSymbol, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
     enums::build_enum_type_index,
     expression_types::{infer_expression_type, TypeInferenceError},
@@ -414,6 +415,16 @@ impl<'a> InterfaceModuleLiteralUseCollector<'a> {
             .insert(module_name.to_string());
     }
 
+    fn dynamic_interface_signature_inputs(&self) -> DynamicInterfaceSignatureInputs<'_> {
+        DynamicInterfaceSignatureInputs {
+            variable_scopes: self.variable_scopes,
+            struct_types: self.struct_types,
+            enum_types: self.enum_types,
+            target_symbols: self.target_symbols,
+            interface_members: self.interface_members,
+        }
+    }
+
     fn check_dynamic_interface_member_arguments(
         &mut self,
         target: &Expression,
@@ -422,28 +433,16 @@ impl<'a> InterfaceModuleLiteralUseCollector<'a> {
         arguments: &[Expression],
         context: &VisitContext,
     ) {
-        let Ok(target_type) = infer_expression_type(
+        let Ok(signature) = resolve_dynamic_interface_signature(
             target,
-            self.variable_scopes,
-            self.struct_types,
-            self.enum_types,
-            self.target_symbols,
-            self.interface_members,
+            member,
+            expected_kind.clone(),
+            self.dynamic_interface_signature_inputs(),
             context.current_module.as_deref(),
             context.current_flow_path.as_deref(),
         ) else {
             return;
         };
-
-        let Some(interface_name) = target_type.as_interface_name() else {
-            return;
-        };
-        let Some(signature) = self.interface_members.member(interface_name, member) else {
-            return;
-        };
-        if signature.kind() != expected_kind {
-            return;
-        }
 
         for (argument, parameter) in arguments.iter().zip(signature.arguments()) {
             let Some(expected_type) = parameter.declared_type() else {
