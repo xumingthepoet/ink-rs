@@ -425,7 +425,7 @@ Validation:
 Commit record: implementation `afe8da16` (`Add runtime Dict value type`);
 review fix `7e7a4d7a` (`Cover Dict default value comparison`)
 
-### [ ] Task 12: Runtime Dict INDEX And SET_INDEX
+### [~] Task 12: Runtime Dict INDEX And SET_INDEX
 
 Goal: Execute Dict reads and writes with existing native index operations.
 
