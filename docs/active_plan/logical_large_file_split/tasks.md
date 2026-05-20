@@ -175,7 +175,7 @@ ink-test --test integration runtime_api`, `cargo test -p ink-test --test
 integration functions`, and `make gate`. Review found no follow-up changes;
 completion validation passed with the same focused commands and `make gate`.
 
-### [ ] Task 06: Split StoryState Pointer And Choice State Helpers
+### [~] Task 06: Split StoryState Pointer And Choice State Helpers
 
 Goal: Separate navigation-adjacent state fields from output and save logic.
 
