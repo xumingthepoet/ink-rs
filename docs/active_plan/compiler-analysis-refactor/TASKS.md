@@ -1,4 +1,4 @@
-Progress: 14/24
+Progress: 15/24
 
 # Compiler Analysis Refactor Active Plan
 
@@ -482,7 +482,7 @@ Review record: Reviewed implementation commit `75fcf20c` with `git show
 Commit record: Implementation commit `75fcf20c`; waiting-review record
 `a5664873`; completion-record commit recorded by this task-list update.
 
-### [>] Task 15: Extract dynamic interface signature helper
+### [x] Task 15: Extract dynamic interface signature helper
 
 Goal: Replace duplicated dynamic interface signature lookup code.
 
@@ -507,8 +507,17 @@ Validation record: `cargo test -p ink-compiler targets` passed; `cargo test -p
 ink-compiler interface_module` passed; `cargo test -p ink-compiler
 array_literals` passed; `cargo test -p ink-compiler dict_literals` passed;
 `cargo test -p ink-compiler struct_literals` passed; `make gate` passed.
+Review validation repeated after implementation review: `cargo test -p
+ink-compiler targets` passed; `cargo test -p ink-compiler interface_module`
+passed; `cargo test -p ink-compiler array_literals` passed; `cargo test -p
+ink-compiler dict_literals` passed; `cargo test -p ink-compiler
+struct_literals` passed; `make gate` passed.
 
-Commit record: Implementation commit `f67e9cc8`; completion-record commit TBD.
+Review record: Reviewed implementation commit `f67e9cc8` with `git show
+--check`; no follow-up changes required.
+
+Commit record: Implementation commit `f67e9cc8`; waiting-review record
+`fbee5aaf`; completion-record commit recorded by this task-list update.
 
 ### [ ] Task 16: Replace duplicated dispatch in array literal checker
 
