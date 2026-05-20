@@ -1,4 +1,4 @@
-Progress: 24/27
+Progress: 25/27
 
 # Logical Large-File Split Active Plan
 
@@ -745,7 +745,7 @@ integration compiler_snapshots`, and `make gate`. Review found no follow-up
 changes; completion validation passed with the same focused commands and `make
 gate`.
 
-### [>] Task 25: Split Lower Expression Calls And Collection Builtins
+### [x] Task 25: Split Lower Expression Calls And Collection Builtins
 
 Goal: Move function call and collection mutation lowering into dedicated
 modules.
@@ -773,7 +773,8 @@ typed_values`; `make gate`.
 Commit record: implementation commit `bc67f273 Split lower expression calls
 and builtins`; validation passed with `cargo fmt --all --check`, `cargo test
 -p ink-test --test integration functions`, `cargo test -p ink-test --test
-integration typed_values`, and `make gate`.
+integration typed_values`, and `make gate`. Review found no follow-up changes;
+completion validation passed with the same focused commands and `make gate`.
 
 ### [ ] Task 26: Split Lower Dynamic Interface Expressions
 
