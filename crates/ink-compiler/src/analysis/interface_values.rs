@@ -120,7 +120,7 @@ pub(super) fn collect_interface_module_literal_uses_for_story(
     )
 }
 
-fn collect_interface_module_literal_uses(
+pub(super) fn collect_interface_module_literal_uses(
     story: &Story,
     variable_scopes: &VariableScopeIndex,
     struct_types: &StructTypeIndex,

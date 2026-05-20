@@ -3,7 +3,10 @@ use crate::parsed::Story;
 use super::{
     context::{EnumTypeIndex, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
     enums::build_enum_type_index,
-    interface_values::{build_module_implementation_index, ModuleImplementationIndex},
+    interface_values::{
+        build_module_implementation_index, collect_interface_module_literal_uses,
+        InterfaceModuleLiteralUses, ModuleImplementationIndex,
+    },
     interfaces::{build_interface_member_index, InterfaceMemberIndex},
     modules::{ModuleAnalysis, ModuleImportIndex},
     structs::build_struct_type_index,
@@ -19,18 +22,36 @@ pub(super) struct AnalysisIndexes<'a> {
     pub(super) interface_members: InterfaceMemberIndex,
     pub(super) module_imports: &'a ModuleImportIndex,
     pub(super) module_implementations: ModuleImplementationIndex,
+    pub(super) interface_module_literal_uses: InterfaceModuleLiteralUses,
 }
 
 impl<'a> AnalysisIndexes<'a> {
     pub(super) fn build(story: &Story, module_analysis: &'a ModuleAnalysis) -> Self {
+        let variable_scopes = build_variable_scope_index(story);
+        let struct_types = build_struct_type_index(story);
+        let enum_types = build_enum_type_index(story);
+        let target_symbols = build_target_symbol_index(story);
+        let interface_members = build_interface_member_index(story);
+        let module_implementations = build_module_implementation_index(story);
+        let interface_module_literal_uses = collect_interface_module_literal_uses(
+            story,
+            &variable_scopes,
+            &struct_types,
+            &enum_types,
+            &target_symbols,
+            &module_implementations,
+            &interface_members,
+        );
+
         Self {
-            variable_scopes: build_variable_scope_index(story),
-            struct_types: build_struct_type_index(story),
-            enum_types: build_enum_type_index(story),
-            target_symbols: build_target_symbol_index(story),
-            interface_members: build_interface_member_index(story),
+            variable_scopes,
+            struct_types,
+            enum_types,
+            target_symbols,
+            interface_members,
             module_imports: &module_analysis.imports,
-            module_implementations: build_module_implementation_index(story),
+            module_implementations,
+            interface_module_literal_uses,
         }
     }
 
@@ -43,6 +64,7 @@ impl<'a> AnalysisIndexes<'a> {
             &self.interface_members,
             self.module_imports,
             &self.module_implementations,
+            &self.interface_module_literal_uses,
         );
     }
 }

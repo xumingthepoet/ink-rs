@@ -40,7 +40,7 @@ use interfaces::{interface_diagnostics, interface_implementation_diagnostics};
 use names::naming_diagnostics;
 use struct_literals::struct_literal_diagnostics;
 use structs::struct_type_diagnostics;
-use targets::call_target_diagnostics;
+use targets::call_target_diagnostics_with_indexes;
 use warnings::author_warning_diagnostics;
 
 pub use modules::{
@@ -156,7 +156,10 @@ fn run_analysis_passes_with_modules(
     // Target checks build symbol and variable-scope indexes.
     // Keep this after naming/flow diagnostics so resolution errors do not hide
     // more local structural problems.
-    diagnostics.extend(call_target_diagnostics(story));
+    diagnostics.extend(call_target_diagnostics_with_indexes(
+        story,
+        &analysis_indexes,
+    ));
 
     diagnostics.extend(variable_initializer_diagnostics(story));
     diagnostics.extend(variable_assignment_diagnostics(story));
