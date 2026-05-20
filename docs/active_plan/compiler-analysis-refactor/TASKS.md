@@ -1,4 +1,4 @@
-Progress: 0/24
+Progress: 1/24
 
 # Compiler Analysis Refactor Active Plan
 
@@ -23,7 +23,7 @@ Completion records are committed separately from implementation commits.
 
 ## Milestone 1: Shared Analysis Inputs
 
-### [>] Task 01: Introduce shared analysis index container
+### [x] Task 01: Introduce shared analysis index container
 
 Goal: Add a pass-local shared index container for compiler analysis so later
 tasks can reuse the same analysis inputs instead of rebuilding them per pass.
@@ -50,9 +50,14 @@ adjacent analysis support module only.
 Validation commands: `cargo test -p ink-compiler analysis`; `make gate`.
 
 Validation record: `cargo test -p ink-compiler analysis` passed;
-`make gate` passed.
+`make gate` passed. Review validation repeated after implementation review:
+`cargo test -p ink-compiler analysis` passed; `make gate` passed.
 
-Commit record: Implementation commit `d250386c`; completion-record commit TBD.
+Review record: Reviewed implementation commit `d250386c` with `git show --check`;
+no follow-up changes required.
+
+Commit record: Implementation commit `d250386c`; waiting-review record
+`598d1f60`; completion-record commit recorded by this task-list update.
 
 ### [ ] Task 02: Migrate target diagnostics to shared indexes
 
