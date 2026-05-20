@@ -12,6 +12,7 @@ mod builtins;
 mod calls;
 mod checker;
 mod diverts;
+mod interfaces;
 
 use checker::CallTargetChecker;
 

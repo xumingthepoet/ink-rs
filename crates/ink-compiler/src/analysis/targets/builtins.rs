@@ -5,7 +5,8 @@ use crate::{
 };
 
 use super::super::interface_values::{check_expression_type_with_expected, ExpectedTypeCheckError};
-use super::checker::{is_interface_module_literal_argument, CallTargetChecker};
+use super::checker::CallTargetChecker;
+use super::interfaces::is_interface_module_literal_argument;
 
 impl<'a> CallTargetChecker<'a> {
     pub(super) fn check_typed_builtin_call(

@@ -12,9 +12,8 @@ use super::super::{
     expression_types::{infer_expression_type, is_typed_builtin_function, TypeInferenceError},
     interface_values::{check_expression_type_with_expected, ExpectedTypeCheckError},
 };
-use super::checker::{
-    is_composite_literal, is_interface_module_literal_argument, CallTargetChecker,
-};
+use super::checker::{is_composite_literal, CallTargetChecker};
+use super::interfaces::is_interface_module_literal_argument;
 
 impl<'a> CallTargetChecker<'a> {
     pub(super) fn check_function_call(
