@@ -1,0 +1,84 @@
+Battlefield control simulation.
+Initial state --
+Ridgeline Beacon: 0 - 0, remains neutral.
+Last action: No activity
+Black Forge: 0 - 0, remains neutral.
+Last action: No activity
+River Bastion: 0 - 0, remains neutral.
+Last action: No activity
+[Ridgeline Beacon] Blue scouts secure Ridgeline (+2/+0).
+[Black Forge] Red raider slips into Black Forge (+0/+1).
+[River Bastion] No changes at River Bastion (+0/+0).
+Round 1 after events --
+Ridgeline Beacon: 2 - 0, controlled by Blue.
+Last action: Blue scouts secure Ridgeline
+Black Forge: 0 - 1, controlled by Red.
+Last action: Red raider slips into Black Forge
+River Bastion: 0 - 0, remains neutral.
+Last action: No changes at River Bastion
+Round 1 scoring:
+Blue controlled 1 points.
+Red controlled 1 points.
+Running total: Blue 1, Red 1.
+Totals are tied.
+Match tally --
+Blue: 1
+Red: 1
+[Ridgeline Beacon] Red counter-scouts contest Ridgeline (+0/+2).
+[Black Forge] Blue patrols reach Black Forge (+2/+0).
+[River Bastion] Red artillery opens fire on River Bastion (+0/+3).
+Round 2 after events --
+Ridgeline Beacon: 2 - 2, Contested.
+Last action: Red counter-scouts contest Ridgeline
+Black Forge: 2 - 1, controlled by Blue.
+Last action: Blue patrols reach Black Forge
+River Bastion: 0 - 3, controlled by Red.
+Last action: Red artillery opens fire on River Bastion
+Round 2 scoring:
+Blue controlled 1 points.
+Red controlled 1 points.
+Running total: Blue 2, Red 2.
+Totals are tied.
+Match tally --
+Blue: 2
+Red: 2
+[Ridgeline Beacon] Blue reinforcement pushes into Ridgeline (+2/+0).
+[Black Forge] Equal skirmishes at Black Forge (+1/+1).
+[River Bastion] Blue engineers retake a foothold (+1/+0).
+Round 3 after events --
+Ridgeline Beacon: 4 - 2, controlled by Blue.
+Last action: Blue reinforcement pushes into Ridgeline
+Black Forge: 3 - 2, controlled by Blue.
+Last action: Equal skirmishes at Black Forge
+River Bastion: 1 - 3, controlled by Red.
+Last action: Blue engineers retake a foothold
+Round 3 scoring:
+Blue controlled 2 points.
+Red controlled 1 points.
+Running total: Blue 4, Red 3.
+Blue leads by 1.
+Match tally --
+Blue: 4
+Red: 3
+[Ridgeline Beacon] Red night sweep at Ridgeline (+0/+1).
+[Black Forge] Red reserve fortifies Black Forge (+0/+2).
+[River Bastion] Blue reserve lifts River Bastion (+2/+0).
+Round 4 after events --
+Ridgeline Beacon: 4 - 3, controlled by Blue.
+Last action: Red night sweep at Ridgeline
+Black Forge: 3 - 4, controlled by Red.
+Last action: Red reserve fortifies Black Forge
+River Bastion: 3 - 3, Contested.
+Last action: Blue reserve lifts River Bastion
+Round 4 scoring:
+Blue controlled 1 points.
+Red controlled 1 points.
+Running total: Blue 5, Red 4.
+Blue leads by 1.
+Match tally --
+Blue: 5
+Red: 4
+Combat window closes.
+Match tally --
+Blue: 5
+Red: 4
