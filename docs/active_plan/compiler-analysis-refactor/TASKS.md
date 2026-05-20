@@ -605,7 +605,7 @@ recorded by this task-list update.
 
 ## Milestone 4: Literal Visitor State And Spans
 
-### [ ] Task 19: Replace or contain expected-expression pointer tracking
+### [>] Task 19: Replace or contain expected-expression pointer tracking
 
 Goal: Reduce reliance on raw pointer-derived expression ids for literal
 expected-expression tracking.
@@ -627,7 +627,7 @@ Modification boundaries: Literal checker expected-expression state only.
 
 Validation commands: `cargo test -p ink-compiler array_literals dict_literals struct_literals`; `make gate`.
 
-Commit record: Implementation commit TBD; completion-record commit TBD.
+Commit record: Implementation commit `38dcfe7e` (`Contain expected expression tracking`). Focused validation passed via split Cargo filters because Cargo accepts one test filter per invocation: `cargo test -p ink-compiler array_literals`, `cargo test -p ink-compiler dict_literals`, `cargo test -p ink-compiler struct_literals`; `make gate` passed. Completion-record commit TBD.
 
 ### [ ] Task 20: Pass real spans through function-call literal checks
 
