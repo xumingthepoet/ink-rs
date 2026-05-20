@@ -5,6 +5,7 @@ mod constants;
 mod context;
 mod dict_literals;
 mod enums;
+mod expected_expressions;
 mod expression_types;
 mod field_access;
 mod flow;

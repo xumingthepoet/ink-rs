@@ -20,6 +20,7 @@ use super::{
     },
     context::{EnumTypeIndex, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
     enums::type_name_contains_enum,
+    expected_expressions::ExpectedExpressionSet,
     indexes::AnalysisIndexes,
     interface_values::{
         check_expression_type_with_expected, ExpectedTypeCheckError, ExpectedTypeInference,
@@ -66,7 +67,7 @@ struct DictLiteralChecker<'a> {
     module_imports: &'a ModuleImportIndex,
     interface_members: &'a InterfaceMemberIndex,
     diagnostics: Vec<Diagnostic>,
-    expected_expression_ids: HashSet<usize>,
+    expected_expressions: ExpectedExpressionSet,
 }
 
 impl<'a> DictLiteralChecker<'a> {
@@ -88,7 +89,7 @@ impl<'a> DictLiteralChecker<'a> {
             module_imports,
             interface_members,
             diagnostics: Vec::new(),
-            expected_expression_ids: HashSet::new(),
+            expected_expressions: ExpectedExpressionSet::default(),
         }
     }
 
@@ -636,8 +637,7 @@ impl<'a> DictLiteralChecker<'a> {
     }
 
     fn mark_expected_expression(&mut self, expression: &Expression) {
-        self.expected_expression_ids
-            .insert(expression as *const Expression as usize);
+        self.expected_expressions.mark(expression);
     }
 
     fn type_name_contains_dict(&self, type_name: &TypeName, current_module: Option<&str>) -> bool {
@@ -723,11 +723,7 @@ impl ParsedVisitor for DictLiteralChecker<'_> {
                 &SourceSpan::new(None, 1, 1),
                 context,
             ),
-            Expression::DictLiteral(entries)
-                if !self
-                    .expected_expression_ids
-                    .contains(&(expression as *const Expression as usize)) =>
-            {
+            Expression::DictLiteral(entries) if !self.expected_expressions.contains(expression) => {
                 let span = SourceSpan::new(None, 1, 1);
                 self.check_dict_literal_key_consistency(entries, "Dict literal", &span);
                 self.diagnostics.push(Diagnostic::error(

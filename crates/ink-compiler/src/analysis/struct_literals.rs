@@ -1,4 +1,4 @@
-use std::collections::{BTreeSet, HashSet};
+use std::collections::BTreeSet;
 
 use crate::{
     diagnostic::Diagnostic,
@@ -19,6 +19,7 @@ use super::{
     },
     context::{EnumTypeIndex, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
     enums::type_name_contains_enum,
+    expected_expressions::ExpectedExpressionSet,
     expression_types::infer_expression_type,
     indexes::AnalysisIndexes,
     interface_values::{
@@ -66,7 +67,7 @@ struct StructLiteralChecker<'a> {
     module_imports: &'a ModuleImportIndex,
     interface_members: &'a InterfaceMemberIndex,
     diagnostics: Vec<Diagnostic>,
-    expected_expression_ids: HashSet<usize>,
+    expected_expressions: ExpectedExpressionSet,
 }
 
 impl<'a> StructLiteralChecker<'a> {
@@ -88,7 +89,7 @@ impl<'a> StructLiteralChecker<'a> {
             module_imports,
             interface_members,
             diagnostics: Vec::new(),
-            expected_expression_ids: HashSet::new(),
+            expected_expressions: ExpectedExpressionSet::default(),
         }
     }
 
@@ -535,8 +536,7 @@ impl<'a> StructLiteralChecker<'a> {
     }
 
     fn mark_expected_expression(&mut self, expression: &Expression) {
-        self.expected_expression_ids
-            .insert(expression as *const Expression as usize);
+        self.expected_expressions.mark(expression);
     }
 }
 
@@ -579,9 +579,7 @@ impl ParsedVisitor for StructLiteralChecker<'_> {
                 context,
             ),
             Expression::StructLiteral { type_name, fields }
-                if !self
-                    .expected_expression_ids
-                    .contains(&(expression as *const Expression as usize)) =>
+                if !self.expected_expressions.contains(expression) =>
             {
                 self.check_struct_literal_for_type(
                     type_name,
