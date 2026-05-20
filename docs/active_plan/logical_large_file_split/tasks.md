@@ -651,7 +651,7 @@ test -p ink-test --test integration modules`, `cargo test -p ink-test --test
 integration typed_values`, and `make gate`. Review found no follow-up changes;
 completion validation passed with the same focused commands and `make gate`.
 
-### [ ] Task 22: Split Target Context Helpers
+### [~] Task 22: Split Target Context Helpers
 
 Goal: Move target-analysis helper functions that are shared across checks into
 a stable utility module.
