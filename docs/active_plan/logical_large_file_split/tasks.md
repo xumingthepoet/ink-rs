@@ -270,7 +270,7 @@ passed with the same focused commands and `make gate`.
 
 ## Milestone 2: Syntax Expression Boundaries
 
-### [ ] Task 09: Split Expression Token Model And Operator Tables
+### [~] Task 09: Split Expression Token Model And Operator Tables
 
 Goal: Separate expression token data definitions from tokenization and parsing.
 
