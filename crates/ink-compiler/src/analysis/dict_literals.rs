@@ -252,7 +252,19 @@ impl<'a> DictLiteralChecker<'a> {
         span: &SourceSpan,
         context: &VisitContext,
     ) {
+        let mut seen_keys = HashSet::new();
         for entry in entries {
+            if !seen_keys.insert(entry.key().clone()) {
+                self.diagnostics.push(Diagnostic::error(
+                    span.clone(),
+                    format!(
+                        "Duplicate key {} in Dict literal for '{}'",
+                        dict_literal_key_display(entry.key()),
+                        context_name
+                    ),
+                ));
+            }
+
             if !dict_key_matches(key_type, entry.key()) {
                 self.diagnostics.push(Diagnostic::error(
                     span.clone(),
@@ -594,6 +606,13 @@ fn dict_literal_key_type_name(key: &DictLiteralKey) -> &'static str {
     }
 }
 
+fn dict_literal_key_display(key: &DictLiteralKey) -> String {
+    match key {
+        DictLiteralKey::String(value) => format!("\"{}\"", escape_snapshot_text(value)),
+        DictLiteralKey::Int(value) => value.to_string(),
+    }
+}
+
 fn dict_entry_context(context_name: &str, key: &DictLiteralKey) -> String {
     match key {
         DictLiteralKey::String(value) => {
@@ -701,6 +720,54 @@ mod tests {
             &diagnostics,
             DiagnosticSeverity::Error,
             "Value for 'table[\"row\"][1]' has type int but expected string",
+        );
+    }
+
+    #[test]
+    fn reports_duplicate_string_dict_literal_keys() {
+        let story = parse_story(
+            "VAR scores: Dict<string, int> = {\"ada\": 10, \"ada\": 12}\n\
+             -> DONE",
+        );
+
+        let diagnostics = dict_literal_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Duplicate key \"ada\" in Dict literal for 'scores'",
+        );
+    }
+
+    #[test]
+    fn reports_duplicate_int_dict_literal_keys() {
+        let story = parse_story(
+            "VAR names: Dict<int, string> = {1: \"one\", 1: \"uno\"}\n\
+             -> DONE",
+        );
+
+        let diagnostics = dict_literal_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Duplicate key 1 in Dict literal for 'names'",
+        );
+    }
+
+    #[test]
+    fn reports_duplicate_nested_dict_literal_keys_with_context() {
+        let story = parse_story(
+            "VAR table: Dict<string, Dict<int, string>> = {\"row\": {1: \"one\", 1: \"uno\"}}\n\
+             -> DONE",
+        );
+
+        let diagnostics = dict_literal_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Duplicate key 1 in Dict literal for 'table[\"row\"]'",
         );
     }
 

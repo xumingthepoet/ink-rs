@@ -144,6 +144,19 @@ fn dict_builtin_diagnostics_report_unsupported_collection_builtins() {
 }
 
 #[test]
+fn dict_literal_diagnostics_report_duplicate_keys() {
+    let diagnostics = diagnostics_for_fixture("diagnostics/dicts/duplicate-keys.ink");
+
+    for message in [
+        "Duplicate key \"ada\" in Dict literal for 'scores'",
+        "Duplicate key 1 in Dict literal for 'names'",
+        "Duplicate key 1 in Dict literal for 'nested[\"row\"]'",
+    ] {
+        assert_diagnostic(&diagnostics, DiagnosticSeverity::Error, message);
+    }
+}
+
+#[test]
 fn interface_body_diagnostics_reject_executable_content() {
     let diagnostics = diagnostics_for_fixture("diagnostics/interface-invalid-body.ink");
 

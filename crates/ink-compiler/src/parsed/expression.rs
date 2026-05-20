@@ -64,7 +64,7 @@ impl DictLiteralEntry {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum DictLiteralKey {
     String(String),
     Int(i32),
