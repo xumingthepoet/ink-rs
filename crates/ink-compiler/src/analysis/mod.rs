@@ -27,10 +27,10 @@ mod warnings;
 
 use crate::{compiler::StageOutput, diagnostic::Diagnostic, parsed::Story};
 
-use array_literals::array_literal_diagnostics;
+use array_literals::array_literal_diagnostics_with_indexes;
 use assignments::variable_assignment_diagnostics_with_indexes;
 use constants::constant_redefinition_diagnostics;
-use dict_literals::dict_literal_diagnostics;
+use dict_literals::dict_literal_diagnostics_with_indexes;
 use enums::enum_type_diagnostics;
 use field_access::field_access_diagnostics_with_indexes;
 use flow::flow_diagnostics_with_indexes;
@@ -38,7 +38,7 @@ use index_access::index_access_diagnostics_with_indexes;
 use initializers::variable_initializer_diagnostics_with_indexes;
 use interfaces::{interface_diagnostics, interface_implementation_diagnostics};
 use names::naming_diagnostics;
-use struct_literals::struct_literal_diagnostics;
+use struct_literals::struct_literal_diagnostics_with_indexes;
 use structs::struct_type_diagnostics;
 use targets::call_target_diagnostics_with_indexes;
 use warnings::author_warning_diagnostics;
@@ -169,9 +169,18 @@ fn run_analysis_passes_with_modules(
         story,
         &analysis_indexes,
     ));
-    diagnostics.extend(dict_literal_diagnostics(story));
-    diagnostics.extend(struct_literal_diagnostics(story));
-    diagnostics.extend(array_literal_diagnostics(story));
+    diagnostics.extend(dict_literal_diagnostics_with_indexes(
+        story,
+        &analysis_indexes,
+    ));
+    diagnostics.extend(struct_literal_diagnostics_with_indexes(
+        story,
+        &analysis_indexes,
+    ));
+    diagnostics.extend(array_literal_diagnostics_with_indexes(
+        story,
+        &analysis_indexes,
+    ));
     diagnostics.extend(field_access_diagnostics_with_indexes(
         story,
         &analysis_indexes,

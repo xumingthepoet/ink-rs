@@ -13,18 +13,15 @@ use crate::{
 
 use super::{
     context::{EnumTypeIndex, FlowSymbol, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
-    enums::{build_enum_type_index, type_name_contains_enum},
+    enums::type_name_contains_enum,
     expression_types::infer_expression_type,
-    interface_values::{
-        build_module_implementation_index, infer_expected_interface_expression_type,
-        ModuleImplementationIndex,
-    },
-    interfaces::{build_interface_member_index, InterfaceMemberIndex},
-    modules::{build_module_import_index, ModuleImportIndex},
-    structs::{build_struct_type_index, resolve_struct_symbol},
-    target_symbols::{build_target_symbol_index, resolve_target_symbol},
+    indexes::AnalysisIndexes,
+    interface_values::{infer_expected_interface_expression_type, ModuleImplementationIndex},
+    interfaces::InterfaceMemberIndex,
+    modules::ModuleImportIndex,
+    structs::resolve_struct_symbol,
+    target_symbols::resolve_target_symbol,
     type_names::qualify_type_name_for_module,
-    variables::build_variable_scope_index,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -33,22 +30,28 @@ enum StructLiteralMode {
     Full,
 }
 
+#[cfg(test)]
+use super::modules::ModuleAnalysis;
+
+#[cfg(test)]
 pub(super) fn array_literal_diagnostics(story: &Story) -> Vec<Diagnostic> {
-    let struct_types = build_struct_type_index(story);
-    let enum_types = build_enum_type_index(story);
-    let variable_scopes = build_variable_scope_index(story);
-    let target_symbols = build_target_symbol_index(story);
-    let module_implementations = build_module_implementation_index(story);
-    let module_imports = build_module_import_index(story);
-    let interface_members = build_interface_member_index(story);
+    let module_analysis = ModuleAnalysis::build(story);
+    let indexes = AnalysisIndexes::build(story, &module_analysis);
+    array_literal_diagnostics_with_indexes(story, &indexes)
+}
+
+pub(super) fn array_literal_diagnostics_with_indexes(
+    story: &Story,
+    indexes: &AnalysisIndexes<'_>,
+) -> Vec<Diagnostic> {
     let mut checker = ArrayLiteralChecker::new(
-        &struct_types,
-        &enum_types,
-        &variable_scopes,
-        &target_symbols,
-        &module_implementations,
-        &module_imports,
-        &interface_members,
+        &indexes.struct_types,
+        &indexes.enum_types,
+        &indexes.variable_scopes,
+        &indexes.target_symbols,
+        &indexes.module_implementations,
+        indexes.module_imports,
+        &indexes.interface_members,
     );
     walk_story(story, &mut checker);
     checker.diagnostics
