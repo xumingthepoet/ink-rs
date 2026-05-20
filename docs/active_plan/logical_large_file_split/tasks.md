@@ -745,7 +745,7 @@ integration compiler_snapshots`, and `make gate`. Review found no follow-up
 changes; completion validation passed with the same focused commands and `make
 gate`.
 
-### [ ] Task 25: Split Lower Expression Calls And Collection Builtins
+### [~] Task 25: Split Lower Expression Calls And Collection Builtins
 
 Goal: Move function call and collection mutation lowering into dedicated
 modules.
