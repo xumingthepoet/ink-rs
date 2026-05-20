@@ -1,0 +1,39 @@
+Portal relay route simulation.
+Current node: Hearth Terminal
+Credit reserve: 36
+Power units: 14
+Portal network map:
+From Hearth Terminal to Harbor Relay: 4 credits.
+From Harbor Relay to Cipher Bay: 2 credits.
+From Harbor Relay to North Spine: Locked link (3 cost + 0 fee), needs key.
+From Cipher Bay to Harbor Relay: 1 credits.
+From North Spine to Citadel Gate: 3 credits.
+From Citadel Gate to Citadel Core: 1 credits.
+Traversing Hearth Terminal to Harbor Relay: stable ring portal
+Cost 3, fee 1. Remaining credits 32, power 11.
+Arrived at Harbor Relay.
+Audit: Harbor Relay to North Spine is locked until key acquired.
+Traversing Harbor Relay to Cipher Bay: covert side lane
+Cost 2, fee 0. Remaining credits 30, power 9.
+Spine key recovered at Cipher Bay.
+Spine relay unlocked.
+Traversing Cipher Bay to Harbor Relay: return lane
+Cost 1, fee 0. Remaining credits 29, power 8.
+Arrived at Harbor Relay.
+Traversing Harbor Relay to North Spine: locked spine corridor
+Cost 3, fee 0. Remaining credits 26, power 5.
+Arrived at North Spine.
+Traversing North Spine to Citadel Gate: fortification bypass
+Cost 2, fee 1. Remaining credits 23, power 3.
+Arrived at Citadel Gate.
+Traversing Citadel Gate to Citadel Core: final anchor lock
+Cost 1, fee 0. Remaining credits 22, power 2.
+Destination node reached.
+Route log: Hearth Terminal to Harbor Relay to Cipher Bay to Harbor Relay to North Spine to Citadel Gate to Citadel Core
+Destination target: Citadel Core
+Hops used: 6
+Successful traversal checks: 6
+Blocked link checks: 1
+Credits remaining: 22
+Power remaining: 2
+Final state: Arrived at destination and completed routing.
