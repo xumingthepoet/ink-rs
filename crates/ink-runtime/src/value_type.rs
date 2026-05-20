@@ -1,5 +1,5 @@
 //! A combination of an Ink value with its type.
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, fmt};
 
 use crate::{path::Path, story_error::StoryError};
 
@@ -20,6 +20,86 @@ pub enum ValueType {
     Array(Vec<ValueType>),
     /// Dynamic Ink object/struct value.
     Object(BTreeMap<String, ValueType>),
+    /// Dynamic Ink dictionary value.
+    Dict(DictValue),
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum DictKeyType {
+    String,
+    Int,
+}
+
+impl fmt::Display for DictKeyType {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::String => formatter.write_str("string"),
+            Self::Int => formatter.write_str("int"),
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum DictKey {
+    String(String),
+    Int(i32),
+}
+
+impl DictKey {
+    pub fn key_type(&self) -> DictKeyType {
+        match self {
+            Self::String(_) => DictKeyType::String,
+            Self::Int(_) => DictKeyType::Int,
+        }
+    }
+}
+
+#[derive(Clone, PartialEq)]
+pub struct DictValue {
+    key_type: DictKeyType,
+    entries: BTreeMap<DictKey, ValueType>,
+}
+
+impl DictValue {
+    pub fn new(
+        key_type: DictKeyType,
+        entries: BTreeMap<DictKey, ValueType>,
+    ) -> Result<Self, StoryError> {
+        if entries.keys().any(|key| key.key_type() != key_type) {
+            return Err(StoryError::InvalidStoryState(
+                "Dict entry key type does not match Dict key type".to_owned(),
+            ));
+        }
+
+        Ok(Self { key_type, entries })
+    }
+
+    pub fn empty(key_type: DictKeyType) -> Self {
+        Self {
+            key_type,
+            entries: BTreeMap::new(),
+        }
+    }
+
+    pub fn key_type(&self) -> DictKeyType {
+        self.key_type
+    }
+
+    pub fn entries(&self) -> &BTreeMap<DictKey, ValueType> {
+        &self.entries
+    }
+
+    pub fn into_entries(self) -> BTreeMap<DictKey, ValueType> {
+        self.entries
+    }
+
+    pub fn get(&self, key: &DictKey) -> Option<&ValueType> {
+        if key.key_type() != self.key_type {
+            return None;
+        }
+
+        self.entries.get(key)
+    }
 }
 
 impl From<bool> for ValueType {
@@ -73,6 +153,12 @@ impl From<Vec<ValueType>> for ValueType {
 impl From<BTreeMap<String, ValueType>> for ValueType {
     fn from(value: BTreeMap<String, ValueType>) -> Self {
         ValueType::Object(value)
+    }
+}
+
+impl From<DictValue> for ValueType {
+    fn from(value: DictValue) -> Self {
+        ValueType::Dict(value)
     }
 }
 
@@ -263,5 +349,45 @@ mod tests {
         edited_fields.insert("count".to_string(), ValueType::Int(4));
 
         assert!(original != ValueType::Object(edited_fields));
+    }
+
+    #[test]
+    fn dict_values_clone_and_compare_by_contents_and_key_type() {
+        let mut original_entries = BTreeMap::new();
+        original_entries.insert(DictKey::String("score".to_string()), ValueType::Int(10));
+        original_entries.insert(
+            DictKey::String("items".to_string()),
+            ValueType::Array(vec![ValueType::new("a"), ValueType::new("b")]),
+        );
+        let original = ValueType::Dict(
+            DictValue::new(DictKeyType::String, original_entries).expect("valid string dict"),
+        );
+
+        let cloned = original.clone();
+
+        assert!(original == cloned);
+
+        let ValueType::Dict(cloned_dict) = cloned else {
+            panic!("expected dict value");
+        };
+        let mut edited_entries = cloned_dict.into_entries();
+        edited_entries.insert(DictKey::String("score".to_string()), ValueType::Int(11));
+
+        assert!(
+            original
+                != ValueType::Dict(
+                    DictValue::new(DictKeyType::String, edited_entries)
+                        .expect("edited entries should keep key type"),
+                )
+        );
+        assert!(original != ValueType::Dict(DictValue::empty(DictKeyType::Int)));
+    }
+
+    #[test]
+    fn dict_values_reject_mismatched_key_type_entries() {
+        let mut entries = BTreeMap::new();
+        entries.insert(DictKey::String("score".to_string()), ValueType::Int(10));
+
+        assert!(DictValue::new(DictKeyType::Int, entries).is_err());
     }
 }

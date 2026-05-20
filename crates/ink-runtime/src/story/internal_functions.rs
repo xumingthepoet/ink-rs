@@ -250,5 +250,6 @@ fn value_type_name(value: &ValueType) -> &'static str {
         ValueType::VariablePointer(_) => "variable pointer",
         ValueType::Array(_) => "array",
         ValueType::Object(_) => "object",
+        ValueType::Dict(_) => "dict",
     }
 }

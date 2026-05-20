@@ -337,6 +337,15 @@ fn value_type_equal(val: &ValueType, default_val: &ValueType) -> bool {
                         .is_some_and(|default_val| value_type_equal(val, default_val))
                 })
         }
+        (ValueType::Dict(val), ValueType::Dict(default_val)) => {
+            val.key_type() == default_val.key_type()
+                && val.entries().len() == default_val.entries().len()
+                && val.entries().iter().all(|(key, val)| {
+                    default_val
+                        .get(key)
+                        .is_some_and(|default_val| value_type_equal(val, default_val))
+                })
+        }
         _ => false,
     }
 }

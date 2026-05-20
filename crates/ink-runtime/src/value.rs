@@ -4,7 +4,7 @@ use crate::{
     object::{Object, RTObject},
     path::Path,
     story_error::StoryError,
-    value_type::{StringValue, ValueType, VariablePointerValue},
+    value_type::{DictKey, StringValue, ValueType, VariablePointerValue},
 };
 
 const CAST_BOOL: u8 = 0;
@@ -15,6 +15,7 @@ const CAST_DIVERT_TARGET: u8 = 4;
 const CAST_VARIABLE_POINTER: u8 = 5;
 const CAST_ARRAY: u8 = 6;
 const CAST_OBJECT: u8 = 7;
+const CAST_DICT: u8 = 8;
 
 pub struct Value {
     obj: Object,
@@ -62,6 +63,25 @@ fn fmt_value_type(value: &ValueType, f: &mut fmt::Formatter<'_>) -> fmt::Result 
             }
             write!(f, "}}")
         }
+        ValueType::Dict(dict) => {
+            write!(f, "Dict<{}>{{", dict.key_type())?;
+            for (index, (key, value)) in dict.entries().iter().enumerate() {
+                if index > 0 {
+                    write!(f, ", ")?;
+                }
+                fmt_dict_key(key, f)?;
+                write!(f, ": ")?;
+                fmt_value_type(value, f)?;
+            }
+            write!(f, "}}")
+        }
+    }
+}
+
+fn fmt_dict_key(key: &DictKey, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match key {
+        DictKey::String(value) => write!(f, "\"{}\"", value),
+        DictKey::Int(value) => write!(f, "{}", value),
     }
 }
 
@@ -187,6 +207,9 @@ impl Value {
             )),
             ValueType::Object(_) => Err(StoryError::InvalidStoryState(
                 "Shouldn't be checking the truthiness of an object".to_owned(),
+            )),
+            ValueType::Dict(_) => Err(StoryError::InvalidStoryState(
+                "Shouldn't be checking the truthiness of a dict".to_owned(),
             )),
         }
     }
@@ -314,6 +337,12 @@ impl Value {
                     "Cast not allowed for object".to_owned(),
                 )),
             },
+            ValueType::Dict(_) => match cast_dest_type {
+                CAST_DICT => Ok(None),
+                _ => Err(StoryError::InvalidStoryState(
+                    "Cast not allowed for dict".to_owned(),
+                )),
+            },
         }
     }
 }
@@ -321,6 +350,8 @@ impl Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::value_type::{DictKeyType, DictValue};
+    use std::collections::BTreeMap;
 
     #[test]
     fn invalid_string_cast_to_int_returns_error() {
@@ -365,5 +396,34 @@ mod tests {
             .expect("valid float parse should succeed")
             .expect("string to float should produce a new value");
         assert!(matches!(float_value.value, ValueType::Float(value) if value == 3.5));
+    }
+
+    #[test]
+    fn dict_values_display_with_key_type_and_reject_truthiness_and_casts() {
+        let mut entries = BTreeMap::new();
+        entries.insert(DictKey::String("ada".to_string()), ValueType::Int(10));
+        entries.insert(
+            DictKey::String("items".to_string()),
+            ValueType::Array(vec![ValueType::Int(1)]),
+        );
+        let value = Value::new_value_type(ValueType::Dict(
+            DictValue::new(DictKeyType::String, entries).expect("valid dict"),
+        ));
+
+        assert_eq!(
+            value.to_string(),
+            "Dict<string>{\"ada\": 10, \"items\": [1]}"
+        );
+        assert!(matches!(
+            value.is_truthy(),
+            Err(StoryError::InvalidStoryState(message))
+                if message.contains("truthiness of a dict")
+        ));
+        assert!(matches!(value.cast(CAST_DICT), Ok(None)));
+        assert!(matches!(
+            value.cast(CAST_INT),
+            Err(StoryError::InvalidStoryState(message))
+                if message.contains("Cast not allowed for dict")
+        ));
     }
 }

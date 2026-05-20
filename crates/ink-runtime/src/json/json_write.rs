@@ -224,6 +224,9 @@ fn value_type_to_format_object(value: &ValueType) -> Result<format::Object, Stor
             .map(|(name, value)| Ok((name.clone(), value_type_to_format_object(value)?)))
             .collect::<Result<BTreeMap<_, _>, _>>()
             .map(format::Object::ValueObject),
+        ValueType::Dict(_) => Err(StoryError::BadJson(
+            "Dict values are not supported by the runtime JSON writer yet".to_owned(),
+        )),
     }
 }
 
