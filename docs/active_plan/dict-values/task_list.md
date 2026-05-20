@@ -677,7 +677,7 @@ Commit record: implementation `9d677242` (`Add Dict parse snapshots`)
 
 ## Milestone 7: Gate And Closeout
 
-### [~] Task 19: Review Active Plan Records And Final Gate
+### [>] Task 19: Review Active Plan Records And Final Gate
 
 Goal: Ensure task status, validation, commit records, and final workspace
 validation are complete.
@@ -698,7 +698,21 @@ Modification boundaries: active plan records only.
 Validation commands: `cargo fmt --all --check`, `cargo check --workspace`,
 `cargo test --workspace`, `make gate`
 
-Commit record: pending
+Validation:
+
+- Reviewed task statuses and progress count: Tasks 01-18 are `[x]`, Task 19 is
+  current, Task 20 is pending, and `Progress: 18/20` matched the completed
+  tasks before this record.
+- Reviewed commit records and validation sections for Tasks 01-18; no stale
+  waiting-review or blocked task records remained.
+- `cargo fmt --all --check` passed.
+- `cargo check --workspace` passed.
+- `cargo test --workspace` passed.
+- Initial default `make gate` reached the workspace test stage but failed by
+  wrapper timeout with no failing tests reported.
+- `make gate UNIT_TEST_TIMEOUT=120s INK_TEST_TIMEOUT=600s` passed.
+
+Commit record: final validation record (`Record Dict final gate validation`)
 
 ### [ ] Task 20: Move Dict Plan To Finished Plans
 
