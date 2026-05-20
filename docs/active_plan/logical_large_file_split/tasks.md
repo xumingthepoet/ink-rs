@@ -55,7 +55,7 @@ ink-runtime story_state::tests::malformed_evaluation_stack_underflow_returns_err
 and `make gate`. Review found no follow-up changes; completion validation
 passed with the same focused command and `make gate`.
 
-### [ ] Task 02: Split StoryState Output Text And Tag Readers
+### [~] Task 02: Split StoryState Output Text And Tag Readers
 
 Goal: Give read-only output presentation logic a home separate from state
 mutation and save/load.
