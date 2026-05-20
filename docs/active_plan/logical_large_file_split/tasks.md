@@ -392,7 +392,7 @@ syntax::expression::tests::token_parser_reproduces_current_expression_baseline`,
 Review found no follow-up changes; completion validation passed with the same
 focused commands and `make gate`.
 
-### [ ] Task 13: Split Composite Expression Literal Parsing
+### [~] Task 13: Split Composite Expression Literal Parsing
 
 Goal: Give array, struct, and dict expression literals a focused parser owner.
 
