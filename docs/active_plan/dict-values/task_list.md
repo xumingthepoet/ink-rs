@@ -1,4 +1,4 @@
-Progress: 10/20
+Progress: 11/20
 
 # Typed Dict Values Task List
 
@@ -388,7 +388,7 @@ Commit record: implementation `2d50da09` (`Lower Dict index writes`)
 
 ## Milestone 5: Runtime Values
 
-### [>] Task 11: Add Runtime Dict Value Type
+### [x] Task 11: Add Runtime Dict Value Type
 
 Goal: Represent Dict values in runtime-owned value data.
 
@@ -414,8 +414,16 @@ Validation:
 - Second `make gate` rerun reached the `ink-test` integration stage but failed
   by the same wrapper timeout with no failing tests reported.
 - Reran `make gate` again after incremental compilation; passed.
+- Review fix: covered Dict default value comparison by key type and nested
+  entries, then reran `cargo test -p ink-runtime value_type`,
+  `cargo test -p ink-runtime value`, `cargo test -p ink-runtime variables_state`,
+  `cargo fmt --all --check`, and `make gate`. The first two review-fix
+  `make gate` runs hit wrapper timeouts with no failing tests reported; the
+  final hot rerun passed. Reran the same focused validations plus `make gate`
+  after the review-fix commit.
 
-Commit record: implementation `afe8da16` (`Add runtime Dict value type`)
+Commit record: implementation `afe8da16` (`Add runtime Dict value type`);
+review fix `7e7a4d7a` (`Cover Dict default value comparison`)
 
 ### [ ] Task 12: Runtime Dict INDEX And SET_INDEX
 
