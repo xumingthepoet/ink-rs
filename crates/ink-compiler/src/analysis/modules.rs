@@ -697,6 +697,8 @@ mod tests {
             diagnostics[0].message,
             "Qualified reference 'items::helper' requires a direct import in module 'game': FROM items IMPORT helper"
         );
+        assert_eq!(diagnostics[0].line, 3);
+        assert_eq!(diagnostics[0].column, 3);
     }
 
     #[test]

@@ -306,7 +306,12 @@ struct QualifiedUse {
 fn collect_qualified_uses(story: &Story) -> BTreeMap<String, Vec<QualifiedUse>> {
     let mut uses = BTreeMap::new();
     for module in story.modules() {
-        collect_qualified_uses_in_objects(module.name(), module.weave().content(), &mut uses);
+        collect_qualified_uses_in_objects(
+            module.name(),
+            module.weave().content(),
+            module.span(),
+            &mut uses,
+        );
         for flow in module.flows() {
             collect_qualified_uses_in_flow(module.name(), flow, &mut uses);
         }
@@ -325,7 +330,7 @@ fn collect_qualified_uses_in_flow(
         }
     }
     collect_qualified_uses_in_type_name(current_module, flow.return_type(), uses);
-    collect_qualified_uses_in_objects(current_module, flow.weave().content(), uses);
+    collect_qualified_uses_in_objects(current_module, flow.weave().content(), flow.span(), uses);
     for child in flow.child_flows() {
         collect_qualified_uses_in_flow(current_module, child, uses);
     }
@@ -334,56 +339,80 @@ fn collect_qualified_uses_in_flow(
 fn collect_qualified_uses_in_content_list(
     current_module: &str,
     content: &ContentList,
+    fallback_span: &SourceSpan,
     uses: &mut BTreeMap<String, Vec<QualifiedUse>>,
 ) {
-    collect_qualified_uses_in_objects(current_module, content.objects(), uses);
+    collect_qualified_uses_in_objects(current_module, content.objects(), fallback_span, uses);
 }
 
 fn collect_qualified_uses_in_objects(
     current_module: &str,
     objects: &[Object],
+    fallback_span: &SourceSpan,
     uses: &mut BTreeMap<String, Vec<QualifiedUse>>,
 ) {
     for object in objects {
-        collect_qualified_uses_in_object(current_module, object, uses);
+        collect_qualified_uses_in_object(current_module, object, fallback_span, uses);
     }
 }
 
 fn collect_qualified_uses_in_object(
     current_module: &str,
     object: &Object,
+    fallback_span: &SourceSpan,
     uses: &mut BTreeMap<String, Vec<QualifiedUse>>,
 ) {
+    let object_span = object_qualified_use_span(object).unwrap_or_else(|| fallback_span.clone());
     match object {
         Object::Expression(expression) | Object::LogicLine(expression) => {
-            collect_qualified_uses_in_expression(current_module, expression, uses);
+            collect_qualified_uses_in_expression(current_module, expression, &object_span, uses);
         }
         Object::ConstantDeclaration(declaration) => {
             collect_qualified_uses_in_type_name(current_module, declaration.declared_type(), uses);
-            collect_qualified_uses_in_expression(current_module, declaration.expression(), uses);
+            collect_qualified_uses_in_expression(
+                current_module,
+                declaration.expression(),
+                &object_span,
+                uses,
+            );
         }
         Object::ContentList(content) => {
-            collect_qualified_uses_in_content_list(current_module, content, uses)
+            collect_qualified_uses_in_content_list(current_module, content, &object_span, uses)
         }
         Object::Conditional(conditional) => {
             if let Some(condition) = conditional.initial_condition() {
-                collect_qualified_uses_in_expression(current_module, condition, uses);
+                collect_qualified_uses_in_expression(current_module, condition, &object_span, uses);
             }
             for branch in conditional.branches() {
                 if let Some(condition) = branch.own_condition() {
-                    collect_qualified_uses_in_expression(current_module, condition, uses);
+                    collect_qualified_uses_in_expression(
+                        current_module,
+                        condition,
+                        &object_span,
+                        uses,
+                    );
                 }
-                collect_qualified_uses_in_objects(current_module, branch.content().content(), uses);
+                collect_qualified_uses_in_objects(
+                    current_module,
+                    branch.content().content(),
+                    &object_span,
+                    uses,
+                );
             }
         }
         Object::Choice(choice) => {
             if let Some(condition) = choice.condition() {
-                collect_qualified_uses_in_expression(current_module, condition, uses);
+                collect_qualified_uses_in_expression(current_module, condition, &object_span, uses);
             }
             if let Some(content) = choice.start_content() {
-                collect_qualified_uses_in_content_list(current_module, content, uses);
+                collect_qualified_uses_in_content_list(current_module, content, &object_span, uses);
             }
-            collect_qualified_uses_in_content_list(current_module, choice.inner_content(), uses);
+            collect_qualified_uses_in_content_list(
+                current_module,
+                choice.inner_content(),
+                &object_span,
+                uses,
+            );
         }
         Object::Divert(divert) => {
             collect_qualified_uses_in_divert_target(
@@ -393,7 +422,7 @@ fn collect_qualified_uses_in_object(
                 uses,
             );
             for argument in divert.arguments() {
-                collect_qualified_uses_in_expression(current_module, argument, uses);
+                collect_qualified_uses_in_expression(current_module, argument, &object_span, uses);
             }
         }
         Object::TunnelOnwards(tunnel_onwards) => {
@@ -406,25 +435,50 @@ fn collect_qualified_uses_in_object(
                 );
             }
             for argument in tunnel_onwards.arguments() {
-                collect_qualified_uses_in_expression(current_module, argument, uses);
+                collect_qualified_uses_in_expression(current_module, argument, &object_span, uses);
             }
         }
         Object::VariableAssignment(assignment) => {
             if let Some(type_name) = assignment.declared_type() {
                 collect_qualified_uses_in_type_name(current_module, type_name, uses);
             }
-            collect_qualified_uses_in_assignment_target(current_module, assignment.target(), uses);
+            collect_qualified_uses_in_assignment_target(
+                current_module,
+                assignment.target(),
+                &object_span,
+                uses,
+            );
             if let Some(expression) = assignment.expression() {
-                collect_qualified_uses_in_expression(current_module, expression, uses);
+                collect_qualified_uses_in_expression(
+                    current_module,
+                    expression,
+                    &object_span,
+                    uses,
+                );
             }
         }
         Object::IncDec(inc_dec) => {
-            collect_qualified_uses_in_assignment_target(current_module, inc_dec.target(), uses);
-            collect_qualified_uses_in_expression(current_module, inc_dec.expression(), uses);
+            collect_qualified_uses_in_assignment_target(
+                current_module,
+                inc_dec.target(),
+                &object_span,
+                uses,
+            );
+            collect_qualified_uses_in_expression(
+                current_module,
+                inc_dec.expression(),
+                &object_span,
+                uses,
+            );
         }
         Object::Return(ret) => {
             if let Some(expression) = ret.returned_expression() {
-                collect_qualified_uses_in_expression(current_module, expression, uses);
+                collect_qualified_uses_in_expression(
+                    current_module,
+                    expression,
+                    &object_span,
+                    uses,
+                );
             }
         }
         Object::ExternalDeclaration(external) => {
@@ -440,13 +494,38 @@ fn collect_qualified_uses_in_object(
             }
         }
         Object::Weave(weave) => {
-            collect_qualified_uses_in_objects(current_module, weave.content(), uses)
+            collect_qualified_uses_in_objects(current_module, weave.content(), &object_span, uses)
         }
         Object::AuthorWarning(_)
         | Object::Gather(_)
         | Object::Glue(_)
         | Object::Tag(_)
         | Object::Text(_) => {}
+    }
+}
+
+fn object_qualified_use_span(object: &Object) -> Option<SourceSpan> {
+    match object {
+        Object::Choice(choice) => Some(choice.span().clone()),
+        Object::AuthorWarning(author_warning) => Some(author_warning.span().clone()),
+        Object::ConstantDeclaration(declaration) => Some(declaration.span().clone()),
+        Object::Divert(divert) => Some(divert.span().clone()),
+        Object::ExternalDeclaration(external) => Some(external.span().clone()),
+        Object::Gather(gather) => Some(gather.span().clone()),
+        Object::IncDec(inc_dec) => Some(inc_dec.span().clone()),
+        Object::Return(ret) => Some(ret.span().clone()),
+        Object::EnumDeclaration(declaration) => Some(declaration.span().clone()),
+        Object::StructDeclaration(declaration) => Some(declaration.span().clone()),
+        Object::Text(text) => Some(text.span().clone()),
+        Object::TunnelOnwards(tunnel_onwards) => Some(tunnel_onwards.span().clone()),
+        Object::VariableAssignment(assignment) => Some(assignment.span().clone()),
+        Object::ContentList(_)
+        | Object::Conditional(_)
+        | Object::Expression(_)
+        | Object::Glue(_)
+        | Object::LogicLine(_)
+        | Object::Tag(_)
+        | Object::Weave(_) => None,
     }
 }
 
@@ -462,7 +541,7 @@ fn collect_qualified_uses_in_divert_target(
         }
         DivertTarget::QualifiedPath(path) => record_qualified_name_use(current_module, path, uses),
         DivertTarget::Dynamic(expression) => {
-            collect_qualified_uses_in_expression(current_module, expression, uses)
+            collect_qualified_uses_in_expression(current_module, expression, fallback_span, uses)
         }
         DivertTarget::Done | DivertTarget::End | DivertTarget::Empty => {}
     }
@@ -471,67 +550,78 @@ fn collect_qualified_uses_in_divert_target(
 fn collect_qualified_uses_in_expression(
     current_module: &str,
     expression: &Expression,
+    fallback_span: &SourceSpan,
     uses: &mut BTreeMap<String, Vec<QualifiedUse>>,
 ) {
     match expression {
         Expression::VariableReference(name) | Expression::DivertTarget(name) => {
-            record_qualified_use(current_module, name, fallback_qualified_use_span(), uses);
+            record_qualified_use(current_module, name, fallback_span.clone(), uses);
         }
         Expression::QualifiedReference(name) => {
             record_qualified_name_use(current_module, name, uses);
         }
         Expression::FunctionCall { name, args } => {
-            record_qualified_use(current_module, name, fallback_qualified_use_span(), uses);
+            record_qualified_use(current_module, name, fallback_span.clone(), uses);
             for arg in args {
-                collect_qualified_uses_in_expression(current_module, arg, uses);
+                collect_qualified_uses_in_expression(current_module, arg, fallback_span, uses);
             }
         }
         Expression::QualifiedFunctionCall { name, args } => {
             record_qualified_name_use(current_module, name, uses);
             for arg in args {
-                collect_qualified_uses_in_expression(current_module, arg, uses);
+                collect_qualified_uses_in_expression(current_module, arg, fallback_span, uses);
             }
         }
         Expression::DynamicInterfaceAccess { target, .. } => {
-            collect_qualified_uses_in_expression(current_module, target, uses);
+            collect_qualified_uses_in_expression(current_module, target, fallback_span, uses);
         }
         Expression::DynamicInterfaceFunctionCall { target, args, .. } => {
-            collect_qualified_uses_in_expression(current_module, target, uses);
+            collect_qualified_uses_in_expression(current_module, target, fallback_span, uses);
             for arg in args {
-                collect_qualified_uses_in_expression(current_module, arg, uses);
+                collect_qualified_uses_in_expression(current_module, arg, fallback_span, uses);
             }
         }
         Expression::StringContent(content) => {
-            collect_qualified_uses_in_content_list(current_module, content, uses)
+            collect_qualified_uses_in_content_list(current_module, content, fallback_span, uses)
         }
         Expression::ArrayLiteral(elements) | Expression::MultipleCondition(elements) => {
             for element in elements {
-                collect_qualified_uses_in_expression(current_module, element, uses);
+                collect_qualified_uses_in_expression(current_module, element, fallback_span, uses);
             }
         }
         Expression::StructLiteral { fields, .. } => {
             for field in fields {
-                collect_qualified_uses_in_expression(current_module, field.expression(), uses);
+                collect_qualified_uses_in_expression(
+                    current_module,
+                    field.expression(),
+                    fallback_span,
+                    uses,
+                );
             }
         }
         Expression::DictLiteral(entries) => {
             for entry in entries {
-                collect_qualified_uses_in_expression(current_module, entry.value(), uses);
+                collect_qualified_uses_in_expression(
+                    current_module,
+                    entry.value(),
+                    fallback_span,
+                    uses,
+                );
             }
         }
         Expression::FieldAccess { base, .. } => {
-            collect_qualified_uses_in_expression(current_module, base, uses);
+            collect_qualified_uses_in_expression(current_module, base, fallback_span, uses);
         }
         Expression::IndexAccess { base, index } => {
-            collect_qualified_uses_in_expression(current_module, base, uses);
-            collect_qualified_uses_in_expression(current_module, index, uses);
+            collect_qualified_uses_in_expression(current_module, base, fallback_span, uses);
+            collect_qualified_uses_in_expression(current_module, index, fallback_span, uses);
         }
         Expression::Binary { left, right, .. } => {
-            collect_qualified_uses_in_expression(current_module, left, uses);
-            collect_qualified_uses_in_expression(current_module, right, uses);
+            collect_qualified_uses_in_expression(current_module, left, fallback_span, uses);
+            collect_qualified_uses_in_expression(current_module, right, fallback_span, uses);
         }
         Expression::Unary { expression, .. } => {
-            collect_qualified_uses_in_expression(current_module, expression, uses);
+            collect_qualified_uses_in_expression(current_module, expression, fallback_span, uses);
         }
         Expression::String(_)
         | Expression::NumberBool(_)
@@ -543,21 +633,22 @@ fn collect_qualified_uses_in_expression(
 fn collect_qualified_uses_in_assignment_target(
     current_module: &str,
     target: &AssignmentTarget,
+    fallback_span: &SourceSpan,
     uses: &mut BTreeMap<String, Vec<QualifiedUse>>,
 ) {
     match target {
         AssignmentTarget::Variable(name) => {
-            record_qualified_use(current_module, name, fallback_qualified_use_span(), uses)
+            record_qualified_use(current_module, name, fallback_span.clone(), uses)
         }
         AssignmentTarget::QualifiedVariable(name) => {
             record_qualified_name_use(current_module, name, uses)
         }
         AssignmentTarget::FieldAccess { base, .. } => {
-            collect_qualified_uses_in_assignment_target(current_module, base, uses);
+            collect_qualified_uses_in_assignment_target(current_module, base, fallback_span, uses);
         }
         AssignmentTarget::IndexAccess { base, index } => {
-            collect_qualified_uses_in_assignment_target(current_module, base, uses);
-            collect_qualified_uses_in_expression(current_module, index, uses);
+            collect_qualified_uses_in_assignment_target(current_module, base, fallback_span, uses);
+            collect_qualified_uses_in_expression(current_module, index, fallback_span, uses);
         }
     }
 }
@@ -629,8 +720,4 @@ fn record_qualified_parts(
             symbol: symbol.to_string(),
             span,
         });
-}
-
-fn fallback_qualified_use_span() -> SourceSpan {
-    SourceSpan::new(None, 1, 1)
 }
