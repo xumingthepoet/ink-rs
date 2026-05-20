@@ -715,7 +715,7 @@ ink-test --test integration variables`, and `make gate`. Review found no
 follow-up changes; completion validation passed with the same focused commands
 and `make gate`.
 
-### [ ] Task 24: Split Lower Expression Type Inference Helpers
+### [~] Task 24: Split Lower Expression Type Inference Helpers
 
 Goal: Give lowering-time type inference and type qualification helpers their
 own module.
