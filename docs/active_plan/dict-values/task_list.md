@@ -322,8 +322,9 @@ lowering.
 Implementation method: Reuse the `INDEX` native token for Dict reads. Ensure
 array read lowering remains unchanged and Dict keys are evaluated once.
 
-Acceptance criteria: Runtime fixture output and JSON sequence tests cover
-`dict["key"]` and `dict[1]`.
+Acceptance criteria: JSON sequence tests cover `dict["key"]` and `dict[1]`
+lowering to `INDEX`. Runtime fixture output remains covered by the runtime and
+integration tasks after compiled Dict values can load.
 
 Forbidden shortcuts: Do not add a separate compiled token unless existing
 `INDEX` cannot represent Dict reads.
