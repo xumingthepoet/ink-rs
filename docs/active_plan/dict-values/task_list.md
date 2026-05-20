@@ -1,4 +1,4 @@
-Progress: 17/20
+Progress: 18/20
 
 # Typed Dict Values Task List
 
@@ -646,7 +646,7 @@ Validation:
 
 Commit record: implementation `83012cea` (`Add Dict diagnostic fixtures`)
 
-### [>] Task 18: Add Parse Snapshots
+### [x] Task 18: Add Parse Snapshots
 
 Goal: Pin the visible parsed model for Dict source syntax.
 
@@ -669,6 +669,9 @@ Validation:
 - Initial default `make gate` reached the workspace doc-test stage but failed
   by wrapper timeout with no failing tests reported.
 - `make gate UNIT_TEST_TIMEOUT=120s INK_TEST_TIMEOUT=600s` passed.
+- Review found no follow-up code fixes required; reran
+  `cargo test -p ink-test parse`, `cargo fmt --all --check`, and
+  `make gate UNIT_TEST_TIMEOUT=120s INK_TEST_TIMEOUT=600s`.
 
 Commit record: implementation `9d677242` (`Add Dict parse snapshots`)
 
