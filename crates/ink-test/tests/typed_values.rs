@@ -2,16 +2,14 @@ use std::{cell::RefCell, collections::BTreeMap, rc::Rc};
 
 use serde_json::json;
 
-mod support;
-
-use ink_runtime::value_type::{DictKey, DictKeyType, DictValue};
-use support::{
+use crate::support::{
     compiler::{
         assert_diagnostic, assert_json_sequence, assert_story_output, compile_fixture,
         diagnostics_for_fixture, json_contains_divert_target,
     },
     runtime::{ExternalFunction, Story, ValueType},
 };
+use ink_runtime::value_type::{DictKey, DictKeyType, DictValue};
 
 #[test]
 fn primitives_run() {

@@ -1,6 +1,4 @@
-mod support;
-
-use support::{
+use crate::support::{
     compiler::compile_fixture_to_story,
     runtime::{Story, StoryError, ValueType},
     story_runner as common,

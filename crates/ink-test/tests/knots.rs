@@ -1,6 +1,4 @@
-mod support;
-
-use support::{runtime::StoryError, story_runner as common};
+use crate::support::{runtime::StoryError, story_runner as common};
 
 #[test]
 fn single_line_test() -> Result<(), StoryError> {

@@ -1,13 +1,11 @@
 use std::{cell::RefCell, collections::BTreeMap, error::Error, rc::Rc};
 
-mod support;
-
-use ink_runtime::value_type::{DictKey, DictKeyType, DictValue};
-use support::{
+use crate::support::{
     compiler::compile_fixture,
     runtime::{ExternalFunction, Story, ValueType},
     story_runner as common,
 };
+use ink_runtime::value_type::{DictKey, DictKeyType, DictValue};
 
 struct ExtFunc1;
 struct ExtFunc2;

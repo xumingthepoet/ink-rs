@@ -3,9 +3,14 @@ name = "ink-test"
 version = "0.1.0"
 edition.workspace = true
 publish = false
+autotests = false
 
 [lib]
 doctest = false
+
+[[test]]
+name = "integration"
+path = "tests/integration.rs"
 
 [dependencies]
 ink_runtime = { package = "ink-runtime", path = "../ink-runtime" }

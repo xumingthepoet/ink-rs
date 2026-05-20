@@ -1,10 +1,8 @@
-mod support;
-
-use ink_compiler::DiagnosticSeverity;
-use support::compiler::{
+use crate::support::compiler::{
     assert_diagnostic, assert_fixture_compile_errors, compile_fixture,
     compile_fixture_error_messages, diagnostics_for_fixture,
 };
+use ink_compiler::DiagnosticSeverity;
 
 #[test]
 fn module_level_content_is_rejected() {

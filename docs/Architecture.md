@@ -453,15 +453,19 @@ serializing incomplete execution internals.
 Owner: `crates/ink-test/`
 
 Integration tests are normal Cargo integration targets grouped by behavior.
-There is no aggregate origin/example-suite target. `make test` runs
-`cargo test --workspace --quiet` through `tools/run-with-timeout`; `make gate`
-adds formatting and standalone workspace checking around that test run.
+`crates/ink-test` compiles those behavior groups through one aggregate
+`integration` test target so workspace validation does not rebuild shared test
+dependencies once per file. There is no aggregate origin/example-suite target.
+`make test` runs `cargo test --workspace --quiet` through
+`tools/run-with-timeout`; `make gate` adds formatting and standalone workspace
+checking around that test run.
 
 ```text
 crates/ink-test/
 |-- src/lib.rs
 |   Workspace and fixture path helpers.
 |-- tests/
+|   |-- integration.rs
 |   |-- choices.rs
 |   |-- compiler_api.rs
 |   |-- compiler_snapshots.rs
@@ -535,10 +539,10 @@ Test policy:
 Use the smallest relevant test target first, for example:
 
 ```text
-cargo test -p ink-test --test diagnostics
-cargo test -p ink-test --test typed_values
-cargo test -p ink-test --test runtime_api
-cargo test -p ink-test --test integration_policy
+cargo test -p ink-test --test integration diagnostics
+cargo test -p ink-test --test integration typed_values
+cargo test -p ink-test --test integration runtime_api
+cargo test -p ink-test --test integration integration_policy
 cargo test -p ink-test
 ```
 
@@ -602,7 +606,7 @@ Use this table to decide where to start.
 | Variable get/set wrong | `variables_state.rs`, `story/state.rs` | runtime API and variables tests |
 | Save/load bug | `story_state.rs`, `json/json_write.rs`, `flow.rs`, `callstack.rs` | choices/runtime save-load tests |
 | CLI compile behavior | `crates/ink-tools/src/main.rs` | compiler API tests |
-| Test harness or fixture policy | `crates/ink-test/tests/support/`, `integration_policy.rs` | `cargo test -p ink-test --test integration_policy` |
+| Test harness or fixture policy | `crates/ink-test/tests/support/`, `integration_policy.rs` | `cargo test -p ink-test --test integration integration_policy` |
 
 ## Feature Workflow
 
