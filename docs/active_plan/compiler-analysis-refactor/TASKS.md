@@ -1,4 +1,4 @@
-Progress: 16/24
+Progress: 17/24
 
 # Compiler Analysis Refactor Active Plan
 
@@ -547,7 +547,7 @@ changes required.
 Commit record: Implementation commit `ec6df905`; completion-record commit
 recorded by this task-list update.
 
-### [ ] Task 17: Replace duplicated dispatch in dict literal checker
+### [x] Task 17: Replace duplicated dispatch in dict literal checker
 
 Goal: Use shared argument dispatch helpers in the dict literal checker.
 
@@ -565,7 +565,15 @@ Modification boundaries: Dict literal checker dispatch code only.
 
 Validation commands: `cargo test -p ink-compiler dict_literals`; `make gate`.
 
-Commit record: Implementation commit TBD; completion-record commit TBD.
+Validation record: `cargo test -p ink-compiler dict_literals` passed; `make
+gate` passed.
+
+Review record: Dict literal dispatch now calls shared static target,
+function-call, and dynamic interface signature helpers directly; no follow-up
+changes required.
+
+Commit record: Implementation commit `4eccc875`; completion-record commit
+recorded by this task-list update.
 
 ### [ ] Task 18: Replace duplicated dispatch in struct literal checker
 
