@@ -593,7 +593,7 @@ ink-test --test integration functions`, `cargo test -p ink-test --test
 integration diagnostics`, and `make gate`. Review found no follow-up changes;
 completion validation passed with the same focused commands and `make gate`.
 
-### [~] Task 20: Split Typed Builtin Target Checks
+### [>] Task 20: Split Typed Builtin Target Checks
 
 Goal: Give runtime built-in call type checking its own module.
 
@@ -615,7 +615,10 @@ Validation commands: `cargo fmt --all --check`; `cargo test -p ink-test --test
 integration typed_values`; `cargo test -p ink-test --test integration
 diagnostics`; `make gate`.
 
-Commit record: pending.
+Commit record: implementation commit `a5b12d8a Split typed builtin target
+checks`; validation passed with `cargo fmt --all --check`, `cargo test -p
+ink-test --test integration typed_values`, `cargo test -p ink-test --test
+integration diagnostics`, and `make gate`.
 
 ### [ ] Task 21: Split Dynamic Interface Target Checks
 
