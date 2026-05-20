@@ -12,7 +12,6 @@ FROM morale_event
 FROM blessing_event
 
 VAR handlers: Dict<int, interface<IEventHandler>> = %{}
-VAR active: Dict<int, bool> = %{}
 VAR one_shot: Dict<int, bool> = %{}
 
 == main ==
@@ -20,18 +19,20 @@ VAR one_shot: Dict<int, bool> = %{}
 -> register(20, ambush_event, false) ->
 -> register(30, treasure_event, true) ->
 -> register(40, morale_event, false) ->
+-> print_registry ->
 -> trigger(20, 7, 2) ->
 -> trigger(30, 7, 1) ->
+-> print_registry ->
 -> trigger(30, 7, 1) ->
 -> unregister(10) ->
 -> trigger(10, 7, 4) ->
 -> register(10, blessing_event, false) ->
+-> print_registry ->
 -> trigger(10, 7, 4) ->
 -> END
 
 == register(event_id: int, handler: interface<IEventHandler>, once: bool) ==
 ~ handlers[event_id] = handler
-~ active[event_id] = true
 ~ one_shot[event_id] = once
 { if once:
     Registered {event_id}: {{handler}::label()} once.
@@ -41,32 +42,55 @@ VAR one_shot: Dict<int, bool> = %{}
 ->->
 
 == unregister(event_id: int) ==
-~ active[event_id] = false
-Unregistered {event_id}; registry slot disabled.
+{ if DICT_HAS(handlers, event_id):
+    ~ DICT_REMOVE(handlers, event_id)
+    ~ DICT_REMOVE(one_shot, event_id)
+    Unregistered {event_id}; registry slot removed.
+- else:
+    Unregister ignored for {event_id}; no registry slot.
+}
 ->->
 
 == trigger(event_id: int, actor_id: int, amount: int) ==
-{ if active[event_id]:
-    Trigger {event_id}: {{handlers[event_id]}::label()} for actor {actor_id}.
-    -> {{handlers[event_id]}::run}(actor_id, amount) ->
-    { if one_shot[event_id]:
+{ if DICT_HAS(handlers, event_id):
+    ~ temp handler: interface<IEventHandler> = handlers[event_id]
+    ~ temp once: bool = one_shot[event_id]
+    Trigger {event_id}: {{handler}::label()} for actor {actor_id}.
+    -> {{handler}::run}(actor_id, amount) ->
+    { if once:
         -> unregister(event_id) ->
     }
-    -> trigger_children(event_id, actor_id, amount, 0)
+    -> trigger_children(event_id, handler, actor_id, amount, 0)
 - else:
     Skipped {event_id}: not active.
 }
 ->->
 
-== trigger_children(event_id: int, actor_id: int, amount: int, index: int) ==
-~ temp count: int = {handlers[event_id]}::child_count(actor_id, amount)
+== trigger_children(event_id: int, handler: interface<IEventHandler>, actor_id: int, amount: int, index: int) ==
+~ temp count: int = {handler}::child_count(actor_id, amount)
 { if index >= count:
     ->->
 - else:
-    ~ temp child_id: int = {handlers[event_id]}::child_at(actor_id, amount, index)
+    ~ temp child_id: int = {handler}::child_at(actor_id, amount, index)
     Event {event_id} emits child {child_id}.
     -> trigger(child_id, actor_id, amount) ->
-    -> trigger_children(event_id, actor_id, amount, index + 1)
+    -> trigger_children(event_id, handler, actor_id, amount, index + 1)
+}
+
+== print_registry ==
+~ temp event_ids: int[] = DICT_KEYS(handlers)
+Registry has {DICT_SIZE(handlers)} active handlers.
+-> print_registry_ids(event_ids, 0) ->
+->->
+
+== print_registry_ids(event_ids: int[], index: int) ==
+{ if index >= LEN(event_ids):
+    ->->
+- else:
+    ~ temp event_id: int = event_ids[index]
+    ~ temp handler: interface<IEventHandler> = handlers[event_id]
+    Handler {event_id}: {{handler}::label()}
+    -> print_registry_ids(event_ids, index + 1)
 }
 
 === module heal_event implements IEventHandler ===
