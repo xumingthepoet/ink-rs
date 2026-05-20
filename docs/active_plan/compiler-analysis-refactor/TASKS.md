@@ -1,4 +1,4 @@
-Progress: 11/24
+Progress: 12/24
 
 # Compiler Analysis Refactor Active Plan
 
@@ -386,7 +386,7 @@ Review record: Dynamic interface member argument migration was covered by Task
 Commit record: Implementation covered by commits `4b6a2db5` and `5fde59e2`;
 completion-record commit recorded by this task-list update.
 
-### [ ] Task 12: Migrate nested literal value checking
+### [x] Task 12: Migrate nested literal value checking
 
 Goal: Make nested array, dict, and struct literal value checks use the
 centralized expected-type checker for non-literal leaf expressions.
@@ -406,7 +406,17 @@ Modification boundaries: Literal non-literal leaf type checking only.
 
 Validation commands: `cargo test -p ink-compiler array_literals dict_literals struct_literals interface_module`; `make gate`.
 
-Commit record: Implementation commit TBD; completion-record commit TBD.
+Validation record: `cargo test -p ink-compiler array_literals` passed; `cargo
+test -p ink-compiler dict_literals` passed; `cargo test -p ink-compiler
+struct_literals` passed; `cargo test -p ink-compiler interface_module` passed;
+`make gate` passed.
+
+Review record: Nested literal non-literal leaf checking migration was covered
+by Task 07 implementation commit `4b6a2db5` and Task 08 implementation commit
+`5fde59e2`; no additional code changes were required for this task.
+
+Commit record: Implementation covered by commits `4b6a2db5` and `5fde59e2`;
+completion-record commit recorded by this task-list update.
 
 ## Milestone 3: Argument Dispatch Consolidation
 
