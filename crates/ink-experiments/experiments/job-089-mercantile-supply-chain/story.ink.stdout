@@ -1,0 +1,179 @@
+Mercantile supply chain report.
+Opening cash: 4200
+Opening warehouse: 22 crates
+Contract week 1
+Supplier: North Caravans
+Requested demand (including backlog): 31
+Stock after replenishment: 70
+Reliability index: 87%, route delay 1
+Shipment holds by schedule.
+Week shipment result:
+Shipped units: 31
+Stale units: 0
+Units sold: 31
+Demand backlog carried: 0
+Net this contract: 184
+Cash was updated from 4200 to 4384.
+Warehouse stock now: 53
+Remaining supplier stock North Caravans: 39
+Demand met for this contract.
+Contract week 2
+Supplier: Tidebound Docks
+Requested demand (including backlog): 42
+Stock after replenishment: 80
+Reliability index: 76%, route delay 3
+Shipment delay causes 2 demand units to decay before arrival.
+Week shipment result:
+Shipped units: 40
+Stale units: 20
+Units sold: 20
+Demand backlog carried: 0
+Net this contract: -49
+Cash was updated from 4384 to 4335.
+Warehouse stock now: 73
+Remaining supplier stock Tidebound Docks: 40
+Demand met for this contract.
+Contract week 3
+Supplier: Glassroad Trust
+Requested demand (including backlog): 27
+Stock after replenishment: 64
+Reliability index: 92%, route delay 2
+Shipment holds by schedule.
+Week shipment result:
+Shipped units: 27
+Stale units: 0
+Units sold: 27
+Demand backlog carried: 0
+Net this contract: 156
+Cash was updated from 4335 to 4491.
+Warehouse stock now: 100
+Remaining supplier stock Glassroad Trust: 37
+Demand met for this contract.
+Contract week 4
+Supplier: Ashfall Bins
+Requested demand (including backlog): 53
+Stock after replenishment: 60
+Reliability index: 81%, route delay 4
+Shipment delay causes 4 demand units to decay before arrival.
+Week shipment result:
+Shipped units: 49
+Stale units: 16
+Units sold: 33
+Demand backlog carried: 0
+Net this contract: 87
+Cash was updated from 4491 to 4578.
+Warehouse stock now: 133
+Remaining supplier stock Ashfall Bins: 11
+Demand met for this contract.
+Contract week 5
+Supplier: North Caravans
+Requested demand (including backlog): 29
+Stock after replenishment: 45
+Reliability index: 87%, route delay 1
+Shipment holds by schedule.
+Week shipment result:
+Shipped units: 29
+Stale units: 0
+Units sold: 29
+Demand backlog carried: 0
+Net this contract: 172
+Cash was updated from 4578 to 4750.
+Warehouse stock now: 162
+Remaining supplier stock North Caravans: 16
+Demand met for this contract.
+Contract week 6
+Supplier: Tidebound Docks
+Requested demand (including backlog): 46
+Stock after replenishment: 48
+Reliability index: 76%, route delay 5
+Shipment delay causes 6 demand units to decay before arrival.
+Week shipment result:
+Shipped units: 40
+Stale units: 10
+Units sold: 30
+Demand backlog carried: 0
+Net this contract: 105
+Cash was updated from 4750 to 4855.
+Warehouse stock now: 192
+Remaining supplier stock Tidebound Docks: 8
+Demand met for this contract.
+Contract week 7
+Supplier: Glassroad Trust
+Requested demand (including backlog): 34
+Stock after replenishment: 42
+Reliability index: 92%, route delay 2
+Shipment holds by schedule.
+Week shipment result:
+Shipped units: 34
+Stale units: 0
+Units sold: 34
+Demand backlog carried: 0
+Net this contract: 198
+Cash was updated from 4855 to 5053.
+Warehouse stock now: 226
+Remaining supplier stock Glassroad Trust: 8
+Demand met for this contract.
+Contract week 8
+Supplier: Ashfall Bins
+Requested demand (including backlog): 39
+Stock after replenishment: 18
+Reliability index: 81%, route delay 3
+Shipment delay causes 2 demand units to decay before arrival.
+Week shipment result:
+Shipped units: 18
+Stale units: 9
+Units sold: 9
+Demand backlog carried: 19
+Net this contract: -21
+Cash was updated from 5053 to 5032.
+Warehouse stock now: 235
+Remaining supplier stock Ashfall Bins: 0
+Remaining demand missed this cycle: 19
+Contract week 9
+Supplier: North Caravans
+Requested demand (including backlog): 60
+Stock after replenishment: 22
+Reliability index: 87%, route delay 1
+Shipment holds by schedule.
+Week shipment result:
+Shipped units: 22
+Stale units: 0
+Units sold: 22
+Demand backlog carried: 38
+Net this contract: 130
+Cash was updated from 5032 to 5162.
+Warehouse stock now: 257
+Remaining supplier stock North Caravans: 0
+Remaining demand missed this cycle: 38
+Contract week 10
+Supplier: Tidebound Docks
+Requested demand (including backlog): 60
+Stock after replenishment: 16
+Reliability index: 76%, route delay 4
+Shipment delay causes 4 demand units to decay before arrival.
+Week shipment result:
+Shipped units: 16
+Stale units: 5
+Units sold: 11
+Demand backlog carried: 40
+Net this contract: 20
+Cash was updated from 5162 to 5182.
+Warehouse stock now: 268
+Remaining supplier stock Tidebound Docks: 0
+Remaining demand missed this cycle: 40
+Supply cycle closed.
+Profit and loss snapshot.
+Opening cash 4200
+Gross shipment revenue 3404
+Material spend 2340
+Freight spend 82
+Fulfillment volume 306
+Sale losses from staleness 60
+Demand shortfall 97
+Stock decay losses from delay 18
+Late contracts 5
+Contracts completed 10
+Final cash 5182
+Net performance 982
+Restoration margin 982
+Warehouse final 268

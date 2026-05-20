@@ -1,0 +1,92 @@
+Druid grove balance cycle begins.
+Opening grove state:
+Water: 58
+Fire: 46
+Earth: 52
+Air: 41
+Imbalance: 23
+Rite 1: Moonwell Tide Blessing
+Intent: restorative.
+Element Water moved by 12 to 70.
+Balance worsened by 14.
+Water: 70
+Fire: 45
+Earth: 52
+Air: 40
+Imbalance: 37
+Rite 2: Ashen Ward Circle
+Intent: restorative.
+Element Fire moved by 12 to 57.
+Balance worsened by 2.
+Water: 70
+Fire: 57
+Earth: 51
+Air: 39
+Imbalance: 39
+Rite 3: Soil Anchor Binding
+Intent: corrupting pressure.
+Element Earth moved by 12 to 63.
+Balance worsened by 16.
+Water: 72
+Fire: 59
+Earth: 63
+Air: 39
+Imbalance: 55
+Rite 4: Highwind Invocation
+Intent: restorative.
+Element Air moved by 12 to 51.
+Balance improved by 12.
+Water: 71
+Fire: 59
+Earth: 62
+Air: 51
+Imbalance: 43
+Rite 5: Deep Root Supplication
+Intent: restorative.
+Element Earth moved by 12 to 74.
+Balance worsened by 10.
+Water: 70
+Fire: 58
+Earth: 74
+Air: 51
+Imbalance: 53
+Rite 6: Smoke Gate Offering
+Intent: corrupting pressure.
+Element Fire moved by 9 to 67.
+Balance worsened by 13.
+Water: 70
+Fire: 67
+Earth: 76
+Air: 53
+Imbalance: 66
+Rite 7: Riverglass Chime
+Intent: restorative.
+Element Water moved by 12 to 82.
+Balance worsened by 10.
+Water: 82
+Fire: 66
+Earth: 76
+Air: 52
+Imbalance: 76
+Rite 8: Cloud Hollow Lament
+Intent: corrupting pressure.
+Element Air moved by 9 to 61.
+Balance worsened by 13.
+Water: 84
+Fire: 66
+Earth: 78
+Air: 61
+Imbalance: 89
+All rites complete.
+Final grove assessment:
+Water: 84
+Fire: 66
+Earth: 78
+Air: 61
+Imbalance: 89
+Restoration pressure: 12
+Corruption pressure: 78
+Restorative events: 1
+Corruptive events: 7
+Imbalance index: 89
+Outcome: grove corruption advances.
