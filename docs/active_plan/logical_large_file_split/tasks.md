@@ -1,4 +1,4 @@
-Progress: 15/27
+Progress: 16/27
 
 # Logical Large-File Split Active Plan
 
@@ -478,7 +478,7 @@ ink-test --test integration text`, `cargo test -p ink-test --test integration
 expressions`, and `make gate`. Review found no follow-up changes; completion
 validation passed with the same focused commands and `make gate`.
 
-### [>] Task 16: Split Expression Argument And Path Utilities
+### [x] Task 16: Split Expression Argument And Path Utilities
 
 Goal: Keep reusable top-level expression helpers separate from parser internals.
 
@@ -503,7 +503,8 @@ integration functions`; `cargo test -p ink-test --test integration diverts`;
 Commit record: implementation commit `24345619 Split expression argument
 utilities`; validation passed with `cargo fmt --all --check`, `cargo test -p
 ink-test --test integration functions`, `cargo test -p ink-test --test
-integration diverts`, and `make gate`.
+integration diverts`, and `make gate`. Review found no follow-up changes;
+completion validation passed with the same focused commands and `make gate`.
 
 ## Milestone 3: Analysis Target Boundaries
 
