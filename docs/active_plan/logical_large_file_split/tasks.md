@@ -1,4 +1,4 @@
-Progress: 5/27
+Progress: 6/27
 
 # Logical Large-File Split Active Plan
 
@@ -175,7 +175,7 @@ ink-test --test integration runtime_api`, `cargo test -p ink-test --test
 integration functions`, and `make gate`. Review found no follow-up changes;
 completion validation passed with the same focused commands and `make gate`.
 
-### [>] Task 06: Split StoryState Pointer And Choice State Helpers
+### [x] Task 06: Split StoryState Pointer And Choice State Helpers
 
 Goal: Separate navigation-adjacent state fields from output and save logic.
 
@@ -202,7 +202,8 @@ gate`.
 Commit record: implementation commit `2cd6a715 Split StoryState flow state
 helpers`; validation passed with `cargo fmt --all --check`, `cargo test -p
 ink-test --test integration choices`, `cargo test -p ink-test --test
-integration flow`, and `make gate`.
+integration flow`, and `make gate`. Review found no follow-up changes;
+completion validation passed with the same focused commands and `make gate`.
 
 ### [ ] Task 07: Split StoryState Patch Lifecycle
 
