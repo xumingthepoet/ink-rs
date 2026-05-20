@@ -995,6 +995,72 @@ mod tests {
     }
 
     #[test]
+    fn array_push_and_insert_lowering_uses_native_tokens_and_reassignment() {
+        let source = concat!(
+            "=== module game ===\n",
+            "STRUCT Bag {\n",
+            "items: int[]\n",
+            "}\n",
+            "VAR items: int[] = [1]\n",
+            "VAR bags: Bag[] = [%Bag{ items: [2] }]\n",
+            "== main ==\n",
+            "before{ARRAY_PUSH(items, 3)}after\n",
+            "~ ARRAY_INSERT(items, 1, 2)\n",
+            "~ ARRAY_PUSH(bags[0].items, 4)\n",
+            "~ ARRAY_INSERT(bags[0].items, LEN(bags[0].items), 5)\n",
+            "-> END\n",
+        );
+        let compiled = Compiler::default().compile(SourceInput::new(source));
+
+        assert!(
+            compiled.artifact.is_some(),
+            "module story should compile: {:#?}",
+            compiled.diagnostics
+        );
+        let json = compiled
+            .artifact
+            .expect("compiled story")
+            .program
+            .to_json_value();
+
+        assert!(json_contains_sequence(
+            &json,
+            &[
+                json!({"VAR?": "game::items"}),
+                json!(3),
+                json!("ARRAY_PUSH"),
+                json!({"VAR=": "game::items", "re": true})
+            ]
+        ));
+        assert!(json_contains_sequence(
+            &json,
+            &[
+                json!({"VAR?": "game::items"}),
+                json!(1),
+                json!(2),
+                json!("ARRAY_INSERT"),
+                json!({"VAR=": "game::items", "re": true})
+            ]
+        ));
+        assert!(json_contains_sequence(
+            &json,
+            &[
+                json!({"VAR?": "game::bags"}),
+                json!({"VAR?": "$lvalue0"}),
+                json!("INDEX"),
+                json!("^items"),
+                json!("FIELD"),
+                json!(4),
+                json!("ARRAY_PUSH"),
+                json!("SET_FIELD"),
+                json!("SET_INDEX"),
+                json!({"VAR=": "game::bags", "re": true})
+            ]
+        ));
+        assert!(json_contains_sequence(&json, &[json!("ARRAY_INSERT")]));
+    }
+
+    #[test]
     fn divert_lowering_context_preserves_current_control_flow_json() {
         let source = concat!(
             "=== module game ===\n",

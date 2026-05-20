@@ -21,6 +21,11 @@ const SET_INDEX_NEW_VALUE: &str = "SET_INDEX expected a value as its third param
 const LEN_ARRAY: &str = "LEN expected an array value as its parameter";
 const ARRAY_REMOVE_ARRAY: &str = "ARRAY_REMOVE expected an array value as its first parameter";
 const ARRAY_REMOVE_INDEX: &str = "ARRAY_REMOVE expected an int index as its second parameter";
+const ARRAY_PUSH_ARRAY: &str = "ARRAY_PUSH expected an array value as its first parameter";
+const ARRAY_PUSH_VALUE: &str = "ARRAY_PUSH expected a value as its second parameter";
+const ARRAY_INSERT_ARRAY: &str = "ARRAY_INSERT expected an array value as its first parameter";
+const ARRAY_INSERT_INDEX: &str = "ARRAY_INSERT expected an int index as its second parameter";
+const ARRAY_INSERT_VALUE: &str = "ARRAY_INSERT expected a value as its third parameter";
 const DICT_HAS_DICT: &str = "DICT_HAS expected a dict value as its first parameter";
 const DICT_SIZE_DICT: &str = "DICT_SIZE expected a dict value as its parameter";
 const DICT_REMOVE_DICT: &str = "DICT_REMOVE expected a dict value as its first parameter";
@@ -164,6 +169,45 @@ pub(super) fn array_remove(params: &[Rc<dyn RTObject>]) -> Result<Rc<dyn RTObjec
     Ok(Rc::new(Value::new_value_type(ValueType::Array(
         updated_values,
     ))))
+}
+
+pub(super) fn array_push(params: &[Rc<dyn RTObject>]) -> Result<Rc<dyn RTObject>, StoryError> {
+    let value = params::value(params, 0, ARRAY_PUSH_ARRAY)?;
+    let values = params::array_values(value, ARRAY_PUSH_ARRAY)?;
+    let new_value = params::value(params, 1, ARRAY_PUSH_VALUE)?;
+
+    let mut updated_values = values.to_vec();
+    updated_values.push(new_value.value.clone());
+    Ok(Rc::new(Value::new_value_type(ValueType::Array(
+        updated_values,
+    ))))
+}
+
+pub(super) fn array_insert(params: &[Rc<dyn RTObject>]) -> Result<Rc<dyn RTObject>, StoryError> {
+    let value = params::value(params, 0, ARRAY_INSERT_ARRAY)?;
+    let index = params::int(params, 1, ARRAY_INSERT_INDEX)?;
+    let values = params::array_values(value, ARRAY_INSERT_ARRAY)?;
+    let new_value = params::value(params, 2, ARRAY_INSERT_VALUE)?;
+    let array_index = array_insert_index_in_bounds(index, values.len())?;
+
+    let mut updated_values = values.to_vec();
+    updated_values.insert(array_index, new_value.value.clone());
+    Ok(Rc::new(Value::new_value_type(ValueType::Array(
+        updated_values,
+    ))))
+}
+
+fn array_insert_index_in_bounds(index: i32, len: usize) -> Result<usize, StoryError> {
+    let array_index =
+        usize::try_from(index).map_err(|_| array_insert_index_out_of_bounds(index))?;
+    if array_index > len {
+        return Err(array_insert_index_out_of_bounds(index));
+    }
+    Ok(array_index)
+}
+
+fn array_insert_index_out_of_bounds(index: i32) -> StoryError {
+    StoryError::InvalidStoryState(format!("Array insert index out of bounds: {index}"))
 }
 
 pub(super) fn dict_has(params: &[Rc<dyn RTObject>]) -> Result<Rc<dyn RTObject>, StoryError> {
@@ -318,6 +362,55 @@ mod tests {
             .call(vec![updated])
             .expect("len should succeed");
         assert!(matches!(value_type(len.as_ref()), ValueType::Int(2)));
+    }
+
+    #[test]
+    fn array_push_and_insert_return_array_copies() {
+        let original = array_value(vec![ValueType::Int(1), ValueType::Int(3)]);
+        let pushed = NativeFunctionCall::new(Op::ArrayPush)
+            .call(vec![original.clone(), int_value(4)])
+            .expect("ARRAY_PUSH should succeed");
+        let inserted_head = NativeFunctionCall::new(Op::ArrayInsert)
+            .call(vec![pushed.clone(), int_value(0), int_value(0)])
+            .expect("ARRAY_INSERT should insert at the head");
+        let inserted_middle = NativeFunctionCall::new(Op::ArrayInsert)
+            .call(vec![inserted_head.clone(), int_value(2), int_value(2)])
+            .expect("ARRAY_INSERT should insert in the middle");
+        let inserted_tail = NativeFunctionCall::new(Op::ArrayInsert)
+            .call(vec![inserted_middle.clone(), int_value(5), int_value(5)])
+            .expect("ARRAY_INSERT should insert at LEN(array)");
+
+        assert!(
+            matches!(value_type(original.as_ref()), ValueType::Array(values)
+                if matches!(values.as_slice(), [ValueType::Int(1), ValueType::Int(3)]))
+        );
+        assert!(
+            matches!(value_type(pushed.as_ref()), ValueType::Array(values)
+                if matches!(values.as_slice(), [ValueType::Int(1), ValueType::Int(3), ValueType::Int(4)]))
+        );
+        assert!(
+            matches!(value_type(inserted_tail.as_ref()), ValueType::Array(values)
+            if matches!(values.as_slice(), [
+                ValueType::Int(0),
+                ValueType::Int(1),
+                ValueType::Int(2),
+                ValueType::Int(3),
+                ValueType::Int(4),
+                ValueType::Int(5)
+            ]))
+        );
+    }
+
+    #[test]
+    fn array_insert_reports_out_of_bounds_indexes() {
+        for index in [-1, 3] {
+            let error = invalid_state(NativeFunctionCall::new(Op::ArrayInsert).call(vec![
+                array_value(vec![ValueType::Int(1), ValueType::Int(2)]),
+                int_value(index),
+                int_value(3),
+            ]));
+            assert_eq!(error, format!("Array insert index out of bounds: {index}"));
+        }
     }
 
     #[test]

@@ -28,6 +28,15 @@ pub(super) enum AssignmentUpdateValue<'a> {
     ArrayRemove {
         index: &'a Expression,
     },
+    ArrayPush {
+        value: &'a Expression,
+        expected_type: Option<&'a TypeName>,
+    },
+    ArrayInsert {
+        index: &'a Expression,
+        value: &'a Expression,
+        expected_type: Option<&'a TypeName>,
+    },
     DictRemove {
         key: &'a Expression,
     },
@@ -165,6 +174,42 @@ fn lower_assignment_update_value_into(
             lower_assignment_path_read_into(content, root_name, components, context);
             lower_expression_into(content, index, context, false);
             content.push(RuntimeObject::NativeFunction(NativeFunction::ArrayRemove));
+        }
+        AssignmentUpdateValue::ArrayPush {
+            value,
+            expected_type,
+        } => {
+            lower_assignment_path_read_into(content, root_name, components, context);
+            lower_assignment_update_value_into(
+                content,
+                root_name,
+                components,
+                AssignmentUpdateValue::Expression {
+                    expression: value,
+                    expected_type,
+                },
+                context,
+            );
+            content.push(RuntimeObject::NativeFunction(NativeFunction::ArrayPush));
+        }
+        AssignmentUpdateValue::ArrayInsert {
+            index,
+            value,
+            expected_type,
+        } => {
+            lower_assignment_path_read_into(content, root_name, components, context);
+            lower_expression_into(content, index, context, false);
+            lower_assignment_update_value_into(
+                content,
+                root_name,
+                components,
+                AssignmentUpdateValue::Expression {
+                    expression: value,
+                    expected_type,
+                },
+                context,
+            );
+            content.push(RuntimeObject::NativeFunction(NativeFunction::ArrayInsert));
         }
         AssignmentUpdateValue::DictRemove { key } => {
             lower_assignment_path_read_into(content, root_name, components, context);

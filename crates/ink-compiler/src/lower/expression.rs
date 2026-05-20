@@ -460,7 +460,7 @@ fn builtin_return_type_for_call(
     context: &LoweringContext<'_>,
 ) -> Option<TypeName> {
     match name {
-        "ARRAY_REMOVE" | "DICT_REMOVE" => Some(TypeName::void()),
+        "ARRAY_REMOVE" | "ARRAY_PUSH" | "ARRAY_INSERT" | "DICT_REMOVE" => Some(TypeName::void()),
         "LEN" | "DICT_SIZE" => Some(TypeName::int()),
         "DICT_HAS" => Some(TypeName::bool()),
         "DICT_KEYS" => {
@@ -601,6 +601,12 @@ fn lower_function_call_into(
         "ARRAY_REMOVE" => {
             lower_array_remove_call_into(content, args, lowering);
         }
+        "ARRAY_PUSH" => {
+            lower_array_push_call_into(content, args, lowering);
+        }
+        "ARRAY_INSERT" => {
+            lower_array_insert_call_into(content, args, lowering);
+        }
         "DICT_REMOVE" => {
             lower_dict_remove_call_into(content, args, lowering);
         }
@@ -718,6 +724,122 @@ fn lower_array_remove_call_into(
 
     push_reassignment_for_name(content, resolved_root_name.as_str(), context.path_mode());
     content.push(RuntimeObject::Void);
+}
+
+fn lower_array_push_call_into(
+    content: &mut Vec<RuntimeObject>,
+    args: &[Expression],
+    lowering: &mut ExpressionLoweringContext<'_, '_>,
+) {
+    let context = lowering.context;
+    let (Some(target_expression), Some(value_expression)) = (args.first(), args.get(1)) else {
+        content.push(RuntimeObject::Void);
+        return;
+    };
+    let Some(target) = AssignmentTarget::from_expression(target_expression.clone()) else {
+        content.push(RuntimeObject::Void);
+        return;
+    };
+
+    let expected_type = infer_array_element_type(target_expression, context);
+    let mut components = Vec::new();
+    let Some(root_name) = collect_assignment_path(&target, &mut components) else {
+        content.push(RuntimeObject::Void);
+        return;
+    };
+    let cached_components = lower_cached_assignment_indexes_into(content, &components, context);
+    let resolved_root_name =
+        resolve_runtime_variable_name(root_name, context.path_mode(), context.global_variables());
+
+    if cached_components.is_empty() {
+        content.push(RuntimeObject::VariableReference(resolved_root_name.clone()));
+        lower_expression_with_expected_type_into_with_constants(
+            content,
+            value_expression,
+            expected_type.as_ref(),
+            lowering,
+        );
+        content.push(RuntimeObject::NativeFunction(NativeFunction::ArrayPush));
+    } else {
+        lower_assignment_path_update_value_into(
+            content,
+            resolved_root_name.as_str(),
+            &cached_components,
+            0,
+            AssignmentUpdateValue::ArrayPush {
+                value: value_expression,
+                expected_type: expected_type.as_ref(),
+            },
+            context,
+        );
+    }
+
+    push_reassignment_for_name(content, resolved_root_name.as_str(), context.path_mode());
+    content.push(RuntimeObject::Void);
+}
+
+fn lower_array_insert_call_into(
+    content: &mut Vec<RuntimeObject>,
+    args: &[Expression],
+    lowering: &mut ExpressionLoweringContext<'_, '_>,
+) {
+    let context = lowering.context;
+    let (Some(target_expression), Some(index_expression), Some(value_expression)) =
+        (args.first(), args.get(1), args.get(2))
+    else {
+        content.push(RuntimeObject::Void);
+        return;
+    };
+    let Some(target) = AssignmentTarget::from_expression(target_expression.clone()) else {
+        content.push(RuntimeObject::Void);
+        return;
+    };
+
+    let expected_type = infer_array_element_type(target_expression, context);
+    let mut components = Vec::new();
+    let Some(root_name) = collect_assignment_path(&target, &mut components) else {
+        content.push(RuntimeObject::Void);
+        return;
+    };
+    let cached_components = lower_cached_assignment_indexes_into(content, &components, context);
+    let resolved_root_name =
+        resolve_runtime_variable_name(root_name, context.path_mode(), context.global_variables());
+
+    if cached_components.is_empty() {
+        content.push(RuntimeObject::VariableReference(resolved_root_name.clone()));
+        lower_expression_into_with_constants(content, index_expression, lowering);
+        lower_expression_with_expected_type_into_with_constants(
+            content,
+            value_expression,
+            expected_type.as_ref(),
+            lowering,
+        );
+        content.push(RuntimeObject::NativeFunction(NativeFunction::ArrayInsert));
+    } else {
+        lower_assignment_path_update_value_into(
+            content,
+            resolved_root_name.as_str(),
+            &cached_components,
+            0,
+            AssignmentUpdateValue::ArrayInsert {
+                index: index_expression,
+                value: value_expression,
+                expected_type: expected_type.as_ref(),
+            },
+            context,
+        );
+    }
+
+    push_reassignment_for_name(content, resolved_root_name.as_str(), context.path_mode());
+    content.push(RuntimeObject::Void);
+}
+
+fn infer_array_element_type(
+    expression: &Expression,
+    context: &LoweringContext<'_>,
+) -> Option<TypeName> {
+    infer_lowered_expression_type(expression, context)
+        .and_then(|type_name| type_name.array_element_type().cloned())
 }
 
 fn lower_dict_remove_call_into(
@@ -863,6 +985,8 @@ fn builtin_native_function(name: &str) -> Option<NativeFunction> {
         "INT" => Some(NativeFunction::Int),
         "FLOAT" => Some(NativeFunction::Float),
         "LEN" => Some(NativeFunction::Len),
+        "ARRAY_PUSH" => Some(NativeFunction::ArrayPush),
+        "ARRAY_INSERT" => Some(NativeFunction::ArrayInsert),
         "DICT_HAS" => Some(NativeFunction::DictHas),
         "DICT_SIZE" => Some(NativeFunction::DictSize),
         "DICT_REMOVE" => Some(NativeFunction::DictRemove),

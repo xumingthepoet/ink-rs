@@ -647,8 +647,11 @@ impl<'a> CallTargetChecker<'a> {
         }
 
         if is_typed_builtin_function(name) {
-            self.check_typed_builtin_call(name, args, span, context);
-            for arg in args {
+            let skip_argument_indexes = self.check_typed_builtin_call(name, args, span, context);
+            for (index, arg) in args.iter().enumerate() {
+                if skip_argument_indexes.contains(&index) {
+                    continue;
+                }
                 self.check_expression(arg, span, context);
             }
             return;
@@ -699,15 +702,35 @@ impl<'a> CallTargetChecker<'a> {
         args: &[Expression],
         span: &SourceSpan,
         context: &VisitContext,
-    ) {
+    ) -> Vec<usize> {
         match name {
-            "ARRAY_REMOVE" => self.check_array_remove_call(args, span, context),
-            "LEN" => self.check_len_call(args, span, context),
-            "DICT_HAS" => self.check_dict_has_call(args, span, context),
-            "DICT_SIZE" => self.check_dict_size_call(args, span, context),
-            "DICT_REMOVE" => self.check_dict_remove_call(args, span, context),
-            "DICT_KEYS" => self.check_dict_keys_call(args, span, context),
-            _ => {}
+            "ARRAY_REMOVE" => {
+                self.check_array_remove_call(args, span, context);
+                Vec::new()
+            }
+            "ARRAY_PUSH" => self.check_array_push_call(args, span, context),
+            "ARRAY_INSERT" => self.check_array_insert_call(args, span, context),
+            "LEN" => {
+                self.check_len_call(args, span, context);
+                Vec::new()
+            }
+            "DICT_HAS" => {
+                self.check_dict_has_call(args, span, context);
+                Vec::new()
+            }
+            "DICT_SIZE" => {
+                self.check_dict_size_call(args, span, context);
+                Vec::new()
+            }
+            "DICT_REMOVE" => {
+                self.check_dict_remove_call(args, span, context);
+                Vec::new()
+            }
+            "DICT_KEYS" => {
+                self.check_dict_keys_call(args, span, context);
+                Vec::new()
+            }
+            _ => Vec::new(),
         }
     }
 
@@ -830,6 +853,210 @@ impl<'a> CallTargetChecker<'a> {
                     error.message()
                 ),
             )),
+        }
+    }
+
+    fn check_array_push_call(
+        &mut self,
+        args: &[Expression],
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) -> Vec<usize> {
+        if args.len() != 2 {
+            self.diagnostics.push(Diagnostic::error(
+                span.clone(),
+                format!(
+                    "Builtin 'ARRAY_PUSH' expects 2 arguments but got {}",
+                    args.len()
+                ),
+            ));
+            return Vec::new();
+        }
+
+        if !is_mutable_lvalue(&args[0]) {
+            self.diagnostics.push(Diagnostic::error(
+                span.clone(),
+                "First argument for builtin 'ARRAY_PUSH' must be a mutable lvalue",
+            ));
+        }
+
+        let Some(element_type) =
+            self.check_array_argument("ARRAY_PUSH", "First", &args[0], span, context)
+        else {
+            return Vec::new();
+        };
+        self.check_array_value_argument(
+            "ARRAY_PUSH",
+            "Second",
+            &element_type,
+            &args[1],
+            span,
+            context,
+        )
+        .then_some(1)
+        .into_iter()
+        .collect()
+    }
+
+    fn check_array_insert_call(
+        &mut self,
+        args: &[Expression],
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) -> Vec<usize> {
+        if args.len() != 3 {
+            self.diagnostics.push(Diagnostic::error(
+                span.clone(),
+                format!(
+                    "Builtin 'ARRAY_INSERT' expects 3 arguments but got {}",
+                    args.len()
+                ),
+            ));
+            return Vec::new();
+        }
+
+        if !is_mutable_lvalue(&args[0]) {
+            self.diagnostics.push(Diagnostic::error(
+                span.clone(),
+                "First argument for builtin 'ARRAY_INSERT' must be a mutable lvalue",
+            ));
+        }
+
+        let Some(element_type) =
+            self.check_array_argument("ARRAY_INSERT", "First", &args[0], span, context)
+        else {
+            return Vec::new();
+        };
+        self.check_int_argument("ARRAY_INSERT", "Second", &args[1], span, context);
+        self.check_array_value_argument(
+            "ARRAY_INSERT",
+            "Third",
+            &element_type,
+            &args[2],
+            span,
+            context,
+        )
+        .then_some(2)
+        .into_iter()
+        .collect()
+    }
+
+    fn check_array_argument(
+        &mut self,
+        builtin: &str,
+        ordinal: &str,
+        arg: &Expression,
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) -> Option<TypeName> {
+        match self.infer_call_argument_type(arg, context) {
+            Ok(argument_type) => {
+                let Some(element_type) = argument_type.array_element_type() else {
+                    self.diagnostics.push(Diagnostic::error(
+                        span.clone(),
+                        format!(
+                            "{} argument for builtin '{}' has type {} but expected array",
+                            ordinal,
+                            builtin,
+                            argument_type.display_name()
+                        ),
+                    ));
+                    return None;
+                };
+                Some(element_type.clone())
+            }
+            Err(error) => {
+                self.diagnostics.push(Diagnostic::error(
+                    span.clone(),
+                    format!(
+                        "Cannot type-check {} argument for builtin '{}': {}",
+                        ordinal.to_lowercase(),
+                        builtin,
+                        error.message()
+                    ),
+                ));
+                None
+            }
+        }
+    }
+
+    fn check_int_argument(
+        &mut self,
+        builtin: &str,
+        ordinal: &str,
+        arg: &Expression,
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) {
+        match self.infer_call_argument_type(arg, context) {
+            Ok(argument_type) if argument_type != TypeName::int() => {
+                self.diagnostics.push(Diagnostic::error(
+                    span.clone(),
+                    format!(
+                        "{} argument for builtin '{}' has type {} but expected int",
+                        ordinal,
+                        builtin,
+                        argument_type.display_name()
+                    ),
+                ));
+            }
+            Ok(_) => {}
+            Err(error) => self.diagnostics.push(Diagnostic::error(
+                span.clone(),
+                format!(
+                    "Cannot type-check {} argument for builtin '{}': {}",
+                    ordinal.to_lowercase(),
+                    builtin,
+                    error.message()
+                ),
+            )),
+        }
+    }
+
+    fn check_array_value_argument(
+        &mut self,
+        builtin: &str,
+        ordinal: &str,
+        expected_type: &TypeName,
+        arg: &Expression,
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) -> bool {
+        let argument_type = check_expression_type_with_expected(
+            arg,
+            expected_type,
+            self.expected_type_inference(),
+            self.current_module(context),
+            self.current_flow_path(context),
+        );
+
+        match argument_type {
+            Err(ExpectedTypeCheckError::Mismatch(actual_type)) => {
+                self.diagnostics.push(Diagnostic::error(
+                    span.clone(),
+                    format!(
+                        "{} argument for builtin '{}' has type {} but expected {}",
+                        ordinal,
+                        builtin,
+                        actual_type.display_name(),
+                        expected_type.display_name()
+                    ),
+                ));
+                false
+            }
+            Ok(()) => is_interface_module_literal_argument(arg, expected_type),
+            Err(ExpectedTypeCheckError::Inference(error)) => {
+                self.diagnostics.push(Diagnostic::error(
+                    span.clone(),
+                    format!(
+                        "Cannot type-check {} argument for builtin '{}': {}",
+                        ordinal.to_lowercase(),
+                        builtin,
+                        error.message()
+                    ),
+                ));
+                false
+            }
         }
     }
 
@@ -1658,6 +1885,43 @@ mod tests {
     }
 
     #[test]
+    fn accepts_array_push_and_insert_builtins_for_array_types() {
+        let story = parse_story(
+            "=== interface IRoute ===\n\
+             == go ==\n\
+             === module game ===\n\
+             ENUM State { Idle Busy }\n\
+             STRUCT Player {\n\
+             hp: int\n\
+             }\n\
+             FROM left\n\
+             VAR score: int = 1\n\
+             VAR player: Player = %Player{ hp: 10 }\n\
+             VAR scores: int[] = [score]\n\
+             VAR players: Player[] = [player]\n\
+             VAR lookups: Dict<string, int>[] = [%{\"ada\": 10}]\n\
+             VAR states: State[] = [State.Idle]\n\
+             VAR routes: interface<IRoute>[] = [left]\n\
+             VAR nested_scores: int[][] = [scores]\n\
+             == main ==\n\
+             ~ ARRAY_PUSH(scores, 2)\n\
+             ~ ARRAY_PUSH(players, player)\n\
+             ~ ARRAY_PUSH(lookups, lookups[0])\n\
+             ~ ARRAY_PUSH(states, State.Busy)\n\
+             ~ ARRAY_PUSH(routes, routes[0])\n\
+             ~ ARRAY_PUSH(nested_scores, scores)\n\
+             ~ ARRAY_INSERT(scores, 0, 0)\n\
+             ~ ARRAY_INSERT(scores, LEN(scores), 3)\n\
+             -> DONE\n\
+             === module left implements IRoute ===\n\
+             == go ==\n\
+             -> DONE",
+        );
+
+        assert_eq!(super::super::run_analysis_passes(&story), []);
+    }
+
+    #[test]
     fn reports_array_remove_builtin_invalid_arguments() {
         let cases = [
             (
@@ -1692,6 +1956,72 @@ mod tests {
                  == function copy_values() => int[] ==\n\
                  ~ return values",
                 "First argument for builtin 'ARRAY_REMOVE' must be a mutable lvalue",
+            ),
+        ];
+
+        for (source, expected_message) in cases {
+            let story = parse_story(source);
+            let diagnostics = call_target_diagnostics(&story);
+
+            assert_single_diagnostic(&diagnostics, DiagnosticSeverity::Error, expected_message);
+        }
+    }
+
+    #[test]
+    fn reports_array_push_and_insert_builtin_invalid_arguments() {
+        let cases = [
+            (
+                "VAR value: int = 1\n\
+                 ~ ARRAY_PUSH(value, 1)\n\
+                 -> DONE",
+                "First argument for builtin 'ARRAY_PUSH' has type int but expected array",
+            ),
+            (
+                "VAR values: int[] = [1]\n\
+                 ~ ARRAY_PUSH(copy_values(), 1)\n\
+                 -> DONE\n\
+                 == function copy_values() => int[] ==\n\
+                 ~ return values",
+                "First argument for builtin 'ARRAY_PUSH' must be a mutable lvalue",
+            ),
+            (
+                "VAR values: int[] = [1]\n\
+                 ~ ARRAY_PUSH(values, \"two\")\n\
+                 -> DONE",
+                "Second argument for builtin 'ARRAY_PUSH' has type string but expected int",
+            ),
+            (
+                "VAR values: int[] = [1]\n\
+                 ~ ARRAY_PUSH(values)\n\
+                 -> DONE",
+                "Builtin 'ARRAY_PUSH' expects 2 arguments but got 1",
+            ),
+            (
+                "VAR values: int[] = [1]\n\
+                 VAR index: string = \"0\"\n\
+                 ~ ARRAY_INSERT(values, index, 2)\n\
+                 -> DONE",
+                "Second argument for builtin 'ARRAY_INSERT' has type string but expected int",
+            ),
+            (
+                "VAR values: int[] = [1]\n\
+                 ~ ARRAY_INSERT(values, 0, \"two\")\n\
+                 -> DONE",
+                "Third argument for builtin 'ARRAY_INSERT' has type string but expected int",
+            ),
+            (
+                "VAR values: int[] = [1]\n\
+                 ~ ARRAY_INSERT(values, 0)\n\
+                 -> DONE",
+                "Builtin 'ARRAY_INSERT' expects 3 arguments but got 2",
+            ),
+            (
+                "VAR values: int[] = [1]\n\
+                 ~ ARRAY_INSERT(copy_values(), 0, 1)\n\
+                 -> DONE\n\
+                 == function copy_values() => int[] ==\n\
+                 ~ return values",
+                "First argument for builtin 'ARRAY_INSERT' must be a mutable lvalue",
             ),
         ];
 
