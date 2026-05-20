@@ -86,6 +86,10 @@ is an external compatibility reference, not a tracked repository directory.
 - Avoid broad unrelated edits when working on compiler or language behavior.
 - Do not automatically create or switch branches. Stay on the current branch
   unless the project owner explicitly asks for a branch change.
+- When asked to implement an approved plan, active plan task, or issue fix,
+  commit the successful, validated change by default. Stage only related files,
+  preserve unrelated edits, and skip the commit if validation fails or the owner
+  explicitly asks not to commit.
 - Use `active plan` terminology consistently. Do not create or reference legacy
   aliases for the active-plan directory or concept.
 - Store active implementation plans under `docs/active_plan/`. When a plan is
