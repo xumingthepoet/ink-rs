@@ -462,7 +462,7 @@ Validation:
 Commit record: implementation `c50da78d` (`Support runtime Dict index operations`);
 review fix `b983c956` (`Preserve SET_INDEX key error ordering`)
 
-### [ ] Task 13: Runtime Dict Equality
+### [~] Task 13: Runtime Dict Equality
 
 Goal: Compare Dict values recursively with `==` and `!=`.
 
