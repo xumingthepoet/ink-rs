@@ -497,7 +497,7 @@ Validation:
 Commit record: implementation `dc3cafb8` (`Support runtime Dict equality`);
 review fix `55709dfa` (`Cover nested Dict equality`)
 
-### [~] Task 14: Runtime JSON Load And Save
+### [>] Task 14: Runtime JSON Load And Save
 
 Goal: Load and save Dict values through the format crate.
 
@@ -515,7 +515,21 @@ Modification boundaries: runtime JSON read/write and variable-state save paths.
 
 Validation commands: `cargo test -p ink-runtime json variables_state`
 
-Commit record: pending
+Validation:
+
+- The listed focused command was split because Cargo accepts only one test
+  filter per invocation.
+- `cargo test -p ink-runtime json` passed.
+- `cargo test -p ink-runtime variables_state` passed.
+- `cargo test -p ink-runtime story_state::tests::save_state_roundtrips_dict_variables_and_omits_defaults`
+  passed.
+- `cargo fmt --all --check` passed.
+- Initial `make gate` runs reached late test stages but failed by the 120s
+  wrapper timeout with no failing tests reported.
+- `make gate INK_TEST_TIMEOUT=240s` passed, then the default `make gate` hot
+  rerun passed.
+
+Commit record: implementation `4fab3f45` (`Load and save runtime Dict JSON`)
 
 ### [ ] Task 15: Runtime API And Externals
 
