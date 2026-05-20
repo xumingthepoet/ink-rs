@@ -9,6 +9,7 @@ use crate::{
 use super::{is_identifier, scan, text};
 
 mod error;
+mod literals;
 mod parser;
 mod token;
 mod tokenize;

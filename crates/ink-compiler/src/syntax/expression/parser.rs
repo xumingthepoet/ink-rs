@@ -1,8 +1,5 @@
 use crate::{
-    parsed::{
-        BinaryOperator, DictLiteralEntry, DictLiteralKey, Expression, FloatLiteral, QualifiedName,
-        StructLiteralField, TypeName, UnaryOperator,
-    },
+    parsed::{BinaryOperator, Expression, FloatLiteral, QualifiedName, UnaryOperator},
     source::SourceSpan,
 };
 
@@ -14,7 +11,7 @@ use super::{
     tokenize::tokenize_expression_at,
 };
 
-struct TokenExpressionParser<'a> {
+pub(super) struct TokenExpressionParser<'a> {
     tokens: &'a [ExpressionToken],
     index: usize,
     eof_span: SourceSpan,
@@ -42,7 +39,7 @@ impl<'a> TokenExpressionParser<'a> {
         Ok(expression)
     }
 
-    fn parse_expression(
+    pub(super) fn parse_expression(
         &mut self,
         minimum_precedence: u8,
     ) -> Result<Expression, ExpressionParseError> {
@@ -361,7 +358,7 @@ impl<'a> TokenExpressionParser<'a> {
         })
     }
 
-    fn parse_qualified_name_after_module(
+    pub(super) fn parse_qualified_name_after_module(
         &mut self,
         module: &str,
         module_span: SourceSpan,
@@ -400,264 +397,6 @@ impl<'a> TokenExpressionParser<'a> {
             symbol,
             token.span.clone(),
         ))
-    }
-
-    fn parse_array_literal(&mut self) -> Result<Expression, ExpressionParseError> {
-        let mut elements = Vec::new();
-        if self.match_kind(|kind| matches!(kind, ExpressionTokenKind::CloseBracket)) {
-            return Ok(Expression::ArrayLiteral(elements));
-        }
-
-        loop {
-            elements.push(self.parse_expression(0)?);
-            if self.match_kind(|kind| matches!(kind, ExpressionTokenKind::Comma)) {
-                continue;
-            }
-            self.expect_kind(
-                |kind| matches!(kind, ExpressionTokenKind::CloseBracket),
-                |found| ExpressionParseErrorKind::ExpectedCommaOrArrayCloseBracket { found },
-            )?;
-            break;
-        }
-
-        Ok(Expression::ArrayLiteral(elements))
-    }
-
-    fn parse_braced_literal(&mut self) -> Result<Expression, ExpressionParseError> {
-        if self.match_kind(|kind| matches!(kind, ExpressionTokenKind::CloseBrace)) {
-            return Err(ExpressionParseError::new(
-                ExpressionParseErrorKind::LegacyEmptyCompositeLiteral,
-                self.previous_span(),
-            ));
-        }
-
-        match self.peek().map(|token| &token.kind) {
-            Some(ExpressionTokenKind::Identifier(_)) => Err(ExpressionParseError::new(
-                ExpressionParseErrorKind::LegacyStructLiteral,
-                self.peek().expect("kind came from peek").span.clone(),
-            )),
-            Some(ExpressionTokenKind::StringLiteral(_))
-            | Some(ExpressionTokenKind::IntLiteral(_)) => Err(ExpressionParseError::new(
-                ExpressionParseErrorKind::LegacyDictLiteral,
-                self.peek().expect("kind came from peek").span.clone(),
-            )),
-            Some(ExpressionTokenKind::Operator(operator))
-                if operator == "-" && self.next_token_is_int_literal() =>
-            {
-                Err(ExpressionParseError::new(
-                    ExpressionParseErrorKind::LegacyDictLiteral,
-                    self.peek().expect("kind came from peek").span.clone(),
-                ))
-            }
-            Some(kind) => {
-                let token = self.peek().expect("kind came from peek");
-                Err(ExpressionParseError::new(
-                    ExpressionParseErrorKind::ExpectedCompositeLiteralKey {
-                        found: Some(describe_token_kind(kind)),
-                    },
-                    token.span.clone(),
-                ))
-            }
-            None => Err(
-                self.error_at_eof(ExpressionParseErrorKind::ExpectedCompositeLiteralKey {
-                    found: None,
-                }),
-            ),
-        }
-    }
-
-    fn parse_percent_literal(
-        &mut self,
-        percent_span: SourceSpan,
-    ) -> Result<Expression, ExpressionParseError> {
-        if self.match_kind(|kind| matches!(kind, ExpressionTokenKind::OpenBrace)) {
-            return self.parse_dict_literal();
-        }
-
-        let type_name = match self.peek().map(|token| token.kind.clone()) {
-            Some(ExpressionTokenKind::Identifier(name)) => {
-                let type_span = self.advance().expect("peek checked token").span.clone();
-                if self.match_kind(|kind| matches!(kind, ExpressionTokenKind::DoubleColon)) {
-                    TypeName::qualified_struct_type(
-                        self.parse_qualified_name_after_module(&name, type_span)?,
-                    )
-                } else {
-                    if !is_identifier(&name) {
-                        return Err(ExpressionParseError::new(
-                            ExpressionParseErrorKind::ExpectedPercentLiteralTarget {
-                                found: Some(name),
-                            },
-                            type_span,
-                        ));
-                    }
-                    TypeName::struct_type(name)
-                }
-            }
-            Some(kind) => {
-                let span = self.peek().expect("kind came from peek").span.clone();
-                return Err(ExpressionParseError::new(
-                    ExpressionParseErrorKind::ExpectedPercentLiteralTarget {
-                        found: Some(describe_token_kind(&kind)),
-                    },
-                    span,
-                ));
-            }
-            None => {
-                return Err(ExpressionParseError::new(
-                    ExpressionParseErrorKind::ExpectedPercentLiteralTarget { found: None },
-                    percent_span,
-                ));
-            }
-        };
-
-        self.expect_kind(
-            |kind| matches!(kind, ExpressionTokenKind::OpenBrace),
-            |found| ExpressionParseErrorKind::ExpectedPercentLiteralOpenBrace { found },
-        )?;
-        self.parse_struct_literal(type_name)
-    }
-
-    fn parse_struct_literal(
-        &mut self,
-        type_name: TypeName,
-    ) -> Result<Expression, ExpressionParseError> {
-        let mut fields = Vec::new();
-        if self.match_kind(|kind| matches!(kind, ExpressionTokenKind::CloseBrace)) {
-            return Ok(Expression::StructLiteral { type_name, fields });
-        }
-
-        loop {
-            let Some(token) = self.advance() else {
-                return Err(self.error_at_eof(
-                    ExpressionParseErrorKind::ExpectedStructLiteralField { found: None },
-                ));
-            };
-            let kind = token.kind.clone();
-            let ExpressionTokenKind::Identifier(name) = kind else {
-                return Err(ExpressionParseError::new(
-                    ExpressionParseErrorKind::ExpectedStructLiteralField {
-                        found: Some(describe_token_kind(&kind)),
-                    },
-                    token.span.clone(),
-                ));
-            };
-            if !is_identifier(&name) {
-                return Err(ExpressionParseError::new(
-                    ExpressionParseErrorKind::ExpectedStructLiteralField { found: Some(name) },
-                    token.span.clone(),
-                ));
-            }
-
-            self.expect_kind(
-                |kind| matches!(kind, ExpressionTokenKind::Colon),
-                |found| ExpressionParseErrorKind::ExpectedStructFieldColon {
-                    name: name.clone(),
-                    found,
-                },
-            )?;
-            let expression = self.parse_expression(0)?;
-            fields.push(StructLiteralField::new(name, expression));
-
-            if self.match_kind(|kind| matches!(kind, ExpressionTokenKind::Comma)) {
-                continue;
-            }
-            self.expect_kind(
-                |kind| matches!(kind, ExpressionTokenKind::CloseBrace),
-                |found| ExpressionParseErrorKind::ExpectedCommaOrStructCloseBrace { found },
-            )?;
-            break;
-        }
-
-        Ok(Expression::StructLiteral { type_name, fields })
-    }
-
-    fn parse_dict_literal(&mut self) -> Result<Expression, ExpressionParseError> {
-        let mut entries = Vec::new();
-        if self.match_kind(|kind| matches!(kind, ExpressionTokenKind::CloseBrace)) {
-            return Ok(Expression::DictLiteral(entries));
-        }
-
-        loop {
-            let key = self.parse_dict_literal_key()?;
-            self.expect_kind(
-                |kind| matches!(kind, ExpressionTokenKind::Colon),
-                |found| ExpressionParseErrorKind::ExpectedDictEntryColon { found },
-            )?;
-            let value = self.parse_expression(0)?;
-            entries.push(DictLiteralEntry::new(key, value));
-
-            if self.match_kind(|kind| matches!(kind, ExpressionTokenKind::Comma)) {
-                continue;
-            }
-            self.expect_kind(
-                |kind| matches!(kind, ExpressionTokenKind::CloseBrace),
-                |found| ExpressionParseErrorKind::ExpectedCommaOrDictCloseBrace { found },
-            )?;
-            break;
-        }
-
-        Ok(Expression::DictLiteral(entries))
-    }
-
-    fn parse_dict_literal_key(&mut self) -> Result<DictLiteralKey, ExpressionParseError> {
-        let Some(token) = self.advance() else {
-            return Err(
-                self.error_at_eof(ExpressionParseErrorKind::ExpectedDictLiteralKey { found: None })
-            );
-        };
-        let kind = token.kind.clone();
-        match kind {
-            ExpressionTokenKind::StringLiteral(value) => Ok(DictLiteralKey::String(value)),
-            ExpressionTokenKind::IntLiteral(value) => {
-                value.parse::<i32>().map(DictLiteralKey::Int).map_err(|_| {
-                    ExpressionParseError::new(
-                        ExpressionParseErrorKind::InvalidIntegerLiteral { value },
-                        token.span.clone(),
-                    )
-                })
-            }
-            ExpressionTokenKind::Operator(operator) if operator == "-" => {
-                let Some(value_token) = self.advance() else {
-                    return Err(self.error_at_eof(
-                        ExpressionParseErrorKind::ExpectedDictLiteralKey { found: None },
-                    ));
-                };
-                let value_kind = value_token.kind.clone();
-                let ExpressionTokenKind::IntLiteral(value) = value_kind else {
-                    return Err(ExpressionParseError::new(
-                        ExpressionParseErrorKind::ExpectedDictLiteralKey {
-                            found: Some(describe_token_kind(&value_kind)),
-                        },
-                        value_token.span.clone(),
-                    ));
-                };
-                let parsed = value.parse::<i32>().map_err(|_| {
-                    ExpressionParseError::new(
-                        ExpressionParseErrorKind::InvalidIntegerLiteral {
-                            value: format!("-{value}"),
-                        },
-                        token.span.clone(),
-                    )
-                })?;
-                parsed
-                    .checked_neg()
-                    .map(DictLiteralKey::Int)
-                    .ok_or_else(|| {
-                        ExpressionParseError::new(
-                            ExpressionParseErrorKind::InvalidIntegerLiteral {
-                                value: format!("-{value}"),
-                            },
-                            token.span.clone(),
-                        )
-                    })
-            }
-            other => Err(ExpressionParseError::new(
-                ExpressionParseErrorKind::ExpectedDictLiteralKey {
-                    found: Some(describe_token_kind(&other)),
-                },
-                token.span.clone(),
-            )),
-        }
     }
 
     fn parse_divert_target(&mut self) -> Result<Expression, ExpressionParseError> {
@@ -716,11 +455,11 @@ impl<'a> TokenExpressionParser<'a> {
         binary_operator_rule(operator).map(|rule| (rule.operator, rule.precedence, rule.text))
     }
 
-    fn peek(&self) -> Option<&'a ExpressionToken> {
+    pub(super) fn peek(&self) -> Option<&'a ExpressionToken> {
         self.tokens.get(self.index)
     }
 
-    fn next_token_is_int_literal(&self) -> bool {
+    pub(super) fn next_token_is_int_literal(&self) -> bool {
         self.tokens
             .get(self.index + 1)
             .is_some_and(|token| matches!(token.kind, ExpressionTokenKind::IntLiteral(_)))
@@ -733,20 +472,23 @@ impl<'a> TokenExpressionParser<'a> {
         )
     }
 
-    fn previous_span(&self) -> SourceSpan {
+    pub(super) fn previous_span(&self) -> SourceSpan {
         self.tokens
             .get(self.index.saturating_sub(1))
             .map(|token| token.span.clone())
             .unwrap_or_else(|| self.eof_span.clone())
     }
 
-    fn advance(&mut self) -> Option<&'a ExpressionToken> {
+    pub(super) fn advance(&mut self) -> Option<&'a ExpressionToken> {
         let token = self.peek()?;
         self.index += 1;
         Some(token)
     }
 
-    fn match_kind(&mut self, matches: impl FnOnce(&ExpressionTokenKind) -> bool) -> bool {
+    pub(super) fn match_kind(
+        &mut self,
+        matches: impl FnOnce(&ExpressionTokenKind) -> bool,
+    ) -> bool {
         if self.peek().is_some_and(|token| matches(&token.kind)) {
             self.index += 1;
             true
@@ -755,7 +497,7 @@ impl<'a> TokenExpressionParser<'a> {
         }
     }
 
-    fn expect_kind(
+    pub(super) fn expect_kind(
         &mut self,
         matches: impl FnOnce(&ExpressionTokenKind) -> bool,
         error_kind: impl FnOnce(Option<String>) -> ExpressionParseErrorKind,
@@ -774,7 +516,7 @@ impl<'a> TokenExpressionParser<'a> {
             .unwrap_or_else(|| (None, self.eof_span.clone()))
     }
 
-    fn error_at_eof(&self, kind: ExpressionParseErrorKind) -> ExpressionParseError {
+    pub(super) fn error_at_eof(&self, kind: ExpressionParseErrorKind) -> ExpressionParseError {
         ExpressionParseError::new(kind, self.eof_span.clone())
     }
 }
