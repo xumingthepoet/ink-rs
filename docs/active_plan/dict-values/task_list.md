@@ -574,7 +574,7 @@ Commit record: implementation `d0c277d8` (`Support Dict runtime APIs`)
 
 ## Milestone 6: Integration Fixtures
 
-### [ ] Task 16: Add Dict Runtime Fixtures And Author Docs
+### [~] Task 16: Add Dict Runtime Fixtures And Author Docs
 
 Goal: Cover end-to-end story behavior for core Dict operations and document the
 supported author-facing feature.
