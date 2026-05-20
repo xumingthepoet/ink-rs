@@ -522,7 +522,10 @@ fn float_op(params: &[Rc<Value>]) -> Result<Rc<dyn RTObject>, StoryError> {
 }
 
 fn value_type_is_composite(value: &ValueType) -> bool {
-    matches!(value, ValueType::Array(_) | ValueType::Object(_))
+    matches!(
+        value,
+        ValueType::Array(_) | ValueType::Object(_) | ValueType::Dict(_)
+    )
 }
 
 fn coerced_values_equal(params: &[Rc<Value>]) -> Result<bool, StoryError> {
@@ -586,6 +589,15 @@ fn value_types_equal(left: &ValueType, right: &ValueType) -> bool {
                         .is_some_and(|right_value| value_types_equal(left_value, right_value))
                 })
         }
+        (ValueType::Dict(left), ValueType::Dict(right)) => {
+            left.key_type() == right.key_type()
+                && left.entries().len() == right.entries().len()
+                && left.entries().iter().all(|(key, left_value)| {
+                    right
+                        .get(key)
+                        .is_some_and(|right_value| value_types_equal(left_value, right_value))
+                })
+        }
         _ => false,
     }
 }
@@ -595,7 +607,12 @@ mod tests {
     use std::{collections::BTreeMap, rc::Rc};
 
     use super::super::{NativeFunctionCall, Op};
-    use crate::{object::RTObject, story_error::StoryError, value::Value, value_type::ValueType};
+    use crate::{
+        object::RTObject,
+        story_error::StoryError,
+        value::Value,
+        value_type::{DictKey, DictKeyType, DictValue, ValueType},
+    };
 
     fn int_value(value: i32) -> Rc<dyn RTObject> {
         Rc::new(Value::new::<i32>(value))
@@ -607,6 +624,13 @@ mod tests {
 
     fn string_value(value: &str) -> Rc<dyn RTObject> {
         Rc::new(Value::new::<&str>(value))
+    }
+
+    fn dict_value(key_type: DictKeyType, entries: Vec<(DictKey, ValueType)>) -> Rc<dyn RTObject> {
+        Rc::new(Value::new_value_type(ValueType::Dict(
+            DictValue::new(key_type, entries.into_iter().collect::<BTreeMap<_, _>>())
+                .expect("test dict entries should match key type"),
+        )))
     }
 
     fn value_type(value: &dyn RTObject) -> &ValueType {
@@ -657,5 +681,77 @@ mod tests {
             ])
             .expect("composite equality should succeed");
         assert!(matches!(value_type(result.as_ref()), ValueType::Bool(true)));
+    }
+
+    #[test]
+    fn scalar_equality_compares_dict_values_recursively() {
+        let left = dict_value(
+            DictKeyType::String,
+            vec![
+                (DictKey::String("hp".to_string()), ValueType::Int(10)),
+                (
+                    DictKey::String("nested".to_string()),
+                    ValueType::Array(vec![ValueType::Int(1)]),
+                ),
+            ],
+        );
+        let right = dict_value(
+            DictKeyType::String,
+            vec![
+                (DictKey::String("hp".to_string()), ValueType::Int(10)),
+                (
+                    DictKey::String("nested".to_string()),
+                    ValueType::Array(vec![ValueType::Int(1)]),
+                ),
+            ],
+        );
+        let different_value = dict_value(
+            DictKeyType::String,
+            vec![
+                (DictKey::String("hp".to_string()), ValueType::Int(11)),
+                (
+                    DictKey::String("nested".to_string()),
+                    ValueType::Array(vec![ValueType::Int(1)]),
+                ),
+            ],
+        );
+        let different_key_type = dict_value(
+            DictKeyType::Int,
+            vec![(DictKey::Int(1), ValueType::Int(10))],
+        );
+
+        let equal = NativeFunctionCall::new(Op::Equal)
+            .call(vec![left.clone(), right])
+            .expect("dict equality should succeed");
+        assert!(matches!(value_type(equal.as_ref()), ValueType::Bool(true)));
+
+        let unequal_value = NativeFunctionCall::new(Op::Equal)
+            .call(vec![left.clone(), different_value])
+            .expect("dict equality should succeed");
+        assert!(matches!(
+            value_type(unequal_value.as_ref()),
+            ValueType::Bool(false)
+        ));
+
+        let unequal_key_type = NativeFunctionCall::new(Op::Equal)
+            .call(vec![left.clone(), different_key_type])
+            .expect("dict equality should succeed");
+        assert!(matches!(
+            value_type(unequal_key_type.as_ref()),
+            ValueType::Bool(false)
+        ));
+
+        let not_equal = NativeFunctionCall::new(Op::NotEquals)
+            .call(vec![
+                left,
+                Rc::new(Value::new_value_type(ValueType::Array(vec![
+                    ValueType::Int(10),
+                ]))),
+            ])
+            .expect("cross-type dict inequality should succeed");
+        assert!(matches!(
+            value_type(not_equal.as_ref()),
+            ValueType::Bool(true)
+        ));
     }
 }
