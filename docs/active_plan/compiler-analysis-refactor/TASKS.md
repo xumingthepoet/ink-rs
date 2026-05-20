@@ -627,7 +627,17 @@ Modification boundaries: Literal checker expected-expression state only.
 
 Validation commands: `cargo test -p ink-compiler array_literals dict_literals struct_literals`; `make gate`.
 
-Commit record: Implementation commit `38dcfe7e` (`Contain expected expression tracking`). Focused validation passed via split Cargo filters because Cargo accepts one test filter per invocation: `cargo test -p ink-compiler array_literals`, `cargo test -p ink-compiler dict_literals`, `cargo test -p ink-compiler struct_literals`; `make gate` passed. Completion-record commit `17dfa0dd` recorded waiting review; final completion-record commit TBD.
+Validation record: Focused validation passed via split Cargo filters because
+Cargo accepts one test filter per invocation: `cargo test -p ink-compiler
+array_literals`, `cargo test -p ink-compiler dict_literals`, `cargo test -p
+ink-compiler struct_literals`; `make gate` passed.
+
+Review record: Expected-expression pointer-id logic is contained in the shared
+`ExpectedExpressionSet`; the literal checkers no longer duplicate raw pointer
+tracking code.
+
+Commit record: Implementation commit `38dcfe7e`; completion-record commit
+recorded by this task-list update.
 
 ### [ ] Task 20: Pass real spans through function-call literal checks
 
