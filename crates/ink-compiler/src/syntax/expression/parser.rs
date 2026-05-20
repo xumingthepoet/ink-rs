@@ -5,8 +5,8 @@ use crate::{
 
 use super::super::is_identifier;
 use super::{
+    args::is_path_identifier,
     error::{describe_token_kind, ExpressionParseError, ExpressionParseErrorKind},
-    is_path_identifier,
     string::parse_string_expression,
     token::{binary_operator_rule, ExpressionToken, ExpressionTokenKind},
     tokenize::tokenize_expression_at,

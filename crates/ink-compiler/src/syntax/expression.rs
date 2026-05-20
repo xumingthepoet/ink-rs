@@ -2,8 +2,7 @@
 use crate::parsed::BinaryOperator;
 use crate::{diagnostic::Diagnostic, parsed::Expression, source::SourceSpan};
 
-use super::{is_identifier, scan};
-
+mod args;
 mod dynamic_interface;
 mod error;
 mod literals;
@@ -12,6 +11,7 @@ mod string;
 mod token;
 mod tokenize;
 
+pub(super) use args::split_top_level_args;
 use parser::{parse_token_expression, parse_token_expression_at};
 #[cfg(test)]
 use token::{binary_operator_rule, ExpressionToken, ExpressionTokenKind};
@@ -33,14 +33,6 @@ pub(super) fn parse_initial_expression_or_error(
     base_span: SourceSpan,
 ) -> Result<Expression, Diagnostic> {
     parse_token_expression_at(source, base_span).map_err(|error| error.into_diagnostic())
-}
-
-pub(super) fn split_top_level_args(source: &str) -> Vec<&str> {
-    scan::split_top_level_with_options(source, ',', scan::ScanOptions::expression())
-}
-
-fn is_path_identifier(source: &str) -> bool {
-    source.split('.').all(is_identifier)
 }
 
 #[cfg(test)]
