@@ -1,0 +1,68 @@
+Arena bracket runs in fixed rounds.
+1. Arius | score 40 | wins 0 | injuries 0
+2. Bren | score 38 | wins 0 | injuries 0
+3. Cora | score 42 | wins 0 | injuries 0
+4. Doran | score 40 | wins 0 | injuries 0
+5. Eira | score 39 | wins 0 | injuries 0
+6. Fen | score 39 | wins 0 | injuries 0
+7. Galen | score 39 | wins 0 | injuries 0
+8. Hela | score 35 | wins 0 | injuries 0
+Quarterfinals begin.
+Quarterfinal 1 --
+Matchup: Arius vs Bren
+Score compare: Arius 40 vs Bren 38
+Arius wins.
+Bren is lightly injured.
+Quarterfinal 2 --
+Matchup: Cora vs Doran
+Score compare: Cora 42 vs Doran 40
+Cora wins.
+Doran is lightly injured.
+Quarterfinal 3 --
+Matchup: Eira vs Fen
+Score compare: Eira 39 vs Fen 39
+Eira wins.
+Fen is lightly injured.
+Quarterfinal 4 --
+Matchup: Galen vs Hela
+Score compare: Galen 39 vs Hela 35
+Galen wins.
+Hela is lightly injured.
+Quarterfinals done.
+Semifinals begin.
+Semifinal 1 --
+Matchup: Arius vs Cora
+Score compare: Arius 40 vs Cora 42
+Cora wins.
+Arius is lightly injured.
+Semifinal 2 --
+Matchup: Eira vs Galen
+Score compare: Eira 39 vs Galen 39
+Eira wins.
+Galen is lightly injured.
+Semifinals done.
+Final round.
+Final --
+Matchup: Cora vs Eira
+Score compare: Cora 42 vs Eira 39
+Cora wins.
+Eira is lightly injured.
+Champion:
+Cora
+Wins: 3
+Power remaining: 10
+Speed: 8
+Discipline: 12
+Resilience: 12
+Injuries: 0
+Final champion output:
+The champion stayed clear and uninjured.
+Final roster status.
+1. Arius | score 39 | wins 1 | injuries 1
+2. Bren | score 37 | wins 0 | injuries 1
+3. Cora | score 42 | wins 3 | injuries 0
+4. Doran | score 39 | wins 0 | injuries 1
+5. Eira | score 38 | wins 2 | injuries 1
+6. Fen | score 38 | wins 0 | injuries 1
+7. Galen | score 38 | wins 1 | injuries 1
+8. Hela | score 34 | wins 0 | injuries 1
