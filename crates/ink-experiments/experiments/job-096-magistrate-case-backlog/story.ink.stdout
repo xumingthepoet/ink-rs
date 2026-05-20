@@ -1,0 +1,59 @@
+Magistrate backlog review begins.
+Opening public trust: 63
+Opening backlog pressure: 73
+Case 1: Canal Toll Embezzlement
+Priority 4, delay 7 days.
+Urgency score: 19
+Delay penalty: 20
+Verdict: Conviction
+Trust shift: -1
+Public trust now: 62
+Remaining backlog pressure: 54
+Case 2: Mill District Arson
+Priority 5, delay 10 days.
+Urgency score: 25
+Delay penalty: 42
+Verdict: Dismissal
+Trust shift: -13
+Public trust now: 49
+Remaining backlog pressure: 29
+Case 3: Harvest Contract Fraud
+Priority 3, delay 5 days.
+Urgency score: 14
+Delay penalty: 8
+Verdict: Probation
+Trust shift: -1
+Public trust now: 48
+Remaining backlog pressure: 15
+Case 4: Dockside Assault
+Priority 4, delay 11 days.
+Urgency score: 23
+Delay penalty: 40
+Verdict: Dismissal
+Trust shift: -15
+Public trust now: 33
+Remaining backlog pressure: 0
+Case 5: Archive Seal Tampering
+Priority 2, delay 4 days.
+Urgency score: 10
+Delay penalty: 3
+Verdict: Probation
+Trust shift: 1
+Public trust now: 34
+Remaining backlog pressure: 0
+Cases processed for the current docket.
+Case ledger:
+Canal Toll Embezzlement: urgency 19, penalty 20, verdict Conviction, trust -1
+Mill District Arson: urgency 25, penalty 42, verdict Dismissal, trust -13
+Harvest Contract Fraud: urgency 14, penalty 8, verdict Probation, trust -1
+Dockside Assault: urgency 23, penalty 40, verdict Dismissal, trust -15
+Archive Seal Tampering: urgency 10, penalty 3, verdict Probation, trust 1
+Final magistrate summary:
+Cases resolved: 5
+Convictions: 1
+Probations: 2
+Dismissals: 2
+Total delay penalty: 113
+Restitution points: 19
+Public trust closing value: 34
+Court legitimacy slips; emergency reforms are demanded.
