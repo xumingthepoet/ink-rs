@@ -1,0 +1,73 @@
+Night watch begins across four rooms.
+Initial haunt levels:
+Great Hall: 12
+Gallery: 9
+Archive: 14
+Cellar: 6
+Round 1: Gallery
+Planned cleansing action: Cleanse
+Gallery cleansing reduces haunt by 4 to 5.
+Spread resolved. Current pressure:
+Great Hall: 12
+Gallery: 7
+Archive: 14
+Cellar: 7
+Round 2: Archive
+Planned cleansing action: Observe only
+No intervention in Archive.
+Spread resolved. Current pressure:
+Great Hall: 12
+Gallery: 9
+Archive: 14
+Cellar: 8
+Round 3: Great Hall
+Planned cleansing action: Cleanse
+Great Hall cleansing reduces haunt by 4 to 8.
+Spread resolved. Current pressure:
+Great Hall: 9
+Gallery: 11
+Archive: 16
+Cellar: 9
+Round 4: Cellar
+Planned cleansing action: Contain surge
+Cellar is stabilized for this round at 8.
+Spread resolved. Current pressure:
+Great Hall: 10
+Gallery: 13
+Archive: 18
+Cellar: 9
+Round 5: Gallery
+Planned cleansing action: Cleanse
+Gallery cleansing reduces haunt by 4 to 9.
+Spread resolved. Current pressure:
+Great Hall: 11
+Gallery: 11
+Archive: 20
+Cellar: 10
+Round 6: Great Hall
+Planned cleansing action: Contain surge
+Great Hall is stabilized for this round at 10.
+Spread resolved. Current pressure:
+Great Hall: 11
+Gallery: 13
+Archive: 22
+Cellar: 11
+Round 7: Archive
+Planned cleansing action: Cleanse
+Archive cleansing reduces haunt by 4 to 18.
+Spread resolved. Current pressure:
+Great Hall: 12
+Gallery: 15
+Archive: 20
+Cellar: 12
+Watch sequence complete.
+Watch complete.
+Manifestation status: Major manifestation breached the ward.
+Cleanse attempts: 6
+Failed cleanse attempts: 0
+Total spread events: 36
+Final pressure:
+Great Hall: 12
+Gallery: 15
+Archive: 20
+Cellar: 12
