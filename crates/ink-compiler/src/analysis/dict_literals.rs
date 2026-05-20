@@ -13,6 +13,9 @@ use crate::{
 };
 
 use super::{
+    argument_resolution::{
+        resolve_function_call_expected_arguments, FunctionCallArgumentResolution,
+    },
     context::{EnumTypeIndex, FlowSymbol, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
     enums::type_name_contains_enum,
     expression_types::infer_expression_type,
@@ -233,17 +236,39 @@ impl<'a> DictLiteralChecker<'a> {
         span: &SourceSpan,
         context: &VisitContext,
     ) {
-        let Some(symbol) = resolve_target_symbol(
-            name,
-            context.current_module.as_deref(),
-            context.current_flow_path.as_deref(),
-            self.target_symbols,
-        )
-        .cloned() else {
+        let FunctionCallArgumentResolution::Function(expected_arguments) =
+            resolve_function_call_expected_arguments(
+                name,
+                context.current_module.as_deref(),
+                context.current_flow_path.as_deref(),
+                self.target_symbols,
+            )
+        else {
             return;
         };
 
-        self.check_flow_symbol_arguments(name, args, &symbol, span, context);
+        self.check_resolved_expected_arguments(&expected_arguments, args, span, context);
+    }
+
+    fn check_resolved_expected_arguments(
+        &mut self,
+        expected_arguments: &super::argument_resolution::ResolvedExpectedArguments,
+        arguments: &[Expression],
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) {
+        for (argument, parameter) in arguments.iter().zip(expected_arguments.arguments()) {
+            let Some(expected_type) = parameter.declared_type() else {
+                continue;
+            };
+            self.check_expression_against_type(
+                argument,
+                expected_type,
+                parameter.name(),
+                span,
+                context,
+            );
+        }
     }
 
     fn check_dynamic_interface_function_arguments(

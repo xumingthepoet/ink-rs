@@ -13,7 +13,13 @@ pub(super) struct ResolvedExpectedArguments {
 
 pub(super) struct ResolvedExpectedArgument {
     name: String,
-    declared_type: TypeName,
+    declared_type: Option<TypeName>,
+}
+
+pub(super) enum FunctionCallArgumentResolution {
+    Function(ResolvedExpectedArguments),
+    NonFunction,
+    Missing,
 }
 
 impl ResolvedExpectedArguments {
@@ -31,8 +37,8 @@ impl ResolvedExpectedArgument {
         &self.name
     }
 
-    pub(super) fn declared_type(&self) -> &TypeName {
-        &self.declared_type
+    pub(super) fn declared_type(&self) -> Option<&TypeName> {
+        self.declared_type.as_ref()
     }
 }
 
@@ -60,6 +66,25 @@ pub(super) fn resolve_static_target_expected_arguments(
     Some(resolve_flow_symbol_expected_arguments(target_name, symbol))
 }
 
+pub(super) fn resolve_function_call_expected_arguments(
+    name: &str,
+    current_module: Option<&str>,
+    current_flow_path: Option<&str>,
+    target_symbols: &TargetSymbolIndex,
+) -> FunctionCallArgumentResolution {
+    let Some(symbol) =
+        resolve_target_symbol(name, current_module, current_flow_path, target_symbols)
+    else {
+        return FunctionCallArgumentResolution::Missing;
+    };
+
+    if !symbol.is_function() {
+        return FunctionCallArgumentResolution::NonFunction;
+    }
+
+    FunctionCallArgumentResolution::Function(resolve_flow_symbol_expected_arguments(name, symbol))
+}
+
 pub(super) fn resolve_flow_symbol_expected_arguments(
     target_name: &str,
     symbol: &FlowSymbol,
@@ -68,14 +93,13 @@ pub(super) fn resolve_flow_symbol_expected_arguments(
     let arguments = symbol
         .arguments()
         .iter()
-        .filter_map(|parameter| {
-            let declared_type = parameter.declared_type()?;
-            Some(ResolvedExpectedArgument {
-                name: parameter.name().to_string(),
-                declared_type: qualified_module
+        .map(|parameter| ResolvedExpectedArgument {
+            name: parameter.name().to_string(),
+            declared_type: parameter.declared_type().map(|declared_type| {
+                qualified_module
                     .map(|module| qualify_type_name_for_module(declared_type, module))
-                    .unwrap_or_else(|| declared_type.clone()),
-            })
+                    .unwrap_or_else(|| declared_type.clone())
+            }),
         })
         .collect();
 

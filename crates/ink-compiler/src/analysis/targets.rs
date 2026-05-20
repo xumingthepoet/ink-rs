@@ -12,10 +12,11 @@ use crate::{
 };
 
 use super::{
-    context::{
-        EnumTypeIndex, FlowContext, FlowSymbol, StructTypeIndex, TargetSymbolIndex,
-        VariableScopeIndex,
+    argument_resolution::{
+        resolve_function_call_expected_arguments, FunctionCallArgumentResolution,
+        ResolvedExpectedArguments,
     },
+    context::{EnumTypeIndex, FlowContext, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
     enums::is_enum_member_reference,
     expression_types::{infer_expression_type, typed_builtin_return_type},
     indexes::AnalysisIndexes,
@@ -27,7 +28,6 @@ use super::{
     modules::ModuleImportIndex,
     span::object_span,
     target_symbols::{is_cross_module_stitch_target, resolve_target_symbol},
-    type_names::qualify_type_name_for_module,
 };
 
 #[cfg(test)]
@@ -664,16 +664,16 @@ impl<'a> CallTargetChecker<'a> {
             return;
         }
 
-        let symbol = resolve_target_symbol(
+        match resolve_function_call_expected_arguments(
             name,
             self.current_module(context),
             self.current_flow_path(context),
             self.target_symbols,
-        )
-        .cloned();
-
-        if let Some(symbol) = symbol {
-            if !symbol.is_function() {
+        ) {
+            FunctionCallArgumentResolution::Function(expected_arguments) => {
+                self.check_function_call_signature(name, args, &expected_arguments, span, context);
+            }
+            FunctionCallArgumentResolution::NonFunction => {
                 self.diagnostics.push(Diagnostic::error(
                     span.clone(),
                     format!(
@@ -683,16 +683,15 @@ impl<'a> CallTargetChecker<'a> {
                 for arg in args {
                     self.check_expression(arg, span, context);
                 }
-            } else {
-                self.check_function_call_signature(name, args, &symbol, span, context);
             }
-        } else {
-            self.diagnostics.push(Diagnostic::error(
-                span.clone(),
-                format!("Function '{name}' is not declared"),
-            ));
-            for arg in args {
-                self.check_expression(arg, span, context);
+            FunctionCallArgumentResolution::Missing => {
+                self.diagnostics.push(Diagnostic::error(
+                    span.clone(),
+                    format!("Function '{name}' is not declared"),
+                ));
+                for arg in args {
+                    self.check_expression(arg, span, context);
+                }
             }
         }
     }
@@ -837,12 +836,11 @@ impl<'a> CallTargetChecker<'a> {
         &mut self,
         name: &str,
         args: &[Expression],
-        symbol: &FlowSymbol,
+        expected_arguments: &ResolvedExpectedArguments,
         span: &SourceSpan,
         context: &VisitContext,
     ) {
-        let parameters = symbol.arguments();
-        let qualified_module = name.split_once("::").map(|(module, _)| module);
+        let parameters = expected_arguments.arguments();
         if args.len() != parameters.len() {
             self.diagnostics.push(Diagnostic::error(
                 span.clone(),
@@ -863,9 +861,6 @@ impl<'a> CallTargetChecker<'a> {
                 self.check_expression(argument, span, context);
                 continue;
             };
-            let expected_type = qualified_module
-                .map(|module| qualify_type_name_for_module(expected_type, module))
-                .unwrap_or_else(|| expected_type.clone());
             if is_composite_literal(argument) {
                 self.check_expression(argument, span, context);
                 continue;

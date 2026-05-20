@@ -13,8 +13,8 @@ use crate::{
 
 use super::{
     argument_resolution::{
-        resolve_flow_symbol_expected_arguments, resolve_static_target_expected_arguments,
-        ResolvedExpectedArguments,
+        resolve_function_call_expected_arguments, resolve_static_target_expected_arguments,
+        FunctionCallArgumentResolution, ResolvedExpectedArguments,
     },
     context::{EnumTypeIndex, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
     enums::type_name_contains_enum,
@@ -27,7 +27,6 @@ use super::{
     interfaces::InterfaceMemberIndex,
     modules::ModuleImportIndex,
     structs::resolve_struct_symbol,
-    target_symbols::resolve_target_symbol,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -225,17 +224,17 @@ impl<'a> ArrayLiteralChecker<'a> {
         span: &SourceSpan,
         context: &VisitContext,
     ) {
-        let Some(symbol) = resolve_target_symbol(
-            name,
-            context.current_module.as_deref(),
-            context.current_flow_path.as_deref(),
-            self.target_symbols,
-        )
-        .cloned() else {
+        let FunctionCallArgumentResolution::Function(expected_arguments) =
+            resolve_function_call_expected_arguments(
+                name,
+                context.current_module.as_deref(),
+                context.current_flow_path.as_deref(),
+                self.target_symbols,
+            )
+        else {
             return;
         };
 
-        let expected_arguments = resolve_flow_symbol_expected_arguments(name, &symbol);
         self.check_resolved_expected_arguments(&expected_arguments, args, span, context);
     }
 
@@ -263,9 +262,12 @@ impl<'a> ArrayLiteralChecker<'a> {
     ) {
         let _ = expected_arguments.target_name();
         for (argument, parameter) in arguments.iter().zip(expected_arguments.arguments()) {
+            let Some(expected_type) = parameter.declared_type() else {
+                continue;
+            };
             self.check_expression_for_arrays(
                 argument,
-                parameter.declared_type(),
+                expected_type,
                 parameter.name(),
                 span,
                 context,
