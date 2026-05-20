@@ -1,4 +1,4 @@
-Progress: 5/24
+Progress: 6/24
 
 # Compiler Analysis Refactor Active Plan
 
@@ -196,7 +196,7 @@ Review record: Reviewed implementation commit `53690a65` with `git show
 Commit record: Implementation commit `53690a65`; waiting-review record
 `66d152f8`; completion-record commit recorded by this task-list update.
 
-### [>] Task 06: Remove obsolete per-pass index construction
+### [x] Task 06: Remove obsolete per-pass index construction
 
 Goal: Delete now-unused repeated index construction from migrated analysis
 passes.
@@ -216,9 +216,14 @@ Modification boundaries: Analysis pass entry points and imports only.
 Validation commands: `cargo test -p ink-compiler analysis`; `make gate`.
 
 Validation record: `cargo test -p ink-compiler analysis` passed; `make gate`
-passed.
+passed. Review validation repeated after implementation review: `cargo test -p
+ink-compiler analysis` passed; `make gate` passed.
 
-Commit record: Implementation commit `509a5586`; completion-record commit TBD.
+Review record: Reviewed implementation commit `509a5586` with `git show
+--check`; no follow-up changes required.
+
+Commit record: Implementation commit `509a5586`; waiting-review record
+`18ded162`; completion-record commit recorded by this task-list update.
 
 ## Milestone 2: Expected-Type Checking
 
