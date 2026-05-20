@@ -574,7 +574,7 @@ Commit record: implementation `d0c277d8` (`Support Dict runtime APIs`)
 
 ## Milestone 6: Integration Fixtures
 
-### [~] Task 16: Add Dict Runtime Fixtures And Author Docs
+### [>] Task 16: Add Dict Runtime Fixtures And Author Docs
 
 Goal: Cover end-to-end story behavior for core Dict operations and document the
 supported author-facing feature.
@@ -598,7 +598,18 @@ Modification boundaries: `crates/ink-test` fixtures/tests,
 
 Validation commands: `cargo test -p ink-test typed_values`
 
-Commit record: pending
+Validation:
+
+- `cargo test -p ink-test typed_values` passed.
+- `cargo test -p ink-test --test typed_values` passed.
+- `cargo fmt --all --check` passed.
+- Initial default `make gate` reached the workspace doc-test stage but failed
+  by wrapper timeout with no failing tests reported.
+- `make gate UNIT_TEST_TIMEOUT=120s INK_TEST_TIMEOUT=600s` passed; the
+  following default `make gate` hot rerun hit the same workspace doc-test
+  wrapper timeout with no failing tests reported.
+
+Commit record: implementation `2167c03e` (`Add Dict runtime fixtures and docs`)
 
 ### [ ] Task 17: Add Dict Diagnostic Fixtures
 
