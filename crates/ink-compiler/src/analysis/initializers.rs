@@ -11,7 +11,8 @@ use super::{
     enums::type_name_is_enum,
     indexes::AnalysisIndexes,
     interface_values::{
-        infer_expression_type_with_expected, ExpectedTypeInference, ModuleImplementationIndex,
+        check_expression_type_with_expected, ExpectedTypeCheckError, ExpectedTypeInference,
+        ModuleImplementationIndex,
     },
     interfaces::InterfaceMemberIndex,
     modules::ModuleImportIndex,
@@ -112,22 +113,22 @@ impl<'a> VariableInitializerChecker<'a> {
             return;
         };
 
-        match infer_expression_type_with_expected(
+        match check_expression_type_with_expected(
             expression,
             declared_type,
             self.expected_type_inference(),
             context.current_module.as_deref(),
             context.current_flow_path.as_deref(),
         ) {
-            Ok(actual_type) if &actual_type != declared_type => {
+            Err(ExpectedTypeCheckError::Mismatch(actual_type)) => {
                 self.diagnostics.push(type_mismatch_diagnostic(
                     assignment,
                     declared_type,
                     &actual_type,
                 ));
             }
-            Ok(_) => {}
-            Err(error)
+            Ok(()) => {}
+            Err(ExpectedTypeCheckError::Inference(error))
                 if declared_type.primitive_type().is_some()
                     || declared_type.as_interface_name().is_some()
                     || type_name_is_enum(
@@ -145,19 +146,19 @@ impl<'a> VariableInitializerChecker<'a> {
                     ),
                 ));
             }
-            Err(_) => {}
+            Err(ExpectedTypeCheckError::Inference(_)) => {}
         }
     }
 
     fn check_constant(&mut self, declaration: &ConstantDeclaration, context: &VisitContext) {
-        match infer_expression_type_with_expected(
+        match check_expression_type_with_expected(
             declaration.expression(),
             declaration.declared_type(),
             self.expected_type_inference(),
             context.current_module.as_deref(),
             context.current_flow_path.as_deref(),
         ) {
-            Ok(actual_type) if &actual_type != declaration.declared_type() => {
+            Err(ExpectedTypeCheckError::Mismatch(actual_type)) => {
                 self.diagnostics.push(Diagnostic::error(
                     declaration.span().clone(),
                     format!(
@@ -168,8 +169,8 @@ impl<'a> VariableInitializerChecker<'a> {
                     ),
                 ));
             }
-            Ok(_) => {}
-            Err(error)
+            Ok(()) => {}
+            Err(ExpectedTypeCheckError::Inference(error))
                 if declaration.declared_type().primitive_type().is_some()
                     || declaration.declared_type().as_interface_name().is_some()
                     || type_name_is_enum(
@@ -187,7 +188,7 @@ impl<'a> VariableInitializerChecker<'a> {
                     ),
                 ));
             }
-            Err(_) => {}
+            Err(ExpectedTypeCheckError::Inference(_)) => {}
         }
     }
 }

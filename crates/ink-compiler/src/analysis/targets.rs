@@ -20,8 +20,8 @@ use super::{
     expression_types::{infer_expression_type, typed_builtin_return_type},
     indexes::AnalysisIndexes,
     interface_values::{
-        infer_expression_type_with_expected, ExpectedTypeInference, InterfaceModuleLiteralUses,
-        ModuleImplementationIndex,
+        check_expression_type_with_expected, ExpectedTypeCheckError, ExpectedTypeInference,
+        InterfaceModuleLiteralUses, ModuleImplementationIndex,
     },
     interfaces::InterfaceMemberIndex,
     modules::ModuleImportIndex,
@@ -494,7 +494,7 @@ impl<'a> CallTargetChecker<'a> {
                 continue;
             }
 
-            let argument_type = infer_expression_type_with_expected(
+            let argument_type = check_expression_type_with_expected(
                 argument,
                 expected_type,
                 self.expected_type_inference(),
@@ -503,7 +503,7 @@ impl<'a> CallTargetChecker<'a> {
             );
 
             match argument_type {
-                Ok(actual_type) if actual_type != *expected_type => {
+                Err(ExpectedTypeCheckError::Mismatch(actual_type)) => {
                     self.diagnostics.push(Diagnostic::error(
                         span.clone(),
                         format!(
@@ -515,12 +515,12 @@ impl<'a> CallTargetChecker<'a> {
                     ));
                     self.check_expression(argument, span, context);
                 }
-                Ok(_) => {
+                Ok(()) => {
                     if !is_interface_module_literal_argument(argument, expected_type) {
                         self.check_expression(argument, span, context);
                     }
                 }
-                Err(error) => self.diagnostics.push(Diagnostic::error(
+                Err(ExpectedTypeCheckError::Inference(error)) => self.diagnostics.push(Diagnostic::error(
                     span.clone(),
                     format!(
                         "Cannot type-check argument '{}' for dynamic interface {member_kind} '{member}': {}",
@@ -870,7 +870,7 @@ impl<'a> CallTargetChecker<'a> {
                 self.check_expression(argument, span, context);
                 continue;
             }
-            let argument_type = infer_expression_type_with_expected(
+            let argument_type = check_expression_type_with_expected(
                 argument,
                 &expected_type,
                 self.expected_type_inference(),
@@ -879,7 +879,7 @@ impl<'a> CallTargetChecker<'a> {
             );
 
             match argument_type {
-                Ok(actual_type) if actual_type != expected_type => {
+                Err(ExpectedTypeCheckError::Mismatch(actual_type)) => {
                     self.diagnostics.push(Diagnostic::error(
                         span.clone(),
                         format!(
@@ -891,19 +891,21 @@ impl<'a> CallTargetChecker<'a> {
                     ));
                     self.check_expression(argument, span, context);
                 }
-                Ok(_) => {
+                Ok(()) => {
                     if !is_interface_module_literal_argument(argument, &expected_type) {
                         self.check_expression(argument, span, context);
                     }
                 }
-                Err(error) => self.diagnostics.push(Diagnostic::error(
-                    span.clone(),
-                    format!(
-                        "Cannot type-check argument '{}' for function '{name}': {}",
-                        parameter.name(),
-                        error.message()
-                    ),
-                )),
+                Err(ExpectedTypeCheckError::Inference(error)) => {
+                    self.diagnostics.push(Diagnostic::error(
+                        span.clone(),
+                        format!(
+                            "Cannot type-check argument '{}' for function '{name}': {}",
+                            parameter.name(),
+                            error.message()
+                        ),
+                    ))
+                }
             }
         }
     }

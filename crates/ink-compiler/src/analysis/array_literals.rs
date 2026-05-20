@@ -17,7 +17,8 @@ use super::{
     expression_types::infer_expression_type,
     indexes::AnalysisIndexes,
     interface_values::{
-        infer_expression_type_with_expected, ExpectedTypeInference, ModuleImplementationIndex,
+        check_expression_type_with_expected, ExpectedTypeCheckError, ExpectedTypeInference,
+        ModuleImplementationIndex,
     },
     interfaces::InterfaceMemberIndex,
     modules::ModuleImportIndex,
@@ -459,14 +460,14 @@ impl<'a> ArrayLiteralChecker<'a> {
         span: &SourceSpan,
         context: &VisitContext,
     ) {
-        match infer_expression_type_with_expected(
+        match check_expression_type_with_expected(
             expression,
             expected_type,
             self.expected_type_inference(),
             context.current_module.as_deref(),
             context.current_flow_path.as_deref(),
         ) {
-            Ok(actual_type) if &actual_type != expected_type => {
+            Err(ExpectedTypeCheckError::Mismatch(actual_type)) => {
                 self.diagnostics.push(type_mismatch_diagnostic(
                     context_name,
                     expected_type,
@@ -474,15 +475,17 @@ impl<'a> ArrayLiteralChecker<'a> {
                     span,
                 ));
             }
-            Ok(_) => {}
-            Err(error) => self.diagnostics.push(Diagnostic::error(
-                span.clone(),
-                format!(
-                    "Cannot type-check value for '{}': {}",
-                    context_name,
-                    error.message()
-                ),
-            )),
+            Ok(()) => {}
+            Err(ExpectedTypeCheckError::Inference(error)) => {
+                self.diagnostics.push(Diagnostic::error(
+                    span.clone(),
+                    format!(
+                        "Cannot type-check value for '{}': {}",
+                        context_name,
+                        error.message()
+                    ),
+                ))
+            }
         }
     }
 
@@ -494,14 +497,14 @@ impl<'a> ArrayLiteralChecker<'a> {
         span: &SourceSpan,
         context: &VisitContext,
     ) {
-        match infer_expression_type_with_expected(
+        match check_expression_type_with_expected(
             expression,
             expected_type,
             self.expected_type_inference(),
             context.current_module.as_deref(),
             context.current_flow_path.as_deref(),
         ) {
-            Ok(actual_type) if &actual_type != expected_type => {
+            Err(ExpectedTypeCheckError::Mismatch(actual_type)) => {
                 self.diagnostics.push(type_mismatch_diagnostic(
                     context_name,
                     expected_type,
@@ -509,8 +512,8 @@ impl<'a> ArrayLiteralChecker<'a> {
                     span,
                 ));
             }
-            Ok(_) => {}
-            Err(error)
+            Ok(()) => {}
+            Err(ExpectedTypeCheckError::Inference(error))
                 if expected_type.primitive_type().is_some()
                     || expected_type.as_interface_name().is_some()
                     || type_name_contains_enum(
@@ -528,7 +531,7 @@ impl<'a> ArrayLiteralChecker<'a> {
                     ),
                 ));
             }
-            Err(_) => {}
+            Err(ExpectedTypeCheckError::Inference(_)) => {}
         }
     }
 

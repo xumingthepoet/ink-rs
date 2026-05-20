@@ -12,7 +12,8 @@ use super::{
     expression_types::infer_expression_type,
     indexes::AnalysisIndexes,
     interface_values::{
-        infer_expression_type_with_expected, ExpectedTypeInference, ModuleImplementationIndex,
+        check_expression_type_with_expected, ExpectedTypeCheckError, ExpectedTypeInference,
+        ModuleImplementationIndex,
     },
     interfaces::InterfaceMemberIndex,
     modules::ModuleImportIndex,
@@ -328,14 +329,14 @@ impl<'a> VariableAssignmentChecker<'a> {
         context: &VisitContext,
     ) {
         if declared_type.as_interface_name().is_some() {
-            match infer_expression_type_with_expected(
+            match check_expression_type_with_expected(
                 expression,
                 &declared_type,
                 self.expected_type_inference(),
                 context.current_module.as_deref(),
                 context.current_flow_path.as_deref(),
             ) {
-                Ok(actual_type) if actual_type != declared_type => {
+                Err(ExpectedTypeCheckError::Mismatch(actual_type)) => {
                     self.diagnostics.push(Diagnostic::error(
                         span.clone(),
                         format!(
@@ -345,14 +346,16 @@ impl<'a> VariableAssignmentChecker<'a> {
                         ),
                     ));
                 }
-                Ok(_) => {}
-                Err(error) => self.diagnostics.push(Diagnostic::error(
-                    span.clone(),
-                    format!(
-                        "Cannot type-check assignment to variable '{name}': {}",
-                        error.message()
-                    ),
-                )),
+                Ok(()) => {}
+                Err(ExpectedTypeCheckError::Inference(error)) => {
+                    self.diagnostics.push(Diagnostic::error(
+                        span.clone(),
+                        format!(
+                            "Cannot type-check assignment to variable '{name}': {}",
+                            error.message()
+                        ),
+                    ))
+                }
             }
             return;
         }

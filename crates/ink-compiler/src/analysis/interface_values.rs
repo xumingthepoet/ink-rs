@@ -40,6 +40,11 @@ pub(super) struct ExpectedTypeInference<'a> {
     pub(super) interface_members: &'a InterfaceMemberIndex,
 }
 
+pub(super) enum ExpectedTypeCheckError {
+    Mismatch(TypeName),
+    Inference(TypeInferenceError),
+}
+
 pub(super) fn build_module_implementation_index(story: &Story) -> ModuleImplementationIndex {
     let mut index = ModuleImplementationIndex::default();
 
@@ -57,6 +62,28 @@ pub(super) fn build_module_implementation_index(story: &Story) -> ModuleImplemen
     }
 
     index
+}
+
+pub(super) fn check_expression_type_with_expected(
+    expression: &Expression,
+    expected_type: &TypeName,
+    inputs: ExpectedTypeInference<'_>,
+    current_module: Option<&str>,
+    current_flow_path: Option<&str>,
+) -> Result<(), ExpectedTypeCheckError> {
+    match infer_expression_type_with_expected(
+        expression,
+        expected_type,
+        inputs,
+        current_module,
+        current_flow_path,
+    ) {
+        Ok(actual_type) if &actual_type != expected_type => {
+            Err(ExpectedTypeCheckError::Mismatch(actual_type))
+        }
+        Ok(_) => Ok(()),
+        Err(error) => Err(ExpectedTypeCheckError::Inference(error)),
+    }
 }
 
 pub(super) fn infer_expression_type_with_expected(
