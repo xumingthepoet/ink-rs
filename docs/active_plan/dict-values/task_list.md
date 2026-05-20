@@ -1,4 +1,4 @@
-Progress: 12/20
+Progress: 13/20
 
 # Typed Dict Values Task List
 
@@ -462,7 +462,7 @@ Validation:
 Commit record: implementation `c50da78d` (`Support runtime Dict index operations`);
 review fix `b983c956` (`Preserve SET_INDEX key error ordering`)
 
-### [>] Task 13: Runtime Dict Equality
+### [x] Task 13: Runtime Dict Equality
 
 Goal: Compare Dict values recursively with `==` and `!=`.
 
@@ -487,8 +487,15 @@ Validation:
 - Second `make gate` rerun reached the `ink-test` integration stage but failed
   by the same wrapper timeout with no failing tests reported.
 - Reran `make gate` again after incremental compilation; passed.
+- Review fix: covered nested Dict equality directly, then reran
+  `cargo test -p ink-runtime native_function_call::scalar`,
+  `cargo fmt --all --check`, and `make gate`. The first two review-fix
+  `make gate` runs hit wrapper timeouts with no failing tests reported; the
+  final hot rerun passed. Reran focused validation plus `make gate` after the
+  review-fix commit.
 
-Commit record: implementation `dc3cafb8` (`Support runtime Dict equality`)
+Commit record: implementation `dc3cafb8` (`Support runtime Dict equality`);
+review fix `55709dfa` (`Cover nested Dict equality`)
 
 ### [ ] Task 14: Runtime JSON Load And Save
 
