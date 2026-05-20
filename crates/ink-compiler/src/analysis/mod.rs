@@ -1,13 +1,16 @@
+mod argument_resolution;
 mod array_literals;
 mod assignments;
 mod constants;
 mod context;
 mod dict_literals;
 mod enums;
+mod expected_expressions;
 mod expression_types;
 mod field_access;
 mod flow;
 mod index_access;
+mod indexes;
 mod initializers;
 mod interface_values;
 mod interfaces;
@@ -26,20 +29,20 @@ mod warnings;
 
 use crate::{compiler::StageOutput, diagnostic::Diagnostic, parsed::Story};
 
-use array_literals::array_literal_diagnostics;
-use assignments::variable_assignment_diagnostics;
+use array_literals::array_literal_diagnostics_with_indexes;
+use assignments::variable_assignment_diagnostics_with_indexes;
 use constants::constant_redefinition_diagnostics;
-use dict_literals::dict_literal_diagnostics;
+use dict_literals::dict_literal_diagnostics_with_indexes;
 use enums::enum_type_diagnostics;
-use field_access::field_access_diagnostics;
-use flow::flow_diagnostics;
-use index_access::index_access_diagnostics;
-use initializers::variable_initializer_diagnostics;
+use field_access::field_access_diagnostics_with_indexes;
+use flow::flow_diagnostics_with_indexes;
+use index_access::index_access_diagnostics_with_indexes;
+use initializers::variable_initializer_diagnostics_with_indexes;
 use interfaces::{interface_diagnostics, interface_implementation_diagnostics};
 use names::naming_diagnostics;
-use struct_literals::struct_literal_diagnostics;
+use struct_literals::struct_literal_diagnostics_with_indexes;
 use structs::struct_type_diagnostics;
-use targets::call_target_diagnostics;
+use targets::call_target_diagnostics_with_indexes;
 use warnings::author_warning_diagnostics;
 
 pub use modules::{
@@ -106,6 +109,7 @@ fn run_analysis_passes_with_modules(
     story: &Story,
     module_analysis: &modules::ModuleAnalysis,
 ) -> Vec<Diagnostic> {
+    let analysis_indexes = indexes::AnalysisIndexes::build(story, module_analysis);
     let mut diagnostics = Vec::new();
 
     // Constants and author warnings are story-wide discovery passes. They do
@@ -148,20 +152,44 @@ fn run_analysis_passes_with_modules(
     // Flow checks are order-sensitive and should stay before target checks:
     // loose ends, illegal returns, and function body restrictions describe
     // control-flow shape rather than target availability.
-    diagnostics.extend(flow_diagnostics(story));
+    diagnostics.extend(flow_diagnostics_with_indexes(story, &analysis_indexes));
 
     // Target checks build symbol and variable-scope indexes.
     // Keep this after naming/flow diagnostics so resolution errors do not hide
     // more local structural problems.
-    diagnostics.extend(call_target_diagnostics(story));
+    diagnostics.extend(call_target_diagnostics_with_indexes(
+        story,
+        &analysis_indexes,
+    ));
 
-    diagnostics.extend(variable_initializer_diagnostics(story));
-    diagnostics.extend(variable_assignment_diagnostics(story));
-    diagnostics.extend(dict_literal_diagnostics(story));
-    diagnostics.extend(struct_literal_diagnostics(story));
-    diagnostics.extend(array_literal_diagnostics(story));
-    diagnostics.extend(field_access_diagnostics(story));
-    diagnostics.extend(index_access_diagnostics(story));
+    diagnostics.extend(variable_initializer_diagnostics_with_indexes(
+        story,
+        &analysis_indexes,
+    ));
+    diagnostics.extend(variable_assignment_diagnostics_with_indexes(
+        story,
+        &analysis_indexes,
+    ));
+    diagnostics.extend(dict_literal_diagnostics_with_indexes(
+        story,
+        &analysis_indexes,
+    ));
+    diagnostics.extend(struct_literal_diagnostics_with_indexes(
+        story,
+        &analysis_indexes,
+    ));
+    diagnostics.extend(array_literal_diagnostics_with_indexes(
+        story,
+        &analysis_indexes,
+    ));
+    diagnostics.extend(field_access_diagnostics_with_indexes(
+        story,
+        &analysis_indexes,
+    ));
+    diagnostics.extend(index_access_diagnostics_with_indexes(
+        story,
+        &analysis_indexes,
+    ));
 
     diagnostics
 }
@@ -171,6 +199,10 @@ mod tests {
     const ANALYSIS_SOURCES: &[(&str, &str)] = &[
         ("mod.rs", include_str!("mod.rs")),
         ("array_literals.rs", include_str!("array_literals.rs")),
+        (
+            "argument_resolution.rs",
+            include_str!("argument_resolution.rs"),
+        ),
         ("assignments.rs", include_str!("assignments.rs")),
         ("constants.rs", include_str!("constants.rs")),
         ("context.rs", include_str!("context.rs")),
@@ -180,6 +212,7 @@ mod tests {
         ("field_access.rs", include_str!("field_access.rs")),
         ("flow.rs", include_str!("flow.rs")),
         ("index_access.rs", include_str!("index_access.rs")),
+        ("indexes.rs", include_str!("indexes.rs")),
         ("initializers.rs", include_str!("initializers.rs")),
         ("interface_values.rs", include_str!("interface_values.rs")),
         ("interfaces.rs", include_str!("interfaces.rs")),

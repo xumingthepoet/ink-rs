@@ -8,35 +8,38 @@ use crate::{
 
 use super::{
     context::{EnumTypeIndex, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
-    enums::{build_enum_type_index, type_name_is_enum},
-    expression_types::infer_expression_type,
+    enums::type_name_is_enum,
+    indexes::AnalysisIndexes,
     interface_values::{
-        build_module_implementation_index, infer_expected_interface_expression_type,
+        check_expression_type_with_expected, ExpectedTypeCheckError, ExpectedTypeInference,
         ModuleImplementationIndex,
     },
-    interfaces::{build_interface_member_index, InterfaceMemberIndex},
-    modules::{build_module_import_index, ModuleImportIndex},
-    structs::build_struct_type_index,
-    target_symbols::build_target_symbol_index,
-    variables::build_variable_scope_index,
+    interfaces::InterfaceMemberIndex,
+    modules::ModuleImportIndex,
 };
 
+#[cfg(test)]
+use super::modules::ModuleAnalysis;
+
+#[cfg(test)]
 pub(super) fn variable_initializer_diagnostics(story: &Story) -> Vec<Diagnostic> {
-    let struct_types = build_struct_type_index(story);
-    let enum_types = build_enum_type_index(story);
-    let variable_scopes = build_variable_scope_index(story);
-    let target_symbols = build_target_symbol_index(story);
-    let interface_members = build_interface_member_index(story);
-    let module_implementations = build_module_implementation_index(story);
-    let module_imports = build_module_import_index(story);
+    let module_analysis = ModuleAnalysis::build(story);
+    let indexes = AnalysisIndexes::build(story, &module_analysis);
+    variable_initializer_diagnostics_with_indexes(story, &indexes)
+}
+
+pub(super) fn variable_initializer_diagnostics_with_indexes(
+    story: &Story,
+    indexes: &AnalysisIndexes<'_>,
+) -> Vec<Diagnostic> {
     let mut checker = VariableInitializerChecker::new(
-        &variable_scopes,
-        &struct_types,
-        &enum_types,
-        &target_symbols,
-        &interface_members,
-        &module_implementations,
-        &module_imports,
+        &indexes.variable_scopes,
+        &indexes.struct_types,
+        &indexes.enum_types,
+        &indexes.target_symbols,
+        &indexes.interface_members,
+        &indexes.module_implementations,
+        indexes.module_imports,
     );
     walk_story(story, &mut checker);
     checker.diagnostics
@@ -75,6 +78,18 @@ impl<'a> VariableInitializerChecker<'a> {
         }
     }
 
+    fn expected_type_inference(&self) -> ExpectedTypeInference<'_> {
+        ExpectedTypeInference {
+            variable_scopes: self.variable_scopes,
+            struct_types: self.struct_types,
+            enum_types: self.enum_types,
+            target_symbols: self.target_symbols,
+            module_implementations: self.module_implementations,
+            module_imports: self.module_imports,
+            interface_members: self.interface_members,
+        }
+    }
+
     fn check_assignment(&mut self, assignment: &VariableAssignment, context: &VisitContext) {
         if !assignment.is_global() && !assignment.is_temporary() {
             return;
@@ -98,60 +113,24 @@ impl<'a> VariableInitializerChecker<'a> {
             return;
         };
 
-        if let Some(result) = infer_expected_interface_expression_type(
+        match check_expression_type_with_expected(
             expression,
             declared_type,
-            self.variable_scopes,
-            self.struct_types,
-            self.enum_types,
-            self.target_symbols,
-            self.module_implementations,
-            self.module_imports,
-            self.interface_members,
+            self.expected_type_inference(),
             context.current_module.as_deref(),
             context.current_flow_path.as_deref(),
         ) {
-            match result {
-                Ok(actual_type) if &actual_type != declared_type => {
-                    self.diagnostics.push(type_mismatch_diagnostic(
-                        assignment,
-                        declared_type,
-                        &actual_type,
-                    ));
-                }
-                Ok(_) => {}
-                Err(error) => self.diagnostics.push(Diagnostic::error(
-                    assignment.span().clone(),
-                    format!(
-                        "Cannot type-check initializer for variable '{}': {}",
-                        assignment.name(),
-                        error.message()
-                    ),
-                )),
-            }
-            return;
-        }
-
-        match infer_expression_type(
-            expression,
-            self.variable_scopes,
-            self.struct_types,
-            self.enum_types,
-            self.target_symbols,
-            self.interface_members,
-            context.current_module.as_deref(),
-            context.current_flow_path.as_deref(),
-        ) {
-            Ok(actual_type) if &actual_type != declared_type => {
+            Err(ExpectedTypeCheckError::Mismatch(actual_type)) => {
                 self.diagnostics.push(type_mismatch_diagnostic(
                     assignment,
                     declared_type,
                     &actual_type,
                 ));
             }
-            Ok(_) => {}
-            Err(error)
+            Ok(()) => {}
+            Err(ExpectedTypeCheckError::Inference(error))
                 if declared_type.primitive_type().is_some()
+                    || declared_type.as_interface_name().is_some()
                     || type_name_is_enum(
                         declared_type,
                         self.enum_types,
@@ -167,60 +146,19 @@ impl<'a> VariableInitializerChecker<'a> {
                     ),
                 ));
             }
-            Err(_) => {}
+            Err(ExpectedTypeCheckError::Inference(_)) => {}
         }
     }
 
     fn check_constant(&mut self, declaration: &ConstantDeclaration, context: &VisitContext) {
-        if let Some(result) = infer_expected_interface_expression_type(
+        match check_expression_type_with_expected(
             declaration.expression(),
             declaration.declared_type(),
-            self.variable_scopes,
-            self.struct_types,
-            self.enum_types,
-            self.target_symbols,
-            self.module_implementations,
-            self.module_imports,
-            self.interface_members,
+            self.expected_type_inference(),
             context.current_module.as_deref(),
             context.current_flow_path.as_deref(),
         ) {
-            match result {
-                Ok(actual_type) if &actual_type != declaration.declared_type() => {
-                    self.diagnostics.push(Diagnostic::error(
-                        declaration.span().clone(),
-                        format!(
-                            "Initializer for constant '{}' has type {} but declared type is {}",
-                            declaration.name(),
-                            actual_type.display_name(),
-                            declaration.declared_type().display_name()
-                        ),
-                    ));
-                }
-                Ok(_) => {}
-                Err(error) => self.diagnostics.push(Diagnostic::error(
-                    declaration.span().clone(),
-                    format!(
-                        "Cannot type-check initializer for constant '{}': {}",
-                        declaration.name(),
-                        error.message()
-                    ),
-                )),
-            }
-            return;
-        }
-
-        match infer_expression_type(
-            declaration.expression(),
-            self.variable_scopes,
-            self.struct_types,
-            self.enum_types,
-            self.target_symbols,
-            self.interface_members,
-            context.current_module.as_deref(),
-            context.current_flow_path.as_deref(),
-        ) {
-            Ok(actual_type) if &actual_type != declaration.declared_type() => {
+            Err(ExpectedTypeCheckError::Mismatch(actual_type)) => {
                 self.diagnostics.push(Diagnostic::error(
                     declaration.span().clone(),
                     format!(
@@ -231,9 +169,10 @@ impl<'a> VariableInitializerChecker<'a> {
                     ),
                 ));
             }
-            Ok(_) => {}
-            Err(error)
+            Ok(()) => {}
+            Err(ExpectedTypeCheckError::Inference(error))
                 if declaration.declared_type().primitive_type().is_some()
+                    || declaration.declared_type().as_interface_name().is_some()
                     || type_name_is_enum(
                         declaration.declared_type(),
                         self.enum_types,
@@ -249,7 +188,7 @@ impl<'a> VariableInitializerChecker<'a> {
                     ),
                 ));
             }
-            Err(_) => {}
+            Err(ExpectedTypeCheckError::Inference(_)) => {}
         }
     }
 }

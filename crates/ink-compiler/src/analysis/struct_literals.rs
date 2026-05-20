@@ -1,4 +1,4 @@
-use std::collections::{BTreeSet, HashSet};
+use std::collections::BTreeSet;
 
 use crate::{
     diagnostic::Diagnostic,
@@ -12,37 +12,47 @@ use crate::{
 };
 
 use super::{
-    context::{EnumTypeIndex, FlowSymbol, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
-    enums::{build_enum_type_index, type_name_contains_enum},
+    argument_resolution::{
+        resolve_dynamic_interface_signature, resolve_function_call_expected_arguments,
+        resolve_static_target_expected_arguments, DynamicInterfaceSignatureInputs,
+        FunctionCallArgumentResolution, ResolvedExpectedArguments,
+    },
+    context::{EnumTypeIndex, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
+    enums::type_name_contains_enum,
+    expected_expressions::{expression_context_span, ExpectedExpressionSet},
     expression_types::infer_expression_type,
+    indexes::AnalysisIndexes,
     interface_values::{
-        build_module_implementation_index, infer_expected_interface_expression_type,
+        check_expression_type_with_expected, ExpectedTypeCheckError, ExpectedTypeInference,
         ModuleImplementationIndex,
     },
-    interfaces::{build_interface_member_index, InterfaceMemberIndex},
-    modules::{build_module_import_index, ModuleImportIndex},
-    structs::{build_struct_type_index, resolve_struct_symbol},
-    target_symbols::{build_target_symbol_index, resolve_target_symbol},
-    type_names::qualify_type_name_for_module,
-    variables::build_variable_scope_index,
+    interfaces::InterfaceMemberIndex,
+    modules::ModuleImportIndex,
+    structs::resolve_struct_symbol,
 };
 
+#[cfg(test)]
+use super::modules::ModuleAnalysis;
+
+#[cfg(test)]
 pub(super) fn struct_literal_diagnostics(story: &Story) -> Vec<Diagnostic> {
-    let struct_types = build_struct_type_index(story);
-    let enum_types = build_enum_type_index(story);
-    let variable_scopes = build_variable_scope_index(story);
-    let target_symbols = build_target_symbol_index(story);
-    let module_implementations = build_module_implementation_index(story);
-    let module_imports = build_module_import_index(story);
-    let interface_members = build_interface_member_index(story);
+    let module_analysis = ModuleAnalysis::build(story);
+    let indexes = AnalysisIndexes::build(story, &module_analysis);
+    struct_literal_diagnostics_with_indexes(story, &indexes)
+}
+
+pub(super) fn struct_literal_diagnostics_with_indexes(
+    story: &Story,
+    indexes: &AnalysisIndexes<'_>,
+) -> Vec<Diagnostic> {
     let mut checker = StructLiteralChecker::new(
-        &struct_types,
-        &enum_types,
-        &variable_scopes,
-        &target_symbols,
-        &module_implementations,
-        &module_imports,
-        &interface_members,
+        &indexes.struct_types,
+        &indexes.enum_types,
+        &indexes.variable_scopes,
+        &indexes.target_symbols,
+        &indexes.module_implementations,
+        indexes.module_imports,
+        &indexes.interface_members,
     );
     walk_story(story, &mut checker);
     checker.diagnostics
@@ -57,7 +67,7 @@ struct StructLiteralChecker<'a> {
     module_imports: &'a ModuleImportIndex,
     interface_members: &'a InterfaceMemberIndex,
     diagnostics: Vec<Diagnostic>,
-    expected_expression_ids: HashSet<usize>,
+    expected_expressions: ExpectedExpressionSet,
 }
 
 impl<'a> StructLiteralChecker<'a> {
@@ -79,7 +89,29 @@ impl<'a> StructLiteralChecker<'a> {
             module_imports,
             interface_members,
             diagnostics: Vec::new(),
-            expected_expression_ids: HashSet::new(),
+            expected_expressions: ExpectedExpressionSet::default(),
+        }
+    }
+
+    fn expected_type_inference(&self) -> ExpectedTypeInference<'_> {
+        ExpectedTypeInference {
+            variable_scopes: self.variable_scopes,
+            struct_types: self.struct_types,
+            enum_types: self.enum_types,
+            target_symbols: self.target_symbols,
+            module_implementations: self.module_implementations,
+            module_imports: self.module_imports,
+            interface_members: self.interface_members,
+        }
+    }
+
+    fn dynamic_interface_signature_inputs(&self) -> DynamicInterfaceSignatureInputs<'_> {
+        DynamicInterfaceSignatureInputs {
+            variable_scopes: self.variable_scopes,
+            struct_types: self.struct_types,
+            enum_types: self.enum_types,
+            target_symbols: self.target_symbols,
+            interface_members: self.interface_members,
         }
     }
 
@@ -152,18 +184,29 @@ impl<'a> StructLiteralChecker<'a> {
         context: &VisitContext,
     ) {
         match target {
-            DivertTarget::Path(target) => {
-                self.check_static_target_arguments(target, arguments, span, context);
-            }
-            DivertTarget::QualifiedPath(target) => {
-                self.check_static_target_arguments(target.as_str(), arguments, span, context);
+            DivertTarget::Path(_) | DivertTarget::QualifiedPath(_) => {
+                if let Some(expected_arguments) = resolve_static_target_expected_arguments(
+                    target,
+                    context.current_module.as_deref(),
+                    context.current_flow_path.as_deref(),
+                    self.target_symbols,
+                ) {
+                    self.check_resolved_expected_arguments(
+                        &expected_arguments,
+                        arguments,
+                        span,
+                        context,
+                    );
+                }
             }
             DivertTarget::Dynamic(Expression::DynamicInterfaceAccess { target, member }) => {
-                if let Some(signature) = self.dynamic_interface_signature(
+                if let Ok(signature) = resolve_dynamic_interface_signature(
                     target,
                     member,
                     InterfaceMemberKind::Knot,
-                    context,
+                    self.dynamic_interface_signature_inputs(),
+                    context.current_module.as_deref(),
+                    context.current_flow_path.as_deref(),
                 ) {
                     self.check_interface_signature_arguments(
                         member, arguments, &signature, span, context,
@@ -177,26 +220,6 @@ impl<'a> StructLiteralChecker<'a> {
         }
     }
 
-    fn check_static_target_arguments(
-        &mut self,
-        target: &str,
-        arguments: &[Expression],
-        span: &SourceSpan,
-        context: &VisitContext,
-    ) {
-        let Some(symbol) = resolve_target_symbol(
-            target,
-            context.current_module.as_deref(),
-            context.current_flow_path.as_deref(),
-            self.target_symbols,
-        )
-        .cloned() else {
-            return;
-        };
-
-        self.check_flow_symbol_arguments(target, arguments, &symbol, span, context);
-    }
-
     fn check_function_call_arguments(
         &mut self,
         name: &str,
@@ -204,17 +227,39 @@ impl<'a> StructLiteralChecker<'a> {
         span: &SourceSpan,
         context: &VisitContext,
     ) {
-        let Some(symbol) = resolve_target_symbol(
-            name,
-            context.current_module.as_deref(),
-            context.current_flow_path.as_deref(),
-            self.target_symbols,
-        )
-        .cloned() else {
+        let FunctionCallArgumentResolution::Function(expected_arguments) =
+            resolve_function_call_expected_arguments(
+                name,
+                context.current_module.as_deref(),
+                context.current_flow_path.as_deref(),
+                self.target_symbols,
+            )
+        else {
             return;
         };
 
-        self.check_flow_symbol_arguments(name, args, &symbol, span, context);
+        self.check_resolved_expected_arguments(&expected_arguments, args, span, context);
+    }
+
+    fn check_resolved_expected_arguments(
+        &mut self,
+        expected_arguments: &ResolvedExpectedArguments,
+        arguments: &[Expression],
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) {
+        for (argument, parameter) in arguments.iter().zip(expected_arguments.arguments()) {
+            let Some(expected_type) = parameter.declared_type() else {
+                continue;
+            };
+            self.check_expression_against_type(
+                argument,
+                expected_type,
+                parameter.name(),
+                span,
+                context,
+            );
+        }
     }
 
     fn check_dynamic_interface_function_arguments(
@@ -225,39 +270,17 @@ impl<'a> StructLiteralChecker<'a> {
         span: &SourceSpan,
         context: &VisitContext,
     ) {
-        if let Some(signature) =
-            self.dynamic_interface_signature(target, member, InterfaceMemberKind::Function, context)
-        {
+        if let Ok(signature) = resolve_dynamic_interface_signature(
+            target,
+            member,
+            InterfaceMemberKind::Function,
+            self.dynamic_interface_signature_inputs(),
+            context.current_module.as_deref(),
+            context.current_flow_path.as_deref(),
+        ) {
             self.check_interface_signature_arguments(member, args, &signature, span, context);
         }
     }
-
-    fn check_flow_symbol_arguments(
-        &mut self,
-        target_name: &str,
-        arguments: &[Expression],
-        symbol: &FlowSymbol,
-        span: &SourceSpan,
-        context: &VisitContext,
-    ) {
-        let qualified_module = target_name.split_once("::").map(|(module, _)| module);
-        for (argument, parameter) in arguments.iter().zip(symbol.arguments()) {
-            let Some(expected_type) = parameter.declared_type() else {
-                continue;
-            };
-            let expected_type = qualified_module
-                .map(|module| qualify_type_name_for_module(expected_type, module))
-                .unwrap_or_else(|| expected_type.clone());
-            self.check_expression_against_type(
-                argument,
-                &expected_type,
-                parameter.name(),
-                span,
-                context,
-            );
-        }
-    }
-
     fn check_interface_signature_arguments(
         &mut self,
         member: &str,
@@ -279,29 +302,6 @@ impl<'a> StructLiteralChecker<'a> {
                 context,
             );
         }
-    }
-
-    fn dynamic_interface_signature(
-        &self,
-        target: &Expression,
-        member: &str,
-        expected_kind: InterfaceMemberKind,
-        context: &VisitContext,
-    ) -> Option<InterfaceMemberSignature> {
-        let target_type = infer_expression_type(
-            target,
-            self.variable_scopes,
-            self.struct_types,
-            self.enum_types,
-            self.target_symbols,
-            self.interface_members,
-            context.current_module.as_deref(),
-            context.current_flow_path.as_deref(),
-        )
-        .ok()?;
-        let interface_name = target_type.as_interface_name()?;
-        let signature = self.interface_members.member(interface_name, member)?;
-        (signature.kind() == &expected_kind).then(|| signature.clone())
     }
 
     fn visible_declared_type(&self, name: &str, context: &VisitContext) -> Option<TypeName> {
@@ -426,52 +426,14 @@ impl<'a> StructLiteralChecker<'a> {
         span: &SourceSpan,
         context: &VisitContext,
     ) {
-        if let Some(result) = infer_expected_interface_expression_type(
+        match check_expression_type_with_expected(
             expression,
             expected_type,
-            self.variable_scopes,
-            self.struct_types,
-            self.enum_types,
-            self.target_symbols,
-            self.module_implementations,
-            self.module_imports,
-            self.interface_members,
+            self.expected_type_inference(),
             context.current_module.as_deref(),
             context.current_flow_path.as_deref(),
         ) {
-            match result {
-                Ok(actual_type) if &actual_type != expected_type => {
-                    self.diagnostics.push(type_mismatch_diagnostic(
-                        context_name,
-                        expected_type,
-                        &actual_type,
-                        span,
-                    ));
-                }
-                Ok(_) => {}
-                Err(error) => self.diagnostics.push(Diagnostic::error(
-                    span.clone(),
-                    format!(
-                        "Cannot type-check value for '{}': {}",
-                        context_name,
-                        error.message()
-                    ),
-                )),
-            }
-            return;
-        }
-
-        match infer_expression_type(
-            expression,
-            self.variable_scopes,
-            self.struct_types,
-            self.enum_types,
-            self.target_symbols,
-            self.interface_members,
-            context.current_module.as_deref(),
-            context.current_flow_path.as_deref(),
-        ) {
-            Ok(actual_type) if &actual_type != expected_type => {
+            Err(ExpectedTypeCheckError::Mismatch(actual_type)) => {
                 self.diagnostics.push(type_mismatch_diagnostic(
                     context_name,
                     expected_type,
@@ -479,9 +441,10 @@ impl<'a> StructLiteralChecker<'a> {
                     span,
                 ));
             }
-            Ok(_) => {}
-            Err(error)
+            Ok(()) => {}
+            Err(ExpectedTypeCheckError::Inference(error))
                 if expected_type.primitive_type().is_some()
+                    || expected_type.as_interface_name().is_some()
                     || type_name_contains_enum(
                         expected_type,
                         self.enum_types,
@@ -497,7 +460,7 @@ impl<'a> StructLiteralChecker<'a> {
                     ),
                 ));
             }
-            Err(_) => {}
+            Err(ExpectedTypeCheckError::Inference(_)) => {}
         }
     }
 
@@ -573,8 +536,7 @@ impl<'a> StructLiteralChecker<'a> {
     }
 
     fn mark_expected_expression(&mut self, expression: &Expression) {
-        self.expected_expression_ids
-            .insert(expression as *const Expression as usize);
+        self.expected_expressions.mark(expression);
     }
 }
 
@@ -592,41 +554,24 @@ impl ParsedVisitor for StructLiteralChecker<'_> {
     }
 
     fn visit_expression(&mut self, expression: &Expression, context: &VisitContext) {
+        let span = expression_context_span(context);
         match expression {
-            Expression::FunctionCall { name, args } => self.check_function_call_arguments(
-                name,
-                args,
-                &SourceSpan::new(None, 1, 1),
-                context,
-            ),
-            Expression::QualifiedFunctionCall { name, args } => self.check_function_call_arguments(
-                name.as_str(),
-                args,
-                &SourceSpan::new(None, 1, 1),
-                context,
-            ),
+            Expression::FunctionCall { name, args } => {
+                self.check_function_call_arguments(name, args, &span, context)
+            }
+            Expression::QualifiedFunctionCall { name, args } => {
+                self.check_function_call_arguments(name.as_str(), args, &span, context)
+            }
             Expression::DynamicInterfaceFunctionCall {
                 target,
                 member,
                 args,
-            } => self.check_dynamic_interface_function_arguments(
-                target,
-                member,
-                args,
-                &SourceSpan::new(None, 1, 1),
-                context,
-            ),
+            } => self
+                .check_dynamic_interface_function_arguments(target, member, args, &span, context),
             Expression::StructLiteral { type_name, fields }
-                if !self
-                    .expected_expression_ids
-                    .contains(&(expression as *const Expression as usize)) =>
+                if !self.expected_expressions.contains(expression) =>
             {
-                self.check_struct_literal_for_type(
-                    type_name,
-                    fields,
-                    &SourceSpan::new(None, 1, 1),
-                    context,
-                );
+                self.check_struct_literal_for_type(type_name, fields, &span, context);
             }
             _ => {}
         }
@@ -765,6 +710,31 @@ mod tests {
         );
 
         assert_eq!(super::super::run_analysis_passes(&story), []);
+    }
+
+    #[test]
+    fn reports_function_call_struct_argument_errors_at_containing_object_span() {
+        let story = parse_story(
+            "=== module game ===\n\
+             STRUCT Player {\n\
+             hp: int\n\
+             }\n\
+             == main ==\n\
+             ~ temp value: int = score(%Player{ hp: \"bad\" })\n\
+             -> END\n\
+             == function score(player: Player) => int ==\n\
+             ~ return player.hp",
+        );
+
+        let diagnostics = struct_literal_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Value for 'Player.hp' has type string but expected int",
+        );
+        assert_eq!(diagnostics[0].line, 6);
+        assert_eq!(diagnostics[0].column, 1);
     }
 
     #[test]

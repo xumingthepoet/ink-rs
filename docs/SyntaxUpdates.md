@@ -26,6 +26,27 @@ Each entry should include:
 - migration guidance
 - tests
 
+## 2026-05-21: Multiplicative Operators Share Precedence
+
+- status: supported
+- upstream behavior: conventional arithmetic treats multiplication, division,
+  and remainder operators as one precedence group that associates
+  left-to-right.
+- ink-rs behavior: `*`, `/`, `mod`, and `%` now share one precedence level and
+  associate left-to-right. For example, `8 * 100 / 56` parses as
+  `(8 * 100) / 56`, and `14 mod 5 % 3` parses as `(14 mod 5) % 3`.
+- documentation effect: `SyntaxReference.md` now states that multiplicative
+  arithmetic operators share precedence and associate left-to-right.
+- rationale: the previous parser table gave each multiplicative operator a
+  different precedence, so mixed chains such as `a * b / c` could silently
+  evaluate as `a * (b / c)`.
+- migration guidance: remove defensive parentheses that only worked around the
+  old parser bug. Keep parentheses when a non-left-associative grouping is
+  intended.
+- tests: parser snapshots cover mixed multiplicative chains, and the
+  arithmetic runtime fixture covers integer percentage and mixed remainder
+  formulas whose outputs differ under the old precedence table.
+
 ## 2026-05-20: Elixir-Style Struct And Dict Literals
 
 - status: supported

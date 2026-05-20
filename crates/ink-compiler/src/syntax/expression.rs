@@ -173,19 +173,19 @@ const BINARY_OPERATOR_RULES: &[BinaryOperatorRule] = &[
     BinaryOperatorRule {
         text: "/",
         operator: BinaryOperator::Divide,
-        precedence: 7,
+        precedence: 6,
         token_kind: OperatorTokenKind::Symbol,
     },
     BinaryOperatorRule {
         text: "mod",
         operator: BinaryOperator::Modulo,
-        precedence: 8,
+        precedence: 6,
         token_kind: OperatorTokenKind::Word,
     },
     BinaryOperatorRule {
         text: "%",
         operator: BinaryOperator::Modulo,
-        precedence: 9,
+        precedence: 6,
         token_kind: OperatorTokenKind::Symbol,
     },
 ];
@@ -1681,6 +1681,18 @@ mod tests {
             (
                 "8 / 4 / 2",
                 "Binary(/, Binary(/, Number(8), Number(4)), Number(2))",
+            ),
+            (
+                "8 * 4 / 2",
+                "Binary(/, Binary(*, Number(8), Number(4)), Number(2))",
+            ),
+            (
+                "8 / 4 * 2",
+                "Binary(*, Binary(/, Number(8), Number(4)), Number(2))",
+            ),
+            (
+                "14 mod 5 % 3",
+                "Binary(%, Binary(%, Number(14), Number(5)), Number(3))",
             ),
             ("8 mod 3", "Binary(%, Number(8), Number(3))"),
             ("8 % 3", "Binary(%, Number(8), Number(3))"),

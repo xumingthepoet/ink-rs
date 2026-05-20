@@ -697,6 +697,8 @@ mod tests {
             diagnostics[0].message,
             "Qualified reference 'items::helper' requires a direct import in module 'game': FROM items IMPORT helper"
         );
+        assert_eq!(diagnostics[0].line, 3);
+        assert_eq!(diagnostics[0].column, 3);
     }
 
     #[test]
@@ -726,6 +728,29 @@ mod tests {
             diagnostics[0].message,
             "Qualified reference 'items::helper' requires a direct import in module 'game': FROM items IMPORT helper"
         );
+    }
+
+    #[test]
+    fn reports_qualified_import_use_in_return_at_containing_object_span() {
+        let story = parse_story(
+            "=== module game ===\n\
+             == function value() => int ==\n\
+             ~ return items::helper()\n\
+             === module items ===\n\
+             == function helper() => int ==\n\
+             ~ return 1",
+        );
+
+        let diagnostics = import_diagnostics(&story);
+
+        assert_eq!(diagnostics.len(), 1, "{diagnostics:#?}");
+        assert_eq!(diagnostics[0].severity, DiagnosticSeverity::Error);
+        assert_eq!(
+            diagnostics[0].message,
+            "Qualified reference 'items::helper' requires a direct import in module 'game': FROM items IMPORT helper"
+        );
+        assert_eq!(diagnostics[0].line, 3);
+        assert_eq!(diagnostics[0].column, 10);
     }
 
     #[test]

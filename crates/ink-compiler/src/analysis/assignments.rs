@@ -8,36 +8,41 @@ use crate::{
 
 use super::{
     context::{EnumTypeIndex, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
-    enums::{build_enum_type_index, type_name_is_enum},
+    enums::type_name_is_enum,
     expression_types::infer_expression_type,
+    indexes::AnalysisIndexes,
     interface_values::{
-        build_module_implementation_index, infer_expected_interface_expression_type,
+        check_expression_type_with_expected, ExpectedTypeCheckError, ExpectedTypeInference,
         ModuleImplementationIndex,
     },
-    interfaces::{build_interface_member_index, InterfaceMemberIndex},
-    modules::{build_module_import_index, ModuleImportIndex},
-    structs::{build_struct_type_index, resolve_struct_symbol},
-    target_symbols::build_target_symbol_index,
+    interfaces::InterfaceMemberIndex,
+    modules::ModuleImportIndex,
+    structs::resolve_struct_symbol,
     type_names::{qualify_type_name_for_module, type_name_module},
-    variables::build_variable_scope_index,
 };
 
+#[cfg(test)]
+use super::modules::ModuleAnalysis;
+
+#[cfg(test)]
 pub(super) fn variable_assignment_diagnostics(story: &Story) -> Vec<Diagnostic> {
-    let struct_types = build_struct_type_index(story);
-    let enum_types = build_enum_type_index(story);
-    let variable_scopes = build_variable_scope_index(story);
-    let target_symbols = build_target_symbol_index(story);
-    let module_implementations = build_module_implementation_index(story);
-    let module_imports = build_module_import_index(story);
-    let interface_members = build_interface_member_index(story);
+    let module_analysis = ModuleAnalysis::build(story);
+    let indexes = AnalysisIndexes::build(story, &module_analysis);
+    variable_assignment_diagnostics_with_indexes(story, &indexes)
+}
+
+pub(super) fn variable_assignment_diagnostics_with_indexes(
+    story: &Story,
+    indexes: &AnalysisIndexes<'_>,
+) -> Vec<Diagnostic> {
     let mut checker = VariableAssignmentChecker::new(
-        &variable_scopes,
-        &struct_types,
-        &enum_types,
-        &target_symbols,
-        &module_implementations,
-        &module_imports,
-        &interface_members,
+        &indexes.variable_scopes,
+        &indexes.struct_types,
+        &indexes.enum_types,
+        &indexes.target_symbols,
+        &indexes.module_implementations,
+        indexes.module_imports,
+        &indexes.interface_members,
     );
     walk_story(story, &mut checker);
     checker.diagnostics
@@ -73,6 +78,18 @@ impl<'a> VariableAssignmentChecker<'a> {
             module_imports,
             interface_members,
             diagnostics: Vec::new(),
+        }
+    }
+
+    fn expected_type_inference(&self) -> ExpectedTypeInference<'_> {
+        ExpectedTypeInference {
+            variable_scopes: self.variable_scopes,
+            struct_types: self.struct_types,
+            enum_types: self.enum_types,
+            target_symbols: self.target_symbols,
+            module_implementations: self.module_implementations,
+            module_imports: self.module_imports,
+            interface_members: self.interface_members,
         }
     }
 
@@ -311,21 +328,15 @@ impl<'a> VariableAssignmentChecker<'a> {
         span: &crate::source::SourceSpan,
         context: &VisitContext,
     ) {
-        if let Some(result) = infer_expected_interface_expression_type(
-            expression,
-            &declared_type,
-            self.variable_scopes,
-            self.struct_types,
-            self.enum_types,
-            self.target_symbols,
-            self.module_implementations,
-            self.module_imports,
-            self.interface_members,
-            context.current_module.as_deref(),
-            context.current_flow_path.as_deref(),
-        ) {
-            match result {
-                Ok(actual_type) if actual_type != declared_type => {
+        if declared_type.as_interface_name().is_some() {
+            match check_expression_type_with_expected(
+                expression,
+                &declared_type,
+                self.expected_type_inference(),
+                context.current_module.as_deref(),
+                context.current_flow_path.as_deref(),
+            ) {
+                Err(ExpectedTypeCheckError::Mismatch(actual_type)) => {
                     self.diagnostics.push(Diagnostic::error(
                         span.clone(),
                         format!(
@@ -335,14 +346,16 @@ impl<'a> VariableAssignmentChecker<'a> {
                         ),
                     ));
                 }
-                Ok(_) => {}
-                Err(error) => self.diagnostics.push(Diagnostic::error(
-                    span.clone(),
-                    format!(
-                        "Cannot type-check assignment to variable '{name}': {}",
-                        error.message()
-                    ),
-                )),
+                Ok(()) => {}
+                Err(ExpectedTypeCheckError::Inference(error)) => {
+                    self.diagnostics.push(Diagnostic::error(
+                        span.clone(),
+                        format!(
+                            "Cannot type-check assignment to variable '{name}': {}",
+                            error.message()
+                        ),
+                    ))
+                }
             }
             return;
         }

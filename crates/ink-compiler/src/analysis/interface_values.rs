@@ -7,6 +7,7 @@ use crate::parsed::{
 };
 
 use super::{
+    argument_resolution::{resolve_dynamic_interface_signature, DynamicInterfaceSignatureInputs},
     context::{EnumTypeIndex, FlowSymbol, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
     enums::build_enum_type_index,
     expression_types::{infer_expression_type, TypeInferenceError},
@@ -29,6 +30,22 @@ pub(super) struct InterfaceModuleLiteralUses {
     modules_by_importing_module: BTreeMap<String, BTreeSet<String>>,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub(super) struct ExpectedTypeInference<'a> {
+    pub(super) variable_scopes: &'a VariableScopeIndex,
+    pub(super) struct_types: &'a StructTypeIndex,
+    pub(super) enum_types: &'a EnumTypeIndex,
+    pub(super) target_symbols: &'a TargetSymbolIndex,
+    pub(super) module_implementations: &'a ModuleImplementationIndex,
+    pub(super) module_imports: &'a ModuleImportIndex,
+    pub(super) interface_members: &'a InterfaceMemberIndex,
+}
+
+pub(super) enum ExpectedTypeCheckError {
+    Mismatch(TypeName),
+    Inference(TypeInferenceError),
+}
+
 pub(super) fn build_module_implementation_index(story: &Story) -> ModuleImplementationIndex {
     let mut index = ModuleImplementationIndex::default();
 
@@ -46,6 +63,62 @@ pub(super) fn build_module_implementation_index(story: &Story) -> ModuleImplemen
     }
 
     index
+}
+
+pub(super) fn check_expression_type_with_expected(
+    expression: &Expression,
+    expected_type: &TypeName,
+    inputs: ExpectedTypeInference<'_>,
+    current_module: Option<&str>,
+    current_flow_path: Option<&str>,
+) -> Result<(), ExpectedTypeCheckError> {
+    match infer_expression_type_with_expected(
+        expression,
+        expected_type,
+        inputs,
+        current_module,
+        current_flow_path,
+    ) {
+        Ok(actual_type) if &actual_type != expected_type => {
+            Err(ExpectedTypeCheckError::Mismatch(actual_type))
+        }
+        Ok(_) => Ok(()),
+        Err(error) => Err(ExpectedTypeCheckError::Inference(error)),
+    }
+}
+
+pub(super) fn infer_expression_type_with_expected(
+    expression: &Expression,
+    expected_type: &TypeName,
+    inputs: ExpectedTypeInference<'_>,
+    current_module: Option<&str>,
+    current_flow_path: Option<&str>,
+) -> Result<TypeName, TypeInferenceError> {
+    infer_expected_interface_expression_type(
+        expression,
+        expected_type,
+        inputs.variable_scopes,
+        inputs.struct_types,
+        inputs.enum_types,
+        inputs.target_symbols,
+        inputs.module_implementations,
+        inputs.module_imports,
+        inputs.interface_members,
+        current_module,
+        current_flow_path,
+    )
+    .unwrap_or_else(|| {
+        infer_expression_type(
+            expression,
+            inputs.variable_scopes,
+            inputs.struct_types,
+            inputs.enum_types,
+            inputs.target_symbols,
+            inputs.interface_members,
+            current_module,
+            current_flow_path,
+        )
+    })
 }
 
 pub(super) fn infer_expected_interface_expression_type(
@@ -120,7 +193,7 @@ pub(super) fn collect_interface_module_literal_uses_for_story(
     )
 }
 
-fn collect_interface_module_literal_uses(
+pub(super) fn collect_interface_module_literal_uses(
     story: &Story,
     variable_scopes: &VariableScopeIndex,
     struct_types: &StructTypeIndex,
@@ -342,6 +415,16 @@ impl<'a> InterfaceModuleLiteralUseCollector<'a> {
             .insert(module_name.to_string());
     }
 
+    fn dynamic_interface_signature_inputs(&self) -> DynamicInterfaceSignatureInputs<'_> {
+        DynamicInterfaceSignatureInputs {
+            variable_scopes: self.variable_scopes,
+            struct_types: self.struct_types,
+            enum_types: self.enum_types,
+            target_symbols: self.target_symbols,
+            interface_members: self.interface_members,
+        }
+    }
+
     fn check_dynamic_interface_member_arguments(
         &mut self,
         target: &Expression,
@@ -350,28 +433,16 @@ impl<'a> InterfaceModuleLiteralUseCollector<'a> {
         arguments: &[Expression],
         context: &VisitContext,
     ) {
-        let Ok(target_type) = infer_expression_type(
+        let Ok(signature) = resolve_dynamic_interface_signature(
             target,
-            self.variable_scopes,
-            self.struct_types,
-            self.enum_types,
-            self.target_symbols,
-            self.interface_members,
+            member,
+            expected_kind.clone(),
+            self.dynamic_interface_signature_inputs(),
             context.current_module.as_deref(),
             context.current_flow_path.as_deref(),
         ) else {
             return;
         };
-
-        let Some(interface_name) = target_type.as_interface_name() else {
-            return;
-        };
-        let Some(signature) = self.interface_members.member(interface_name, member) else {
-            return;
-        };
-        if signature.kind() != expected_kind {
-            return;
-        }
 
         for (argument, parameter) in arguments.iter().zip(signature.arguments()) {
             let Some(expected_type) = parameter.declared_type() else {

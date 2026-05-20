@@ -12,46 +12,48 @@ use crate::{
 };
 
 use super::{
-    context::{
-        EnumTypeIndex, FlowContext, FlowSymbol, StructTypeIndex, TargetSymbolIndex,
-        VariableScopeIndex,
+    argument_resolution::{
+        resolve_dynamic_interface_signature, resolve_function_call_expected_arguments,
+        DynamicInterfaceSignatureError, DynamicInterfaceSignatureInputs,
+        FunctionCallArgumentResolution, ResolvedExpectedArguments,
     },
-    enums::{build_enum_type_index, is_enum_member_reference},
+    context::{EnumTypeIndex, FlowContext, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
+    enums::is_enum_member_reference,
     expression_types::{infer_expression_type, typed_builtin_return_type},
+    indexes::AnalysisIndexes,
     interface_values::{
-        build_module_implementation_index, collect_interface_module_literal_uses_for_story,
-        infer_expected_interface_expression_type, InterfaceModuleLiteralUses,
-        ModuleImplementationIndex,
+        check_expression_type_with_expected, ExpectedTypeCheckError, ExpectedTypeInference,
+        InterfaceModuleLiteralUses, ModuleImplementationIndex,
     },
-    interfaces::{build_interface_member_index, InterfaceMemberIndex},
-    modules::{build_module_import_index, ModuleImportIndex},
+    interfaces::InterfaceMemberIndex,
+    modules::ModuleImportIndex,
     span::object_span,
-    structs::build_struct_type_index,
-    target_symbols::{
-        build_target_symbol_index, is_cross_module_stitch_target, resolve_target_symbol,
-    },
-    type_names::qualify_type_name_for_module,
-    variables::build_variable_scope_index,
+    target_symbols::{is_cross_module_stitch_target, resolve_target_symbol},
 };
 
+#[cfg(test)]
+use super::modules::ModuleAnalysis;
+
+#[cfg(test)]
 pub(super) fn call_target_diagnostics(story: &Story) -> Vec<Diagnostic> {
-    let target_symbols = build_target_symbol_index(story);
-    let variable_scopes = build_variable_scope_index(story);
-    let struct_types = build_struct_type_index(story);
-    let enum_types = build_enum_type_index(story);
-    let interface_members = build_interface_member_index(story);
-    let module_implementations = build_module_implementation_index(story);
-    let module_imports = build_module_import_index(story);
-    let interface_module_literal_uses = collect_interface_module_literal_uses_for_story(story);
+    let module_analysis = ModuleAnalysis::build(story);
+    let indexes = AnalysisIndexes::build(story, &module_analysis);
+    call_target_diagnostics_with_indexes(story, &indexes)
+}
+
+pub(super) fn call_target_diagnostics_with_indexes(
+    story: &Story,
+    indexes: &AnalysisIndexes<'_>,
+) -> Vec<Diagnostic> {
     let mut checker = CallTargetChecker::new(
-        &target_symbols,
-        &variable_scopes,
-        &struct_types,
-        &enum_types,
-        &interface_members,
-        &module_implementations,
-        &module_imports,
-        &interface_module_literal_uses,
+        &indexes.target_symbols,
+        &indexes.variable_scopes,
+        &indexes.struct_types,
+        &indexes.enum_types,
+        &indexes.interface_members,
+        &indexes.module_implementations,
+        indexes.module_imports,
+        &indexes.interface_module_literal_uses,
     );
     walk_story(story, &mut checker);
     checker.diagnostics
@@ -106,11 +108,33 @@ impl<'a> CallTargetChecker<'a> {
         context.current_module.as_deref()
     }
 
+    fn expected_type_inference(&self) -> ExpectedTypeInference<'_> {
+        ExpectedTypeInference {
+            variable_scopes: self.variable_scopes,
+            struct_types: self.struct_types,
+            enum_types: self.enum_types,
+            target_symbols: self.target_symbols,
+            module_implementations: self.module_implementations,
+            module_imports: self.module_imports,
+            interface_members: self.interface_members,
+        }
+    }
+
     fn current_flow_context(&self, context: &VisitContext) -> Option<&FlowContext> {
         self.current_flow_path(context).and_then(|flow_path| {
             self.flow_contexts_by_path
                 .get(&scoped_context_key(self.current_module(context), flow_path))
         })
+    }
+
+    fn dynamic_interface_signature_inputs(&self) -> DynamicInterfaceSignatureInputs<'_> {
+        DynamicInterfaceSignatureInputs {
+            variable_scopes: self.variable_scopes,
+            struct_types: self.struct_types,
+            enum_types: self.enum_types,
+            target_symbols: self.target_symbols,
+            interface_members: self.interface_members,
+        }
     }
 
     fn current_flow_arguments(&self, context: &VisitContext) -> Option<&[FlowArgument]> {
@@ -307,18 +331,16 @@ impl<'a> CallTargetChecker<'a> {
         span: &SourceSpan,
         context: &VisitContext,
     ) -> Option<InterfaceMemberSignature> {
-        let target_type = match infer_expression_type(
+        match resolve_dynamic_interface_signature(
             target,
-            self.variable_scopes,
-            self.struct_types,
-            self.enum_types,
-            self.target_symbols,
-            self.interface_members,
+            member,
+            InterfaceMemberKind::Knot,
+            self.dynamic_interface_signature_inputs(),
             self.current_module(context),
             self.current_flow_path(context),
         ) {
-            Ok(target_type) => target_type,
-            Err(error) => {
+            Ok(signature) => Some(signature),
+            Err(DynamicInterfaceSignatureError::Inference(error)) => {
                 self.diagnostics.push(Diagnostic::error(
                     span.clone(),
                     format!(
@@ -326,40 +348,35 @@ impl<'a> CallTargetChecker<'a> {
                         error.message()
                     ),
                 ));
-                return None;
+                None
             }
-        };
-
-        let Some(interface_name) = target_type.as_interface_name() else {
-            self.diagnostics.push(Diagnostic::error(
-                span.clone(),
-                format!(
+            Err(DynamicInterfaceSignatureError::NonInterface(target_type)) => {
+                self.diagnostics.push(Diagnostic::error(
+                    span.clone(),
+                    format!(
                     "Dynamic interface target '{member}' has base type {} but expected interface",
                     target_type.display_name()
                 ),
-            ));
-            return None;
-        };
-
-        let Some(signature) = self.interface_members.member(interface_name, member) else {
-            self.diagnostics.push(Diagnostic::error(
-                span.clone(),
-                format!("Interface '{interface_name}' does not declare member '{member}'"),
-            ));
-            return None;
-        };
-
-        if signature.kind() != &InterfaceMemberKind::Knot {
-            self.diagnostics.push(Diagnostic::error(
+                ));
+                None
+            }
+            Err(DynamicInterfaceSignatureError::MissingMember { interface_name }) => {
+                self.diagnostics.push(Diagnostic::error(
+                    span.clone(),
+                    format!("Interface '{interface_name}' does not declare member '{member}'"),
+                ));
+                None
+            }
+            Err(DynamicInterfaceSignatureError::WrongKind { interface_name }) => {
+                self.diagnostics.push(Diagnostic::error(
                 span.clone(),
                 format!(
                     "Interface '{interface_name}' member '{member}' is a function but dynamic target access requires a knot"
                 ),
             ));
-            return None;
+                None
+            }
         }
-
-        Some(signature.clone())
     }
 
     fn check_dynamic_interface_function_call(
@@ -393,18 +410,16 @@ impl<'a> CallTargetChecker<'a> {
         span: &SourceSpan,
         context: &VisitContext,
     ) -> Option<InterfaceMemberSignature> {
-        let target_type = match infer_expression_type(
+        match resolve_dynamic_interface_signature(
             target,
-            self.variable_scopes,
-            self.struct_types,
-            self.enum_types,
-            self.target_symbols,
-            self.interface_members,
+            member,
+            InterfaceMemberKind::Function,
+            self.dynamic_interface_signature_inputs(),
             self.current_module(context),
             self.current_flow_path(context),
         ) {
-            Ok(target_type) => target_type,
-            Err(error) => {
+            Ok(signature) => Some(signature),
+            Err(DynamicInterfaceSignatureError::Inference(error)) => {
                 self.diagnostics.push(Diagnostic::error(
                     span.clone(),
                     format!(
@@ -412,40 +427,35 @@ impl<'a> CallTargetChecker<'a> {
                         error.message()
                     ),
                 ));
-                return None;
+                None
             }
-        };
-
-        let Some(interface_name) = target_type.as_interface_name() else {
-            self.diagnostics.push(Diagnostic::error(
-                span.clone(),
-                format!(
+            Err(DynamicInterfaceSignatureError::NonInterface(target_type)) => {
+                self.diagnostics.push(Diagnostic::error(
+                    span.clone(),
+                    format!(
                     "Dynamic interface function '{member}' has base type {} but expected interface",
                     target_type.display_name()
                 ),
-            ));
-            return None;
-        };
-
-        let Some(signature) = self.interface_members.member(interface_name, member) else {
-            self.diagnostics.push(Diagnostic::error(
-                span.clone(),
-                format!("Interface '{interface_name}' does not declare member '{member}'"),
-            ));
-            return None;
-        };
-
-        if signature.kind() != &InterfaceMemberKind::Function {
-            self.diagnostics.push(Diagnostic::error(
+                ));
+                None
+            }
+            Err(DynamicInterfaceSignatureError::MissingMember { interface_name }) => {
+                self.diagnostics.push(Diagnostic::error(
+                    span.clone(),
+                    format!("Interface '{interface_name}' does not declare member '{member}'"),
+                ));
+                None
+            }
+            Err(DynamicInterfaceSignatureError::WrongKind { interface_name }) => {
+                self.diagnostics.push(Diagnostic::error(
                 span.clone(),
                 format!(
                     "Interface '{interface_name}' member '{member}' is a knot but dynamic function call requires a function"
                 ),
             ));
-            return None;
+                None
+            }
         }
-
-        Some(signature.clone())
     }
 
     fn check_dynamic_interface_member_arguments(
@@ -481,34 +491,16 @@ impl<'a> CallTargetChecker<'a> {
                 continue;
             }
 
-            let argument_type = infer_expected_interface_expression_type(
+            let argument_type = check_expression_type_with_expected(
                 argument,
                 expected_type,
-                self.variable_scopes,
-                self.struct_types,
-                self.enum_types,
-                self.target_symbols,
-                self.module_implementations,
-                self.module_imports,
-                self.interface_members,
+                self.expected_type_inference(),
                 self.current_module(context),
                 self.current_flow_path(context),
-            )
-            .unwrap_or_else(|| {
-                infer_expression_type(
-                    argument,
-                    self.variable_scopes,
-                    self.struct_types,
-                    self.enum_types,
-                    self.target_symbols,
-                    self.interface_members,
-                    self.current_module(context),
-                    self.current_flow_path(context),
-                )
-            });
+            );
 
             match argument_type {
-                Ok(actual_type) if actual_type != *expected_type => {
+                Err(ExpectedTypeCheckError::Mismatch(actual_type)) => {
                     self.diagnostics.push(Diagnostic::error(
                         span.clone(),
                         format!(
@@ -520,12 +512,12 @@ impl<'a> CallTargetChecker<'a> {
                     ));
                     self.check_expression(argument, span, context);
                 }
-                Ok(_) => {
+                Ok(()) => {
                     if !is_interface_module_literal_argument(argument, expected_type) {
                         self.check_expression(argument, span, context);
                     }
                 }
-                Err(error) => self.diagnostics.push(Diagnostic::error(
+                Err(ExpectedTypeCheckError::Inference(error)) => self.diagnostics.push(Diagnostic::error(
                     span.clone(),
                     format!(
                         "Cannot type-check argument '{}' for dynamic interface {member_kind} '{member}': {}",
@@ -669,16 +661,16 @@ impl<'a> CallTargetChecker<'a> {
             return;
         }
 
-        let symbol = resolve_target_symbol(
+        match resolve_function_call_expected_arguments(
             name,
             self.current_module(context),
             self.current_flow_path(context),
             self.target_symbols,
-        )
-        .cloned();
-
-        if let Some(symbol) = symbol {
-            if !symbol.is_function() {
+        ) {
+            FunctionCallArgumentResolution::Function(expected_arguments) => {
+                self.check_function_call_signature(name, args, &expected_arguments, span, context);
+            }
+            FunctionCallArgumentResolution::NonFunction => {
                 self.diagnostics.push(Diagnostic::error(
                     span.clone(),
                     format!(
@@ -688,16 +680,15 @@ impl<'a> CallTargetChecker<'a> {
                 for arg in args {
                     self.check_expression(arg, span, context);
                 }
-            } else {
-                self.check_function_call_signature(name, args, &symbol, span, context);
             }
-        } else {
-            self.diagnostics.push(Diagnostic::error(
-                span.clone(),
-                format!("Function '{name}' is not declared"),
-            ));
-            for arg in args {
-                self.check_expression(arg, span, context);
+            FunctionCallArgumentResolution::Missing => {
+                self.diagnostics.push(Diagnostic::error(
+                    span.clone(),
+                    format!("Function '{name}' is not declared"),
+                ));
+                for arg in args {
+                    self.check_expression(arg, span, context);
+                }
             }
         }
     }
@@ -842,12 +833,11 @@ impl<'a> CallTargetChecker<'a> {
         &mut self,
         name: &str,
         args: &[Expression],
-        symbol: &FlowSymbol,
+        expected_arguments: &ResolvedExpectedArguments,
         span: &SourceSpan,
         context: &VisitContext,
     ) {
-        let parameters = symbol.arguments();
-        let qualified_module = name.split_once("::").map(|(module, _)| module);
+        let parameters = expected_arguments.arguments();
         if args.len() != parameters.len() {
             self.diagnostics.push(Diagnostic::error(
                 span.clone(),
@@ -868,41 +858,20 @@ impl<'a> CallTargetChecker<'a> {
                 self.check_expression(argument, span, context);
                 continue;
             };
-            let expected_type = qualified_module
-                .map(|module| qualify_type_name_for_module(expected_type, module))
-                .unwrap_or_else(|| expected_type.clone());
             if is_composite_literal(argument) {
                 self.check_expression(argument, span, context);
                 continue;
             }
-            let argument_type = infer_expected_interface_expression_type(
+            let argument_type = check_expression_type_with_expected(
                 argument,
                 &expected_type,
-                self.variable_scopes,
-                self.struct_types,
-                self.enum_types,
-                self.target_symbols,
-                self.module_implementations,
-                self.module_imports,
-                self.interface_members,
+                self.expected_type_inference(),
                 self.current_module(context),
                 self.current_flow_path(context),
-            )
-            .unwrap_or_else(|| {
-                infer_expression_type(
-                    argument,
-                    self.variable_scopes,
-                    self.struct_types,
-                    self.enum_types,
-                    self.target_symbols,
-                    self.interface_members,
-                    self.current_module(context),
-                    self.current_flow_path(context),
-                )
-            });
+            );
 
             match argument_type {
-                Ok(actual_type) if actual_type != expected_type => {
+                Err(ExpectedTypeCheckError::Mismatch(actual_type)) => {
                     self.diagnostics.push(Diagnostic::error(
                         span.clone(),
                         format!(
@@ -914,19 +883,21 @@ impl<'a> CallTargetChecker<'a> {
                     ));
                     self.check_expression(argument, span, context);
                 }
-                Ok(_) => {
+                Ok(()) => {
                     if !is_interface_module_literal_argument(argument, &expected_type) {
                         self.check_expression(argument, span, context);
                     }
                 }
-                Err(error) => self.diagnostics.push(Diagnostic::error(
-                    span.clone(),
-                    format!(
-                        "Cannot type-check argument '{}' for function '{name}': {}",
-                        parameter.name(),
-                        error.message()
-                    ),
-                )),
+                Err(ExpectedTypeCheckError::Inference(error)) => {
+                    self.diagnostics.push(Diagnostic::error(
+                        span.clone(),
+                        format!(
+                            "Cannot type-check argument '{}' for function '{name}': {}",
+                            parameter.name(),
+                            error.message()
+                        ),
+                    ))
+                }
             }
         }
     }

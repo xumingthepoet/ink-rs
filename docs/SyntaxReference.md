@@ -1507,7 +1507,7 @@ and the following will test conditions:
 
 ### Mathematics
 
-**ink** supports the four basic mathematical operations (`+`, `-`, `*` and `/`), as well as `%` (or `mod`), which returns the remainder after integer division. There's also POW for to-the-power-of:
+**ink** supports the four basic mathematical operations (`+`, `-`, `*` and `/`), as well as `%` (or `mod`), which returns the remainder after integer division. `*`, `/`, `mod`, and `%` share the same precedence and associate left-to-right, so `8 * 100 / 56` is evaluated as `(8 * 100) / 56`. There's also POW for to-the-power-of:
 
 	{POW(3, 2)} is 9.
 	{POW(16, 0.5)} is 4.
