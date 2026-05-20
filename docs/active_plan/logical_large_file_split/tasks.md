@@ -1,4 +1,4 @@
-Progress: 8/27
+Progress: 9/27
 
 # Logical Large-File Split Active Plan
 
@@ -270,7 +270,7 @@ passed with the same focused commands and `make gate`.
 
 ## Milestone 2: Syntax Expression Boundaries
 
-### [>] Task 09: Split Expression Token Model And Operator Tables
+### [x] Task 09: Split Expression Token Model And Operator Tables
 
 Goal: Separate expression token data definitions from tokenization and parsing.
 
@@ -297,6 +297,8 @@ validation passed with `cargo fmt --all --check`, `cargo test -q -p
 ink-compiler
 syntax::expression::tests::operator_rule_table_drill_covers_tokenizer_and_parser_lookup`,
 `cargo test -p ink-test --test integration expressions`, and `make gate`.
+Review found no follow-up changes; completion validation passed with the same
+focused commands and `make gate`.
 
 ### [ ] Task 10: Split Expression Tokenizer
 
