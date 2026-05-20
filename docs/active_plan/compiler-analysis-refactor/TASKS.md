@@ -23,7 +23,7 @@ Completion records are committed separately from implementation commits.
 
 ## Milestone 1: Shared Analysis Inputs
 
-### [ ] Task 01: Introduce shared analysis index container
+### [>] Task 01: Introduce shared analysis index container
 
 Goal: Add a pass-local shared index container for compiler analysis so later
 tasks can reuse the same analysis inputs instead of rebuilding them per pass.
@@ -49,7 +49,10 @@ adjacent analysis support module only.
 
 Validation commands: `cargo test -p ink-compiler analysis`; `make gate`.
 
-Commit record: Implementation commit TBD; completion-record commit TBD.
+Validation record: `cargo test -p ink-compiler analysis` passed;
+`make gate` passed.
+
+Commit record: Implementation commit `d250386c`; completion-record commit TBD.
 
 ### [ ] Task 02: Migrate target diagnostics to shared indexes
 
