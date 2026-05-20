@@ -116,7 +116,7 @@ text`, `cargo test -p ink-test --test integration glue`, and `make gate`.
 Review found no follow-up changes; completion validation passed with the same
 focused commands and `make gate`.
 
-### [~] Task 04: Split StoryState Evaluation Stack Operations
+### [>] Task 04: Split StoryState Evaluation Stack Operations
 
 Goal: Move evaluation stack primitives into their own implementation unit.
 
@@ -138,7 +138,12 @@ story_state::tests::malformed_evaluation_stack_underflow_returns_error`; `cargo
 test -q -p ink-runtime story_state::tests::malformed_native_call_underflow_returns_error`;
 `make gate`.
 
-Commit record: pending.
+Commit record: implementation commit `47798a93 Split StoryState evaluation
+stack`; validation passed with `cargo fmt --all --check`, `cargo test -q -p
+ink-runtime story_state::tests::malformed_evaluation_stack_underflow_returns_error`,
+`cargo test -q -p ink-runtime
+story_state::tests::malformed_native_call_underflow_returns_error`, and `make
+gate`.
 
 ### [ ] Task 05: Split StoryState Function Evaluation API
 
