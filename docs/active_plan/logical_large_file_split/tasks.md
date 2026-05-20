@@ -83,7 +83,7 @@ ink-runtime story_state::tests`, `cargo test -p ink-test --test integration
 tags`, and `make gate`. Review found no follow-up changes; completion
 validation passed with the same focused commands and `make gate`.
 
-### [~] Task 03: Split StoryState Output Stream Mutation
+### [>] Task 03: Split StoryState Output Stream Mutation
 
 Goal: Isolate output stream mutation, glue handling, and newline trimming from
 core state bookkeeping.
@@ -109,7 +109,10 @@ Validation commands: `cargo fmt --all --check`; `cargo test -q -p ink-runtime
 story_state::tests`; `cargo test -p ink-test --test integration text`; `cargo
 test -p ink-test --test integration glue`; `make gate`.
 
-Commit record: pending.
+Commit record: implementation commit `2d2aa5cb Split StoryState output
+mutation`; validation passed with `cargo fmt --all --check`, `cargo test -q -p
+ink-runtime story_state::tests`, `cargo test -p ink-test --test integration
+text`, `cargo test -p ink-test --test integration glue`, and `make gate`.
 
 ### [ ] Task 04: Split StoryState Evaluation Stack Operations
 
