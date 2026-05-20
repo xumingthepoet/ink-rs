@@ -1,4 +1,4 @@
-Progress: 16/20
+Progress: 17/20
 
 # Typed Dict Values Task List
 
@@ -617,7 +617,7 @@ Validation:
 Commit record: implementation `2167c03e` (`Add Dict runtime fixtures and docs`);
 review fix `0a91453b` (`Clarify Dict empty literal docs`)
 
-### [>] Task 17: Add Dict Diagnostic Fixtures
+### [x] Task 17: Add Dict Diagnostic Fixtures
 
 Goal: Cover user-facing compiler failures for invalid Dict code.
 
@@ -640,6 +640,9 @@ Validation:
 - Initial default `make gate` reached the workspace doc-test stage but failed
   by wrapper timeout with no failing tests reported.
 - `make gate UNIT_TEST_TIMEOUT=120s INK_TEST_TIMEOUT=600s` passed.
+- Review found no follow-up code fixes required; reran
+  `cargo test -p ink-test diagnostics`, `cargo fmt --all --check`, and
+  `make gate UNIT_TEST_TIMEOUT=120s INK_TEST_TIMEOUT=600s`.
 
 Commit record: implementation `83012cea` (`Add Dict diagnostic fixtures`)
 
