@@ -1,4 +1,4 @@
-Progress: 0/27
+Progress: 1/27
 
 # Logical Large-File Split Active Plan
 
@@ -23,7 +23,7 @@ implementation commit can be recorded as `[>]`.
 
 ## Milestone 1: Runtime Story State Boundaries
 
-### [>] Task 01: Split StoryState Error And Warning Handling
+### [x] Task 01: Split StoryState Error And Warning Handling
 
 Goal: Move current error and warning state helpers out of the large story state
 file into a dedicated runtime state concern.
@@ -52,7 +52,8 @@ gate`.
 Commit record: implementation commit `c760ed43 Split StoryState error
 handling`; validation passed with `cargo fmt --all --check`, `cargo test -q -p
 ink-runtime story_state::tests::malformed_evaluation_stack_underflow_returns_error`,
-and `make gate`.
+and `make gate`. Review found no follow-up changes; completion validation
+passed with the same focused command and `make gate`.
 
 ### [ ] Task 02: Split StoryState Output Text And Tag Readers
 
