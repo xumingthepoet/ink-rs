@@ -566,7 +566,7 @@ diagnostics`, and `make gate`. Review follow-up commit `63c924ad Include
 target divert checks in analysis source scan`; completion validation passed
 with the same focused commands and `make gate`.
 
-### [ ] Task 19: Split Function And External Call Checks
+### [~] Task 19: Split Function And External Call Checks
 
 Goal: Separate ordinary call target and signature validation from built-in and
 interface-specific checks.
