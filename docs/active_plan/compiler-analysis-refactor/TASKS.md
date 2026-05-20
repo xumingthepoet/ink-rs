@@ -1,4 +1,4 @@
-Progress: 13/24
+Progress: 14/24
 
 # Compiler Analysis Refactor Active Plan
 
@@ -450,7 +450,7 @@ Review record: Reviewed implementation commit `11d3f854` with `git show
 Commit record: Implementation commit `11d3f854`; waiting-review record
 `35856a27`; completion-record commit recorded by this task-list update.
 
-### [>] Task 14: Extract function-call argument resolution helper
+### [x] Task 14: Extract function-call argument resolution helper
 
 Goal: Remove repeated function call argument resolution logic.
 
@@ -471,9 +471,16 @@ Validation commands: `cargo test -p ink-compiler targets array_literals dict_lit
 Validation record: `cargo test -p ink-compiler targets` passed; `cargo test -p
 ink-compiler array_literals` passed; `cargo test -p ink-compiler
 dict_literals` passed; `cargo test -p ink-compiler struct_literals` passed;
-`make gate` passed.
+`make gate` passed. Review validation repeated after implementation review:
+`cargo test -p ink-compiler targets` passed; `cargo test -p ink-compiler
+array_literals` passed; `cargo test -p ink-compiler dict_literals` passed;
+`cargo test -p ink-compiler struct_literals` passed; `make gate` passed.
 
-Commit record: Implementation commit `75fcf20c`; completion-record commit TBD.
+Review record: Reviewed implementation commit `75fcf20c` with `git show
+--check`; no follow-up changes required.
+
+Commit record: Implementation commit `75fcf20c`; waiting-review record
+`a5664873`; completion-record commit recorded by this task-list update.
 
 ### [ ] Task 15: Extract dynamic interface signature helper
 
