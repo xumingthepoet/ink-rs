@@ -4,14 +4,15 @@ use crate::{
     diagnostic::Diagnostic,
     parsed::{
         visit::{walk_story, ParsedVisitor, VisitContext},
-        ConstantDeclaration, DictLiteralEntry, Expression, Object, Story, StructLiteralField,
-        TypeName, VariableAssignment,
+        ConstantDeclaration, DictLiteralEntry, Divert, DivertTarget, Expression,
+        InterfaceMemberKind, InterfaceMemberSignature, Object, Story, StructLiteralField,
+        TunnelOnwards, TypeName, VariableAssignment,
     },
     source::SourceSpan,
 };
 
 use super::{
-    context::{EnumTypeIndex, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
+    context::{EnumTypeIndex, FlowSymbol, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
     enums::{build_enum_type_index, type_name_contains_enum},
     expression_types::infer_expression_type,
     interface_values::{
@@ -21,7 +22,8 @@ use super::{
     interfaces::{build_interface_member_index, InterfaceMemberIndex},
     modules::{build_module_import_index, ModuleImportIndex},
     structs::{build_struct_type_index, resolve_struct_symbol},
-    target_symbols::build_target_symbol_index,
+    target_symbols::{build_target_symbol_index, resolve_target_symbol},
+    type_names::qualify_type_name_for_module,
     variables::build_variable_scope_index,
 };
 
@@ -120,6 +122,184 @@ impl<'a> ArrayLiteralChecker<'a> {
             declaration.span(),
             context,
         );
+    }
+
+    fn check_divert_arguments(&mut self, divert: &Divert, context: &VisitContext) {
+        self.check_divert_target_arguments(
+            divert.target(),
+            divert.arguments(),
+            divert.span(),
+            context,
+        );
+    }
+
+    fn check_tunnel_onwards_arguments(
+        &mut self,
+        tunnel_onwards: &TunnelOnwards,
+        context: &VisitContext,
+    ) {
+        if let Some(target) = tunnel_onwards.override_target() {
+            self.check_divert_target_arguments(
+                target,
+                tunnel_onwards.arguments(),
+                tunnel_onwards.span(),
+                context,
+            );
+        }
+    }
+
+    fn check_divert_target_arguments(
+        &mut self,
+        target: &DivertTarget,
+        arguments: &[Expression],
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) {
+        match target {
+            DivertTarget::Path(target) => {
+                self.check_static_target_arguments(target, arguments, span, context);
+            }
+            DivertTarget::QualifiedPath(target) => {
+                self.check_static_target_arguments(target.as_str(), arguments, span, context);
+            }
+            DivertTarget::Dynamic(Expression::DynamicInterfaceAccess { target, member }) => {
+                if let Some(signature) = self.dynamic_interface_signature(
+                    target,
+                    member,
+                    InterfaceMemberKind::Knot,
+                    context,
+                ) {
+                    self.check_interface_signature_arguments(
+                        member, arguments, &signature, span, context,
+                    );
+                }
+            }
+            DivertTarget::Dynamic(_)
+            | DivertTarget::Done
+            | DivertTarget::End
+            | DivertTarget::Empty => {}
+        }
+    }
+
+    fn check_static_target_arguments(
+        &mut self,
+        target: &str,
+        arguments: &[Expression],
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) {
+        let Some(symbol) = resolve_target_symbol(
+            target,
+            context.current_module.as_deref(),
+            context.current_flow_path.as_deref(),
+            self.target_symbols,
+        )
+        .cloned() else {
+            return;
+        };
+
+        self.check_flow_symbol_arguments(target, arguments, &symbol, span, context);
+    }
+
+    fn check_function_call_arguments(
+        &mut self,
+        name: &str,
+        args: &[Expression],
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) {
+        let Some(symbol) = resolve_target_symbol(
+            name,
+            context.current_module.as_deref(),
+            context.current_flow_path.as_deref(),
+            self.target_symbols,
+        )
+        .cloned() else {
+            return;
+        };
+
+        self.check_flow_symbol_arguments(name, args, &symbol, span, context);
+    }
+
+    fn check_dynamic_interface_function_arguments(
+        &mut self,
+        target: &Expression,
+        member: &str,
+        args: &[Expression],
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) {
+        if let Some(signature) =
+            self.dynamic_interface_signature(target, member, InterfaceMemberKind::Function, context)
+        {
+            self.check_interface_signature_arguments(member, args, &signature, span, context);
+        }
+    }
+
+    fn check_flow_symbol_arguments(
+        &mut self,
+        target_name: &str,
+        arguments: &[Expression],
+        symbol: &FlowSymbol,
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) {
+        let qualified_module = target_name.split_once("::").map(|(module, _)| module);
+        for (argument, parameter) in arguments.iter().zip(symbol.arguments()) {
+            let Some(expected_type) = parameter.declared_type() else {
+                continue;
+            };
+            let expected_type = qualified_module
+                .map(|module| qualify_type_name_for_module(expected_type, module))
+                .unwrap_or_else(|| expected_type.clone());
+            self.check_expression_for_arrays(
+                argument,
+                &expected_type,
+                parameter.name(),
+                span,
+                context,
+            );
+        }
+    }
+
+    fn check_interface_signature_arguments(
+        &mut self,
+        member: &str,
+        arguments: &[Expression],
+        signature: &InterfaceMemberSignature,
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) {
+        for (argument, parameter) in arguments.iter().zip(signature.arguments()) {
+            let Some(expected_type) = parameter.declared_type() else {
+                continue;
+            };
+            let context_name = format!("{member}.{}", parameter.name());
+            self.check_expression_for_arrays(argument, expected_type, &context_name, span, context);
+        }
+    }
+
+    fn dynamic_interface_signature(
+        &self,
+        target: &Expression,
+        member: &str,
+        expected_kind: InterfaceMemberKind,
+        context: &VisitContext,
+    ) -> Option<InterfaceMemberSignature> {
+        let target_type = infer_expression_type(
+            target,
+            self.variable_scopes,
+            self.struct_types,
+            self.enum_types,
+            self.target_symbols,
+            self.interface_members,
+            context.current_module.as_deref(),
+            context.current_flow_path.as_deref(),
+        )
+        .ok()?;
+        let interface_name = target_type.as_interface_name()?;
+        let signature = self.interface_members.member(interface_name, member)?;
+        (signature.kind() == &expected_kind).then(|| signature.clone())
     }
 
     fn visible_declared_type(&self, name: &str, context: &VisitContext) -> Option<TypeName> {
@@ -564,12 +744,43 @@ impl ParsedVisitor for ArrayLiteralChecker<'_> {
     fn visit_object(&mut self, object: &Object, context: &VisitContext) {
         match object {
             Object::ConstantDeclaration(declaration) => self.check_constant(declaration, context),
+            Object::Divert(divert) => self.check_divert_arguments(divert, context),
+            Object::TunnelOnwards(tunnel_onwards) => {
+                self.check_tunnel_onwards_arguments(tunnel_onwards, context);
+            }
             Object::VariableAssignment(assignment) => self.check_assignment(assignment, context),
             _ => {}
         }
     }
 
-    fn visit_expression(&mut self, expression: &Expression, _context: &VisitContext) {
+    fn visit_expression(&mut self, expression: &Expression, context: &VisitContext) {
+        match expression {
+            Expression::FunctionCall { name, args } => self.check_function_call_arguments(
+                name,
+                args,
+                &SourceSpan::new(None, 1, 1),
+                context,
+            ),
+            Expression::QualifiedFunctionCall { name, args } => self.check_function_call_arguments(
+                name.as_str(),
+                args,
+                &SourceSpan::new(None, 1, 1),
+                context,
+            ),
+            Expression::DynamicInterfaceFunctionCall {
+                target,
+                member,
+                args,
+            } => self.check_dynamic_interface_function_arguments(
+                target,
+                member,
+                args,
+                &SourceSpan::new(None, 1, 1),
+                context,
+            ),
+            _ => {}
+        }
+
         if matches!(expression, Expression::ArrayLiteral(_))
             && !self
                 .expected_expression_ids
@@ -696,6 +907,91 @@ mod tests {
         );
 
         assert_eq!(array_literal_diagnostics(&story), []);
+    }
+
+    #[test]
+    fn accepts_array_literals_in_typed_divert_arguments() {
+        let story = parse_story(
+            "=== module game ===\n\
+             == main ==\n\
+             -> start([1, 2, 3])\n\
+             == start(ids: int[]) ==\n\
+             -> END",
+        );
+
+        assert_eq!(super::super::run_analysis_passes(&story), []);
+    }
+
+    #[test]
+    fn accepts_array_literals_in_typed_function_arguments() {
+        let story = parse_story(
+            "=== module game ===\n\
+             == main ==\n\
+             ~ temp values: int[] = identity([1, 2, 3])\n\
+             {values[0]}\n\
+             -> END\n\
+             == function identity(values: int[]) => int[] ==\n\
+             ~ return values",
+        );
+
+        assert_eq!(super::super::run_analysis_passes(&story), []);
+    }
+
+    #[test]
+    fn accepts_struct_array_literals_in_typed_divert_arguments() {
+        let story = parse_story(
+            "=== module game ===\n\
+             STRUCT Player {\n\
+             hp: int\n\
+             }\n\
+             == main ==\n\
+             -> start([{ hp: 10 }])\n\
+             == start(players: Player[]) ==\n\
+             -> END",
+        );
+
+        assert_eq!(super::super::run_analysis_passes(&story), []);
+    }
+
+    #[test]
+    fn accepts_array_literals_in_dynamic_interface_arguments() {
+        let story = parse_story(
+            "=== interface IItem ===\n\
+             == target(ids: int[]) ==\n\
+             == function score(ids: int[]) => int ==\n\
+             === module game ===\n\
+             FROM left\n\
+             VAR route: interface<IItem> = left\n\
+             == main ==\n\
+             ~ temp value: int = {route}::score([1, 2])\n\
+             -> {{route}::target}([1, 2])\n\
+             === module left implements IItem ===\n\
+             == target(ids: int[]) ==\n\
+             -> END\n\
+             == function score(ids: int[]) => int ==\n\
+             ~ return ids[0]",
+        );
+
+        assert_eq!(super::super::run_analysis_passes(&story), []);
+    }
+
+    #[test]
+    fn reports_array_literal_argument_element_type_mismatch() {
+        let story = parse_story(
+            "=== module game ===\n\
+             == main ==\n\
+             -> start([1, \"two\"])\n\
+             == start(ids: int[]) ==\n\
+             -> END",
+        );
+
+        let diagnostics = array_literal_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Value for 'ids[1]' has type string but expected int",
+        );
     }
 
     #[test]

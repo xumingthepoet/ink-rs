@@ -32,6 +32,12 @@ fn arrays_run() {
 }
 
 #[test]
+fn inline_array_arguments_run() {
+    let compiled = compile_fixture("typed/inline-array-arguments.ink");
+    assert_story_output(&compiled, "First 101.\nCount 3.\nCopied 8.\n");
+}
+
+#[test]
 fn divert_target_values_run() {
     let compiled = compile_fixture("typed/divert-targets.ink");
     assert_story_output(&compiled, "Here.\nStruct.\nArray.\nFallback.\n");

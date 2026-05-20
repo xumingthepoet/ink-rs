@@ -476,6 +476,11 @@ impl<'a> CallTargetChecker<'a> {
                 continue;
             };
 
+            if matches!(argument, Expression::ArrayLiteral(_)) {
+                self.check_expression(argument, span, context);
+                continue;
+            }
+
             let argument_type = infer_expected_interface_expression_type(
                 argument,
                 expected_type,
@@ -861,6 +866,9 @@ impl<'a> CallTargetChecker<'a> {
             let expected_type = qualified_module
                 .map(|module| qualify_type_name_for_module(expected_type, module))
                 .unwrap_or_else(|| expected_type.clone());
+            if matches!(argument, Expression::ArrayLiteral(_)) {
+                continue;
+            }
             match infer_expression_type(
                 argument,
                 self.variable_scopes,
