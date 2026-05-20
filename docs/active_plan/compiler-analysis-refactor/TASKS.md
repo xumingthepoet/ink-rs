@@ -1,4 +1,4 @@
-Progress: 9/24
+Progress: 10/24
 
 # Compiler Analysis Refactor Active Plan
 
@@ -324,7 +324,7 @@ commit `5fde59e2`; no additional code changes were required for this task.
 Commit record: Implementation covered by commits `4b6a2db5` and `5fde59e2`;
 completion-record commit recorded by this task-list update.
 
-### [ ] Task 10: Migrate static function and flow arguments
+### [x] Task 10: Migrate static function and flow arguments
 
 Goal: Make static function calls and static divert/tunnel arguments use the
 centralized expected-type checker.
@@ -344,7 +344,16 @@ Modification boundaries: Target argument type checking only.
 
 Validation commands: `cargo test -p ink-compiler targets interface_module`; `cargo test -p ink-test --test integration typed_values`; `make gate`.
 
-Commit record: Implementation commit TBD; completion-record commit TBD.
+Validation record: `cargo test -p ink-compiler targets` passed; `cargo test -p
+ink-compiler interface_module` passed; `cargo test -p ink-test --test
+integration typed_values` passed; `make gate` passed.
+
+Review record: Static function and flow argument migration was covered by Task
+07 implementation commit `4b6a2db5` and Task 08 implementation commit
+`5fde59e2`; no additional code changes were required for this task.
+
+Commit record: Implementation covered by commits `4b6a2db5` and `5fde59e2`;
+completion-record commit recorded by this task-list update.
 
 ### [ ] Task 11: Migrate dynamic interface member arguments
 
