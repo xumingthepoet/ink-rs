@@ -1,4 +1,4 @@
-Progress: 5/20
+Progress: 6/20
 
 # Typed Dict Values Task List
 
@@ -198,7 +198,7 @@ Validation:
 
 Commit record: implementation `b289208d` (`Validate Dict assignment targets`)
 
-### [>] Task 06: Validate Dict Function And External Signatures
+### [x] Task 06: Validate Dict Function And External Signatures
 
 Goal: Allow Dict types in function, external, internal, constant, struct field,
 and interface-relevant type positions.
@@ -225,6 +225,9 @@ Validation:
 - First `make gate` run reached the final `ink-test` doc-test stage but failed
   by the 120s wrapper timeout with no failing tests reported.
 - Reran `make gate` after incremental compilation; passed.
+- Review found no follow-up code fixes required; reran
+  `cargo test -p ink-compiler analysis`, `cargo fmt --all --check`, and
+  `make gate`.
 
 Commit record: implementation `ccfaf4c3` (`Cover Dict signature type positions`)
 
