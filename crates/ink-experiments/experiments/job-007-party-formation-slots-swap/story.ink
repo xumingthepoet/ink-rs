@@ -14,13 +14,13 @@ VAR formation: PartySlot[] = [
 
 == main ==
 Party formation:
--> show_formation(0)
+-> show_formation(0) ->
 Swap request: indices 0 and 2.
--> swap_slots(0, 2)
--> show_formation(0)
+-> swap_slots(0, 2) ->
+-> show_formation(0) ->
 Swap request: indices 1 and 3.
--> swap_slots(1, 3)
--> show_formation(0)
+-> swap_slots(1, 3) ->
+-> show_formation(0) ->
 -> DONE
 
 == show_formation(index: int) ==

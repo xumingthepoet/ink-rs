@@ -1,0 +1,24 @@
+Runtime session starts.
+Baseline --
+HP: 20
+Stamina: 12
+Gold: 35
+Herbs: 4
+Elixir: 0
+Coins: 35
+Combat strikes for two rounds.
+After combat --
+HP: 13
+Stamina: 7
+Gold: 23
+Herbs: 4
+Elixir: 0
+Coins: 23
+Restoring checkpoint snapshot.
+Restored --
+HP: 20
+Stamina: 12
+Gold: 35
+Herbs: 4
+Elixir: 0
+Coins: 35

@@ -11,7 +11,7 @@ VAR next_route_step: int = 0
 
 == main ==
 Map route registry playback begins.
--> travel_route(0)
+-> travel_route(0) ->
 -> DONE
 
 == travel_route(step: int) ==

@@ -7,8 +7,8 @@ VAR event_amounts: int[] = [1, 1, 2, 1, 1, 1]
 
 == main ==
 Quest objective table seeded.
--> show_quests(0)
--> apply_events(0)
+-> show_quests(0) ->
+-> apply_events(0) ->
 -> DONE
 
 == apply_events(index: int) ==
@@ -25,7 +25,7 @@ Quest objective table seeded.
     - else:
         {quest_id} incomplete.
     }
-    -> show_quests(0)
+    -> show_quests(0) ->
     -> apply_events(index + 1)
 }
 

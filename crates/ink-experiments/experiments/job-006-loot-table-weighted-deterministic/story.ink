@@ -5,7 +5,7 @@ VAR deterministic_rolls: int[] = [7, 42, 65, 99]
 
 == main ==
 Deterministic weighted loot rolls:
--> open_chests(0)
+-> open_chests(0) ->
 -> DONE
 
 == open_chests(chest: int) ==

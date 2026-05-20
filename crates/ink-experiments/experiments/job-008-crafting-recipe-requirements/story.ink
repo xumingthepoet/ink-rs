@@ -48,9 +48,9 @@ VAR inventory: Dict<string, int> = %{
 
 == main ==
 Crafting session begins.
--> show_inventory(0)
--> craft_recipes(0)
--> show_inventory(0)
+-> show_inventory(0) ->
+-> craft_recipes(0) ->
+-> show_inventory(0) ->
 -> DONE
 
 == craft_recipes(index: int) ==
@@ -78,6 +78,6 @@ Crafting session begins.
 { if index >= LEN(names):
     ->->
 - else:
-    { names[index] + ": " + INT(inventory[names[index]])}
+    {names[index]}: {inventory[names[index]]}
     -> show_inventory(index + 1)
 }

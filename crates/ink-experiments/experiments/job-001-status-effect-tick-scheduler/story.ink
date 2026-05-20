@@ -29,7 +29,7 @@ Status scheduler starts.
     - else:
         No new status entered this tick.
     }
-    -> process_statuses(0)
+    -> process_statuses(0) ->
     -> process_tick(tick + 1)
 }
 

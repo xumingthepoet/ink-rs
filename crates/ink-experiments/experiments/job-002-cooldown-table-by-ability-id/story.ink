@@ -29,9 +29,9 @@ Cooldown scheduler by ability id.
 - else:
     ~ temp ability_id: int = command_queue[command_index]
     Attempting {ability_names[ability_id]}.
-    -> cast_if_ready(ability_id)
-    -> show_cooldowns(0)
-    -> tick_cooldowns(0)
+    -> cast_if_ready(ability_id) ->
+    -> show_cooldowns(0) ->
+    -> tick_cooldowns(0) ->
     -> execute_commands(command_index + 1)
 }
 

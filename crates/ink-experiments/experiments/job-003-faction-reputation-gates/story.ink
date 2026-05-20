@@ -20,12 +20,12 @@ VAR gates: FactionGate[] = [
 
 == main ==
 Faction gate audit:
--> evaluate_gates(0)
+-> evaluate_gates(0) ->
 ~ reputation["Guild"] = reputation["Guild"] + 3
 ~ reputation["Bandits"] = reputation["Bandits"] + 3
 ~ reputation["Scholars"] = reputation["Scholars"] - 4
 After reputation changes:
--> evaluate_gates(0)
+-> evaluate_gates(0) ->
 -> DONE
 
 == evaluate_gates(index: int) ==

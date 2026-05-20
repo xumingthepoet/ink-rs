@@ -19,7 +19,7 @@ VAR event_order: string[] = ["movement", "combat", "movement", "inventory", "dia
 
 == main ==
 Tutorial once-only registry:
--> trigger_tutorials(0)
+-> trigger_tutorials(0) ->
 -> DONE
 
 == trigger_tutorials(index: int) ==
