@@ -684,7 +684,7 @@ completion validation passed with the same focused commands and `make gate`.
 
 ## Milestone 4: Lowering Expression Boundaries
 
-### [ ] Task 23: Split Lower Expression Operators And Name Resolution
+### [~] Task 23: Split Lower Expression Operators And Name Resolution
 
 Goal: Separate operator token mapping and runtime name resolution from the main
 expression lowering traversal.
