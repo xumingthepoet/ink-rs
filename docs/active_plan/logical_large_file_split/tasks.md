@@ -1,4 +1,4 @@
-Progress: 9/27
+Progress: 10/27
 
 # Logical Large-File Split Active Plan
 
@@ -300,7 +300,7 @@ syntax::expression::tests::operator_rule_table_drill_covers_tokenizer_and_parser
 Review found no follow-up changes; completion validation passed with the same
 focused commands and `make gate`.
 
-### [>] Task 10: Split Expression Tokenizer
+### [x] Task 10: Split Expression Tokenizer
 
 Goal: Give lexical scanning for expressions an independent module.
 
@@ -329,7 +329,8 @@ ink-compiler
 syntax::expression::tests::tokenizer_covers_expression_token_categories`,
 `cargo test -q -p ink-compiler
 syntax::expression::tests::tokenizer_tracks_character_columns_for_unicode_prefixes`,
-and `make gate`.
+and `make gate`. Review found no follow-up changes; completion validation
+passed with the same focused commands and `make gate`.
 
 ### [ ] Task 11: Split Expression Parse Errors
 
