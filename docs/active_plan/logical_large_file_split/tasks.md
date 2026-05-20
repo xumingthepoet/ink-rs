@@ -1,4 +1,4 @@
-Progress: 17/27
+Progress: 18/27
 
 # Logical Large-File Split Active Plan
 
@@ -537,7 +537,7 @@ ink-test --test integration diagnostics`, and `make gate`. Review found no
 follow-up changes; completion validation passed with the same focused command
 and `make gate`.
 
-### [>] Task 18: Split Divert Target Checks
+### [x] Task 18: Split Divert Target Checks
 
 Goal: Move static, dynamic, conditional, tunnel, and cross-module divert target
 checking into a focused module.
@@ -562,7 +562,9 @@ integration diverts`; `cargo test -p ink-test --test integration diagnostics`;
 Commit record: implementation commit `3b9d0107 Split divert target checks`;
 validation passed with `cargo fmt --all --check`, `cargo test -p ink-test
 --test integration diverts`, `cargo test -p ink-test --test integration
-diagnostics`, and `make gate`.
+diagnostics`, and `make gate`. Review follow-up commit `63c924ad Include
+target divert checks in analysis source scan`; completion validation passed
+with the same focused commands and `make gate`.
 
 ### [ ] Task 19: Split Function And External Call Checks
 
