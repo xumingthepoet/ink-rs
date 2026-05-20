@@ -23,16 +23,7 @@ VAR draft_pool: Card[] = [
 VAR pick_order: int[] = [2, 0, 6, 1, 8, 3, 5, 7]
 VAR draw_order: int[] = [0, 3, 1, 4, 2, 6, 5, 7]
 
-VAR deck_cards: Card[] = [
-    %Card{ name: "", card_type: "", cost: 0, power: 0 },
-    %Card{ name: "", card_type: "", cost: 0, power: 0 },
-    %Card{ name: "", card_type: "", cost: 0, power: 0 },
-    %Card{ name: "", card_type: "", cost: 0, power: 0 },
-    %Card{ name: "", card_type: "", cost: 0, power: 0 },
-    %Card{ name: "", card_type: "", cost: 0, power: 0 },
-    %Card{ name: "", card_type: "", cost: 0, power: 0 },
-    %Card{ name: "", card_type: "", cost: 0, power: 0 }
-]
+VAR deck_cards: Card[] = []
 
 VAR flame_count: int = 0
 VAR tide_count: int = 0
@@ -61,7 +52,7 @@ Trading-card deck synergy simulation begins.
 - else:
     ~ temp pick_index: int = pick_order[slot]
     ~ temp card: Card = draft_pool[pick_index]
-    ~ deck_cards[slot] = card
+    ~ ARRAY_PUSH(deck_cards, card)
     ~ deck_power_total = deck_power_total + card.power
     ~ add_type_count(card.card_type)
     Pick {slot + 1}: {card.name} [{card.card_type}] cost {card.cost}, power {card.power}

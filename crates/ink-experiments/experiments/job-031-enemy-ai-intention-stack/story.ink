@@ -11,7 +11,6 @@ STRUCT Enemy {
 }
 
 STRUCT Intention {
-    slot: int
     enemy_id: string
     action: string
     priority: int
@@ -25,14 +24,8 @@ VAR enemies: Enemy[] = [
     %Enemy{id: "Pup", hp: 5, stamina: 4, state: "normal", attack_cd: 2, special_cd: 4, alive: true}
 ]
 
-VAR intent_stack: Intention[] = [
-    %Intention{slot: 0, enemy_id: "", action: "", priority: 0, cooldown_type: ""},
-    %Intention{slot: 1, enemy_id: "", action: "", priority: 0, cooldown_type: ""},
-    %Intention{slot: 2, enemy_id: "", action: "", priority: 0, cooldown_type: ""},
-    %Intention{slot: 3, enemy_id: "", action: "", priority: 0, cooldown_type: ""}
-]
+VAR intent_stack: Intention[] = []
 
-VAR stack_depth: int = 0
 VAR current_turn: int = 1
 VAR hero_hp: int = 54
 
@@ -53,11 +46,10 @@ Hero hp left: {hero_hp}.
         Hero defeated. Combat stops before Turn {turn}.
     - else:
         Turn {turn}
-        ~ stack_depth = 0
+        ~ intent_stack = []
         ~ build_intention_stack(0)
-        ~ sort_plan(stack_depth - 1)
         ~ print_turn_plan()
-        ~ execute_plan(stack_depth - 1)
+        ~ execute_plan(LEN(intent_stack) - 1)
         ~ print_turn_roster(turn)
         ~ apply_end_of_turn_effects(0)
         ~ run_turn(turn + 1)
@@ -99,33 +91,22 @@ Hero hp left: {hero_hp}.
                 }
             }
         }
-        ~ intent_stack[stack_depth].slot = index
-        ~ intent_stack[stack_depth].enemy_id = enemy.id
-        ~ intent_stack[stack_depth].action = action
-        ~ intent_stack[stack_depth].priority = priority
-        ~ intent_stack[stack_depth].cooldown_type = cooldown_type
-        ~ stack_depth = stack_depth + 1
+        ~ insert_intention_sorted(%Intention{enemy_id: enemy.id, action: action, priority: priority, cooldown_type: cooldown_type}, 0)
     - else:
         {enemy.id} is down.
     }
     ~ build_intention_stack(index + 1)
 }
 
-== function sort_plan(end: int) => void ==
-{ if end > 0:
-    ~ bubble_plan(0, end)
-    ~ sort_plan(end - 1)
-}
-
-== function bubble_plan(index: int, end: int) => void ==
-{ if index < end:
-    ~ temp left: Intention = intent_stack[index]
-    ~ temp right: Intention = intent_stack[index + 1]
-    { if left.priority < right.priority:
-        ~ intent_stack[index] = right
-        ~ intent_stack[index + 1] = left
+== function insert_intention_sorted(intent: Intention, index: int) => void ==
+{ if index >= LEN(intent_stack):
+    ~ ARRAY_PUSH(intent_stack, intent)
+- else:
+    { if intent.priority > intent_stack[index].priority:
+        ~ ARRAY_INSERT(intent_stack, index, intent)
+    - else:
+        ~ insert_intention_sorted(intent, index + 1)
     }
-    ~ bubble_plan(index + 1, end)
 }
 
 == function print_turn_plan() => void ==
@@ -133,7 +114,7 @@ Hero hp left: {hero_hp}.
 ~ print_plan_entry(0)
 
 == function print_plan_entry(index: int) => void ==
-{ if index < stack_depth:
+{ if index < LEN(intent_stack):
     ~ temp intent: Intention = intent_stack[index]
     { if intent.action == "":
         {intent.enemy_id}
