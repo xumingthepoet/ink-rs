@@ -20,7 +20,7 @@ use super::{
     expression_types::{infer_expression_type, typed_builtin_return_type},
     indexes::AnalysisIndexes,
     interface_values::{
-        infer_expected_interface_expression_type, InterfaceModuleLiteralUses,
+        infer_expression_type_with_expected, ExpectedTypeInference, InterfaceModuleLiteralUses,
         ModuleImplementationIndex,
     },
     interfaces::InterfaceMemberIndex,
@@ -105,6 +105,18 @@ impl<'a> CallTargetChecker<'a> {
 
     fn current_module<'context>(&self, context: &'context VisitContext) -> Option<&'context str> {
         context.current_module.as_deref()
+    }
+
+    fn expected_type_inference(&self) -> ExpectedTypeInference<'_> {
+        ExpectedTypeInference {
+            variable_scopes: self.variable_scopes,
+            struct_types: self.struct_types,
+            enum_types: self.enum_types,
+            target_symbols: self.target_symbols,
+            module_implementations: self.module_implementations,
+            module_imports: self.module_imports,
+            interface_members: self.interface_members,
+        }
     }
 
     fn current_flow_context(&self, context: &VisitContext) -> Option<&FlowContext> {
@@ -482,31 +494,13 @@ impl<'a> CallTargetChecker<'a> {
                 continue;
             }
 
-            let argument_type = infer_expected_interface_expression_type(
+            let argument_type = infer_expression_type_with_expected(
                 argument,
                 expected_type,
-                self.variable_scopes,
-                self.struct_types,
-                self.enum_types,
-                self.target_symbols,
-                self.module_implementations,
-                self.module_imports,
-                self.interface_members,
+                self.expected_type_inference(),
                 self.current_module(context),
                 self.current_flow_path(context),
-            )
-            .unwrap_or_else(|| {
-                infer_expression_type(
-                    argument,
-                    self.variable_scopes,
-                    self.struct_types,
-                    self.enum_types,
-                    self.target_symbols,
-                    self.interface_members,
-                    self.current_module(context),
-                    self.current_flow_path(context),
-                )
-            });
+            );
 
             match argument_type {
                 Ok(actual_type) if actual_type != *expected_type => {
@@ -876,31 +870,13 @@ impl<'a> CallTargetChecker<'a> {
                 self.check_expression(argument, span, context);
                 continue;
             }
-            let argument_type = infer_expected_interface_expression_type(
+            let argument_type = infer_expression_type_with_expected(
                 argument,
                 &expected_type,
-                self.variable_scopes,
-                self.struct_types,
-                self.enum_types,
-                self.target_symbols,
-                self.module_implementations,
-                self.module_imports,
-                self.interface_members,
+                self.expected_type_inference(),
                 self.current_module(context),
                 self.current_flow_path(context),
-            )
-            .unwrap_or_else(|| {
-                infer_expression_type(
-                    argument,
-                    self.variable_scopes,
-                    self.struct_types,
-                    self.enum_types,
-                    self.target_symbols,
-                    self.interface_members,
-                    self.current_module(context),
-                    self.current_flow_path(context),
-                )
-            });
+            );
 
             match argument_type {
                 Ok(actual_type) if actual_type != expected_type => {

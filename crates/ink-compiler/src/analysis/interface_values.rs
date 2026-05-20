@@ -29,6 +29,17 @@ pub(super) struct InterfaceModuleLiteralUses {
     modules_by_importing_module: BTreeMap<String, BTreeSet<String>>,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub(super) struct ExpectedTypeInference<'a> {
+    pub(super) variable_scopes: &'a VariableScopeIndex,
+    pub(super) struct_types: &'a StructTypeIndex,
+    pub(super) enum_types: &'a EnumTypeIndex,
+    pub(super) target_symbols: &'a TargetSymbolIndex,
+    pub(super) module_implementations: &'a ModuleImplementationIndex,
+    pub(super) module_imports: &'a ModuleImportIndex,
+    pub(super) interface_members: &'a InterfaceMemberIndex,
+}
+
 pub(super) fn build_module_implementation_index(story: &Story) -> ModuleImplementationIndex {
     let mut index = ModuleImplementationIndex::default();
 
@@ -46,6 +57,40 @@ pub(super) fn build_module_implementation_index(story: &Story) -> ModuleImplemen
     }
 
     index
+}
+
+pub(super) fn infer_expression_type_with_expected(
+    expression: &Expression,
+    expected_type: &TypeName,
+    inputs: ExpectedTypeInference<'_>,
+    current_module: Option<&str>,
+    current_flow_path: Option<&str>,
+) -> Result<TypeName, TypeInferenceError> {
+    infer_expected_interface_expression_type(
+        expression,
+        expected_type,
+        inputs.variable_scopes,
+        inputs.struct_types,
+        inputs.enum_types,
+        inputs.target_symbols,
+        inputs.module_implementations,
+        inputs.module_imports,
+        inputs.interface_members,
+        current_module,
+        current_flow_path,
+    )
+    .unwrap_or_else(|| {
+        infer_expression_type(
+            expression,
+            inputs.variable_scopes,
+            inputs.struct_types,
+            inputs.enum_types,
+            inputs.target_symbols,
+            inputs.interface_members,
+            current_module,
+            current_flow_path,
+        )
+    })
 }
 
 pub(super) fn infer_expected_interface_expression_type(

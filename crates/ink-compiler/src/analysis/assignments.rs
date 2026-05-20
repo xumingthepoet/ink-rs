@@ -11,7 +11,9 @@ use super::{
     enums::type_name_is_enum,
     expression_types::infer_expression_type,
     indexes::AnalysisIndexes,
-    interface_values::{infer_expected_interface_expression_type, ModuleImplementationIndex},
+    interface_values::{
+        infer_expression_type_with_expected, ExpectedTypeInference, ModuleImplementationIndex,
+    },
     interfaces::InterfaceMemberIndex,
     modules::ModuleImportIndex,
     structs::resolve_struct_symbol,
@@ -75,6 +77,18 @@ impl<'a> VariableAssignmentChecker<'a> {
             module_imports,
             interface_members,
             diagnostics: Vec::new(),
+        }
+    }
+
+    fn expected_type_inference(&self) -> ExpectedTypeInference<'_> {
+        ExpectedTypeInference {
+            variable_scopes: self.variable_scopes,
+            struct_types: self.struct_types,
+            enum_types: self.enum_types,
+            target_symbols: self.target_symbols,
+            module_implementations: self.module_implementations,
+            module_imports: self.module_imports,
+            interface_members: self.interface_members,
         }
     }
 
@@ -313,20 +327,14 @@ impl<'a> VariableAssignmentChecker<'a> {
         span: &crate::source::SourceSpan,
         context: &VisitContext,
     ) {
-        if let Some(result) = infer_expected_interface_expression_type(
-            expression,
-            &declared_type,
-            self.variable_scopes,
-            self.struct_types,
-            self.enum_types,
-            self.target_symbols,
-            self.module_implementations,
-            self.module_imports,
-            self.interface_members,
-            context.current_module.as_deref(),
-            context.current_flow_path.as_deref(),
-        ) {
-            match result {
+        if declared_type.as_interface_name().is_some() {
+            match infer_expression_type_with_expected(
+                expression,
+                &declared_type,
+                self.expected_type_inference(),
+                context.current_module.as_deref(),
+                context.current_flow_path.as_deref(),
+            ) {
                 Ok(actual_type) if actual_type != declared_type => {
                     self.diagnostics.push(Diagnostic::error(
                         span.clone(),
