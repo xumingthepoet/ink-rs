@@ -1,4 +1,4 @@
-Progress: 11/20
+Progress: 12/20
 
 # Typed Dict Values Task List
 
@@ -425,7 +425,7 @@ Validation:
 Commit record: implementation `afe8da16` (`Add runtime Dict value type`);
 review fix `7e7a4d7a` (`Cover Dict default value comparison`)
 
-### [>] Task 12: Runtime Dict INDEX And SET_INDEX
+### [x] Task 12: Runtime Dict INDEX And SET_INDEX
 
 Goal: Execute Dict reads and writes with existing native index operations.
 
@@ -451,8 +451,16 @@ Validation:
 - Second `make gate` rerun reached the `ink-test` typed values stage but failed
   by the same wrapper timeout with no failing tests reported.
 - Reran `make gate` again after incremental compilation; passed.
+- Review fix: preserved `SET_INDEX` key/index error ordering before third
+  parameter validation, then reran
+  `cargo test -p ink-runtime native_function_call::composite`,
+  `cargo fmt --all --check`, and `make gate`. The first two review-fix
+  `make gate` runs hit wrapper timeouts with no failing tests reported; the
+  final hot rerun passed. Reran focused validation plus `make gate` after the
+  review-fix commit.
 
-Commit record: implementation `c50da78d` (`Support runtime Dict index operations`)
+Commit record: implementation `c50da78d` (`Support runtime Dict index operations`);
+review fix `b983c956` (`Preserve SET_INDEX key error ordering`)
 
 ### [ ] Task 13: Runtime Dict Equality
 
