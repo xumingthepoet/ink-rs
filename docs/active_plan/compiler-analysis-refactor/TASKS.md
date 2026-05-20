@@ -1,4 +1,4 @@
-Progress: 19/24
+Progress: 20/24
 
 # Compiler Analysis Refactor Active Plan
 
@@ -639,7 +639,7 @@ tracking code.
 Commit record: Implementation commit `38dcfe7e`; completion-record commit
 recorded by this task-list update.
 
-### [>] Task 20: Pass real spans through function-call literal checks
+### [x] Task 20: Pass real spans through function-call literal checks
 
 Goal: Replace fallback `SourceSpan::new(None, 1, 1)` in literal checker
 function-call paths where a real containing object span is available.
@@ -665,7 +665,12 @@ Cargo accepts one test filter per invocation: `cargo test -p ink-compiler
 array_literals`, `cargo test -p ink-compiler dict_literals`, `cargo test -p
 ink-compiler struct_literals`; `make gate` passed.
 
-Commit record: Implementation commit `e412de7b`; completion-record commit TBD.
+Review record: `VisitContext` now carries the nearest containing object span,
+and literal checker function-call paths use that span while retaining the old
+`1:1` fallback when no containing object span exists.
+
+Commit record: Implementation commit `e412de7b`; completion-record commit
+recorded by this task-list update.
 
 ### [ ] Task 21: Pass real spans through qualified import-use collection where available
 
