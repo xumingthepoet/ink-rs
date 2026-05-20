@@ -1,4 +1,4 @@
-Progress: 21/27
+Progress: 22/27
 
 # Logical Large-File Split Active Plan
 
@@ -651,7 +651,7 @@ test -p ink-test --test integration modules`, `cargo test -p ink-test --test
 integration typed_values`, and `make gate`. Review found no follow-up changes;
 completion validation passed with the same focused commands and `make gate`.
 
-### [>] Task 22: Split Target Context Helpers
+### [x] Task 22: Split Target Context Helpers
 
 Goal: Move target-analysis helper functions that are shared across checks into
 a stable utility module.
@@ -679,7 +679,8 @@ integration diagnostics`; `cargo test -p ink-test --test integration modules`;
 Commit record: implementation commit `b91d4979 Split target context
 helpers`; validation passed with `cargo fmt --all --check`, `cargo test -p
 ink-test --test integration diagnostics`, `cargo test -p ink-test --test
-integration modules`, and `make gate`.
+integration modules`, and `make gate`. Review found no follow-up changes;
+completion validation passed with the same focused commands and `make gate`.
 
 ## Milestone 4: Lowering Expression Boundaries
 
