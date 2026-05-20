@@ -112,6 +112,27 @@ Supported types:
     ```
 
     This represents an object value with `flags`, `hp`, and `name` fields. Static Ink source type names and field declarations are not serialized in story JSON or save JSON in this phase; only the runtime values are serialized.
+* **dynamic Dict value**: represented as an array marker that stores the key
+  type and an array of key/value entries:
+
+    ```json
+    ["dict", "string", [["ada", 10], ["grace", "^compiler"]]]
+    ```
+
+    The second element is the key type, either `"string"` or `"int"`. The third
+    element is an array of two-item `[key, value]` entries. String keys are
+    plain JSON strings, int keys are JSON integer numbers, and entry values use
+    the same recursive runtime value encoding as arrays and objects.
+
+    ```json
+    ["dict", "int", [[1, "^one"], [2, {"hp": 10}]]]
+    ```
+
+    Dicts use an array marker instead of a JSON object so the encoding does not
+    consume the open field namespace used by dynamic object/struct values. This
+    also keeps int keys as integer entry keys rather than converting them to
+    JSON object field names. Ordinary object fields named `dict`, `^dict`, or
+    `entries` remain dynamic object fields and are not interpreted as Dicts.
 * **interface value**: represented as a runtime string containing the source
   module name, using the same string value encoding as other strings. For
   example, an `interface<IItem>` variable initialized with module `left` stores

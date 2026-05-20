@@ -186,6 +186,9 @@ fn format_object_to_runtime(object: &format::Object) -> Result<Rc<dyn RTObject>,
         format::Object::ValueArray(_) | format::Object::ValueObject(_) => Ok(Rc::new(
             Value::new_value_type(format_object_to_runtime_value(object)?),
         )),
+        format::Object::ValueDict(_) => Err(StoryError::BadJson(
+            "Dict values are not supported by the runtime loader yet".to_string(),
+        )),
         format::Object::Void => Ok(Rc::new(Void::new())),
     }
 }
@@ -213,6 +216,9 @@ fn format_object_to_runtime_value(object: &format::Object) -> Result<ValueType, 
             .map(|(name, value)| Ok((name.clone(), format_object_to_runtime_value(value)?)))
             .collect::<Result<BTreeMap<_, _>, _>>()
             .map(ValueType::Object),
+        format::Object::ValueDict(_) => Err(StoryError::BadJson(
+            "Dict values are not supported by the runtime loader yet".to_string(),
+        )),
         _ => Err(StoryError::BadJson(format!(
             "Unsupported value object in dynamic value: {:?}",
             object

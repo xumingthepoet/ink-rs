@@ -60,6 +60,15 @@ pub const DYNAMIC_INTERFACE_NAME_KEY: &str = "interface";
 /// Object key for the argument count on dynamic interface function instruction objects.
 pub const DYNAMIC_INTERFACE_ARGS_KEY: &str = "args";
 
+/// Array marker token for dynamic Dict values.
+pub const DICT_VALUE_MARKER: &str = "dict";
+
+/// Dict key-type token for string-key dictionaries.
+pub const DICT_KEY_TYPE_STRING: &str = "string";
+
+/// Dict key-type token for int-key dictionaries.
+pub const DICT_KEY_TYPE_INT: &str = "int";
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InterfaceDefinition {
     pub members: BTreeMap<String, InterfaceMemberKind>,
@@ -121,6 +130,74 @@ impl InternalFunction {
             args,
             arg_types,
             return_type: return_type.into(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum DictKeyType {
+    String,
+    Int,
+}
+
+impl DictKeyType {
+    pub fn from_token(token: &str) -> Option<Self> {
+        match token {
+            DICT_KEY_TYPE_STRING => Some(Self::String),
+            DICT_KEY_TYPE_INT => Some(Self::Int),
+            _ => None,
+        }
+    }
+
+    pub fn token(self) -> &'static str {
+        match self {
+            Self::String => DICT_KEY_TYPE_STRING,
+            Self::Int => DICT_KEY_TYPE_INT,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum DictKey {
+    String(String),
+    Int(i32),
+}
+
+impl DictKey {
+    pub fn key_type(&self) -> DictKeyType {
+        match self {
+            Self::String(_) => DictKeyType::String,
+            Self::Int(_) => DictKeyType::Int,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct DictValue {
+    pub key_type: DictKeyType,
+    pub entries: BTreeMap<DictKey, Object>,
+}
+
+impl DictValue {
+    pub fn new(
+        key_type: DictKeyType,
+        entries: BTreeMap<DictKey, Object>,
+    ) -> Result<Self, FormatError> {
+        for key in entries.keys() {
+            if key.key_type() != key_type {
+                return Err(FormatError::new(format!(
+                    "Dict key {key:?} does not match {} key type",
+                    key_type.token()
+                )));
+            }
+        }
+        Ok(Self { key_type, entries })
+    }
+
+    pub fn empty(key_type: DictKeyType) -> Self {
+        Self {
+            key_type,
+            entries: BTreeMap::new(),
         }
     }
 }
@@ -252,6 +329,7 @@ pub enum Object {
     Float(f64),
     ValueArray(Vec<Object>),
     ValueObject(BTreeMap<String, Object>),
+    ValueDict(DictValue),
     Void,
     NativeFunction(NativeFunction),
 }
