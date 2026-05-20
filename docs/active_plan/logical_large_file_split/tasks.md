@@ -593,7 +593,7 @@ ink-test --test integration functions`, `cargo test -p ink-test --test
 integration diagnostics`, and `make gate`. Review found no follow-up changes;
 completion validation passed with the same focused commands and `make gate`.
 
-### [ ] Task 20: Split Typed Builtin Target Checks
+### [~] Task 20: Split Typed Builtin Target Checks
 
 Goal: Give runtime built-in call type checking its own module.
 
