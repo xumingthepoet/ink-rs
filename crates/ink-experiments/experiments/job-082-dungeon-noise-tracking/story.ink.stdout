@@ -1,0 +1,80 @@
+An infiltration route is planned with quiet and caution.
+Phase 1: Initial
+Antechamber Gate: closed
+Iron Gate: locked
+Vault Door: closed
+Sentinel Rune (anteroom) awareness 14 = distant
+Rook Guard (vault hall) awareness 8 = distant
+Vault Warden (inner vault) awareness 3 = distant
+Current ambush risk: 0
+Noise stays below alarm threshold.
+You move from the stairs to the entrance walkway.
+Noise source Soft heel scrape is active.
+Soft heel scrape reaches Sentinel Rune, adding 1 awareness.
+Soft heel scrape does not reach Rook Guard.
+Soft heel scrape does not reach Vault Warden.
+Phase 1: After step
+Antechamber Gate: closed
+Iron Gate: locked
+Vault Door: closed
+Sentinel Rune (anteroom) awareness 15 = distant
+Rook Guard (vault hall) awareness 8 = distant
+Vault Warden (inner vault) awareness 3 = distant
+Current ambush risk: 9
+Noise stays below alarm threshold.
+You brace the Antechamber Gate and pull it open.
+The Antechamber Gate shifts from closed to open.
+Noise source Metal hinge rattle is active.
+Metal hinge rattle reaches Sentinel Rune, adding 4 awareness.
+Metal hinge rattle does not reach Rook Guard.
+Metal hinge rattle does not reach Vault Warden.
+Phase 2: After step
+Antechamber Gate: open
+Iron Gate: locked
+Vault Door: closed
+Sentinel Rune (anteroom) awareness 17 = distant
+Rook Guard (vault hall) awareness 6 = distant
+Vault Warden (inner vault) awareness 1 = distant
+Current ambush risk: 9
+Noise stays below alarm threshold.
+You force the Iron Gate and pull it open with effort.
+The Iron Gate shifts from locked to open.
+Noise source Torch chain clink is active.
+Torch chain clink reaches Sentinel Rune, adding 3 awareness.
+Torch chain clink reaches Rook Guard, adding 3 awareness.
+Torch chain clink reaches Vault Warden, adding 1 awareness.
+Phase 3: After step
+Antechamber Gate: open
+Iron Gate: open
+Vault Door: closed
+Sentinel Rune (anteroom) awareness 18 = distant
+Rook Guard (vault hall) awareness 7 = distant
+Vault Warden (inner vault) awareness 1 = distant
+Current ambush risk: 9
+Noise stays below alarm threshold.
+A crate shifts on a support beam above the vault hall.
+Noise source Falling crate is active.
+The noise is sharp and visible.
+Falling crate reaches Sentinel Rune, adding 7 awareness.
+The noise is sharp and visible.
+Falling crate reaches Rook Guard, adding 7 awareness.
+Falling crate reaches Vault Warden, adding 3 awareness.
+Phase 4: After step
+Antechamber Gate: open
+Iron Gate: open
+Vault Door: closed
+Sentinel Rune (anteroom) awareness 27 = distant
+Rook Guard (vault hall) awareness 16 = distant
+Vault Warden (inner vault) awareness 3 = distant
+Current ambush risk: 9
+Noise stays below alarm threshold.
+Infiltration ends.
+Phase 4: Final
+Antechamber Gate: open
+Iron Gate: open
+Vault Door: closed
+Sentinel Rune (anteroom) awareness 25 = distant
+Rook Guard (vault hall) awareness 14 = distant
+Vault Warden (inner vault) awareness 1 = distant
+Current ambush risk: 9
+Noise stays below alarm threshold.
