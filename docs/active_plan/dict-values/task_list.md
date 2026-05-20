@@ -1,4 +1,4 @@
-Progress: 15/20
+Progress: 16/20
 
 # Typed Dict Values Task List
 
@@ -574,7 +574,7 @@ Commit record: implementation `d0c277d8` (`Support Dict runtime APIs`)
 
 ## Milestone 6: Integration Fixtures
 
-### [>] Task 16: Add Dict Runtime Fixtures And Author Docs
+### [x] Task 16: Add Dict Runtime Fixtures And Author Docs
 
 Goal: Cover end-to-end story behavior for core Dict operations and document the
 supported author-facing feature.
@@ -608,8 +608,14 @@ Validation:
 - `make gate UNIT_TEST_TIMEOUT=120s INK_TEST_TIMEOUT=600s` passed; the
   following default `make gate` hot rerun hit the same workspace doc-test
   wrapper timeout with no failing tests reported.
+- Review fix: clarified empty Dict literal documentation so it does not imply
+  inline function-argument literals are supported; reran
+  `cargo test -p ink-test typed_values`,
+  `cargo test -p ink-test --test typed_values`, `cargo fmt --all --check`, and
+  `make gate UNIT_TEST_TIMEOUT=120s INK_TEST_TIMEOUT=600s`.
 
-Commit record: implementation `2167c03e` (`Add Dict runtime fixtures and docs`)
+Commit record: implementation `2167c03e` (`Add Dict runtime fixtures and docs`);
+review fix `0a91453b` (`Clarify Dict empty literal docs`)
 
 ### [ ] Task 17: Add Dict Diagnostic Fixtures
 
