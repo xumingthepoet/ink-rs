@@ -93,7 +93,7 @@ no follow-up changes required.
 Commit record: Implementation commit `39d762cc`; waiting-review record
 `b35af4dc`; completion-record commit recorded by this task-list update.
 
-### [ ] Task 03: Migrate initializer and assignment diagnostics
+### [>] Task 03: Migrate initializer and assignment diagnostics
 
 Goal: Make initializer and assignment diagnostics consume `AnalysisIndexes`.
 
@@ -115,7 +115,11 @@ analysis pass orchestration.
 
 Validation commands: `cargo test -p ink-compiler initializers assignments`; `cargo test -p ink-compiler analysis`; `make gate`.
 
-Commit record: Implementation commit TBD; completion-record commit TBD.
+Validation record: `cargo test -p ink-compiler initializers` passed;
+`cargo test -p ink-compiler assignments` passed; `cargo test -p ink-compiler
+analysis` passed; `make gate` passed.
+
+Commit record: Implementation commit `60ace477`; completion-record commit TBD.
 
 ### [ ] Task 04: Migrate field/index/flow diagnostics
 
