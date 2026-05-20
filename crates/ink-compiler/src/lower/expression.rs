@@ -391,9 +391,17 @@ fn infer_lowered_expression_type(
                     .unwrap_or_else(TypeName::void)
             })
         }
-        Expression::IndexAccess { base, .. } => infer_lowered_expression_type(base, context)?
-            .array_element_type()
-            .cloned(),
+        Expression::IndexAccess { base, .. } => {
+            let base_type = infer_lowered_expression_type(base, context)?;
+            base_type
+                .array_element_type()
+                .or_else(|| {
+                    base_type
+                        .dict_key_value_types()
+                        .map(|(_, value_type)| value_type)
+                })
+                .cloned()
+        }
         Expression::FunctionCall { name, .. } => callable_return_type(name, context),
         Expression::QualifiedFunctionCall { name, .. } => {
             callable_return_type(name.as_str(), context)

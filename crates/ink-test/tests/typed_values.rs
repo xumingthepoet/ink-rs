@@ -329,6 +329,39 @@ fn index_access_reads_array_items_at_runtime() {
 }
 
 #[test]
+fn dict_typed_values_index_reads_lower_to_index_tokens() {
+    let compiled = compile_fixture("typed/dict-index-reads-json.ink");
+    let json = compiled.program.to_json_value();
+
+    assert_json_sequence(
+        &json,
+        vec![
+            json!({"VAR?": "game::scores"}),
+            json!("str"),
+            json!("^ada"),
+            json!("/str"),
+            json!("INDEX"),
+        ],
+    );
+    assert_json_sequence(
+        &json,
+        vec![json!({"VAR?": "game::names"}), json!(1), json!("INDEX")],
+    );
+    assert_json_sequence(
+        &json,
+        vec![
+            json!({"VAR?": "game::nested"}),
+            json!(1),
+            json!("INDEX"),
+            json!("str"),
+            json!("^ada"),
+            json!("/str"),
+            json!("INDEX"),
+        ],
+    );
+}
+
+#[test]
 fn field_assignment_writes_struct_fields_at_runtime() {
     let compiled = compile_fixture("typed/field-assignment.ink");
 
