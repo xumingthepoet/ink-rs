@@ -1,0 +1,15 @@
+Equipment loadout totals:
+Head: Iron Helm [A0 D2 S0]
+Body: Leather Tunic [A0 D3 S0]
+Weapon: Wooden Staff [A4 D0 S1]
+Boots: Traveler Boots [A0 D1 S2]
+Ring: Clear Opal [A1 D1 S0]
+Totals: ATK 5, DEF 7, SPD 3.
+Body now uses Chainmail.
+Boots now uses Racer Greaves.
+Head: Iron Helm [A0 D2 S0]
+Body: Chainmail [A1 D7 S-1]
+Weapon: Wooden Staff [A4 D0 S1]
+Boots: Racer Greaves [A0 D0 S5]
+Ring: Clear Opal [A1 D1 S0]
+Totals: ATK 6, DEF 10, SPD 5.

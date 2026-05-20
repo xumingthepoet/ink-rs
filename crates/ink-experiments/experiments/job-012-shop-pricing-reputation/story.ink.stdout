@@ -1,0 +1,35 @@
+Shop pricing with reputation and discounts:
+Initial pricing
+Potion (Merchants, rep 4)
+Base: 18
+Discounted: true
+Price: 13
+Chainmail (Guild, rep 7)
+Base: 140
+Discounted: false
+Price: 113
+Hunting Bow (Frontiersmen, rep 0)
+Base: 110
+Discounted: false
+Price: 99
+Nightshade (Outlaws, rep -6)
+Base: 35
+Discounted: true
+Price: 39
+After reputation shifts
+Potion (Merchants, rep 4)
+Base: 18
+Discounted: true
+Price: 15
+Chainmail (Guild, rep 9)
+Base: 140
+Discounted: true
+Price: 95
+Hunting Bow (Frontiersmen, rep 0)
+Base: 110
+Discounted: false
+Price: 110
+Nightshade (Outlaws, rep 2)
+Base: 35
+Discounted: true
+Price: 29
