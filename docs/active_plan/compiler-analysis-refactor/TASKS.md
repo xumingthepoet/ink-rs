@@ -162,7 +162,7 @@ no follow-up changes required.
 Commit record: Implementation commit `bf229a49`; waiting-review record
 `cbc5a4fc`; completion-record commit recorded by this task-list update.
 
-### [ ] Task 05: Migrate literal diagnostics
+### [>] Task 05: Migrate literal diagnostics
 
 Goal: Make array, dict, and struct literal diagnostics consume shared analysis
 indexes.
@@ -182,7 +182,12 @@ Modification boundaries: Literal diagnostics and analysis pass orchestration.
 
 Validation commands: `cargo test -p ink-compiler array_literals dict_literals struct_literals`; `cargo test -p ink-compiler analysis`; `make gate`.
 
-Commit record: Implementation commit TBD; completion-record commit TBD.
+Validation record: `cargo test -p ink-compiler array_literals` passed; `cargo
+test -p ink-compiler dict_literals` passed; `cargo test -p ink-compiler
+struct_literals` passed; `cargo test -p ink-compiler analysis` passed; `make
+gate` passed.
+
+Commit record: Implementation commit `53690a65`; completion-record commit TBD.
 
 ### [ ] Task 06: Remove obsolete per-pass index construction
 
