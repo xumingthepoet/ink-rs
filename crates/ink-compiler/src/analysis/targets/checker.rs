@@ -3,15 +3,15 @@ use std::collections::HashMap;
 use crate::{
     diagnostic::Diagnostic,
     parsed::{
-        visit::{walk_story, ParsedVisitor, VisitContext},
+        visit::{ParsedVisitor, VisitContext},
         DivertTarget, Expression, Flow, FlowArgument, InterfaceMemberKind,
-        InterfaceMemberSignature, Object, Story, TypeName,
+        InterfaceMemberSignature, Object, TypeName,
     },
     source::SourceSpan,
     syntax::parse_initial_expression,
 };
 
-use super::{
+use super::super::{
     argument_resolution::{
         resolve_dynamic_interface_signature, resolve_function_call_expected_arguments,
         DynamicInterfaceSignatureError, DynamicInterfaceSignatureInputs,
@@ -20,7 +20,6 @@ use super::{
     context::{EnumTypeIndex, FlowContext, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
     enums::is_enum_member_reference,
     expression_types::{infer_expression_type, is_typed_builtin_function},
-    indexes::AnalysisIndexes,
     interface_values::{
         check_expression_type_with_expected, ExpectedTypeCheckError, ExpectedTypeInference,
         InterfaceModuleLiteralUses, ModuleImplementationIndex,
@@ -31,35 +30,7 @@ use super::{
     target_symbols::{is_cross_module_stitch_target, resolve_target_symbol},
 };
 
-#[cfg(test)]
-use super::modules::ModuleAnalysis;
-
-#[cfg(test)]
-pub(super) fn call_target_diagnostics(story: &Story) -> Vec<Diagnostic> {
-    let module_analysis = ModuleAnalysis::build(story);
-    let indexes = AnalysisIndexes::build(story, &module_analysis);
-    call_target_diagnostics_with_indexes(story, &indexes)
-}
-
-pub(super) fn call_target_diagnostics_with_indexes(
-    story: &Story,
-    indexes: &AnalysisIndexes<'_>,
-) -> Vec<Diagnostic> {
-    let mut checker = CallTargetChecker::new(
-        &indexes.target_symbols,
-        &indexes.variable_scopes,
-        &indexes.struct_types,
-        &indexes.enum_types,
-        &indexes.interface_members,
-        &indexes.module_implementations,
-        indexes.module_imports,
-        &indexes.interface_module_literal_uses,
-    );
-    walk_story(story, &mut checker);
-    checker.diagnostics
-}
-
-struct CallTargetChecker<'a> {
+pub(super) struct CallTargetChecker<'a> {
     target_symbols: &'a TargetSymbolIndex,
     variable_scopes: &'a VariableScopeIndex,
     struct_types: &'a StructTypeIndex,
@@ -68,12 +39,12 @@ struct CallTargetChecker<'a> {
     module_implementations: &'a ModuleImplementationIndex,
     module_imports: &'a ModuleImportIndex,
     interface_module_literal_uses: &'a InterfaceModuleLiteralUses,
-    diagnostics: Vec<Diagnostic>,
+    pub(super) diagnostics: Vec<Diagnostic>,
     flow_contexts_by_path: HashMap<String, FlowContext>,
 }
 
 impl<'a> CallTargetChecker<'a> {
-    fn new(
+    pub(super) fn new(
         target_symbols: &'a TargetSymbolIndex,
         variable_scopes: &'a VariableScopeIndex,
         struct_types: &'a StructTypeIndex,
@@ -1236,7 +1207,7 @@ impl<'a> CallTargetChecker<'a> {
         &self,
         arg: &Expression,
         context: &VisitContext,
-    ) -> Result<TypeName, super::expression_types::TypeInferenceError> {
+    ) -> Result<TypeName, super::super::expression_types::TypeInferenceError> {
         infer_expression_type(
             arg,
             self.variable_scopes,
@@ -1628,10 +1599,8 @@ fn resolve_current_flow_argument<'a>(
 mod tests {
     use crate::diagnostic::DiagnosticSeverity;
 
-    use super::{
-        super::test_support::{assert_single_diagnostic, parse_story},
-        *,
-    };
+    use super::super::super::test_support::{assert_single_diagnostic, parse_story};
+    use super::super::call_target_diagnostics;
 
     #[test]
     fn reports_missing_divert_targets() {
@@ -1685,7 +1654,7 @@ mod tests {
              ~ return values",
         );
 
-        assert_eq!(super::super::run_analysis_passes(&story), []);
+        assert_eq!(super::super::super::run_analysis_passes(&story), []);
     }
 
     #[test]
@@ -1707,7 +1676,7 @@ mod tests {
              -> DONE",
         );
 
-        assert_eq!(super::super::run_analysis_passes(&story), []);
+        assert_eq!(super::super::super::run_analysis_passes(&story), []);
     }
 
     #[test]
@@ -1727,7 +1696,7 @@ mod tests {
              ~ return scores",
         );
 
-        assert_eq!(super::super::run_analysis_passes(&story), []);
+        assert_eq!(super::super::super::run_analysis_passes(&story), []);
     }
 
     #[test]
@@ -1773,7 +1742,7 @@ mod tests {
              -> DONE",
         );
 
-        let diagnostics = super::super::run_analysis_passes(&story);
+        let diagnostics = super::super::super::run_analysis_passes(&story);
 
         assert!(
             diagnostics.iter().any(|diagnostic| {
@@ -1802,7 +1771,7 @@ mod tests {
              -> DONE",
         );
 
-        assert_eq!(super::super::run_analysis_passes(&story), []);
+        assert_eq!(super::super::super::run_analysis_passes(&story), []);
     }
 
     #[test]
@@ -1881,7 +1850,7 @@ mod tests {
              -> DONE",
         );
 
-        assert_eq!(super::super::run_analysis_passes(&story), []);
+        assert_eq!(super::super::super::run_analysis_passes(&story), []);
     }
 
     #[test]
@@ -1918,7 +1887,7 @@ mod tests {
              -> DONE",
         );
 
-        assert_eq!(super::super::run_analysis_passes(&story), []);
+        assert_eq!(super::super::super::run_analysis_passes(&story), []);
     }
 
     #[test]
@@ -2050,7 +2019,7 @@ mod tests {
              -> DONE",
         );
 
-        assert_eq!(super::super::run_analysis_passes(&story), []);
+        assert_eq!(super::super::super::run_analysis_passes(&story), []);
     }
 
     #[test]
@@ -2177,7 +2146,7 @@ mod tests {
              ~ return \"ok\"",
         );
 
-        let diagnostics = super::super::run_analysis_passes(&story);
+        let diagnostics = super::super::super::run_analysis_passes(&story);
 
         assert!(
             diagnostics.iter().any(|diagnostic| {
@@ -2469,7 +2438,7 @@ mod tests {
              -> END",
         );
 
-        assert_eq!(super::super::run_analysis_passes(&story), []);
+        assert_eq!(super::super::super::run_analysis_passes(&story), []);
     }
 
     #[test]
@@ -2489,7 +2458,7 @@ mod tests {
              -> END",
         );
 
-        assert_eq!(super::super::run_analysis_passes(&story), []);
+        assert_eq!(super::super::super::run_analysis_passes(&story), []);
     }
 
     #[test]
@@ -2514,7 +2483,7 @@ mod tests {
              -> END",
         );
 
-        assert_eq!(super::super::run_analysis_passes(&story), []);
+        assert_eq!(super::super::super::run_analysis_passes(&story), []);
     }
 
     #[test]
