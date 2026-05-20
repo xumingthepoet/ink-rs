@@ -807,7 +807,7 @@ gate`.
 
 ## Milestone 5: Format JSON Codec Boundary And Closeout
 
-### [~] Task 27: Split Format JSON Codec And Close The Plan
+### [>] Task 27: Split Format JSON Codec And Close The Plan
 
 Goal: Give the compiled-story JSON codec independent modules for program,
 metadata, containers, objects, and dynamic values, then close the active plan.
@@ -838,4 +838,7 @@ Validation commands: `cargo fmt --all --check`; `cargo test -q -p
 ink-story-json-format`; `cargo test -p ink-test --test integration
 compiler_snapshots`; `make gate`.
 
-Commit record: pending.
+Commit record: implementation commit `6991221e Split format JSON codec`;
+validation passed with `cargo fmt --all --check`, `cargo test -q -p
+ink-story-json-format`, `cargo test -p ink-test --test integration
+compiler_snapshots`, and `make gate`.
