@@ -1,0 +1,19 @@
+Evenings in the tavern begin with one whisper.
+Initial report from Innkeeper Vale: "A sealed wagon is bringing tax silver through the north road." with confidence 95.
+A confident account of Captain Rook's hearing comes from Innkeeper Vale.
+A confident account of Healer Nessa's hearing comes from Captain Rook.
+A confident account of Magistrate Tolan's hearing comes from Healer Nessa.
+A confident account of Magistrate Tolan's hearing comes from Captain Rook.
+A confident account of Blacksmith Orin's hearing comes from Innkeeper Vale.
+The tavern settles; what each person believes is logged.
+Innkeeper Vale: "A sealed wagon is bringing tax silver through the north road."
+Confidence 95, source seed.
+Captain Rook: "A sealed wagon is bringing tax silver through the north road. and Innkeeper Vale says it was Captain Rook sized up at the gate."
+Confidence 85, source Innkeeper Vale.
+Healer Nessa: "Rumor from Captain Rook: maybe A sealed wagon is bringing tax silver through the north road. and Innkeeper Vale says it was Captain Rook sized up at the gate., though this feels uncertain."
+Confidence 69, source Captain Rook.
+Blacksmith Orin: "A sealed wagon is bringing tax silver through the north road. (transmitted with little flourish)."
+Confidence 82, source Innkeeper Vale.
+Magistrate Tolan: "A sealed wagon is bringing tax silver through the north road. and Innkeeper Vale says it was Captain Rook sized up at the gate. (transmitted with little flourish)."
+Confidence 70, source Captain Rook.
+Most stable rumor currently comes from Innkeeper Vale with confidence 95.
