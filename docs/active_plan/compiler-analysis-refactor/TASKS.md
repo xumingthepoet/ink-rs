@@ -1,4 +1,4 @@
-Progress: 6/24
+Progress: 7/24
 
 # Compiler Analysis Refactor Active Plan
 
@@ -227,7 +227,7 @@ Commit record: Implementation commit `509a5586`; waiting-review record
 
 ## Milestone 2: Expected-Type Checking
 
-### [>] Task 07: Extract expected interface expression inference wrapper
+### [x] Task 07: Extract expected interface expression inference wrapper
 
 Goal: Centralize the repeated call pattern around
 `infer_expected_interface_expression_type` and fallback `infer_expression_type`.
@@ -251,9 +251,16 @@ only to adopt the wrapper.
 Validation commands: `cargo test -p ink-compiler interface_module`; `cargo test -p ink-compiler targets`; `make gate`.
 
 Validation record: `cargo test -p ink-compiler interface_module` passed; `cargo
-test -p ink-compiler targets` passed; `make gate` passed.
+test -p ink-compiler targets` passed; `make gate` passed. Review validation
+repeated after implementation review: `cargo test -p ink-compiler
+interface_module` passed; `cargo test -p ink-compiler targets` passed; `make
+gate` passed.
 
-Commit record: Implementation commit `4b6a2db5`; completion-record commit TBD.
+Review record: Reviewed implementation commit `4b6a2db5` with `git show
+--check`; no follow-up changes required.
+
+Commit record: Implementation commit `4b6a2db5`; waiting-review record
+`88632b6a`; completion-record commit recorded by this task-list update.
 
 ### [ ] Task 08: Centralize exact expected-type diagnostics
 
