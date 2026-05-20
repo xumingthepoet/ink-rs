@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use ink_story_json_format::{ControlCommand, NativeFunction, Object as RuntimeObject};
 
-use crate::parsed::{Expression, InterfaceMemberKind, InterfaceMemberSignature, TypeName};
+use crate::parsed::{Expression, TypeName};
 
 use super::composite_literal::lower_dynamic_composite_literal_into;
 use super::context::{ChoicePathMode, LoweringContext};
@@ -14,15 +14,19 @@ use super::weave::lower_content_list_into_context;
 
 mod builtins;
 mod calls;
+mod dynamic_interface;
 mod name_resolution;
 mod operators;
 mod types;
 
 pub(super) use self::calls::lower_function_arg_into;
-use self::calls::{lower_function_arg_into_parts, lower_function_call_into};
+use self::calls::lower_function_call_into;
+pub(super) use self::dynamic_interface::dynamic_interface_knot_signature;
+use self::dynamic_interface::{
+    lower_dynamic_interface_function_call_into, lower_dynamic_interface_target_into,
+};
 use self::name_resolution::{resolve_constant_name, resolve_runtime_variable_name};
 use self::operators::{native_function_for_binary_operator, native_function_for_unary_operator};
-use self::types::infer_lowered_expression_type;
 
 pub(super) fn lower_output_expression_into(
     content: &mut Vec<RuntimeObject>,
@@ -278,79 +282,6 @@ fn lower_constant_expression_into(
     }
 
     lower_expression_into_with_constants(content, constant.expression(), &mut constant_lowering);
-}
-
-pub(super) fn dynamic_interface_knot_signature(
-    expression: &Expression,
-    context: &LoweringContext<'_>,
-) -> Option<(String, InterfaceMemberSignature)> {
-    let Expression::DynamicInterfaceAccess { target, member } = expression else {
-        return None;
-    };
-    let interface_name = infer_lowered_expression_type(target, context)?
-        .as_interface_name()?
-        .to_string();
-    let signature = context
-        .interface_members()
-        .get(&interface_name)?
-        .get(member)?
-        .clone();
-    (signature.kind() == &InterfaceMemberKind::Knot).then_some((interface_name, signature))
-}
-
-pub(super) fn dynamic_interface_function_signature(
-    target: &Expression,
-    member: &str,
-    context: &LoweringContext<'_>,
-) -> Option<(String, InterfaceMemberSignature)> {
-    let interface_name = infer_lowered_expression_type(target, context)?
-        .as_interface_name()?
-        .to_string();
-    let signature = context
-        .interface_members()
-        .get(&interface_name)?
-        .get(member)?
-        .clone();
-    (signature.kind() == &InterfaceMemberKind::Function).then_some((interface_name, signature))
-}
-
-fn lower_dynamic_interface_target_into(
-    content: &mut Vec<RuntimeObject>,
-    target: &Expression,
-    member: &str,
-    lowering: &mut ExpressionLoweringContext<'_, '_>,
-) {
-    let interface_name = infer_lowered_expression_type(target, lowering.context)
-        .and_then(|type_name| type_name.as_interface_name().map(str::to_string))
-        .expect("dynamic interface target base must have interface type after analysis");
-    lower_expression_into_with_constants(content, target, lowering);
-    content.push(RuntimeObject::DynamicInterfaceTarget {
-        interface: interface_name,
-        member: member.to_string(),
-    });
-}
-
-fn lower_dynamic_interface_function_call_into(
-    content: &mut Vec<RuntimeObject>,
-    target: &Expression,
-    member: &str,
-    args: &[Expression],
-    lowering: &mut ExpressionLoweringContext<'_, '_>,
-) {
-    let (interface_name, signature) =
-        dynamic_interface_function_signature(target, member, lowering.context).expect(
-            "dynamic interface function must have an interface function signature after analysis",
-        );
-
-    for (index, arg) in args.iter().enumerate() {
-        lower_function_arg_into_parts(content, arg, signature.arguments().get(index), lowering);
-    }
-    lower_expression_into_with_constants(content, target, lowering);
-    content.push(RuntimeObject::DynamicInterfaceFunctionCall {
-        interface: interface_name,
-        member: member.to_string(),
-        args: args.len(),
-    });
 }
 
 pub(super) fn lower_expression_with_expected_type_into_with_constants(

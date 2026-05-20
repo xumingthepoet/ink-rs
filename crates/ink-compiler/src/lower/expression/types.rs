@@ -6,7 +6,7 @@ use crate::{
 use super::super::{
     context::LoweringContext, indexes::CallSignature, value::struct_field_definitions_for_type,
 };
-use super::dynamic_interface_function_signature;
+use super::dynamic_interface::dynamic_interface_function_signature;
 use super::name_resolution::{
     resolve_callable_name, resolve_constant_name, resolve_runtime_variable_name,
 };
