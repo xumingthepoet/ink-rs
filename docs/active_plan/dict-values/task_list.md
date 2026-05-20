@@ -314,7 +314,7 @@ Validation:
 Commit record: implementation `7a48f0a8` (`Lower Dict defaults and literals`);
 review fix `d36bc0c2` (`Cover dynamic Dict literal lowering`)
 
-### [~] Task 09: Lower Dict Reads
+### [>] Task 09: Lower Dict Reads
 
 Goal: Emit runtime instructions for Dict index reads through existing expression
 lowering.
@@ -333,7 +333,19 @@ Modification boundaries: expression lowering and tests.
 
 Validation commands: `cargo test -p ink-test typed_values`
 
-Commit record: pending
+Validation:
+
+- Adjusted this task's acceptance criteria to keep runtime output coverage in
+  the later runtime/integration tasks, because compiled Dict values intentionally
+  cannot load before runtime Dict support lands.
+- `cargo test -p ink-test typed_values` passed.
+- `cargo test -p ink-test --test typed_values` passed.
+- `cargo fmt --all --check` passed.
+- Initial `make gate` reached the final doc-test stage but failed by the 120s
+  wrapper timeout with no failing tests reported.
+- Reran `make gate` after incremental compilation; passed.
+
+Commit record: implementation `c069d330` (`Lower Dict index reads`)
 
 ### [ ] Task 10: Lower Dict Writes
 
