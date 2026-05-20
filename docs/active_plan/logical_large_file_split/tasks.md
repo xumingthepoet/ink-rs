@@ -1,4 +1,4 @@
-Progress: 18/27
+Progress: 19/27
 
 # Logical Large-File Split Active Plan
 
@@ -566,7 +566,7 @@ diagnostics`, and `make gate`. Review follow-up commit `63c924ad Include
 target divert checks in analysis source scan`; completion validation passed
 with the same focused commands and `make gate`.
 
-### [>] Task 19: Split Function And External Call Checks
+### [x] Task 19: Split Function And External Call Checks
 
 Goal: Separate ordinary call target and signature validation from built-in and
 interface-specific checks.
@@ -590,7 +590,8 @@ integration functions`; `cargo test -p ink-test --test integration diagnostics`;
 Commit record: implementation commit `181b5dd2 Split function call target
 checks`; validation passed with `cargo fmt --all --check`, `cargo test -p
 ink-test --test integration functions`, `cargo test -p ink-test --test
-integration diagnostics`, and `make gate`.
+integration diagnostics`, and `make gate`. Review found no follow-up changes;
+completion validation passed with the same focused commands and `make gate`.
 
 ### [ ] Task 20: Split Typed Builtin Target Checks
 
