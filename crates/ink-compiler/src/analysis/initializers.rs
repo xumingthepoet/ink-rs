@@ -8,35 +8,36 @@ use crate::{
 
 use super::{
     context::{EnumTypeIndex, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
-    enums::{build_enum_type_index, type_name_is_enum},
+    enums::type_name_is_enum,
     expression_types::infer_expression_type,
-    interface_values::{
-        build_module_implementation_index, infer_expected_interface_expression_type,
-        ModuleImplementationIndex,
-    },
-    interfaces::{build_interface_member_index, InterfaceMemberIndex},
-    modules::{build_module_import_index, ModuleImportIndex},
-    structs::build_struct_type_index,
-    target_symbols::build_target_symbol_index,
-    variables::build_variable_scope_index,
+    indexes::AnalysisIndexes,
+    interface_values::{infer_expected_interface_expression_type, ModuleImplementationIndex},
+    interfaces::InterfaceMemberIndex,
+    modules::ModuleImportIndex,
 };
 
+#[cfg(test)]
+use super::modules::ModuleAnalysis;
+
+#[cfg(test)]
 pub(super) fn variable_initializer_diagnostics(story: &Story) -> Vec<Diagnostic> {
-    let struct_types = build_struct_type_index(story);
-    let enum_types = build_enum_type_index(story);
-    let variable_scopes = build_variable_scope_index(story);
-    let target_symbols = build_target_symbol_index(story);
-    let interface_members = build_interface_member_index(story);
-    let module_implementations = build_module_implementation_index(story);
-    let module_imports = build_module_import_index(story);
+    let module_analysis = ModuleAnalysis::build(story);
+    let indexes = AnalysisIndexes::build(story, &module_analysis);
+    variable_initializer_diagnostics_with_indexes(story, &indexes)
+}
+
+pub(super) fn variable_initializer_diagnostics_with_indexes(
+    story: &Story,
+    indexes: &AnalysisIndexes<'_>,
+) -> Vec<Diagnostic> {
     let mut checker = VariableInitializerChecker::new(
-        &variable_scopes,
-        &struct_types,
-        &enum_types,
-        &target_symbols,
-        &interface_members,
-        &module_implementations,
-        &module_imports,
+        &indexes.variable_scopes,
+        &indexes.struct_types,
+        &indexes.enum_types,
+        &indexes.target_symbols,
+        &indexes.interface_members,
+        &indexes.module_implementations,
+        indexes.module_imports,
     );
     walk_story(story, &mut checker);
     checker.diagnostics

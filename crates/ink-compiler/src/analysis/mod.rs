@@ -28,14 +28,14 @@ mod warnings;
 use crate::{compiler::StageOutput, diagnostic::Diagnostic, parsed::Story};
 
 use array_literals::array_literal_diagnostics;
-use assignments::variable_assignment_diagnostics;
+use assignments::variable_assignment_diagnostics_with_indexes;
 use constants::constant_redefinition_diagnostics;
 use dict_literals::dict_literal_diagnostics;
 use enums::enum_type_diagnostics;
 use field_access::field_access_diagnostics;
 use flow::flow_diagnostics;
 use index_access::index_access_diagnostics;
-use initializers::variable_initializer_diagnostics;
+use initializers::variable_initializer_diagnostics_with_indexes;
 use interfaces::{interface_diagnostics, interface_implementation_diagnostics};
 use names::naming_diagnostics;
 use struct_literals::struct_literal_diagnostics;
@@ -161,8 +161,14 @@ fn run_analysis_passes_with_modules(
         &analysis_indexes,
     ));
 
-    diagnostics.extend(variable_initializer_diagnostics(story));
-    diagnostics.extend(variable_assignment_diagnostics(story));
+    diagnostics.extend(variable_initializer_diagnostics_with_indexes(
+        story,
+        &analysis_indexes,
+    ));
+    diagnostics.extend(variable_assignment_diagnostics_with_indexes(
+        story,
+        &analysis_indexes,
+    ));
     diagnostics.extend(dict_literal_diagnostics(story));
     diagnostics.extend(struct_literal_diagnostics(story));
     diagnostics.extend(array_literal_diagnostics(story));
