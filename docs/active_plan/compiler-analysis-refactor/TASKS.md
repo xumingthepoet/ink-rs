@@ -1,4 +1,4 @@
-Progress: 20/24
+Progress: 21/24
 
 # Compiler Analysis Refactor Active Plan
 
@@ -672,7 +672,7 @@ and literal checker function-call paths use that span while retaining the old
 Commit record: Implementation commit `e412de7b`; completion-record commit
 recorded by this task-list update.
 
-### [>] Task 21: Pass real spans through qualified import-use collection where available
+### [x] Task 21: Pass real spans through qualified import-use collection where available
 
 Goal: Improve qualified import-use diagnostics that currently use fallback
 line 1 column 1 when a containing object span is available.
@@ -695,7 +695,13 @@ Validation commands: `cargo test -p ink-compiler modules`; `make gate`.
 Validation record: `cargo test -p ink-compiler modules` passed; `make gate`
 passed.
 
-Commit record: Implementation commit `7f4bdc7b`; completion-record commit TBD.
+Review record: Qualified import-use collection now threads nearest object
+fallback spans through object, assignment target, divert, tunnel, return,
+choice, conditional, and expression recursion. QualifiedName-owned spans remain
+unchanged.
+
+Commit record: Implementation commit `7f4bdc7b`; completion-record commit
+recorded by this task-list update.
 
 ### [ ] Task 22: Add regression tests for diagnostic span accuracy
 
