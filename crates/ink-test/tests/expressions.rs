@@ -1,6 +1,4 @@
-mod support;
-
-use support::compiler::{assert_story_output, compile_fixture, compile_fixture_to_story};
+use crate::support::compiler::{assert_story_output, compile_fixture, compile_fixture_to_story};
 
 #[test]
 fn arithmetic_fixture_runs() {

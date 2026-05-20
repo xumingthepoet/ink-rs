@@ -5,14 +5,15 @@ use crate::{
     parsed::{
         escape_snapshot_text,
         visit::{walk_story, ParsedVisitor, VisitContext},
-        ConstantDeclaration, DictKeyType, DictLiteralEntry, DictLiteralKey, Expression, Object,
-        Story, StructLiteralField, TypeName, VariableAssignment,
+        ConstantDeclaration, DictKeyType, DictLiteralEntry, DictLiteralKey, Divert, DivertTarget,
+        Expression, InterfaceMemberKind, InterfaceMemberSignature, Object, Story,
+        StructLiteralField, TunnelOnwards, TypeName, VariableAssignment,
     },
     source::SourceSpan,
 };
 
 use super::{
-    context::{EnumTypeIndex, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
+    context::{EnumTypeIndex, FlowSymbol, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
     enums::{build_enum_type_index, type_name_contains_enum},
     expression_types::infer_expression_type,
     interface_values::{
@@ -22,7 +23,8 @@ use super::{
     interfaces::{build_interface_member_index, InterfaceMemberIndex},
     modules::{build_module_import_index, ModuleImportIndex},
     structs::{build_struct_type_index, resolve_struct_symbol},
-    target_symbols::build_target_symbol_index,
+    target_symbols::{build_target_symbol_index, resolve_target_symbol},
+    type_names::qualify_type_name_for_module,
     variables::build_variable_scope_index,
 };
 
@@ -129,6 +131,198 @@ impl<'a> DictLiteralChecker<'a> {
         }
     }
 
+    fn check_divert_arguments(&mut self, divert: &Divert, context: &VisitContext) {
+        self.check_divert_target_arguments(
+            divert.target(),
+            divert.arguments(),
+            divert.span(),
+            context,
+        );
+    }
+
+    fn check_tunnel_onwards_arguments(
+        &mut self,
+        tunnel_onwards: &TunnelOnwards,
+        context: &VisitContext,
+    ) {
+        if let Some(target) = tunnel_onwards.override_target() {
+            self.check_divert_target_arguments(
+                target,
+                tunnel_onwards.arguments(),
+                tunnel_onwards.span(),
+                context,
+            );
+        }
+    }
+
+    fn check_divert_target_arguments(
+        &mut self,
+        target: &DivertTarget,
+        arguments: &[Expression],
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) {
+        match target {
+            DivertTarget::Path(target) => {
+                self.check_static_target_arguments(target, arguments, span, context);
+            }
+            DivertTarget::QualifiedPath(target) => {
+                self.check_static_target_arguments(target.as_str(), arguments, span, context);
+            }
+            DivertTarget::Dynamic(Expression::DynamicInterfaceAccess { target, member }) => {
+                if let Some(signature) = self.dynamic_interface_signature(
+                    target,
+                    member,
+                    InterfaceMemberKind::Knot,
+                    context,
+                ) {
+                    self.check_interface_signature_arguments(
+                        member, arguments, &signature, span, context,
+                    );
+                }
+            }
+            DivertTarget::Dynamic(_)
+            | DivertTarget::Done
+            | DivertTarget::End
+            | DivertTarget::Empty => {}
+        }
+    }
+
+    fn check_static_target_arguments(
+        &mut self,
+        target: &str,
+        arguments: &[Expression],
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) {
+        let Some(symbol) = resolve_target_symbol(
+            target,
+            context.current_module.as_deref(),
+            context.current_flow_path.as_deref(),
+            self.target_symbols,
+        )
+        .cloned() else {
+            return;
+        };
+
+        self.check_flow_symbol_arguments(target, arguments, &symbol, span, context);
+    }
+
+    fn check_function_call_arguments(
+        &mut self,
+        name: &str,
+        args: &[Expression],
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) {
+        let Some(symbol) = resolve_target_symbol(
+            name,
+            context.current_module.as_deref(),
+            context.current_flow_path.as_deref(),
+            self.target_symbols,
+        )
+        .cloned() else {
+            return;
+        };
+
+        self.check_flow_symbol_arguments(name, args, &symbol, span, context);
+    }
+
+    fn check_dynamic_interface_function_arguments(
+        &mut self,
+        target: &Expression,
+        member: &str,
+        args: &[Expression],
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) {
+        if let Some(signature) =
+            self.dynamic_interface_signature(target, member, InterfaceMemberKind::Function, context)
+        {
+            self.check_interface_signature_arguments(member, args, &signature, span, context);
+        }
+    }
+
+    fn check_flow_symbol_arguments(
+        &mut self,
+        target_name: &str,
+        arguments: &[Expression],
+        symbol: &FlowSymbol,
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) {
+        let qualified_module = target_name.split_once("::").map(|(module, _)| module);
+        for (argument, parameter) in arguments.iter().zip(symbol.arguments()) {
+            let Some(expected_type) = parameter.declared_type() else {
+                continue;
+            };
+            let expected_type = qualified_module
+                .map(|module| qualify_type_name_for_module(expected_type, module))
+                .unwrap_or_else(|| expected_type.clone());
+            if self.type_name_contains_dict(&expected_type, context.current_module.as_deref())
+                || expression_contains_dict_literal(argument)
+            {
+                self.check_expression_against_type(
+                    argument,
+                    &expected_type,
+                    parameter.name(),
+                    span,
+                    context,
+                );
+            }
+        }
+    }
+
+    fn check_interface_signature_arguments(
+        &mut self,
+        member: &str,
+        arguments: &[Expression],
+        signature: &InterfaceMemberSignature,
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) {
+        for (argument, parameter) in arguments.iter().zip(signature.arguments()) {
+            let Some(expected_type) = parameter.declared_type() else {
+                continue;
+            };
+            if self.type_name_contains_dict(expected_type, context.current_module.as_deref())
+                || expression_contains_dict_literal(argument)
+            {
+                let context_name = format!("{member}.{}", parameter.name());
+                self.check_expression_against_type(
+                    argument,
+                    expected_type,
+                    &context_name,
+                    span,
+                    context,
+                );
+            }
+        }
+    }
+
+    fn dynamic_interface_signature(
+        &self,
+        target: &Expression,
+        member: &str,
+        expected_kind: InterfaceMemberKind,
+        context: &VisitContext,
+    ) -> Option<InterfaceMemberSignature> {
+        let target_type = infer_expression_type(
+            target,
+            self.variable_scopes,
+            self.struct_types,
+            self.enum_types,
+            self.target_symbols,
+            self.interface_members,
+            context.current_module.as_deref(),
+            context.current_flow_path.as_deref(),
+        )
+        .ok()?;
+        let interface_name = target_type.as_interface_name()?;
+        let signature = self.interface_members.member(interface_name, member)?;
+        (signature.kind() == &expected_kind).then(|| signature.clone())
+    }
+
     fn visible_declared_type(&self, name: &str, context: &VisitContext) -> Option<TypeName> {
         self.variable_scopes
             .visible_variable_declared_type(
@@ -158,7 +352,6 @@ impl<'a> DictLiteralChecker<'a> {
             ) => {
                 self.check_dict_literal(*key_type, value_type, entries, context_name, span, context)
             }
-            (TypeName::Dict { .. }, Expression::EmptyCompositeLiteral) => {}
             (TypeName::Dict { .. }, Expression::ArrayLiteral(_)) => {
                 self.diagnostics.push(Diagnostic::error(
                     span.clone(),
@@ -169,7 +362,7 @@ impl<'a> DictLiteralChecker<'a> {
                     ),
                 ));
             }
-            (TypeName::Dict { .. }, Expression::StructLiteral(_)) => {
+            (TypeName::Dict { .. }, Expression::StructLiteral { .. }) => {
                 self.diagnostics.push(Diagnostic::error(
                     span.clone(),
                     format!(
@@ -191,17 +384,11 @@ impl<'a> DictLiteralChecker<'a> {
             (TypeName::Array(element_type), Expression::ArrayLiteral(elements)) => {
                 self.check_array_literal(element_type, elements, context_name, span, context);
             }
-            (TypeName::Struct(struct_name), Expression::StructLiteral(fields)) => {
+            (TypeName::Struct(struct_name), Expression::StructLiteral { fields, .. }) => {
                 self.check_struct_literal(struct_name, fields, span, context);
             }
-            (TypeName::Struct(struct_name), Expression::EmptyCompositeLiteral) => {
-                self.check_struct_literal(struct_name, &[], span, context);
-            }
-            (TypeName::QualifiedStruct(struct_name), Expression::StructLiteral(fields)) => {
+            (TypeName::QualifiedStruct(struct_name), Expression::StructLiteral { fields, .. }) => {
                 self.check_struct_literal(struct_name.as_str(), fields, span, context);
-            }
-            (TypeName::QualifiedStruct(struct_name), Expression::EmptyCompositeLiteral) => {
-                self.check_struct_literal(struct_name.as_str(), &[], span, context);
             }
             (_, Expression::DictLiteral(_)) => {
                 self.diagnostics.push(Diagnostic::error(
@@ -223,7 +410,7 @@ impl<'a> DictLiteralChecker<'a> {
                     ),
                 ));
             }
-            (_, Expression::StructLiteral(_)) | (_, Expression::EmptyCompositeLiteral) => {
+            (_, Expression::StructLiteral { .. }) => {
                 self.diagnostics.push(Diagnostic::error(
                     span.clone(),
                     format!(
@@ -252,6 +439,7 @@ impl<'a> DictLiteralChecker<'a> {
         span: &SourceSpan,
         context: &VisitContext,
     ) {
+        self.check_dict_literal_key_consistency(entries, context_name, span);
         let mut seen_keys = HashSet::new();
         for entry in entries {
             if !seen_keys.insert(entry.key().clone()) {
@@ -285,6 +473,29 @@ impl<'a> DictLiteralChecker<'a> {
                 span,
                 context,
             );
+        }
+    }
+
+    fn check_dict_literal_key_consistency(
+        &mut self,
+        entries: &[DictLiteralEntry],
+        context_name: &str,
+        span: &SourceSpan,
+    ) {
+        let mut key_types = entries
+            .iter()
+            .map(|entry| dict_literal_key_type_name(entry.key()));
+        let Some(first_type) = key_types.next() else {
+            return;
+        };
+        if key_types.any(|key_type| key_type != first_type) {
+            self.diagnostics.push(Diagnostic::error(
+                span.clone(),
+                format!(
+                    "Dict literal for '{}' mixes string and int keys; use one key type per Dict literal",
+                    context_name
+                ),
+            ));
         }
     }
 
@@ -517,21 +728,53 @@ impl ParsedVisitor for DictLiteralChecker<'_> {
     fn visit_object(&mut self, object: &Object, context: &VisitContext) {
         match object {
             Object::ConstantDeclaration(declaration) => self.check_constant(declaration, context),
+            Object::Divert(divert) => self.check_divert_arguments(divert, context),
+            Object::TunnelOnwards(tunnel_onwards) => {
+                self.check_tunnel_onwards_arguments(tunnel_onwards, context);
+            }
             Object::VariableAssignment(assignment) => self.check_assignment(assignment, context),
             _ => {}
         }
     }
 
-    fn visit_expression(&mut self, expression: &Expression, _context: &VisitContext) {
-        if matches!(expression, Expression::DictLiteral(_))
-            && !self
-                .expected_expression_ids
-                .contains(&(expression as *const Expression as usize))
-        {
-            self.diagnostics.push(Diagnostic::error(
-                SourceSpan::new(None, 1, 1),
-                "Dict literal requires an expected Dict type",
-            ));
+    fn visit_expression(&mut self, expression: &Expression, context: &VisitContext) {
+        match expression {
+            Expression::FunctionCall { name, args } => self.check_function_call_arguments(
+                name,
+                args,
+                &SourceSpan::new(None, 1, 1),
+                context,
+            ),
+            Expression::QualifiedFunctionCall { name, args } => self.check_function_call_arguments(
+                name.as_str(),
+                args,
+                &SourceSpan::new(None, 1, 1),
+                context,
+            ),
+            Expression::DynamicInterfaceFunctionCall {
+                target,
+                member,
+                args,
+            } => self.check_dynamic_interface_function_arguments(
+                target,
+                member,
+                args,
+                &SourceSpan::new(None, 1, 1),
+                context,
+            ),
+            Expression::DictLiteral(entries)
+                if !self
+                    .expected_expression_ids
+                    .contains(&(expression as *const Expression as usize)) =>
+            {
+                let span = SourceSpan::new(None, 1, 1);
+                self.check_dict_literal_key_consistency(entries, "Dict literal", &span);
+                self.diagnostics.push(Diagnostic::error(
+                    span,
+                    "Dict literal requires an expected Dict type",
+                ));
+            }
+            _ => {}
         }
     }
 }
@@ -555,7 +798,7 @@ fn expression_contains_dict_literal(expression: &Expression) -> bool {
         Expression::ArrayLiteral(elements) | Expression::MultipleCondition(elements) => {
             elements.iter().any(expression_contains_dict_literal)
         }
-        Expression::StructLiteral(fields) => fields
+        Expression::StructLiteral { fields, .. } => fields
             .iter()
             .any(|field| expression_contains_dict_literal(field.expression())),
         Expression::FieldAccess { base, .. } => expression_contains_dict_literal(base),
@@ -572,8 +815,7 @@ fn expression_contains_dict_literal(expression: &Expression) -> bool {
         | Expression::NumberBool(_)
         | Expression::DivertTarget(_)
         | Expression::VariableReference(_)
-        | Expression::QualifiedReference(_)
-        | Expression::EmptyCompositeLiteral => false,
+        | Expression::QualifiedReference(_) => false,
     }
 }
 
@@ -659,12 +901,12 @@ mod tests {
              STRUCT Bag {\n\
              scores: Dict<string, int>\n\
              }\n\
-             VAR players: Dict<string, Player> = {\"ada\": { hp: 10 }}\n\
-             VAR nested: Dict<int, Dict<string, int[]>> = {1: {\"scores\": [1, 2]}}\n\
-             VAR states: Dict<string, State> = {\"current\": State.Idle}\n\
-             VAR routes: Dict<string, interface<IRoute>> = {\"next\": left}\n\
-             VAR empty: Dict<string, int> = {}\n\
-             VAR emptyBag: Bag = { scores: {} }\n\
+             VAR players: Dict<string, Player> = %{\"ada\": %Player{ hp: 10 }}\n\
+             VAR nested: Dict<int, Dict<string, int[]>> = %{1: %{\"scores\": [1, 2]}}\n\
+             VAR states: Dict<string, State> = %{\"current\": State.Idle}\n\
+             VAR routes: Dict<string, interface<IRoute>> = %{\"next\": left}\n\
+             VAR empty: Dict<string, int> = %{}\n\
+             VAR emptyBag: Bag = %Bag{ scores: %{} }\n\
              == main ==\n\
              -> END\n\
              === module left implements IRoute ===\n\
@@ -678,7 +920,7 @@ mod tests {
     #[test]
     fn reports_wrong_dict_literal_key_type() {
         let story = parse_story(
-            "VAR scores: Dict<int, int> = {\"ada\": 1}\n\
+            "VAR scores: Dict<int, int> = %{\"ada\": 1}\n\
              -> DONE",
         );
 
@@ -694,7 +936,7 @@ mod tests {
     #[test]
     fn reports_wrong_dict_literal_value_type() {
         let story = parse_story(
-            "VAR scores: Dict<string, int> = {\"ada\": \"high\"}\n\
+            "VAR scores: Dict<string, int> = %{\"ada\": \"high\"}\n\
              -> DONE",
         );
 
@@ -710,7 +952,7 @@ mod tests {
     #[test]
     fn reports_wrong_nested_dict_literal_value_type() {
         let story = parse_story(
-            "VAR table: Dict<string, Dict<int, string>> = {\"row\": {1: 7}}\n\
+            "VAR table: Dict<string, Dict<int, string>> = %{\"row\": %{1: 7}}\n\
              -> DONE",
         );
 
@@ -726,7 +968,7 @@ mod tests {
     #[test]
     fn reports_duplicate_string_dict_literal_keys() {
         let story = parse_story(
-            "VAR scores: Dict<string, int> = {\"ada\": 10, \"ada\": 12}\n\
+            "VAR scores: Dict<string, int> = %{\"ada\": 10, \"ada\": 12}\n\
              -> DONE",
         );
 
@@ -742,7 +984,7 @@ mod tests {
     #[test]
     fn reports_duplicate_int_dict_literal_keys() {
         let story = parse_story(
-            "VAR names: Dict<int, string> = {1: \"one\", 1: \"uno\"}\n\
+            "VAR names: Dict<int, string> = %{1: \"one\", 1: \"uno\"}\n\
              -> DONE",
         );
 
@@ -758,7 +1000,7 @@ mod tests {
     #[test]
     fn reports_duplicate_nested_dict_literal_keys_with_context() {
         let story = parse_story(
-            "VAR table: Dict<string, Dict<int, string>> = {\"row\": {1: \"one\", 1: \"uno\"}}\n\
+            "VAR table: Dict<string, Dict<int, string>> = %{\"row\": %{1: \"one\", 1: \"uno\"}}\n\
              -> DONE",
         );
 
@@ -774,7 +1016,7 @@ mod tests {
     #[test]
     fn rejects_dict_literal_without_expected_type() {
         let story = parse_story(
-            "~ {\"ada\": 1}\n\
+            "~ %{\"ada\": 1}\n\
              -> DONE",
         );
 
@@ -793,7 +1035,7 @@ mod tests {
             "STRUCT Bag {\n\
              scores: Dict<string, int>\n\
              }\n\
-             VAR bag: Bag = { scores: { wrong: 1 } }\n\
+             VAR bag: Bag = %Bag{ scores: %Bag{ wrong: 1 } }\n\
              -> DONE",
         );
 

@@ -1,8 +1,6 @@
 use std::error::Error;
 
-mod support;
-
-use support::{
+use crate::support::{
     runtime::{StoryError, ValueType},
     story_runner as common,
 };

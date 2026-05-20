@@ -26,13 +26,43 @@ Each entry should include:
 - migration guidance
 - tests
 
+## 2026-05-20: Elixir-Style Struct And Dict Literals
+
+- status: supported
+- upstream behavior: upstream Ink does not have typed `STRUCT` or `Dict<K, V>`
+  value literals. Earlier ink-rs builds used bare `{ field: value }`,
+  `{"key": value}`, `{1: value}`, and `{}` composite expression literals.
+- ink-rs behavior: struct literals now use an explicit typed form such as
+  `%Player{hp: 10}` or `%module::Player{hp: 10}`. Dict literals keep the public
+  `Dict<K, V>` type name but use map-style `%{"key": value}`, `%{1: value}`,
+  and `%{}` syntax. Dict keys may be string or int keys, and a single Dict
+  literal cannot mix key types. Empty `%{}` is valid only when an expected
+  `Dict<K, V>` type is available. Bare composite expression literals are
+  removed and report migration diagnostics.
+- documentation effect: `SyntaxReference.md` and `LanguageOverview.md` use only
+  `%Type{...}` struct literals and `%{...}` Dict literals. The removed bare
+  composite spellings remain documented only here and in diagnostics tests.
+- rationale: `%Type{...}` removes ambiguity between struct values and braced ink
+  expression/control forms. `%{...}` gives Dicts a distinct map-style spelling
+  while preserving the existing typed `Dict<K, V>` source type and runtime JSON
+  format.
+- migration guidance: replace struct literal expressions with `%Type{...}` and
+  replace Dict literal expressions with `%{...}`. Use `%Type{}` for an empty
+  struct value and `%{}` for an empty Dict in a typed context.
+- tests: parser, diagnostics, analysis, lowering, typed fixtures, runtime API,
+  experiments, and parse snapshots cover typed and qualified struct literals,
+  string-key and int-key Dict literals, empty Dict literals with expected types,
+  old syntax diagnostics, mixed Dict key diagnostics, modulo parsing, and
+  composite literals in function, static divert, tunnel, tunnel-onwards, and
+  dynamic interface argument positions.
+
 ## 2026-05-20: Typed Dict Values
 
 - status: supported
 - upstream behavior: upstream Ink does not have explicit generic `Dict<K, V>`
   value types with checked key and value types.
 - ink-rs behavior: `Dict<string, V>` and `Dict<int, V>` are supported value
-  types. Dict literals use string or integer keys, `{}` is an empty Dict when
+  types. Dict literals use string or integer keys, `%{}` is an empty Dict when
   the expected type is known, omitted `VAR` initializers default to an empty
   Dict with the declared key type, and index reads/writes use `dict[key]`.
   Assigning through an index inserts or replaces an entry, missing-key reads are

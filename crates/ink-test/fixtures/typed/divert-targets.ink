@@ -7,7 +7,7 @@ STRUCT Route {
 next: ->
 }
 
-VAR route: Route = { next: -> struct_target }
+VAR route: Route = %Route{ next: -> struct_target }
 
 == main ==
 -> {next}

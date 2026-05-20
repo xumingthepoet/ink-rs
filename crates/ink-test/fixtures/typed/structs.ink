@@ -9,7 +9,7 @@ STRUCT Player {
     stats: Stats
 }
 
-VAR original: Player = { name: "Ada", stats: { hp: 10, ready: true } }
+VAR original: Player = %Player{ name: "Ada", stats: %Stats{ hp: 10, ready: true } }
 VAR copy: Player = original
 
 == main ==

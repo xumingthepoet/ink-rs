@@ -1,10 +1,8 @@
-mod support;
-
-use ink_compiler::DiagnosticSeverity;
-use support::compiler::{
+use crate::support::compiler::{
     assert_diagnostic, assert_fixture_compile_errors, compile_fixture,
     compile_fixture_error_messages, diagnostics_for_fixture,
 };
+use ink_compiler::DiagnosticSeverity;
 
 #[test]
 fn module_level_content_is_rejected() {
@@ -99,9 +97,35 @@ fn dict_literal_diagnostics_report_invalid_literals() {
         "Value for 'wrongValue[\"one\"]' has type string but expected int",
         "Value for 'wrongNested[\"row\"][1]' has type int but expected string",
         "Value for 'wrongExpected' is a Dict literal but expected int",
+        "Dict literal for 'mixedKeys' mixes string and int keys",
+        "Dict literal requires an expected Dict type",
     ] {
         assert_diagnostic(&diagnostics, DiagnosticSeverity::Error, message);
     }
+}
+
+#[test]
+fn old_composite_literal_syntax_reports_migration_diagnostics() {
+    let diagnostics = diagnostics_for_fixture("diagnostics/composite-literal-syntax.ink");
+
+    for message in [
+        "Struct literals now use `%Type{...}`",
+        "Dict literals now use `%{...}`",
+        "Use `%Type{}` for structs or `%{}` for Dicts",
+    ] {
+        assert_diagnostic(&diagnostics, DiagnosticSeverity::Error, message);
+    }
+}
+
+#[test]
+fn composite_literal_argument_diagnostics_use_target_parameter_types() {
+    let diagnostics = diagnostics_for_fixture("diagnostics/composite-literal-arguments.ink");
+
+    assert_diagnostic(
+        &diagnostics,
+        DiagnosticSeverity::Error,
+        "Value for 'Player.hp' has type string but expected int",
+    );
 }
 
 #[test]

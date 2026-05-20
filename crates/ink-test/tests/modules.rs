@@ -2,9 +2,7 @@ use std::{cell::RefCell, rc::Rc};
 
 use ink_runtime::story::Story as RuntimeStory;
 
-mod support;
-
-use support::{
+use crate::support::{
     compiler::{assert_story_output, compile_fixture},
     runtime::{ExternalFunction, Story, ValueType},
 };

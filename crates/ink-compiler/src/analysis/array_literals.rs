@@ -337,20 +337,10 @@ impl<'a> ArrayLiteralChecker<'a> {
             (TypeName::Dict { value_type, .. }, Expression::DictLiteral(entries)) => {
                 self.check_dict_literal_values(value_type, entries, context_name, span, context);
             }
-            (TypeName::Dict { .. }, Expression::EmptyCompositeLiteral) => {}
-            (TypeName::Struct(struct_name), Expression::StructLiteral(fields)) => {
+            (TypeName::Struct(struct_name), Expression::StructLiteral { fields, .. }) => {
                 self.check_struct_literal(
                     struct_name,
                     fields,
-                    span,
-                    context,
-                    StructLiteralMode::ArraysOnly,
-                );
-            }
-            (TypeName::Struct(struct_name), Expression::EmptyCompositeLiteral) => {
-                self.check_struct_literal(
-                    struct_name,
-                    &[],
                     span,
                     context,
                     StructLiteralMode::ArraysOnly,
@@ -406,7 +396,7 @@ impl<'a> ArrayLiteralChecker<'a> {
             (TypeName::Array(_), _) => {
                 self.check_non_array_expression(element, element_type, context_name, span, context);
             }
-            (TypeName::Struct(struct_name), Expression::StructLiteral(fields)) => {
+            (TypeName::Struct(struct_name), Expression::StructLiteral { fields, .. }) => {
                 self.check_struct_literal(
                     struct_name,
                     fields,
@@ -415,10 +405,7 @@ impl<'a> ArrayLiteralChecker<'a> {
                     StructLiteralMode::Full,
                 );
             }
-            (TypeName::Struct(struct_name), Expression::EmptyCompositeLiteral) => {
-                self.check_struct_literal(struct_name, &[], span, context, StructLiteralMode::Full);
-            }
-            (TypeName::QualifiedStruct(struct_name), Expression::StructLiteral(fields)) => {
+            (TypeName::QualifiedStruct(struct_name), Expression::StructLiteral { fields, .. }) => {
                 self.check_struct_literal(
                     struct_name.as_str(),
                     fields,
@@ -427,19 +414,9 @@ impl<'a> ArrayLiteralChecker<'a> {
                     StructLiteralMode::Full,
                 );
             }
-            (TypeName::QualifiedStruct(struct_name), Expression::EmptyCompositeLiteral) => {
-                self.check_struct_literal(
-                    struct_name.as_str(),
-                    &[],
-                    span,
-                    context,
-                    StructLiteralMode::Full,
-                );
-            }
             (TypeName::Dict { value_type, .. }, Expression::DictLiteral(entries)) => {
                 self.check_dict_literal_values(value_type, entries, context_name, span, context);
             }
-            (TypeName::Dict { .. }, Expression::EmptyCompositeLiteral) => {}
             (TypeName::Struct(_), _)
             | (TypeName::QualifiedStruct(_), _)
             | (TypeName::Interface { .. }, _)
@@ -679,7 +656,11 @@ impl<'a> ArrayLiteralChecker<'a> {
                     );
                 }
                 (StructLiteralMode::ArraysOnly, TypeName::Struct(nested_struct_name)) => {
-                    if let Expression::StructLiteral(nested_fields) = field.expression() {
+                    if let Expression::StructLiteral {
+                        fields: nested_fields,
+                        ..
+                    } = field.expression()
+                    {
                         self.check_struct_literal(
                             nested_struct_name,
                             nested_fields,
@@ -690,7 +671,11 @@ impl<'a> ArrayLiteralChecker<'a> {
                     }
                 }
                 (StructLiteralMode::ArraysOnly, TypeName::QualifiedStruct(nested_struct_name)) => {
-                    if let Expression::StructLiteral(nested_fields) = field.expression() {
+                    if let Expression::StructLiteral {
+                        fields: nested_fields,
+                        ..
+                    } = field.expression()
+                    {
                         self.check_struct_literal(
                             nested_struct_name.as_str(),
                             nested_fields,
@@ -945,7 +930,7 @@ mod tests {
              hp: int\n\
              }\n\
              == main ==\n\
-             -> start([{ hp: 10 }])\n\
+             -> start([%Player{ hp: 10 }])\n\
              == start(players: Player[]) ==\n\
              -> END",
         );
@@ -1000,7 +985,7 @@ mod tests {
             "STRUCT Player {\n\
              hp: int\n\
              }\n\
-             VAR party: Player[] = [{ hp: 10 }, {}]\n\
+             VAR party: Player[] = [%Player{ hp: 10 }, %Player{}]\n\
              -> DONE",
         );
 
@@ -1013,7 +998,7 @@ mod tests {
             "STRUCT Player {\n\
              scores: int[]\n\
              }\n\
-             VAR player: Player = { scores: [1, 2] }\n\
+             VAR player: Player = %Player{ scores: [1, 2] }\n\
              -> DONE",
         );
 

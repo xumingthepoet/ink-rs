@@ -239,7 +239,7 @@ where
                 walk_expression(element, visitor, &expression_context);
             }
         }
-        Expression::StructLiteral(fields) => {
+        Expression::StructLiteral { fields, .. } => {
             for field in fields {
                 walk_expression(field.expression(), visitor, &expression_context);
             }
@@ -272,8 +272,7 @@ where
         | Expression::NumberBool(_)
         | Expression::DivertTarget(_)
         | Expression::VariableReference(_)
-        | Expression::QualifiedReference(_)
-        | Expression::EmptyCompositeLiteral => {}
+        | Expression::QualifiedReference(_) => {}
     }
 }
 
@@ -382,9 +381,8 @@ mod tests {
                 Expression::IndexAccess { .. } => "index_access",
                 Expression::FunctionCall { .. } => "function_call",
                 Expression::MultipleCondition(_) => "multiple_condition",
-                Expression::StructLiteral(_) => "struct",
+                Expression::StructLiteral { .. } => "struct",
                 Expression::DictLiteral(_) => "dict",
-                Expression::EmptyCompositeLiteral => "empty_composite",
                 Expression::StringContent(_) => "string_content",
                 Expression::Unary { .. } => "unary",
                 Expression::VariableReference(_) => "variable",
@@ -429,19 +427,22 @@ mod tests {
                         args: Vec::new(),
                     },
                 ])),
-                Object::Expression(Expression::StructLiteral(vec![
-                    crate::parsed::StructLiteralField::new(
-                        "struct_value",
-                        Expression::VariableReference("field_value".to_string()),
-                    ),
-                    crate::parsed::StructLiteralField::new(
-                        "struct_call",
-                        Expression::FunctionCall {
-                            name: "field_call".to_string(),
-                            args: Vec::new(),
-                        },
-                    ),
-                ])),
+                Object::Expression(Expression::StructLiteral {
+                    type_name: crate::parsed::TypeName::struct_type("Player"),
+                    fields: vec![
+                        crate::parsed::StructLiteralField::new(
+                            "struct_value",
+                            Expression::VariableReference("field_value".to_string()),
+                        ),
+                        crate::parsed::StructLiteralField::new(
+                            "struct_call",
+                            Expression::FunctionCall {
+                                name: "field_call".to_string(),
+                                args: Vec::new(),
+                            },
+                        ),
+                    ],
+                }),
                 Object::Expression(Expression::FieldAccess {
                     base: Box::new(Expression::VariableReference("field_base".to_string())),
                     field: "hp".to_string(),

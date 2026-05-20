@@ -593,7 +593,7 @@ fn build_external_signatures(story: &Story) -> ExternalSignatures {
     collect_external_signatures_in_objects(story.root_weave().content(), None, &mut signatures);
     for flow in story.flows() {
         collect_external_signatures_in_flow(flow, None, &mut signatures);
-        collect_ink_call_signatures_in_flow(flow, None, &mut signatures);
+        collect_ink_call_signatures_in_flow(flow, None, None, &mut signatures);
     }
     for module in story.modules() {
         collect_external_signatures_in_objects(
@@ -603,7 +603,7 @@ fn build_external_signatures(story: &Story) -> ExternalSignatures {
         );
         for flow in module.flows() {
             collect_external_signatures_in_flow(flow, Some(module.name()), &mut signatures);
-            collect_ink_call_signatures_in_flow(flow, Some(module.name()), &mut signatures);
+            collect_ink_call_signatures_in_flow(flow, Some(module.name()), None, &mut signatures);
         }
     }
     signatures
@@ -623,21 +623,32 @@ fn collect_external_signatures_in_flow(
 fn collect_ink_call_signatures_in_flow(
     flow: &Flow,
     module_name: Option<&str>,
+    parent_flow_path: Option<&str>,
     signatures: &mut ExternalSignatures,
 ) {
-    if flow.is_function() {
+    let flow_path = parent_flow_path
+        .map(|parent| format!("{parent}.{}", flow.name()))
+        .unwrap_or_else(|| flow.name().to_string());
+    if flow.is_function() || flow.has_typed_signature() || !flow.arguments().is_empty() {
         let signature_name = module_name
-            .map(|module| format!("{module}::{}", flow.name()))
-            .unwrap_or_else(|| flow.name().to_string());
+            .map(|module| format!("{module}::{flow_path}"))
+            .unwrap_or_else(|| flow_path.clone());
+        let signature = CallSignature::Ink {
+            args: flow.arguments().to_vec(),
+            return_type: flow.return_type().clone(),
+        };
         signatures
             .entry(signature_name)
-            .or_insert_with(|| CallSignature::Ink {
-                args: flow.arguments().to_vec(),
-                return_type: flow.return_type().clone(),
-            });
+            .or_insert_with(|| signature.clone());
+        if parent_flow_path.is_none() {
+            let short_name = module_name
+                .map(|module| format!("{module}::{}", flow.name()))
+                .unwrap_or_else(|| flow.name().to_string());
+            signatures.entry(short_name).or_insert(signature);
+        }
     }
     for child in flow.child_flows() {
-        collect_ink_call_signatures_in_flow(child, module_name, signatures);
+        collect_ink_call_signatures_in_flow(child, module_name, Some(&flow_path), signatures);
     }
 }
 

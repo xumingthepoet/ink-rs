@@ -11,7 +11,7 @@ state: State
 history: State[]
 mood: Tone
 }
-VAR actor: Actor = { state: State.Busy, history: [State.Idle], mood: Tone.Sharp }
+VAR actor: Actor = %Actor{ state: State.Busy, history: [State.Idle], mood: Tone.Sharp }
 CONST DEFAULT_STATE: State = State.Done
 CONST DEFAULT_TONE: Tone = Tone.Calm
 

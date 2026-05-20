@@ -2,16 +2,14 @@ use std::{cell::RefCell, collections::BTreeMap, rc::Rc};
 
 use serde_json::json;
 
-mod support;
-
-use ink_runtime::value_type::{DictKey, DictKeyType, DictValue};
-use support::{
+use crate::support::{
     compiler::{
         assert_diagnostic, assert_json_sequence, assert_story_output, compile_fixture,
         diagnostics_for_fixture, json_contains_divert_target,
     },
     runtime::{ExternalFunction, Story, ValueType},
 };
+use ink_runtime::value_type::{DictKey, DictKeyType, DictValue};
 
 #[test]
 fn primitives_run() {
@@ -102,6 +100,13 @@ fn interface_values_lower_to_runtime_strings() {
             json!({"VAR=": "game::route", "re": true}),
         ],
     );
+}
+
+#[test]
+fn interface_module_literals_run_as_static_flow_arguments() {
+    let compiled = compile_fixture("typed/interface-argument-module-literals.ink");
+
+    assert_story_output(&compiled, "damage_event|heal_event\n");
 }
 
 #[test]
@@ -258,6 +263,16 @@ fn dict_typed_values_defaults_and_literals_are_lowered_to_json() {
             json!("/ev"),
             json!({"temp=": "local_literal"}),
         ],
+    );
+}
+
+#[test]
+fn composite_literal_arguments_run_at_runtime() {
+    let compiled = compile_fixture("typed/composite-literal-arguments.ink");
+
+    assert_story_output(
+        &compiled,
+        "Function 12. Dynamic 23.\nStatic 34.\nTunnel 56.\nOverride 67.\nOnward 78.\nTarget 45.\n",
     );
 }
 

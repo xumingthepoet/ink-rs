@@ -591,6 +591,31 @@ mod tests {
     }
 
     #[test]
+    fn bare_module_imports_used_by_static_interface_arguments_are_not_warned() {
+        let story = parse_story(
+            "=== interface IItem ===\n\
+             == target ==\n\
+             === module game ===\n\
+             FROM left\n\
+             == main ==\n\
+             -> register(left)\n\
+             ~ temp route: interface<IItem> = select(left)\n\
+             -> END\n\
+             == register(next: interface<IItem>) ==\n\
+             -> DONE\n\
+             == function select(next: interface<IItem>) => interface<IItem> ==\n\
+             ~ return next\n\
+             === module left implements IItem ===\n\
+             == target ==\n\
+             -> END",
+        );
+
+        let diagnostics = import_diagnostics(&story);
+
+        assert!(diagnostics.is_empty(), "{diagnostics:#?}");
+    }
+
+    #[test]
     fn bare_module_imports_do_not_authorize_static_symbol_access() {
         let story = parse_story(
             "=== module game ===\n\

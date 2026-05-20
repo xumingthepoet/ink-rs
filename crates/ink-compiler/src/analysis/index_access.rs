@@ -169,7 +169,7 @@ fn mark_index_accesses(expression: &Expression, index_access_ids: &mut HashSet<u
                 mark_index_accesses(arg, index_access_ids);
             }
         }
-        Expression::StructLiteral(fields) => {
+        Expression::StructLiteral { fields, .. } => {
             for field in fields {
                 mark_index_accesses(field.expression(), index_access_ids);
             }
@@ -193,8 +193,7 @@ fn mark_index_accesses(expression: &Expression, index_access_ids: &mut HashSet<u
         | Expression::NumberBool(_)
         | Expression::DivertTarget(_)
         | Expression::VariableReference(_)
-        | Expression::QualifiedReference(_)
-        | Expression::EmptyCompositeLiteral => {}
+        | Expression::QualifiedReference(_) => {}
     }
 }
 
@@ -233,7 +232,7 @@ mod tests {
     #[test]
     fn resolves_dict_index_type_in_typed_initializer_context() {
         let story = parse_story(
-            "VAR scores: Dict<string, int> = {\"ada\": 10}\n\
+            "VAR scores: Dict<string, int> = %{\"ada\": 10}\n\
              VAR first: int = scores[\"ada\"]\n\
              -> DONE",
         );
@@ -244,7 +243,7 @@ mod tests {
     #[test]
     fn resolves_nested_dict_and_array_index_chains() {
         let story = parse_story(
-            "VAR table: Dict<int, Dict<string, int[]>> = {1: {\"scores\": [10]}}\n\
+            "VAR table: Dict<int, Dict<string, int[]>> = %{1: %{\"scores\": [10]}}\n\
              VAR first: int = table[1][\"scores\"][0]\n\
              -> DONE",
         );
@@ -309,7 +308,7 @@ mod tests {
     #[test]
     fn reports_wrong_dict_key_type() {
         let story = parse_story(
-            "VAR scores: Dict<string, int> = {\"ada\": 10}\n\
+            "VAR scores: Dict<string, int> = %{\"ada\": 10}\n\
              {scores[1]}\n\
              -> DONE",
         );
@@ -326,7 +325,7 @@ mod tests {
     #[test]
     fn accepts_int_dict_keys() {
         let story = parse_story(
-            "VAR scores: Dict<int, string> = {1: \"ada\"}\n\
+            "VAR scores: Dict<int, string> = %{1: \"ada\"}\n\
              VAR first: string = scores[1]\n\
              -> DONE",
         );

@@ -3,7 +3,7 @@ STRUCT Player {
 hp: int
 name: string
 }
-VAR state: Player = { hp: 4, name: "Ada" }
+VAR state: Player = %Player{ hp: 4, name: "Ada" }
 VAR items: int[] = [1]
 
 == main ==

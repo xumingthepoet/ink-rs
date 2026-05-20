@@ -389,9 +389,8 @@ fn condition_type_signal(
         | Expression::NumberFloat(_)
         | Expression::NumberBool(_)
         | Expression::ArrayLiteral(_)
-        | Expression::StructLiteral(_)
-        | Expression::DictLiteral(_)
-        | Expression::EmptyCompositeLiteral => Some(ConditionTypeSignal::LiteralOnly),
+        | Expression::StructLiteral { .. }
+        | Expression::DictLiteral(_) => Some(ConditionTypeSignal::LiteralOnly),
         Expression::VariableReference(name) => matches!(
             variable_scopes.visible_variable_declared_type(name, current_module, current_flow_path),
             Some(Some(_))
@@ -1019,7 +1018,7 @@ mod tests {
                 "STRUCT Player {\n\
                  hp: int\n\
                  }\n\
-                 VAR player: Player = { hp: 10 }\n\
+                 VAR player: Player = %Player{ hp: 10 }\n\
                  { if player:\n\
                    Text.\n\
                  }",
@@ -1194,9 +1193,9 @@ mod tests {
             "STRUCT Player {\n\
              hp: int\n\
              }\n\
-             VAR default_player: Player = { hp: 10 }\n\
+             VAR default_player: Player = %Player{ hp: 10 }\n\
              VAR default_scores: int[] = [1]\n\
-             VAR default_lookup: Dict<string, int> = {\"score\": 1}\n\
+             VAR default_lookup: Dict<string, int> = %{\"score\": 1}\n\
              == function add(a: int, b: int) => int ==\n\
              ~ return a + b\n\
              == function make_player() => Player ==\n\

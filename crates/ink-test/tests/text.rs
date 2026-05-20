@@ -1,8 +1,6 @@
 use std::env;
 
-mod support;
-
-use support::{
+use crate::support::{
     compiler::{assert_story_output, compile_fixture},
     runtime::StoryError,
     story_runner as common,

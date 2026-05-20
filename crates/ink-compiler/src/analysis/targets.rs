@@ -476,7 +476,7 @@ impl<'a> CallTargetChecker<'a> {
                 continue;
             };
 
-            if matches!(argument, Expression::ArrayLiteral(_)) {
+            if is_composite_literal(argument) {
                 self.check_expression(argument, span, context);
                 continue;
             }
@@ -587,7 +587,7 @@ impl<'a> CallTargetChecker<'a> {
                     self.check_expression(element, span, context);
                 }
             }
-            Expression::StructLiteral(fields) => {
+            Expression::StructLiteral { fields, .. } => {
                 for field in fields {
                     self.check_expression(field.expression(), span, context);
                 }
@@ -636,8 +636,7 @@ impl<'a> CallTargetChecker<'a> {
             | Expression::String(_)
             | Expression::NumberInt(_)
             | Expression::NumberFloat(_)
-            | Expression::NumberBool(_)
-            | Expression::EmptyCompositeLiteral => {}
+            | Expression::NumberBool(_) => {}
         }
     }
 
@@ -686,6 +685,9 @@ impl<'a> CallTargetChecker<'a> {
                         "{name} hasn't been marked as a function, but it's being called as one. Do you need to declare the knot as '== function {name} =='?"
                     ),
                 ));
+                for arg in args {
+                    self.check_expression(arg, span, context);
+                }
             } else {
                 self.check_function_call_signature(name, args, &symbol, span, context);
             }
@@ -694,10 +696,9 @@ impl<'a> CallTargetChecker<'a> {
                 span.clone(),
                 format!("Function '{name}' is not declared"),
             ));
-        }
-
-        for arg in args {
-            self.check_expression(arg, span, context);
+            for arg in args {
+                self.check_expression(arg, span, context);
+            }
         }
     }
 
@@ -856,29 +857,51 @@ impl<'a> CallTargetChecker<'a> {
                     args.len()
                 ),
             ));
+            for arg in args {
+                self.check_expression(arg, span, context);
+            }
             return;
         }
 
         for (argument, parameter) in args.iter().zip(parameters) {
             let Some(expected_type) = parameter.declared_type() else {
+                self.check_expression(argument, span, context);
                 continue;
             };
             let expected_type = qualified_module
                 .map(|module| qualify_type_name_for_module(expected_type, module))
                 .unwrap_or_else(|| expected_type.clone());
-            if matches!(argument, Expression::ArrayLiteral(_)) {
+            if is_composite_literal(argument) {
+                self.check_expression(argument, span, context);
                 continue;
             }
-            match infer_expression_type(
+            let argument_type = infer_expected_interface_expression_type(
                 argument,
+                &expected_type,
                 self.variable_scopes,
                 self.struct_types,
                 self.enum_types,
                 self.target_symbols,
+                self.module_implementations,
+                self.module_imports,
                 self.interface_members,
                 self.current_module(context),
                 self.current_flow_path(context),
-            ) {
+            )
+            .unwrap_or_else(|| {
+                infer_expression_type(
+                    argument,
+                    self.variable_scopes,
+                    self.struct_types,
+                    self.enum_types,
+                    self.target_symbols,
+                    self.interface_members,
+                    self.current_module(context),
+                    self.current_flow_path(context),
+                )
+            });
+
+            match argument_type {
                 Ok(actual_type) if actual_type != expected_type => {
                     self.diagnostics.push(Diagnostic::error(
                         span.clone(),
@@ -889,8 +912,13 @@ impl<'a> CallTargetChecker<'a> {
                             expected_type.display_name()
                         ),
                     ));
+                    self.check_expression(argument, span, context);
                 }
-                Ok(_) => {}
+                Ok(_) => {
+                    if !is_interface_module_literal_argument(argument, &expected_type) {
+                        self.check_expression(argument, span, context);
+                    }
+                }
                 Err(error) => self.diagnostics.push(Diagnostic::error(
                     span.clone(),
                     format!(
@@ -1015,6 +1043,13 @@ fn is_mutable_lvalue(expression: &Expression) -> bool {
         | Expression::DynamicInterfaceFunctionCall { .. } => false,
         _ => false,
     }
+}
+
+fn is_composite_literal(expression: &Expression) -> bool {
+    matches!(
+        expression,
+        Expression::ArrayLiteral(_) | Expression::StructLiteral { .. } | Expression::DictLiteral(_)
+    )
 }
 
 fn is_runtime_builtin_function(name: &str) -> bool {
@@ -1230,9 +1265,9 @@ mod tests {
             "STRUCT Player {\n\
              hp: int\n\
              }\n\
-             VAR source_player: Player = { hp: 10 }\n\
+             VAR source_player: Player = %Player{ hp: 10 }\n\
              VAR source_scores: int[] = [1]\n\
-             VAR source_lookup: Dict<string, int> = {\"ada\": 10}\n\
+             VAR source_lookup: Dict<string, int> = %{\"ada\": 10}\n\
              VAR source_lookup_list: Dict<string, int>[] = [source_lookup]\n\
              VAR result: int = add(1, 2)\n\
              VAR copied_player: Player = echo_player(source_player)\n\
@@ -1265,9 +1300,9 @@ mod tests {
              EXTERNAL describe(player: Player, scores: int[]) => string\n\
              EXTERNAL copy_scores(scores: Dict<string, int>) => Dict<string, int>\n\
              VAR score: int = 1\n\
-             VAR source_player: Player = { hp: 10 }\n\
+             VAR source_player: Player = %Player{ hp: 10 }\n\
              VAR scores: int[] = [score]\n\
-             VAR score_lookup: Dict<string, int> = {\"ada\": 10}\n\
+             VAR score_lookup: Dict<string, int> = %{\"ada\": 10}\n\
              VAR adjusted_score: int = external_score(score) + LEN(scores)\n\
              VAR description: string = describe(source_player, scores)\n\
              VAR copied_scores: Dict<string, int> = copy_scores(score_lookup)\n\
@@ -1285,7 +1320,7 @@ mod tests {
              === module game ===\n\
              FROM scorer\n\
              VAR route: interface<IScorer> = scorer\n\
-             VAR source_scores: Dict<string, int> = {\"ada\": 10}\n\
+             VAR source_scores: Dict<string, int> = %{\"ada\": 10}\n\
              VAR copied_scores: Dict<string, int> = {route}::copy_scores(source_scores)\n\
              == main ==\n\
              -> END\n\
@@ -1359,7 +1394,7 @@ mod tests {
              hp: int\n\
              }\n\
              VAR score: int = 1\n\
-             VAR source_player: Player = { hp: 10 }\n\
+             VAR source_player: Player = %Player{ hp: 10 }\n\
              VAR scores: int[] = [score]\n\
              VAR players: Player[] = [source_player]\n\
              VAR nested_scores: int[][] = [scores]\n\
@@ -1391,7 +1426,7 @@ mod tests {
                 "STRUCT Player {\n\
                  hp: int\n\
                  }\n\
-                 VAR player: Player = { hp: 10 }\n\
+                 VAR player: Player = %Player{ hp: 10 }\n\
                  VAR count: int = LEN(player)\n\
                  -> DONE",
                 "Argument for builtin 'LEN' has type Player but expected array",
@@ -1438,7 +1473,7 @@ mod tests {
              hp: int\n\
              }\n\
              VAR score: int = 1\n\
-             VAR source_player: Player = { hp: 10 }\n\
+             VAR source_player: Player = %Player{ hp: 10 }\n\
              VAR scores: int[] = [score]\n\
              VAR players: Player[] = [source_player]\n\
              VAR nested_scores: int[][] = [scores]\n\
@@ -1802,7 +1837,7 @@ mod tests {
              routes: interface<IItem>[]\n\
              }\n\
              VAR route: interface<IItem> = left\n\
-             VAR state: RouteState = { current: left, routes: [left] }\n\
+             VAR state: RouteState = %RouteState{ current: left, routes: [left] }\n\
              VAR routes: interface<IItem>[] = [left]\n\
              == main ==\n\
              -> {{route}::target}(1)\n\
@@ -1838,6 +1873,144 @@ mod tests {
         );
 
         assert_eq!(call_target_diagnostics(&story), []);
+    }
+
+    #[test]
+    fn accepts_interface_module_literals_as_static_divert_arguments() {
+        let story = parse_story(
+            "=== interface IItem ===\n\
+             == target ==\n\
+             === module game ===\n\
+             FROM left\n\
+             == main ==\n\
+             -> register(left)\n\
+             == register(next: interface<IItem>) ==\n\
+             -> END\n\
+             === module left implements IItem ===\n\
+             == target ==\n\
+             -> END",
+        );
+
+        assert_eq!(super::super::run_analysis_passes(&story), []);
+    }
+
+    #[test]
+    fn accepts_interface_module_literals_as_function_call_arguments() {
+        let story = parse_story(
+            "=== interface IItem ===\n\
+             == target ==\n\
+             === module game ===\n\
+             FROM left\n\
+             == main ==\n\
+             ~ temp route: interface<IItem> = select(left)\n\
+             -> END\n\
+             == function select(next: interface<IItem>) => interface<IItem> ==\n\
+             ~ return next\n\
+             === module left implements IItem ===\n\
+             == target ==\n\
+             -> END",
+        );
+
+        assert_eq!(super::super::run_analysis_passes(&story), []);
+    }
+
+    #[test]
+    fn accepts_interface_module_literals_as_qualified_static_arguments() {
+        let story = parse_story(
+            "=== interface IItem ===\n\
+             == target ==\n\
+             === module game ===\n\
+             FROM left\n\
+             FROM registry IMPORT register, select\n\
+             == main ==\n\
+             -> registry::register(left)\n\
+             ~ temp route: interface<IItem> = registry::select(left)\n\
+             -> END\n\
+             === module registry ===\n\
+             == register(next: interface<IItem>) ==\n\
+             -> END\n\
+             == function select(next: interface<IItem>) => interface<IItem> ==\n\
+             ~ return next\n\
+             === module left implements IItem ===\n\
+             == target ==\n\
+             -> END",
+        );
+
+        assert_eq!(super::super::run_analysis_passes(&story), []);
+    }
+
+    #[test]
+    fn visible_variables_take_precedence_over_interface_module_literals_in_arguments() {
+        let story = parse_story(
+            "=== interface IItem ===\n\
+             == target ==\n\
+             === module game ===\n\
+             FROM left\n\
+             == main ==\n\
+             ~ temp left: int = 1\n\
+             ~ temp route: interface<IItem> = select(left)\n\
+             -> END\n\
+             == function select(next: interface<IItem>) => interface<IItem> ==\n\
+             ~ return next\n\
+             === module left implements IItem ===\n\
+             == target ==\n\
+             -> END",
+        );
+
+        assert_single_diagnostic(
+            &call_target_diagnostics(&story),
+            DiagnosticSeverity::Error,
+            "Argument 'next' for function 'select' has type int but expected interface<IItem>",
+        );
+    }
+
+    #[test]
+    fn reports_missing_import_for_interface_module_literals_in_arguments() {
+        let story = parse_story(
+            "=== interface IItem ===\n\
+             == target ==\n\
+             === module game ===\n\
+             == main ==\n\
+             ~ temp route: interface<IItem> = select(left)\n\
+             -> END\n\
+             == function select(next: interface<IItem>) => interface<IItem> ==\n\
+             ~ return next\n\
+             === module left implements IItem ===\n\
+             == target ==\n\
+             -> END",
+        );
+
+        assert_single_diagnostic(
+            &call_target_diagnostics(&story),
+            DiagnosticSeverity::Error,
+            "Cannot type-check argument 'next' for function 'select': Module literal 'left' requires a bare import in module 'game': FROM left",
+        );
+    }
+
+    #[test]
+    fn reports_wrong_interface_for_interface_module_literals_in_arguments() {
+        let story = parse_story(
+            "=== interface IItem ===\n\
+             == target ==\n\
+             === interface IOther ===\n\
+             == target ==\n\
+             === module game ===\n\
+             FROM left\n\
+             == main ==\n\
+             ~ temp route: interface<IItem> = select(left)\n\
+             -> END\n\
+             == function select(next: interface<IItem>) => interface<IItem> ==\n\
+             ~ return next\n\
+             === module left implements IOther ===\n\
+             == target ==\n\
+             -> END",
+        );
+
+        assert_single_diagnostic(
+            &call_target_diagnostics(&story),
+            DiagnosticSeverity::Error,
+            "Cannot type-check argument 'next' for function 'select': Module 'left' does not implement interface 'IItem'",
+        );
     }
 
     #[test]

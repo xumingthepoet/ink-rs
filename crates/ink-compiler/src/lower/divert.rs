@@ -2,9 +2,9 @@ use std::collections::HashSet;
 
 use ink_story_json_format::{ControlCommand, Object as RuntimeObject};
 
-use crate::parsed::{Divert, DivertTarget, Expression, Return, TunnelOnwards};
+use crate::parsed::{Divert, DivertTarget, Expression, FlowArgument, Return, TunnelOnwards};
 
-use super::context::LoweringContext;
+use super::context::{ChoicePathMode, LoweringContext};
 use super::expression::{
     dynamic_interface_knot_signature, lower_expression_into, lower_function_arg_into,
 };
@@ -89,9 +89,7 @@ pub(super) fn push_divert_with_context(
 
     if !divert.arguments().is_empty() {
         content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
-        for argument in divert.arguments() {
-            lower_expression_into(content, argument, context, false);
-        }
+        lower_static_divert_arguments_into(content, divert.target(), divert.arguments(), context);
         content.push(RuntimeObject::ControlCommand(ControlCommand::EvalEnd));
     }
 
@@ -219,6 +217,8 @@ pub(super) fn lower_tunnel_onwards_into(
             tunnel_onwards.arguments(),
             context,
         );
+    } else if let Some(target) = tunnel_onwards.override_target() {
+        lower_static_divert_arguments_into(content, target, tunnel_onwards.arguments(), context);
     } else {
         lower_plain_divert_arguments_into(content, tunnel_onwards.arguments(), context);
     }
@@ -276,6 +276,86 @@ fn lower_plain_divert_arguments_into(
     for argument in arguments {
         lower_expression_into(content, argument, context, false);
     }
+}
+
+fn lower_static_divert_arguments_into(
+    content: &mut Vec<RuntimeObject>,
+    target: &DivertTarget,
+    arguments: &[Expression],
+    context: &LoweringContext<'_>,
+) {
+    let expected_args = static_divert_expected_args(target, context);
+    let mut visiting_constants = HashSet::new();
+    for (index, argument) in arguments.iter().enumerate() {
+        lower_function_arg_into(
+            content,
+            argument,
+            expected_args.and_then(|args| args.get(index)),
+            context,
+            false,
+            &mut visiting_constants,
+        );
+    }
+}
+
+fn static_divert_expected_args<'a>(
+    target: &DivertTarget,
+    context: &'a LoweringContext<'_>,
+) -> Option<&'a [FlowArgument]> {
+    let target = static_divert_target_name(target)?;
+    let signature_name = resolve_static_signature_name(target, context)?;
+    let Some(CallSignature::Ink { args, .. }) = context.external_signatures().get(&signature_name)
+    else {
+        return None;
+    };
+    Some(args)
+}
+
+fn static_divert_target_name(target: &DivertTarget) -> Option<&str> {
+    match target {
+        DivertTarget::Path(target) => Some(target),
+        DivertTarget::QualifiedPath(target) => Some(target.as_str()),
+        DivertTarget::Dynamic(_) | DivertTarget::Done | DivertTarget::End | DivertTarget::Empty => {
+            None
+        }
+    }
+}
+
+fn resolve_static_signature_name(target: &str, context: &LoweringContext<'_>) -> Option<String> {
+    let signatures = context.external_signatures();
+    if target.contains("::") {
+        return signatures.contains_key(target).then(|| target.to_string());
+    }
+
+    let module = context.path_mode().current_module_name();
+    let scoped = |name: &str| {
+        module
+            .map(|module| format!("{module}::{name}"))
+            .unwrap_or_else(|| name.to_string())
+    };
+
+    if target.contains('.') {
+        let candidate = scoped(target);
+        return signatures.contains_key(&candidate).then_some(candidate);
+    }
+
+    let mut candidates = Vec::new();
+    if let ChoicePathMode::Flow {
+        flow_name,
+        parent_flow_name,
+        ..
+    } = context.path_mode()
+    {
+        candidates.push(scoped(&format!("{flow_name}.{target}")));
+        if let Some(parent_flow_name) = parent_flow_name {
+            candidates.push(scoped(&format!("{parent_flow_name}.{target}")));
+        }
+    }
+    candidates.push(scoped(target));
+
+    candidates
+        .into_iter()
+        .find(|candidate| signatures.contains_key(candidate))
 }
 
 fn lower_tunnel_onwards_path_target_into(

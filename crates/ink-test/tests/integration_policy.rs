@@ -8,6 +8,16 @@ const ALLOWED_LEGACY_INK_FIXTURES: &[&str] = &[];
 
 const ALLOWED_SOURCE_CONSTRUCTION_TESTS: &[&str] = &[];
 
+const DISABLED_TEST_HARNESS_SOURCE_ROOTS: &[(&str, &str)] = &[
+    ("Cargo.toml", "src"),
+    (
+        "crates/ink-experiments/Cargo.toml",
+        "crates/ink-experiments/src",
+    ),
+    ("crates/ink-test/Cargo.toml", "crates/ink-test/src"),
+    ("crates/ink-tools/Cargo.toml", "crates/ink-tools/src"),
+];
+
 const BANNED_ORIGIN_LABELS: &[&str] = &[
     "language",
     "conformance",
@@ -126,6 +136,46 @@ fn compiled_json_fixtures_have_source_siblings() {
     );
 }
 
+#[test]
+fn disabled_test_harness_targets_stay_test_free() {
+    let workspace_root = workspace_root();
+    let disabled_manifests = manifests_with_disabled_test_harnesses(&workspace_root)
+        .into_iter()
+        .collect::<BTreeSet<_>>();
+    let tracked_manifests = DISABLED_TEST_HARNESS_SOURCE_ROOTS
+        .iter()
+        .map(|(manifest, _)| manifest.to_string())
+        .collect::<BTreeSet<_>>();
+
+    let unexpected = disabled_manifests
+        .difference(&tracked_manifests)
+        .cloned()
+        .collect::<Vec<_>>();
+    let stale = tracked_manifests
+        .difference(&disabled_manifests)
+        .cloned()
+        .collect::<Vec<_>>();
+
+    assert!(
+        unexpected.is_empty(),
+        "test = false targets must be tracked by DISABLED_TEST_HARNESS_SOURCE_ROOTS so ignored unit tests cannot be added silently: {unexpected:#?}"
+    );
+    assert!(
+        stale.is_empty(),
+        "DISABLED_TEST_HARNESS_SOURCE_ROOTS entries are stale; remove entries for targets that no longer set test = false: {stale:#?}"
+    );
+
+    let offenders = DISABLED_TEST_HARNESS_SOURCE_ROOTS
+        .iter()
+        .flat_map(|(_, source_root)| source_files_with_unit_tests(&workspace_root, source_root))
+        .collect::<Vec<_>>();
+
+    assert!(
+        offenders.is_empty(),
+        "targets with test = false must not contain unit-test markers because Cargo would ignore them; remove test = false or move the tests: {offenders:#?}"
+    );
+}
+
 fn legacy_fixture_path(root: &Path, path: &Path) -> Option<String> {
     let text = fs::read_to_string(path)
         .unwrap_or_else(|error| panic!("failed to read fixture {}: {error}", path.display()));
@@ -140,6 +190,46 @@ fn legacy_fixture_path(root: &Path, path: &Path) -> Option<String> {
     }
 
     Some(relative_path(root, path))
+}
+
+fn manifests_with_disabled_test_harnesses(workspace_root: &Path) -> Vec<String> {
+    workspace_manifests(workspace_root)
+        .into_iter()
+        .filter(|path| {
+            let text = fs::read_to_string(path).unwrap_or_else(|error| {
+                panic!("failed to read manifest {}: {error}", path.display())
+            });
+            text.lines().any(|line| line.trim() == "test = false")
+        })
+        .map(|path| relative_path(workspace_root, &path))
+        .collect()
+}
+
+fn workspace_manifests(workspace_root: &Path) -> Vec<PathBuf> {
+    let mut manifests = vec![workspace_root.join("Cargo.toml")];
+    manifests.extend(files_under(&workspace_root.join("crates"), |path| {
+        path.file_name().is_some_and(|name| name == "Cargo.toml")
+    }));
+    manifests.sort();
+    manifests
+}
+
+fn source_files_with_unit_tests(workspace_root: &Path, source_root: &str) -> Vec<String> {
+    let source_root = workspace_root.join(source_root);
+    rust_files_under(&source_root)
+        .into_iter()
+        .filter(|path| source_file_contains_unit_test_marker(path))
+        .map(|path| relative_path(workspace_root, &path))
+        .collect()
+}
+
+fn source_file_contains_unit_test_marker(path: &Path) -> bool {
+    let text = fs::read_to_string(path)
+        .unwrap_or_else(|error| panic!("failed to read source {}: {error}", path.display()));
+    text.lines().any(|line| {
+        let line = line.trim_start();
+        line.starts_with("#[test]") || line.starts_with("#[cfg(test)]")
+    })
 }
 
 fn origin_label_offender(tests_root: &Path, fixture_root: &Path, path: &Path) -> Option<String> {
@@ -231,6 +321,13 @@ fn collect_files(root: &Path, include: impl Fn(&Path) -> bool + Copy, files: &mu
             files.push(path);
         }
     }
+}
+
+fn workspace_root() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .canonicalize()
+        .unwrap_or_else(|error| panic!("failed to resolve workspace root: {error}"))
 }
 
 fn relative_path(root: &Path, path: &Path) -> String {

@@ -1,7 +1,5 @@
-mod support;
-
-use support::compiler::compile_fixture_to_story;
-use support::{runtime::StoryError, story_runner as common};
+use crate::support::compiler::compile_fixture_to_story;
+use crate::support::{runtime::StoryError, story_runner as common};
 
 #[test]
 fn tags_test() -> Result<(), StoryError> {

@@ -19,7 +19,7 @@ Story
         Field(name="history", type=State[])
         Field(name="mood", type=Tone)
       VariableAssignment(name="actor", global=true, temp=false, type=Actor)
-        StructLiteral(state=VariableReference(State.Busy), history=ArrayLiteral(VariableReference(State.Idle)), mood=VariableReference(Tone.Sharp))
+        StructLiteral(Actor, state=VariableReference(State.Busy), history=ArrayLiteral(VariableReference(State.Idle)), mood=VariableReference(Tone.Sharp))
       ConstantDeclaration(name="DEFAULT_STATE", type=State)
         VariableReference(State.Done)
       ConstantDeclaration(name="DEFAULT_TONE", type=Tone)

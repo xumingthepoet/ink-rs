@@ -6,8 +6,8 @@ VAR targets: ->[] = [-> array_target]
 STRUCT Route {
 next: ->
 }
-VAR route: Route = { next: -> struct_target }
-CONST const_route: Route = { next: -> const_struct_target }
+VAR route: Route = %Route{ next: -> struct_target }
+CONST const_route: Route = %Route{ next: -> const_struct_target }
 
 == main ==
 -> {next}

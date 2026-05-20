@@ -1,4 +1,4 @@
-use super::{push_indent, ContentList, Object, QualifiedName};
+use super::{push_indent, ContentList, Object, QualifiedName, TypeName};
 
 #[derive(Debug, Clone, Copy)]
 pub struct FloatLiteral(f64);
@@ -120,9 +120,11 @@ pub enum Expression {
         args: Vec<Expression>,
     },
     ArrayLiteral(Vec<Expression>),
-    StructLiteral(Vec<StructLiteralField>),
+    StructLiteral {
+        type_name: TypeName,
+        fields: Vec<StructLiteralField>,
+    },
     DictLiteral(Vec<DictLiteralEntry>),
-    EmptyCompositeLiteral,
     FieldAccess {
         base: Box<Expression>,
         field: String,
@@ -262,8 +264,12 @@ impl Expression {
                 }
                 out.push(')');
             }
-            Expression::StructLiteral(fields) => {
+            Expression::StructLiteral { type_name, fields } => {
                 out.push_str("StructLiteral(");
+                out.push_str(&type_name.snapshot_name());
+                if !fields.is_empty() {
+                    out.push_str(", ");
+                }
                 for (index, field) in fields.iter().enumerate() {
                     if index > 0 {
                         out.push_str(", ");
@@ -285,9 +291,6 @@ impl Expression {
                     entry.value().write_parse_snapshot(out, 0);
                 }
                 out.push(')');
-            }
-            Expression::EmptyCompositeLiteral => {
-                out.push_str("EmptyCompositeLiteral()");
             }
             Expression::FieldAccess { base, field } => {
                 if let Some(path) = self.dotted_path() {
@@ -454,7 +457,7 @@ fn expression_display(expression: &Expression) -> String {
                 .join(", ");
             format!("[{elements}]")
         }
-        Expression::StructLiteral(fields) => {
+        Expression::StructLiteral { type_name, fields } => {
             let fields = fields
                 .iter()
                 .map(|field| {
@@ -466,7 +469,7 @@ fn expression_display(expression: &Expression) -> String {
                 })
                 .collect::<Vec<_>>()
                 .join(", ");
-            format!("{{{fields}}}")
+            format!("%{}{{{fields}}}", type_name.snapshot_name())
         }
         Expression::DictLiteral(entries) => {
             let entries = entries
@@ -480,9 +483,8 @@ fn expression_display(expression: &Expression) -> String {
                 })
                 .collect::<Vec<_>>()
                 .join(", ");
-            format!("{{{entries}}}")
+            format!("%{{{entries}}}")
         }
-        Expression::EmptyCompositeLiteral => "{}".to_string(),
         Expression::FieldAccess { base, field } => {
             format!("{}.{}", expression_display(base), field)
         }

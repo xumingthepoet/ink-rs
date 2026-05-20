@@ -15,9 +15,9 @@ Story
       VariableAssignment(name="score_tables", global=true, temp=false, type=Dict<string, int>[])
         ArrayLiteral(DictLiteral("ada"=Number(10)))
       VariableAssignment(name="empty_scores", global=true, temp=false, type=Dict<string, int>)
-        EmptyCompositeLiteral()
+        DictLiteral()
       VariableAssignment(name="sheet", global=true, temp=false, type=Sheet)
-        StructLiteral(scores=DictLiteral("ada"=Number(10)))
+        StructLiteral(Sheet, scores=DictLiteral("ada"=Number(10)))
     Flow(level=Knot, name="main", function=false)
       Weave(baseIndent=0)
         ContentList

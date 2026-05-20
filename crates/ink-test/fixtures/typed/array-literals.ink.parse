@@ -12,7 +12,7 @@ Story
       VariableAssignment(name="matrix", global=true, temp=false, type=int[][])
         ArrayLiteral(ArrayLiteral(Number(1), Number(2)), ArrayLiteral())
       VariableAssignment(name="party", global=true, temp=false, type=Player[])
-        ArrayLiteral(StructLiteral(hp=Number(10), name=String("Ada")))
+        ArrayLiteral(StructLiteral(Player, hp=Number(10), name=String("Ada")))
     Flow(level=Knot, name="main", function=false)
       Weave(baseIndent=0)
         ContentList

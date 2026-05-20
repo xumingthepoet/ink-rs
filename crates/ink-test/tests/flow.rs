@@ -1,6 +1,4 @@
-mod support;
-
-use support::{compiler::compile_fixture_to_story_allowing_warnings, runtime::Story};
+use crate::support::{compiler::compile_fixture_to_story_allowing_warnings, runtime::Story};
 
 fn story_is_ended(story: &Story) -> bool {
     !story.can_continue() && story.get_current_choices().is_empty()

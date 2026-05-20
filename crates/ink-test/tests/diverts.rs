@@ -1,7 +1,5 @@
-mod support;
-
-use support::compiler::{assert_story_output, compile_fixture};
-use support::{runtime::StoryError, story_runner as common};
+use crate::support::compiler::{assert_story_output, compile_fixture};
+use crate::support::{runtime::StoryError, story_runner as common};
 
 #[test]
 fn simple_divert_test() -> Result<(), StoryError> {

@@ -1,6 +1,4 @@
-mod support;
-
-use support::{runtime::StoryError, story_runner as common};
+use crate::support::{runtime::StoryError, story_runner as common};
 
 #[test]
 fn tunnel_onwards_divert_override_test() -> Result<(), StoryError> {

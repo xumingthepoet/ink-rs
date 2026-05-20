@@ -538,7 +538,7 @@ mod tests {
              }\n\
              VAR route: interface<IItem> = left\n\
              VAR routes: interface<IItem>[] = [left]\n\
-             VAR holder: Holder = { next: left }\n\
+             VAR holder: Holder = %Holder{ next: left }\n\
              == main ==\n\
              ~ temp local: interface<IItem> = route\n\
              ~ route = left\n\
@@ -739,7 +739,7 @@ mod tests {
              hp: int\n\
              name: string\n\
              }\n\
-             VAR player: Player = { hp: 10, name: \"Ada\" }\n\
+             VAR player: Player = %Player{ hp: 10, name: \"Ada\" }\n\
              VAR scores: int[] = [1]\n\
              ~ player.hp = 11\n\
              ~ player.name = \"Grace\"\n\
@@ -753,7 +753,7 @@ mod tests {
     #[test]
     fn accepts_dict_index_assignments() {
         let story = parse_story(
-            "VAR scores: Dict<string, int> = {\"ada\": 1}\n\
+            "VAR scores: Dict<string, int> = %{\"ada\": 1}\n\
              ~ scores[\"ada\"] = 2\n\
              ~ scores[\"grace\"] = 3\n\
              -> DONE",
@@ -768,8 +768,8 @@ mod tests {
             "STRUCT Player {\n\
              hp: int\n\
              }\n\
-             VAR players: Dict<string, Player> = {\"ada\": { hp: 10 }}\n\
-             VAR table: Dict<int, Dict<string, string>> = {1: {\"name\": \"Ada\"}}\n\
+             VAR players: Dict<string, Player> = %{\"ada\": %Player{ hp: 10 }}\n\
+             VAR table: Dict<int, Dict<string, string>> = %{1: %{\"name\": \"Ada\"}}\n\
              ~ players[\"ada\"].hp = 11\n\
              ~ players[\"ada\"].hp += 1\n\
              ~ table[1][\"name\"] = \"Grace\"\n\
@@ -785,7 +785,7 @@ mod tests {
             "STRUCT Player {\n\
              hp: int\n\
              }\n\
-             VAR player: Player = { hp: 10 }\n\
+             VAR player: Player = %Player{ hp: 10 }\n\
              ~ player.hp = \"high\"\n\
              -> DONE",
         );
@@ -819,7 +819,7 @@ mod tests {
     #[test]
     fn reports_invalid_dict_key_assignment_type() {
         let story = parse_story(
-            "VAR scores: Dict<string, int> = {\"ada\": 1}\n\
+            "VAR scores: Dict<string, int> = %{\"ada\": 1}\n\
              ~ scores[1] = 2\n\
              -> DONE",
         );
@@ -836,7 +836,7 @@ mod tests {
     #[test]
     fn reports_invalid_dict_value_assignment_type() {
         let story = parse_story(
-            "VAR scores: Dict<string, int> = {\"ada\": 1}\n\
+            "VAR scores: Dict<string, int> = %{\"ada\": 1}\n\
              ~ scores[\"ada\"] = \"two\"\n\
              -> DONE",
         );
@@ -856,7 +856,7 @@ mod tests {
             "STRUCT Player {\n\
              hp: int\n\
              }\n\
-             VAR party: Player[] = [{ hp: 10 }]\n\
+             VAR party: Player[] = [%Player{ hp: 10 }]\n\
              ~ party[0].hp = 11\n\
              ~ party[0].hp += 1\n\
              -> DONE",
@@ -871,7 +871,7 @@ mod tests {
             "STRUCT Player {\n\
              hp: int\n\
              }\n\
-             VAR party: Player[] = [{ hp: 10 }]\n\
+             VAR party: Player[] = [%Player{ hp: 10 }]\n\
              ~ party[0].hp = \"low\"\n\
              -> DONE",
         );
@@ -891,7 +891,7 @@ mod tests {
             "STRUCT Player {\n\
              hp: int\n\
              }\n\
-             VAR player: Player = { hp: 10 }\n\
+             VAR player: Player = %Player{ hp: 10 }\n\
              ~ player.hp += 1.0\n\
              -> DONE",
         );
