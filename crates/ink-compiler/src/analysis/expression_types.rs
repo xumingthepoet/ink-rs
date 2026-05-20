@@ -166,8 +166,8 @@ fn infer_expression_type_in_context(
                 }
             }
         }
-        Expression::FunctionCall { name, .. } => {
-            typed_builtin_return_type(name).map(Ok).unwrap_or_else(|| {
+        Expression::FunctionCall { name, args } => {
+            typed_builtin_return_type_in_context(name, args, context).unwrap_or_else(|| {
                 infer_function_return_type(
                     name,
                     context.target_symbols,
@@ -176,16 +176,18 @@ fn infer_expression_type_in_context(
                 )
             })
         }
-        Expression::QualifiedFunctionCall { name, .. } => typed_builtin_return_type(name.as_str())
-            .map(Ok)
-            .unwrap_or_else(|| {
-                infer_function_return_type(
-                    name.as_str(),
-                    context.target_symbols,
-                    context.current_module,
-                    context.current_flow_path,
-                )
-            }),
+        Expression::QualifiedFunctionCall { name, args } => {
+            typed_builtin_return_type_in_context(name.as_str(), args, context).unwrap_or_else(
+                || {
+                    infer_function_return_type(
+                        name.as_str(),
+                        context.target_symbols,
+                        context.current_module,
+                        context.current_flow_path,
+                    )
+                },
+            )
+        }
         Expression::DynamicInterfaceAccess { target, member } => {
             infer_dynamic_interface_target_type(target, member, context)
         }
@@ -296,12 +298,59 @@ fn infer_dynamic_interface_function_call_type(
         .unwrap_or_else(TypeName::void))
 }
 
+pub(super) fn is_typed_builtin_function(name: &str) -> bool {
+    matches!(
+        name,
+        "ARRAY_REMOVE" | "LEN" | "DICT_HAS" | "DICT_SIZE" | "DICT_REMOVE" | "DICT_KEYS"
+    )
+}
+
 pub(super) fn typed_builtin_return_type(name: &str) -> Option<TypeName> {
     match name {
         "ARRAY_REMOVE" => Some(TypeName::void()),
         "LEN" => Some(TypeName::int()),
+        "DICT_HAS" => Some(TypeName::bool()),
+        "DICT_SIZE" => Some(TypeName::int()),
+        "DICT_REMOVE" => Some(TypeName::void()),
         _ => None,
     }
+}
+
+fn typed_builtin_return_type_in_context(
+    name: &str,
+    args: &[Expression],
+    context: &TypeInferenceContext<'_>,
+) -> Option<Result<TypeName, TypeInferenceError>> {
+    if name == "DICT_KEYS" {
+        return Some(infer_dict_keys_return_type(args, context));
+    }
+
+    typed_builtin_return_type(name).map(Ok)
+}
+
+fn infer_dict_keys_return_type(
+    args: &[Expression],
+    context: &TypeInferenceContext<'_>,
+) -> Result<TypeName, TypeInferenceError> {
+    if args.len() != 1 {
+        return Err(TypeInferenceError::new(format!(
+            "Builtin 'DICT_KEYS' expects 1 argument but got {}",
+            args.len()
+        )));
+    }
+
+    let dict_type = infer_expression_type_in_context(&args[0], context)?;
+    let Some((key_type, _)) = dict_type.dict_key_value_types() else {
+        return Err(TypeInferenceError::new(format!(
+            "First argument for builtin 'DICT_KEYS' has type {} but expected Dict",
+            dict_type.display_name()
+        )));
+    };
+
+    Ok(TypeName::array(match key_type {
+        DictKeyType::String => TypeName::string(),
+        DictKeyType::Int => TypeName::int(),
+    }))
 }
 
 fn infer_variable_type(

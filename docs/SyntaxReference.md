@@ -776,7 +776,7 @@ or:
 
 ## 9) Game Queries and Functions
 
-**ink-rs** provides builtin functions for random numbers, numeric conversion, math, and typed array helpers.
+**ink-rs** provides builtin functions for random numbers, numeric conversion, math, and typed collection helpers.
 
 The convention is to name these in capital letters.
 
@@ -1358,9 +1358,19 @@ and can be passed through function and external signatures:
 	EXTERNAL load_scores(seed: int) => Dict<string, int>
 
 Dict equality compares key type and entries recursively with `==` and `!=`.
-Dict V1 intentionally has no collection builtins such as length, contains,
-remove, iteration, or key enumeration. Use explicit story data or host code for
-those operations.
+Use Dict helpers to test, count, remove, and enumerate entries:
+
+	{DICT_HAS(scores, "ada")}
+	{DICT_SIZE(scores)}
+	~ DICT_REMOVE(scores, "grace")
+	~ temp keys: string[] = DICT_KEYS(scores)
+
+`DICT_HAS(dict, key)` returns `true` when the key is present and `false`
+otherwise. `DICT_SIZE(dict)` returns the current entry count.
+`DICT_REMOVE(dict, key)` removes an existing entry, returns `void`, and does
+nothing when the key is already absent. `DICT_KEYS(dict)` returns `string[]` for
+`Dict<string, V>` and `int[]` for `Dict<int, V>`. String keys are returned in
+lexical order; int keys are returned in ascending order.
 
 ### Enums
 

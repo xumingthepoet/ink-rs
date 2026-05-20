@@ -401,9 +401,13 @@ fn infer_lowered_expression_type(
                 })
                 .cloned()
         }
-        Expression::FunctionCall { name, .. } => callable_return_type(name, context),
-        Expression::QualifiedFunctionCall { name, .. } => {
-            callable_return_type(name.as_str(), context)
+        Expression::FunctionCall { name, args } => {
+            builtin_return_type_for_call(name, args, context)
+                .or_else(|| callable_return_type(name, context))
+        }
+        Expression::QualifiedFunctionCall { name, args } => {
+            builtin_return_type_for_call(name.as_str(), args, context)
+                .or_else(|| callable_return_type(name.as_str(), context))
         }
         Expression::ArrayLiteral(_)
         | Expression::DictLiteral(_)
@@ -448,6 +452,27 @@ fn callable_return_type(name: &str, context: &LoweringContext<'_>) -> Option<Typ
                 .map(|(module, _)| qualify_type_name_for_module(return_type, module))
                 .unwrap_or_else(|| return_type.clone()),
         })
+}
+
+fn builtin_return_type_for_call(
+    name: &str,
+    args: &[Expression],
+    context: &LoweringContext<'_>,
+) -> Option<TypeName> {
+    match name {
+        "ARRAY_REMOVE" | "DICT_REMOVE" => Some(TypeName::void()),
+        "LEN" | "DICT_SIZE" => Some(TypeName::int()),
+        "DICT_HAS" => Some(TypeName::bool()),
+        "DICT_KEYS" => {
+            let dict_type = infer_lowered_expression_type(args.first()?, context)?;
+            let (key_type, _) = dict_type.dict_key_value_types()?;
+            Some(TypeName::array(match key_type {
+                crate::parsed::DictKeyType::String => TypeName::string(),
+                crate::parsed::DictKeyType::Int => TypeName::int(),
+            }))
+        }
+        _ => None,
+    }
 }
 
 fn qualify_field_type_for_base(field_type: &TypeName, base_type: &TypeName) -> TypeName {
@@ -576,6 +601,9 @@ fn lower_function_call_into(
         "ARRAY_REMOVE" => {
             lower_array_remove_call_into(content, args, lowering);
         }
+        "DICT_REMOVE" => {
+            lower_dict_remove_call_into(content, args, lowering);
+        }
         "RANDOM" => {
             for arg in args {
                 lower_function_arg_into_parts(content, arg, None, lowering);
@@ -692,6 +720,54 @@ fn lower_array_remove_call_into(
     content.push(RuntimeObject::Void);
 }
 
+fn lower_dict_remove_call_into(
+    content: &mut Vec<RuntimeObject>,
+    args: &[Expression],
+    lowering: &mut ExpressionLoweringContext<'_, '_>,
+) {
+    let context = lowering.context;
+    let (Some(target_expression), Some(key_expression)) = (args.first(), args.get(1)) else {
+        content.push(RuntimeObject::Void);
+        return;
+    };
+    let Some(target) = AssignmentTarget::from_expression(target_expression.clone()) else {
+        content.push(RuntimeObject::Void);
+        return;
+    };
+
+    let mut components = Vec::new();
+    let Some(root_name) = collect_assignment_path(&target, &mut components) else {
+        content.push(RuntimeObject::Void);
+        return;
+    };
+    let cached_components = lower_cached_assignment_indexes_into(content, &components, context);
+    let resolved_root_name =
+        resolve_runtime_variable_name(root_name, context.path_mode(), context.global_variables());
+
+    if cached_components.is_empty() {
+        content.push(RuntimeObject::VariableReference(resolved_root_name.clone()));
+        let previous_has_start_content = lowering.has_start_content;
+        lowering.has_start_content = false;
+        lower_expression_into_with_constants(content, key_expression, lowering);
+        lowering.has_start_content = previous_has_start_content;
+        content.push(RuntimeObject::NativeFunction(NativeFunction::DictRemove));
+    } else {
+        lower_assignment_path_update_value_into(
+            content,
+            resolved_root_name.as_str(),
+            &cached_components,
+            0,
+            AssignmentUpdateValue::DictRemove {
+                key: key_expression,
+            },
+            context,
+        );
+    }
+
+    push_reassignment_for_name(content, resolved_root_name.as_str(), context.path_mode());
+    content.push(RuntimeObject::Void);
+}
+
 pub(super) fn lower_function_arg_into(
     content: &mut Vec<RuntimeObject>,
     arg: &Expression,
@@ -787,6 +863,10 @@ fn builtin_native_function(name: &str) -> Option<NativeFunction> {
         "INT" => Some(NativeFunction::Int),
         "FLOAT" => Some(NativeFunction::Float),
         "LEN" => Some(NativeFunction::Len),
+        "DICT_HAS" => Some(NativeFunction::DictHas),
+        "DICT_SIZE" => Some(NativeFunction::DictSize),
+        "DICT_REMOVE" => Some(NativeFunction::DictRemove),
+        "DICT_KEYS" => Some(NativeFunction::DictKeys),
         _ => None,
     }
 }

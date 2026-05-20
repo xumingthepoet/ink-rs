@@ -21,6 +21,10 @@ const SET_INDEX_NEW_VALUE: &str = "SET_INDEX expected a value as its third param
 const LEN_ARRAY: &str = "LEN expected an array value as its parameter";
 const ARRAY_REMOVE_ARRAY: &str = "ARRAY_REMOVE expected an array value as its first parameter";
 const ARRAY_REMOVE_INDEX: &str = "ARRAY_REMOVE expected an int index as its second parameter";
+const DICT_HAS_DICT: &str = "DICT_HAS expected a dict value as its first parameter";
+const DICT_SIZE_DICT: &str = "DICT_SIZE expected a dict value as its parameter";
+const DICT_REMOVE_DICT: &str = "DICT_REMOVE expected a dict value as its first parameter";
+const DICT_KEYS_DICT: &str = "DICT_KEYS expected a dict value as its parameter";
 
 pub(super) fn field_read(params: &[Rc<dyn RTObject>]) -> Result<Rc<dyn RTObject>, StoryError> {
     let value = params::value(params, 0, FIELD_OBJECT)?;
@@ -160,6 +164,56 @@ pub(super) fn array_remove(params: &[Rc<dyn RTObject>]) -> Result<Rc<dyn RTObjec
     Ok(Rc::new(Value::new_value_type(ValueType::Array(
         updated_values,
     ))))
+}
+
+pub(super) fn dict_has(params: &[Rc<dyn RTObject>]) -> Result<Rc<dyn RTObject>, StoryError> {
+    let dict = dict_param(params, 0, DICT_HAS_DICT)?;
+    let key = dict_key_param(params, 1, dict.key_type(), "DICT_HAS")?;
+
+    Ok(Rc::new(Value::new::<bool>(dict.get(&key).is_some())))
+}
+
+pub(super) fn dict_size(params: &[Rc<dyn RTObject>]) -> Result<Rc<dyn RTObject>, StoryError> {
+    let dict = dict_param(params, 0, DICT_SIZE_DICT)?;
+
+    Ok(Rc::new(Value::new::<i32>(dict.entries().len() as i32)))
+}
+
+pub(super) fn dict_remove(params: &[Rc<dyn RTObject>]) -> Result<Rc<dyn RTObject>, StoryError> {
+    let dict = dict_param(params, 0, DICT_REMOVE_DICT)?;
+    let key = dict_key_param(params, 1, dict.key_type(), "DICT_REMOVE")?;
+    let mut updated_entries = dict.entries().clone();
+    updated_entries.remove(&key);
+    let updated_dict = DictValue::new(dict.key_type(), updated_entries)?;
+
+    Ok(Rc::new(Value::new_value_type(ValueType::Dict(
+        updated_dict,
+    ))))
+}
+
+pub(super) fn dict_keys(params: &[Rc<dyn RTObject>]) -> Result<Rc<dyn RTObject>, StoryError> {
+    let dict = dict_param(params, 0, DICT_KEYS_DICT)?;
+    let keys = dict
+        .entries()
+        .keys()
+        .map(|key| match key {
+            DictKey::String(value) => ValueType::from(value.as_str()),
+            DictKey::Int(value) => ValueType::Int(*value),
+        })
+        .collect();
+
+    Ok(Rc::new(Value::new_value_type(ValueType::Array(keys))))
+}
+
+fn dict_param<'a>(
+    params: &'a [Rc<dyn RTObject>],
+    index: usize,
+    expected_message: &'static str,
+) -> Result<&'a DictValue, StoryError> {
+    match &params::value(params, index, expected_message)?.value {
+        ValueType::Dict(dict) => Ok(dict),
+        _ => Err(StoryError::InvalidStoryState(expected_message.to_owned())),
+    }
 }
 
 #[cfg(test)]
@@ -314,6 +368,87 @@ mod tests {
         );
         assert!(
             matches!(value_type(replaced.as_ref()), ValueType::Dict(dict) if matches!(dict.get(&DictKey::String("ada".to_string())), Some(ValueType::Int(12))))
+        );
+    }
+
+    #[test]
+    fn dict_collection_helpers_read_size_presence_and_keys() {
+        let string_dict = dict_value(
+            DictKeyType::String,
+            vec![
+                (DictKey::String("bea".to_string()), ValueType::Int(11)),
+                (DictKey::String("ada".to_string()), ValueType::Int(10)),
+            ],
+        );
+        let int_dict = dict_value(
+            DictKeyType::Int,
+            vec![
+                (DictKey::Int(2), ValueType::new("two")),
+                (DictKey::Int(1), ValueType::new("one")),
+            ],
+        );
+
+        let has_ada = NativeFunctionCall::new(Op::DictHas)
+            .call(vec![string_dict.clone(), string_value("ada")])
+            .expect("DICT_HAS should succeed");
+        assert!(matches!(
+            value_type(has_ada.as_ref()),
+            ValueType::Bool(true)
+        ));
+
+        let has_missing = NativeFunctionCall::new(Op::DictHas)
+            .call(vec![string_dict.clone(), string_value("missing")])
+            .expect("DICT_HAS should succeed for missing keys");
+        assert!(matches!(
+            value_type(has_missing.as_ref()),
+            ValueType::Bool(false)
+        ));
+
+        let size = NativeFunctionCall::new(Op::DictSize)
+            .call(vec![string_dict.clone()])
+            .expect("DICT_SIZE should succeed");
+        assert!(matches!(value_type(size.as_ref()), ValueType::Int(2)));
+
+        let string_keys = NativeFunctionCall::new(Op::DictKeys)
+            .call(vec![string_dict])
+            .expect("DICT_KEYS should succeed for string keys");
+        assert!(
+            matches!(value_type(string_keys.as_ref()), ValueType::Array(values)
+                if matches!(values.as_slice(), [ValueType::String(left), ValueType::String(right)] if left.string == "ada" && right.string == "bea"))
+        );
+
+        let int_keys = NativeFunctionCall::new(Op::DictKeys)
+            .call(vec![int_dict])
+            .expect("DICT_KEYS should succeed for int keys");
+        assert!(
+            matches!(value_type(int_keys.as_ref()), ValueType::Array(values)
+                if matches!(values.as_slice(), [ValueType::Int(1), ValueType::Int(2)]))
+        );
+    }
+
+    #[test]
+    fn dict_remove_returns_updated_dict_and_missing_key_is_noop() {
+        let original = dict_value(
+            DictKeyType::String,
+            vec![
+                (DictKey::String("ada".to_string()), ValueType::Int(10)),
+                (DictKey::String("bea".to_string()), ValueType::Int(11)),
+            ],
+        );
+        let removed = NativeFunctionCall::new(Op::DictRemove)
+            .call(vec![original.clone(), string_value("ada")])
+            .expect("DICT_REMOVE should remove existing keys");
+        let nooped = NativeFunctionCall::new(Op::DictRemove)
+            .call(vec![removed.clone(), string_value("missing")])
+            .expect("DICT_REMOVE should ignore missing keys");
+
+        assert!(
+            matches!(value_type(original.as_ref()), ValueType::Dict(dict) if dict.entries().len() == 2)
+        );
+        assert!(matches!(value_type(removed.as_ref()), ValueType::Dict(dict)
+                if dict.entries().len() == 1 && dict.get(&DictKey::String("ada".to_string())).is_none()));
+        assert!(
+            matches!(value_type(nooped.as_ref()), ValueType::Dict(dict) if dict.entries().len() == 1)
         );
     }
 

@@ -471,10 +471,14 @@ pub enum NativeFunction {
     IndexWrite,
     Len,
     ArrayRemove,
+    DictHas,
+    DictSize,
+    DictRemove,
+    DictKeys,
 }
 
 impl NativeFunction {
-    pub const ALL: [Self; 30] = [
+    pub const ALL: [Self; 34] = [
         Self::Add,
         Self::Subtract,
         Self::Divide,
@@ -505,6 +509,10 @@ impl NativeFunction {
         Self::IndexWrite,
         Self::Len,
         Self::ArrayRemove,
+        Self::DictHas,
+        Self::DictSize,
+        Self::DictRemove,
+        Self::DictKeys,
     ];
 
     pub fn from_token(token: &str) -> Option<Self> {
@@ -539,6 +547,10 @@ impl NativeFunction {
             "SET_INDEX" => Some(Self::IndexWrite),
             "LEN" => Some(Self::Len),
             "ARRAY_REMOVE" => Some(Self::ArrayRemove),
+            "DICT_HAS" => Some(Self::DictHas),
+            "DICT_SIZE" => Some(Self::DictSize),
+            "DICT_REMOVE" => Some(Self::DictRemove),
+            "DICT_KEYS" => Some(Self::DictKeys),
             _ => None,
         }
     }
@@ -575,6 +587,10 @@ impl NativeFunction {
             Self::IndexWrite => "SET_INDEX",
             Self::Len => "LEN",
             Self::ArrayRemove => "ARRAY_REMOVE",
+            Self::DictHas => "DICT_HAS",
+            Self::DictSize => "DICT_SIZE",
+            Self::DictRemove => "DICT_REMOVE",
+            Self::DictKeys => "DICT_KEYS",
         }
     }
 
@@ -610,6 +626,10 @@ impl NativeFunction {
             Self::IndexWrite => 3,
             Self::Len => 1,
             Self::ArrayRemove => 2,
+            Self::DictHas => 2,
+            Self::DictSize => 1,
+            Self::DictRemove => 2,
+            Self::DictKeys => 1,
         }
     }
 }
@@ -653,6 +673,10 @@ mod tests {
             (NativeFunction::IndexWrite, "SET_INDEX", 3),
             (NativeFunction::Len, "LEN", 1),
             (NativeFunction::ArrayRemove, "ARRAY_REMOVE", 2),
+            (NativeFunction::DictHas, "DICT_HAS", 2),
+            (NativeFunction::DictSize, "DICT_SIZE", 1),
+            (NativeFunction::DictRemove, "DICT_REMOVE", 2),
+            (NativeFunction::DictKeys, "DICT_KEYS", 1),
         ];
 
         assert_eq!(NativeFunction::ALL.len(), cases.len());

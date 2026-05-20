@@ -19,7 +19,7 @@ use super::{
     },
     context::{EnumTypeIndex, FlowContext, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
     enums::is_enum_member_reference,
-    expression_types::{infer_expression_type, typed_builtin_return_type},
+    expression_types::{infer_expression_type, is_typed_builtin_function},
     indexes::AnalysisIndexes,
     interface_values::{
         check_expression_type_with_expected, ExpectedTypeCheckError, ExpectedTypeInference,
@@ -646,7 +646,7 @@ impl<'a> CallTargetChecker<'a> {
             return;
         }
 
-        if typed_builtin_return_type(name).is_some() {
+        if is_typed_builtin_function(name) {
             self.check_typed_builtin_call(name, args, span, context);
             for arg in args {
                 self.check_expression(arg, span, context);
@@ -703,6 +703,10 @@ impl<'a> CallTargetChecker<'a> {
         match name {
             "ARRAY_REMOVE" => self.check_array_remove_call(args, span, context),
             "LEN" => self.check_len_call(args, span, context),
+            "DICT_HAS" => self.check_dict_has_call(args, span, context),
+            "DICT_SIZE" => self.check_dict_size_call(args, span, context),
+            "DICT_REMOVE" => self.check_dict_remove_call(args, span, context),
+            "DICT_KEYS" => self.check_dict_keys_call(args, span, context),
             _ => {}
         }
     }
@@ -827,6 +831,195 @@ impl<'a> CallTargetChecker<'a> {
                 ),
             )),
         }
+    }
+
+    fn check_dict_has_call(
+        &mut self,
+        args: &[Expression],
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) {
+        if args.len() != 2 {
+            self.diagnostics.push(Diagnostic::error(
+                span.clone(),
+                format!(
+                    "Builtin 'DICT_HAS' expects 2 arguments but got {}",
+                    args.len()
+                ),
+            ));
+            return;
+        }
+
+        let Some((key_type, _)) =
+            self.check_dict_argument("DICT_HAS", "First", &args[0], span, context)
+        else {
+            return;
+        };
+        self.check_dict_key_argument("DICT_HAS", "Second", key_type, &args[1], span, context);
+    }
+
+    fn check_dict_size_call(
+        &mut self,
+        args: &[Expression],
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) {
+        if args.len() != 1 {
+            self.diagnostics.push(Diagnostic::error(
+                span.clone(),
+                format!(
+                    "Builtin 'DICT_SIZE' expects 1 argument but got {}",
+                    args.len()
+                ),
+            ));
+            return;
+        }
+
+        self.check_dict_argument("DICT_SIZE", "First", &args[0], span, context);
+    }
+
+    fn check_dict_remove_call(
+        &mut self,
+        args: &[Expression],
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) {
+        if args.len() != 2 {
+            self.diagnostics.push(Diagnostic::error(
+                span.clone(),
+                format!(
+                    "Builtin 'DICT_REMOVE' expects 2 arguments but got {}",
+                    args.len()
+                ),
+            ));
+            return;
+        }
+
+        if !is_mutable_lvalue(&args[0]) {
+            self.diagnostics.push(Diagnostic::error(
+                span.clone(),
+                "First argument for builtin 'DICT_REMOVE' must be a mutable lvalue",
+            ));
+        }
+
+        let Some((key_type, _)) =
+            self.check_dict_argument("DICT_REMOVE", "First", &args[0], span, context)
+        else {
+            return;
+        };
+        self.check_dict_key_argument("DICT_REMOVE", "Second", key_type, &args[1], span, context);
+    }
+
+    fn check_dict_keys_call(
+        &mut self,
+        args: &[Expression],
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) {
+        if args.len() != 1 {
+            self.diagnostics.push(Diagnostic::error(
+                span.clone(),
+                format!(
+                    "Builtin 'DICT_KEYS' expects 1 argument but got {}",
+                    args.len()
+                ),
+            ));
+            return;
+        }
+
+        self.check_dict_argument("DICT_KEYS", "First", &args[0], span, context);
+    }
+
+    fn check_dict_argument(
+        &mut self,
+        builtin: &str,
+        ordinal: &str,
+        arg: &Expression,
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) -> Option<(crate::parsed::DictKeyType, TypeName)> {
+        match self.infer_call_argument_type(arg, context) {
+            Ok(argument_type) => {
+                let Some((key_type, value_type)) = argument_type.dict_key_value_types() else {
+                    self.diagnostics.push(Diagnostic::error(
+                        span.clone(),
+                        format!(
+                            "{} argument for builtin '{}' has type {} but expected Dict",
+                            ordinal,
+                            builtin,
+                            argument_type.display_name()
+                        ),
+                    ));
+                    return None;
+                };
+                Some((key_type, value_type.clone()))
+            }
+            Err(error) => {
+                self.diagnostics.push(Diagnostic::error(
+                    span.clone(),
+                    format!(
+                        "Cannot type-check {} argument for builtin '{}': {}",
+                        ordinal.to_lowercase(),
+                        builtin,
+                        error.message()
+                    ),
+                ));
+                None
+            }
+        }
+    }
+
+    fn check_dict_key_argument(
+        &mut self,
+        builtin: &str,
+        ordinal: &str,
+        expected_key_type: crate::parsed::DictKeyType,
+        arg: &Expression,
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) {
+        let expected_type = dict_key_type_name(expected_key_type);
+        match self.infer_call_argument_type(arg, context) {
+            Ok(argument_type) if argument_type != expected_type => {
+                self.diagnostics.push(Diagnostic::error(
+                    span.clone(),
+                    format!(
+                        "{} argument for builtin '{}' has type {} but expected {}",
+                        ordinal,
+                        builtin,
+                        argument_type.display_name(),
+                        expected_type.display_name()
+                    ),
+                ));
+            }
+            Ok(_) => {}
+            Err(error) => self.diagnostics.push(Diagnostic::error(
+                span.clone(),
+                format!(
+                    "Cannot type-check {} argument for builtin '{}': {}",
+                    ordinal.to_lowercase(),
+                    builtin,
+                    error.message()
+                ),
+            )),
+        }
+    }
+
+    fn infer_call_argument_type(
+        &self,
+        arg: &Expression,
+        context: &VisitContext,
+    ) -> Result<TypeName, super::expression_types::TypeInferenceError> {
+        infer_expression_type(
+            arg,
+            self.variable_scopes,
+            self.struct_types,
+            self.enum_types,
+            self.target_symbols,
+            self.interface_members,
+            self.current_module(context),
+            self.current_flow_path(context),
+        )
     }
 
     fn check_function_call_signature(
@@ -1028,6 +1221,13 @@ fn is_runtime_builtin_function(name: &str) -> bool {
         name,
         "RANDOM" | "SEED_RANDOM" | "MIN" | "MAX" | "POW" | "FLOOR" | "CEILING" | "INT" | "FLOAT"
     )
+}
+
+fn dict_key_type_name(key_type: crate::parsed::DictKeyType) -> TypeName {
+    match key_type {
+        crate::parsed::DictKeyType::String => TypeName::string(),
+        crate::parsed::DictKeyType::Int => TypeName::int(),
+    }
 }
 
 fn expression_root_variable_name(expression: &Expression) -> Option<&str> {
@@ -1492,6 +1692,83 @@ mod tests {
                  == function copy_values() => int[] ==\n\
                  ~ return values",
                 "First argument for builtin 'ARRAY_REMOVE' must be a mutable lvalue",
+            ),
+        ];
+
+        for (source, expected_message) in cases {
+            let story = parse_story(source);
+            let diagnostics = call_target_diagnostics(&story);
+
+            assert_single_diagnostic(&diagnostics, DiagnosticSeverity::Error, expected_message);
+        }
+    }
+
+    #[test]
+    fn accepts_dict_collection_builtins_for_dict_types() {
+        let story = parse_story(
+            "STRUCT Player {\n\
+             hp: int\n\
+             }\n\
+             VAR players: Dict<string, Player> = %{\"ada\": %Player{ hp: 10 }}\n\
+             VAR names: Dict<int, string> = %{1: \"one\"}\n\
+             VAR has_ada: bool = DICT_HAS(players, \"ada\")\n\
+             VAR player_count: int = DICT_SIZE(players)\n\
+             VAR player_keys: string[] = DICT_KEYS(players)\n\
+             VAR name_keys: int[] = DICT_KEYS(names)\n\
+             ~ DICT_REMOVE(players, \"ada\")\n\
+             ~ DICT_REMOVE(names, 1)\n\
+             -> DONE",
+        );
+
+        assert_eq!(super::super::run_analysis_passes(&story), []);
+    }
+
+    #[test]
+    fn reports_dict_collection_builtin_invalid_arguments() {
+        let cases = [
+            (
+                "VAR value: int = 1\n\
+                 VAR has_value: bool = DICT_HAS(value, \"ada\")\n\
+                 -> DONE",
+                "First argument for builtin 'DICT_HAS' has type int but expected Dict",
+            ),
+            (
+                "VAR scores: Dict<string, int> = %{\"ada\": 10}\n\
+                 VAR has_value: bool = DICT_HAS(scores, 1)\n\
+                 -> DONE",
+                "Second argument for builtin 'DICT_HAS' has type int but expected string",
+            ),
+            (
+                "VAR value: int = 1\n\
+                 VAR count: int = DICT_SIZE(value)\n\
+                 -> DONE",
+                "First argument for builtin 'DICT_SIZE' has type int but expected Dict",
+            ),
+            (
+                "VAR scores: Dict<string, int> = %{\"ada\": 10}\n\
+                 ~ DICT_REMOVE(scores, 1)\n\
+                 -> DONE",
+                "Second argument for builtin 'DICT_REMOVE' has type int but expected string",
+            ),
+            (
+                "VAR scores: Dict<string, int> = %{\"ada\": 10}\n\
+                 ~ DICT_REMOVE(copy_scores(), \"ada\")\n\
+                 -> DONE\n\
+                 == function copy_scores() => Dict<string, int> ==\n\
+                 ~ return scores",
+                "First argument for builtin 'DICT_REMOVE' must be a mutable lvalue",
+            ),
+            (
+                "VAR value: int = 1\n\
+                 VAR keys: int[] = DICT_KEYS(value)\n\
+                 -> DONE",
+                "First argument for builtin 'DICT_KEYS' has type int but expected Dict",
+            ),
+            (
+                "VAR scores: Dict<string, int> = %{\"ada\": 10}\n\
+                 VAR keys: string[] = DICT_KEYS()\n\
+                 -> DONE",
+                "Builtin 'DICT_KEYS' expects 1 argument but got 0",
             ),
         ];
 

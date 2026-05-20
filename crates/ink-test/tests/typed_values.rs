@@ -539,7 +539,17 @@ fn dict_typed_values_run_at_runtime() {
 
     assert_eq!(
         story.continue_maximally(),
-        "Dict<string>{}|10|one|one|10|one\n11|12|two|13|14\ntrue|true\n23|10\n5|6\n"
+        "Dict<string>{}|10|one|one|10|one\n\
+         11|12|two|13|14\n\
+         true|true\n\
+         23|10\n\
+         5|6\n\
+         true|false|2\n\
+         ada|bea|2\n\
+         false|1\n\
+         1\n\
+         1|1\n\
+         false|1\n"
     );
     assert!(
         story.get_current_errors().is_empty(),

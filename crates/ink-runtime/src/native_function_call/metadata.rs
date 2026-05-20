@@ -38,6 +38,10 @@ pub enum Op {
     IndexWrite,
     Len,
     ArrayRemove,
+    DictHas,
+    DictSize,
+    DictRemove,
+    DictKeys,
 }
 
 impl Op {
@@ -73,6 +77,10 @@ impl Op {
             NativeFunction::IndexWrite => Self::IndexWrite,
             NativeFunction::Len => Self::Len,
             NativeFunction::ArrayRemove => Self::ArrayRemove,
+            NativeFunction::DictHas => Self::DictHas,
+            NativeFunction::DictSize => Self::DictSize,
+            NativeFunction::DictRemove => Self::DictRemove,
+            NativeFunction::DictKeys => Self::DictKeys,
         }
     }
 
@@ -108,6 +116,10 @@ impl Op {
             Self::IndexWrite => NativeFunction::IndexWrite,
             Self::Len => NativeFunction::Len,
             Self::ArrayRemove => NativeFunction::ArrayRemove,
+            Self::DictHas => NativeFunction::DictHas,
+            Self::DictSize => NativeFunction::DictSize,
+            Self::DictRemove => NativeFunction::DictRemove,
+            Self::DictKeys => NativeFunction::DictKeys,
         }
     }
 
@@ -158,6 +170,10 @@ mod tests {
             (NativeFunction::IndexWrite, Op::IndexWrite),
             (NativeFunction::Len, Op::Len),
             (NativeFunction::ArrayRemove, Op::ArrayRemove),
+            (NativeFunction::DictHas, Op::DictHas),
+            (NativeFunction::DictSize, Op::DictSize),
+            (NativeFunction::DictRemove, Op::DictRemove),
+            (NativeFunction::DictKeys, Op::DictKeys),
         ];
 
         assert_eq!(cases.len(), NativeFunction::ALL.len());

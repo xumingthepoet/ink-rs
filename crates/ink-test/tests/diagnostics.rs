@@ -156,12 +156,17 @@ fn dict_index_diagnostics_report_invalid_indexing() {
 }
 
 #[test]
-fn dict_builtin_diagnostics_report_unsupported_collection_builtins() {
+fn dict_builtin_diagnostics_report_invalid_collection_builtin_arguments() {
     let diagnostics = diagnostics_for_fixture("diagnostics/dicts/builtins.ink");
 
     for message in [
         "Argument for builtin 'LEN' has type Dict<string, int> but expected array",
         "First argument for builtin 'ARRAY_REMOVE' has type Dict<string, int> but expected array",
+        "Second argument for builtin 'DICT_HAS' has type int but expected string",
+        "First argument for builtin 'DICT_SIZE' has type int but expected Dict",
+        "First argument for builtin 'DICT_KEYS' has type int but expected Dict",
+        "Second argument for builtin 'DICT_REMOVE' has type int but expected string",
+        "First argument for builtin 'DICT_REMOVE' must be a mutable lvalue",
     ] {
         assert_diagnostic(&diagnostics, DiagnosticSeverity::Error, message);
     }

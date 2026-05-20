@@ -71,6 +71,10 @@ impl NativeFunctionCall {
             Op::IndexWrite => composite::index_write(&params),
             Op::Len => composite::len(&params),
             Op::ArrayRemove => composite::array_remove(&params),
+            Op::DictHas => composite::dict_has(&params),
+            Op::DictSize => composite::dict_size(&params),
+            Op::DictRemove => composite::dict_remove(&params),
+            Op::DictKeys => composite::dict_keys(&params),
             _ => scalar::call(self.op, params),
         }
     }
@@ -155,6 +159,10 @@ mod tests {
             (NativeFunction::IndexWrite, Op::IndexWrite),
             (NativeFunction::Len, Op::Len),
             (NativeFunction::ArrayRemove, Op::ArrayRemove),
+            (NativeFunction::DictHas, Op::DictHas),
+            (NativeFunction::DictSize, Op::DictSize),
+            (NativeFunction::DictRemove, Op::DictRemove),
+            (NativeFunction::DictKeys, Op::DictKeys),
         ];
 
         assert_eq!(cases.len(), NativeFunction::ALL.len());

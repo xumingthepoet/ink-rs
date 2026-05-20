@@ -29,6 +29,17 @@ VAR sheet: Sheet = %Sheet{ scores: %{"ada": 10} }
 {sum_scores(scores)}|{lookup(base_scores, "ada")}
 ~ temp made: Dict<string, int> = make_dict_scores(5)
 {made["seed"]}|{pick_dict_score(made, "next")}
+{DICT_HAS(scores, "ada")}|{DICT_HAS(scores, "missing")}|{DICT_SIZE(scores)}
+~ temp score_keys: string[] = DICT_KEYS(scores)
+{score_keys[0]}|{score_keys[1]}|{LEN(score_keys)}
+~ DICT_REMOVE(scores, "bea")
+{DICT_HAS(scores, "bea")}|{DICT_SIZE(scores)}
+~ DICT_REMOVE(scores, "missing")
+{DICT_SIZE(scores)}
+~ temp name_keys: int[] = DICT_KEYS(names)
+{name_keys[0]}|{LEN(name_keys)}
+~ DICT_REMOVE(nested["ada"], 1)
+{DICT_HAS(nested["ada"], 1)}|{DICT_SIZE(nested["ada"])}
 -> DONE
 
 == function sum_scores(values: Dict<string, int>) => int ==

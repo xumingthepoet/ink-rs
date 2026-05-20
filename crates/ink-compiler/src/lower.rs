@@ -922,6 +922,79 @@ mod tests {
     }
 
     #[test]
+    fn dict_collection_builtin_lowering_uses_native_tokens_and_reassignment() {
+        let source = concat!(
+            "=== module game ===\n",
+            "VAR scores: Dict<string, int> = %{\"ada\": 10, \"bea\": 11}\n",
+            "VAR nested: Dict<string, Dict<int, string>> = %{\"row\": %{1: \"one\", 2: \"two\"}}\n",
+            "== main ==\n",
+            "{DICT_HAS(scores, \"ada\")}|{DICT_SIZE(scores)}|{DICT_KEYS(scores)[0]}\n",
+            "~ DICT_REMOVE(scores, \"ada\")\n",
+            "~ DICT_REMOVE(nested[\"row\"], 1)\n",
+            "-> END\n",
+        );
+        let compiled = Compiler::default().compile(SourceInput::new(source));
+
+        assert!(
+            compiled.artifact.is_some(),
+            "module story should compile: {:#?}",
+            compiled.diagnostics
+        );
+        let json = compiled
+            .artifact
+            .expect("compiled story")
+            .program
+            .to_json_value();
+
+        assert!(json_contains_sequence(
+            &json,
+            &[
+                json!({"VAR?": "game::scores"}),
+                json!("str"),
+                json!("^ada"),
+                json!("/str"),
+                json!("DICT_HAS")
+            ]
+        ));
+        assert!(json_contains_sequence(
+            &json,
+            &[json!({"VAR?": "game::scores"}), json!("DICT_SIZE")]
+        ));
+        assert!(json_contains_sequence(
+            &json,
+            &[
+                json!({"VAR?": "game::scores"}),
+                json!("DICT_KEYS"),
+                json!(0),
+                json!("INDEX")
+            ]
+        ));
+        assert!(json_contains_sequence(
+            &json,
+            &[
+                json!({"VAR?": "game::scores"}),
+                json!("str"),
+                json!("^ada"),
+                json!("/str"),
+                json!("DICT_REMOVE"),
+                json!({"VAR=": "game::scores", "re": true})
+            ]
+        ));
+        assert!(json_contains_sequence(
+            &json,
+            &[
+                json!({"VAR?": "game::nested"}),
+                json!({"VAR?": "$lvalue0"}),
+                json!("INDEX"),
+                json!(1),
+                json!("DICT_REMOVE"),
+                json!("SET_INDEX"),
+                json!({"VAR=": "game::nested", "re": true})
+            ]
+        ));
+    }
+
+    #[test]
     fn divert_lowering_context_preserves_current_control_flow_json() {
         let source = concat!(
             "=== module game ===\n",

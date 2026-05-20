@@ -12,7 +12,7 @@ use super::{
     context::{EnumTypeIndex, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
     enums::is_enum_member_reference,
     expression_types::{
-        infer_binary_operator_type, infer_expression_type, typed_builtin_return_type,
+        infer_binary_operator_type, infer_expression_type, is_typed_builtin_function,
     },
     indexes::AnalysisIndexes,
     interfaces::InterfaceMemberIndex,
@@ -410,7 +410,7 @@ fn condition_type_signal(
             Some(Some(_))
         )
         .then_some(ConditionTypeSignal::Typed),
-        Expression::FunctionCall { name, .. } if typed_builtin_return_type(name).is_some() => {
+        Expression::FunctionCall { name, .. } if is_typed_builtin_function(name) => {
             Some(ConditionTypeSignal::Typed)
         }
         Expression::FunctionCall { name, .. } => {

@@ -26,6 +26,30 @@ Each entry should include:
 - migration guidance
 - tests
 
+## 2026-05-21: Dict Collection Helpers
+
+- status: supported
+- upstream behavior: upstream Ink does not have explicit generic `Dict<K, V>`
+  values or typed Dict collection helpers.
+- ink-rs behavior: `Dict<string, V>` and `Dict<int, V>` now support
+  `DICT_HAS(dict, key) => bool`, `DICT_SIZE(dict) => int`,
+  `DICT_REMOVE(dict, key) => void`, and `DICT_KEYS(dict) => K[]`.
+  `DICT_REMOVE` requires a mutable lvalue and ignores missing keys. `DICT_KEYS`
+  returns string keys in lexical order and int keys in ascending order.
+- documentation effect: `SyntaxReference.md` documents the new Dict helpers and
+  removes the old Dict V1 note that collection helpers were intentionally
+  absent.
+- rationale: registry and table-shaped story state should not require parallel
+  key arrays or active maps just to test, count, remove, or enumerate Dict
+  entries.
+- migration guidance: use `DICT_SIZE(dict)` instead of trying `LEN(dict)`, use
+  `DICT_HAS(dict, key)` before optional reads, and replace active-map deletion
+  patterns with `DICT_REMOVE(dict, key)` when the entry should no longer exist.
+- tests: analysis, lowering, runtime native function, diagnostics, and typed
+  integration fixtures cover valid and invalid helper calls, key typing,
+  stable key ordering, missing-key removal, nested lvalue removal, and runtime
+  output.
+
 ## 2026-05-21: Multiplicative Operators Share Precedence
 
 - status: supported

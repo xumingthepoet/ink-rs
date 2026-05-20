@@ -28,6 +28,9 @@ pub(super) enum AssignmentUpdateValue<'a> {
     ArrayRemove {
         index: &'a Expression,
     },
+    DictRemove {
+        key: &'a Expression,
+    },
 }
 
 pub(super) fn lower_assignment_initializer_with_context(
@@ -162,6 +165,11 @@ fn lower_assignment_update_value_into(
             lower_assignment_path_read_into(content, root_name, components, context);
             lower_expression_into(content, index, context, false);
             content.push(RuntimeObject::NativeFunction(NativeFunction::ArrayRemove));
+        }
+        AssignmentUpdateValue::DictRemove { key } => {
+            lower_assignment_path_read_into(content, root_name, components, context);
+            lower_expression_into(content, key, context, false);
+            content.push(RuntimeObject::NativeFunction(NativeFunction::DictRemove));
         }
     }
 }

@@ -47,6 +47,10 @@ fn call_type(op: Op, coerced_params: &[Rc<Value>]) -> Result<Rc<dyn RTObject>, S
         Op::IndexWrite => unreachable!("index write uses uncoerced parameters"),
         Op::Len => unreachable!("LEN uses uncoerced parameters"),
         Op::ArrayRemove => unreachable!("ARRAY_REMOVE uses uncoerced parameters"),
+        Op::DictHas => unreachable!("DICT_HAS uses uncoerced parameters"),
+        Op::DictSize => unreachable!("DICT_SIZE uses uncoerced parameters"),
+        Op::DictRemove => unreachable!("DICT_REMOVE uses uncoerced parameters"),
+        Op::DictKeys => unreachable!("DICT_KEYS uses uncoerced parameters"),
     }
 }
 
