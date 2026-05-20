@@ -351,7 +351,7 @@ Validation:
 
 Commit record: implementation `c069d330` (`Lower Dict index reads`)
 
-### [~] Task 10: Lower Dict Writes
+### [>] Task 10: Lower Dict Writes
 
 Goal: Emit runtime instructions for Dict indexed assignment and nested lvalue
 updates.
@@ -370,7 +370,16 @@ Modification boundaries: assignment lowering and tests.
 
 Validation commands: `cargo test -p ink-test typed_values`
 
-Commit record: pending
+Validation:
+
+- `cargo test -p ink-test typed_values` passed.
+- `cargo test -p ink-test --test typed_values` passed.
+- `cargo fmt --all --check` passed.
+- Initial `make gate` reached the final doc-test stage but failed by the 120s
+  wrapper timeout with no failing tests reported.
+- Reran `make gate` after incremental compilation; passed.
+
+Commit record: implementation `2d50da09` (`Lower Dict index writes`)
 
 ## Milestone 5: Runtime Values
 
