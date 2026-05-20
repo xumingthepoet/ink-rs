@@ -10,3 +10,4 @@ ink-compiler = { path = "../ink-compiler" }
 [[bin]]
 name = "ink_compile"
 path = "src/main.rs"
+test = false

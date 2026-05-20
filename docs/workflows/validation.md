@@ -40,8 +40,12 @@ tests.
 
 Crates without runnable Rust doc examples disable Cargo's doctest harness in
 their manifests so workspace tests keep runnable doctest coverage without paying
-rustdoc startup cost for zero-doctest crates. `ink-runtime` keeps its runnable
-doctest coverage enabled.
+rustdoc startup cost for zero-doctest crates. Library and binary targets with no
+unit tests set `test = false`; crates with integration tests still compile their
+libraries as dependencies, but Cargo does not build empty lib/bin test harnesses.
+`ink-test` policy coverage fails the gate if a disabled harness target gains
+unit-test markers.
+`ink-runtime` keeps its runnable doctest coverage enabled.
 
 ## Required Coverage
 
