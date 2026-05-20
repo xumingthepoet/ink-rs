@@ -535,7 +535,7 @@ Validation:
 
 Commit record: implementation `4fab3f45` (`Load and save runtime Dict JSON`)
 
-### [~] Task 15: Runtime API And Externals
+### [>] Task 15: Runtime API And Externals
 
 Goal: Expose Dict values through host variable and external APIs.
 
@@ -552,7 +552,19 @@ Modification boundaries: runtime API tests and necessary runtime type helpers.
 
 Validation commands: `cargo test -p ink-test runtime_api typed_values`
 
-Commit record: pending
+Validation:
+
+- The listed focused command was split into explicit integration-test binaries
+  because Cargo accepts only one test filter per invocation.
+- `cargo test -p ink-test --test runtime_api` passed.
+- `cargo test -p ink-test --test typed_values` passed.
+- `cargo fmt --all --check` passed.
+- Initial `make gate` runs reached late test stages but failed by wrapper
+  timeouts with no failing tests reported.
+- `make gate UNIT_TEST_TIMEOUT=120s INK_TEST_TIMEOUT=600s` passed, then the
+  default `make gate` hot rerun passed.
+
+Commit record: implementation `d0c277d8` (`Support Dict runtime APIs`)
 
 ## Milestone 6: Integration Fixtures
 
