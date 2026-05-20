@@ -4,7 +4,7 @@ use crate::support::compiler::{assert_story_output, compile_fixture, compile_fix
 fn arithmetic_fixture_runs() {
     let compiled = compile_fixture("expressions/arithmetic.ink");
 
-    assert_story_output(&compiled, "36\n2\n3\n2\n2.3333333\n8\n8\n");
+    assert_story_output(&compiled, "36\n2\n3\n2\n2.3333333\n8\n8\n7\n14\n1\n");
 }
 
 #[test]
