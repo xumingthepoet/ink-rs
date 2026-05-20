@@ -300,7 +300,7 @@ syntax::expression::tests::operator_rule_table_drill_covers_tokenizer_and_parser
 Review found no follow-up changes; completion validation passed with the same
 focused commands and `make gate`.
 
-### [~] Task 10: Split Expression Tokenizer
+### [>] Task 10: Split Expression Tokenizer
 
 Goal: Give lexical scanning for expressions an independent module.
 
@@ -323,7 +323,13 @@ ink-compiler syntax::expression::tests::tokenizer_covers_expression_token_catego
 `cargo test -q -p ink-compiler syntax::expression::tests::tokenizer_tracks_character_columns_for_unicode_prefixes`;
 `make gate`.
 
-Commit record: pending.
+Commit record: implementation commit `6b500f7e Split expression tokenizer`;
+validation passed with `cargo fmt --all --check`, `cargo test -q -p
+ink-compiler
+syntax::expression::tests::tokenizer_covers_expression_token_categories`,
+`cargo test -q -p ink-compiler
+syntax::expression::tests::tokenizer_tracks_character_columns_for_unicode_prefixes`,
+and `make gate`.
 
 ### [ ] Task 11: Split Expression Parse Errors
 
