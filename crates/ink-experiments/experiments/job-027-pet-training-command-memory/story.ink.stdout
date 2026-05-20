@@ -1,0 +1,42 @@
+Pet command memory with response tracking.
+Start --
+sit | attempts 0 | conf 12 | not learned | Looks away, then back at you.
+stay | attempts 0 | conf 25 | not learned | Shifts weight and glances at the trail.
+fetch | attempts 0 | conf 6 | not learned | Confused but attentive.
+roll | attempts 0 | conf 2 | not learned | Needs more cues.
+Mara trains command sit (attempt 1).
+Confidence: 12 to 16.
+Response: sit is still unclear.
+After sit attempt --
+sit | attempts 1 | conf 16 | not learned | sit is still unclear.
+stay | attempts 0 | conf 25 | not learned | Shifts weight and glances at the trail.
+fetch | attempts 0 | conf 6 | not learned | Confused but attentive.
+roll | attempts 0 | conf 2 | not learned | Needs more cues.
+Mara trains command stay (attempt 1).
+Confidence: 25 to 31.
+Response: stay is remembered when prompted.
+Mara trains command sit (attempt 2).
+Confidence: 16 to 21.
+Response: sit is remembered when prompted.
+Mara trains command fetch (attempt 1).
+Confidence: 6 to 12.
+Response: fetch is still unclear.
+Mara trains command roll (attempt 1).
+Confidence: 2 to 7.
+Response: roll is still unclear.
+Mara trains command fetch (attempt 2).
+Confidence: 12 to 20.
+Response: fetch is remembered when prompted.
+After training sessions --
+sit | attempts 2 | conf 21 | learned | sit is remembered when prompted.
+stay | attempts 1 | conf 31 | learned | stay is remembered when prompted.
+fetch | attempts 2 | conf 20 | learned | fetch is remembered when prompted.
+roll | attempts 1 | conf 7 | not learned | roll is still unclear.
+Mara trains command sit (attempt 3).
+Confidence: 21 to 25.
+Response: sit is remembered when prompted.
+After final recall --
+sit | attempts 3 | conf 25 | learned | sit is remembered when prompted.
+stay | attempts 1 | conf 31 | learned | stay is remembered when prompted.
+fetch | attempts 2 | conf 20 | learned | fetch is remembered when prompted.
+roll | attempts 1 | conf 7 | not learned | roll is still unclear.

@@ -1,0 +1,48 @@
+Field triage simulation.
+Medical supplies available: 10.
+Initial list --
+1. Left forearm | severity 9 | untreated | status queued | recovery 0
+2. Rib fracture | severity 7 | untreated | status queued | recovery 0
+3. Scalp cut | severity 3 | untreated | status queued | recovery 0
+4. Bruised knee | severity 4 | untreated | status queued | recovery 0
+Triage order ready.
+Ranked by severity --
+1. Left forearm | severity 9 | untreated | status queued | recovery 0
+2. Rib fracture | severity 7 | untreated | status queued | recovery 0
+3. Bruised knee | severity 4 | untreated | status queued | recovery 0
+4. Scalp cut | severity 3 | untreated | status queued | recovery 0
+Triage: treated Left forearm for 5 supplies.
+Supplies left: 5.
+Triage: treated Rib fracture for 4 supplies.
+Supplies left: 1.
+Warning: shortage while treating Bruised knee.
+Needed 2 supplies, but only 1 remain.
+Warning: shortage while treating Scalp cut.
+Needed 3 supplies, but only 1 remain.
+Triage treatment complete.
+After treatment --
+1. Left forearm | severity 9 | treated | status stabilized | recovery 5
+2. Rib fracture | severity 7 | treated | status stabilized | recovery 3
+3. Bruised knee | severity 4 | untreated | status deferred | recovery 0
+4. Scalp cut | severity 3 | untreated | status deferred | recovery 0
+Day 1 recovery check.
+Left forearm: 4 days remaining.
+Rib fracture: 2 days remaining.
+Bruised knee: deferred and waiting for supplies.
+Scalp cut: deferred and waiting for supplies.
+Day 2 recovery check.
+Left forearm: 3 days remaining.
+Rib fracture: 1 days remaining.
+Bruised knee: deferred and waiting for supplies.
+Scalp cut: deferred and waiting for supplies.
+Day 3 recovery check.
+Left forearm: 2 days remaining.
+Rib fracture: recovery complete.
+Bruised knee: deferred and waiting for supplies.
+Scalp cut: deferred and waiting for supplies.
+Triage complete.
+Final recovery status --
+1. Left forearm | severity 9 | treated | status recovering | recovery 2
+2. Rib fracture | severity 7 | treated | status healed | recovery 0
+3. Bruised knee | severity 4 | untreated | status deferred | recovery 0
+4. Scalp cut | severity 3 | untreated | status deferred | recovery 0
