@@ -1,4 +1,4 @@
-Progress: 8/20
+Progress: 9/20
 
 # Typed Dict Values Task List
 
@@ -314,7 +314,7 @@ Validation:
 Commit record: implementation `7a48f0a8` (`Lower Dict defaults and literals`);
 review fix `d36bc0c2` (`Cover dynamic Dict literal lowering`)
 
-### [>] Task 09: Lower Dict Reads
+### [x] Task 09: Lower Dict Reads
 
 Goal: Emit runtime instructions for Dict index reads through existing expression
 lowering.
@@ -344,6 +344,10 @@ Validation:
 - Initial `make gate` reached the final doc-test stage but failed by the 120s
   wrapper timeout with no failing tests reported.
 - Reran `make gate` after incremental compilation; passed.
+- Review found no follow-up code fixes required; reran
+  `cargo test -p ink-test typed_values`,
+  `cargo test -p ink-test --test typed_values`, `cargo fmt --all --check`, and
+  `make gate`.
 
 Commit record: implementation `c069d330` (`Lower Dict index reads`)
 
