@@ -1,4 +1,4 @@
-Progress: 12/24
+Progress: 13/24
 
 # Compiler Analysis Refactor Active Plan
 
@@ -420,7 +420,7 @@ completion-record commit recorded by this task-list update.
 
 ## Milestone 3: Argument Dispatch Consolidation
 
-### [>] Task 13: Extract static target argument resolution helper
+### [x] Task 13: Extract static target argument resolution helper
 
 Goal: Remove repeated static divert/tunnel target argument resolution logic.
 
@@ -440,9 +440,15 @@ Modification boundaries: Shared argument resolution helper and one pilot caller.
 Validation commands: `cargo test -p ink-compiler targets array_literals`; `make gate`.
 
 Validation record: `cargo test -p ink-compiler targets` passed; `cargo test -p
-ink-compiler array_literals` passed; `make gate` passed.
+ink-compiler array_literals` passed; `make gate` passed. Review validation
+repeated after implementation review: `cargo test -p ink-compiler targets`
+passed; `cargo test -p ink-compiler array_literals` passed; `make gate` passed.
 
-Commit record: Implementation commit `11d3f854`; completion-record commit TBD.
+Review record: Reviewed implementation commit `11d3f854` with `git show
+--check`; no follow-up changes required.
+
+Commit record: Implementation commit `11d3f854`; waiting-review record
+`35856a27`; completion-record commit recorded by this task-list update.
 
 ### [ ] Task 14: Extract function-call argument resolution helper
 
