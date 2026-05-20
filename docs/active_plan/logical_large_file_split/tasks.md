@@ -231,7 +231,7 @@ lifecycle`; validation passed with `cargo fmt --all --check`, `cargo test -q
 runtime_api`, and `make gate`. Review found no follow-up changes; completion
 validation passed with the same focused commands and `make gate`.
 
-### [ ] Task 08: Split Runtime Save-State JSON
+### [~] Task 08: Split Runtime Save-State JSON
 
 Goal: Move runtime save/load versioning and JSON shape into a save-state module
 while keeping it runtime-owned.
