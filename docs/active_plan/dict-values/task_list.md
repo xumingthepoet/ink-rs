@@ -677,7 +677,7 @@ Commit record: implementation `9d677242` (`Add Dict parse snapshots`)
 
 ## Milestone 7: Gate And Closeout
 
-### [ ] Task 19: Review Active Plan Records And Final Gate
+### [~] Task 19: Review Active Plan Records And Final Gate
 
 Goal: Ensure task status, validation, commit records, and final workspace
 validation are complete.
