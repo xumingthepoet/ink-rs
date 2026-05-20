@@ -535,7 +535,7 @@ Validation:
 
 Commit record: implementation `4fab3f45` (`Load and save runtime Dict JSON`)
 
-### [ ] Task 15: Runtime API And Externals
+### [~] Task 15: Runtime API And Externals
 
 Goal: Expose Dict values through host variable and external APIs.
 
