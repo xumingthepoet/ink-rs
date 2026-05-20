@@ -1224,15 +1224,23 @@ mod tests {
              }\n\
              VAR source_player: Player = { hp: 10 }\n\
              VAR source_scores: int[] = [1]\n\
+             VAR source_lookup: Dict<string, int> = {\"ada\": 10}\n\
+             VAR source_lookup_list: Dict<string, int>[] = [source_lookup]\n\
              VAR result: int = add(1, 2)\n\
              VAR copied_player: Player = echo_player(source_player)\n\
              VAR copied_scores: int[] = echo_scores(source_scores)\n\
+             VAR copied_lookup: Dict<string, int> = echo_lookup(source_lookup)\n\
+             VAR copied_lookup_list: Dict<string, int>[] = echo_lookup_list(source_lookup_list)\n\
              -> DONE\n\
              == function add(a: int, b: int) => int ==\n\
              ~ return a + b\n\
              == function echo_player(player: Player) => Player ==\n\
              ~ return player\n\
              == function echo_scores(values: int[]) => int[] ==\n\
+             ~ return values\n\
+             == function echo_lookup(values: Dict<string, int>) => Dict<string, int> ==\n\
+             ~ return values\n\
+             == function echo_lookup_list(values: Dict<string, int>[]) => Dict<string, int>[] ==\n\
              ~ return values",
         );
 
@@ -1247,12 +1255,35 @@ mod tests {
              }\n\
              EXTERNAL external_score(value: int) => int\n\
              EXTERNAL describe(player: Player, scores: int[]) => string\n\
+             EXTERNAL copy_scores(scores: Dict<string, int>) => Dict<string, int>\n\
              VAR score: int = 1\n\
              VAR source_player: Player = { hp: 10 }\n\
              VAR scores: int[] = [score]\n\
+             VAR score_lookup: Dict<string, int> = {\"ada\": 10}\n\
              VAR adjusted_score: int = external_score(score) + LEN(scores)\n\
              VAR description: string = describe(source_player, scores)\n\
+             VAR copied_scores: Dict<string, int> = copy_scores(score_lookup)\n\
              -> DONE",
+        );
+
+        assert_eq!(super::super::run_analysis_passes(&story), []);
+    }
+
+    #[test]
+    fn accepts_dict_types_in_dynamic_interface_function_signatures() {
+        let story = parse_story(
+            "=== interface IScorer ===\n\
+             == function copy_scores(scores: Dict<string, int>) => Dict<string, int> ==\n\
+             === module game ===\n\
+             FROM scorer\n\
+             VAR route: interface<IScorer> = scorer\n\
+             VAR source_scores: Dict<string, int> = {\"ada\": 10}\n\
+             VAR copied_scores: Dict<string, int> = {route}::copy_scores(source_scores)\n\
+             == main ==\n\
+             -> END\n\
+             === module scorer implements IScorer ===\n\
+             == function copy_scores(scores: Dict<string, int>) => Dict<string, int> ==\n\
+             ~ return scores",
         );
 
         assert_eq!(super::super::run_analysis_passes(&story), []);

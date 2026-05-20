@@ -320,6 +320,8 @@ mod tests {
              }\n\
              STRUCT Player {\n\
              inventory: Item[][]\n\
+             lookup: Dict<string, Item[]>\n\
+             nested_lookup: Dict<int, Dict<string, Item>>\n\
              hp: int\n\
              }\n\
              -> DONE",
@@ -334,6 +336,27 @@ mod tests {
             Some(&TypeName::array(TypeName::array(TypeName::struct_type(
                 "Item"
             ))))
+        );
+        assert_eq!(
+            index
+                .get("Player")
+                .and_then(|symbol| symbol.fields().get("lookup")),
+            Some(&TypeName::dict(
+                crate::parsed::DictKeyType::String,
+                TypeName::array(TypeName::struct_type("Item"))
+            ))
+        );
+        assert_eq!(
+            index
+                .get("Player")
+                .and_then(|symbol| symbol.fields().get("nested_lookup")),
+            Some(&TypeName::dict(
+                crate::parsed::DictKeyType::Int,
+                TypeName::dict(
+                    crate::parsed::DictKeyType::String,
+                    TypeName::struct_type("Item")
+                )
+            ))
         );
         assert_eq!(
             index

@@ -314,6 +314,18 @@ mod tests {
     }
 
     #[test]
+    fn accepts_dict_constants_and_array_values() {
+        let story = parse_story(
+            "CONST default_scores: Dict<string, int> = {\"ada\": 10}\n\
+             VAR score_tables: Dict<string, int>[] = [default_scores]\n\
+             VAR empty_by_id: Dict<int, string>\n\
+             -> DONE",
+        );
+
+        assert_eq!(super::super::run_analysis_passes(&story), []);
+    }
+
+    #[test]
     fn accepts_imported_qualified_constant_initializers() {
         let story = parse_story(
             "=== module game ===\n\

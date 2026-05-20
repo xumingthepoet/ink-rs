@@ -1196,12 +1196,15 @@ mod tests {
              }\n\
              VAR default_player: Player = { hp: 10 }\n\
              VAR default_scores: int[] = [1]\n\
+             VAR default_lookup: Dict<string, int> = {\"score\": 1}\n\
              == function add(a: int, b: int) => int ==\n\
              ~ return a + b\n\
              == function make_player() => Player ==\n\
              ~ return default_player\n\
              == function scores() => int[] ==\n\
-             ~ return default_scores",
+             ~ return default_scores\n\
+             == function lookup() => Dict<string, int> ==\n\
+             ~ return default_lookup",
         );
 
         assert_eq!(flow_diagnostics(&story), []);
