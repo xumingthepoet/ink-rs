@@ -1,4 +1,4 @@
-Progress: 14/27
+Progress: 15/27
 
 # Logical Large-File Split Active Plan
 
@@ -451,7 +451,7 @@ syntax::expression::tests::tokenizer_covers_dynamic_interface_separators`,
 Review found no follow-up changes; completion validation passed with the same
 focused commands and `make gate`.
 
-### [>] Task 15: Split Expression String Parsing
+### [x] Task 15: Split Expression String Parsing
 
 Goal: Separate string-expression content parsing from general token expression
 parsing.
@@ -475,7 +475,8 @@ integration text`; `cargo test -p ink-test --test integration expressions`;
 Commit record: implementation commit `8d761283 Split expression string
 parsing`; validation passed with `cargo fmt --all --check`, `cargo test -p
 ink-test --test integration text`, `cargo test -p ink-test --test integration
-expressions`, and `make gate`.
+expressions`, and `make gate`. Review found no follow-up changes; completion
+validation passed with the same focused commands and `make gate`.
 
 ### [ ] Task 16: Split Expression Argument And Path Utilities
 
