@@ -420,7 +420,7 @@ completion-record commit recorded by this task-list update.
 
 ## Milestone 3: Argument Dispatch Consolidation
 
-### [ ] Task 13: Extract static target argument resolution helper
+### [>] Task 13: Extract static target argument resolution helper
 
 Goal: Remove repeated static divert/tunnel target argument resolution logic.
 
@@ -439,7 +439,10 @@ Modification boundaries: Shared argument resolution helper and one pilot caller.
 
 Validation commands: `cargo test -p ink-compiler targets array_literals`; `make gate`.
 
-Commit record: Implementation commit TBD; completion-record commit TBD.
+Validation record: `cargo test -p ink-compiler targets` passed; `cargo test -p
+ink-compiler array_literals` passed; `make gate` passed.
+
+Commit record: Implementation commit `11d3f854`; completion-record commit TBD.
 
 ### [ ] Task 14: Extract function-call argument resolution helper
 
