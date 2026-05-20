@@ -362,7 +362,7 @@ syntax::expression::tests::token_parser_reports_structured_errors_with_spans`,
 Review found no follow-up changes; completion validation passed with the same
 focused commands and `make gate`.
 
-### [ ] Task 12: Split Expression Pratt Parser Core
+### [>] Task 12: Split Expression Pratt Parser Core
 
 Goal: Isolate the expression parser state machine from literal-specific parse
 helpers.
@@ -384,7 +384,11 @@ Validation commands: `cargo fmt --all --check`; `cargo test -q -p
 ink-compiler syntax::expression::tests::token_parser_reproduces_current_expression_baseline`;
 `cargo test -p ink-test --test integration expressions`; `make gate`.
 
-Commit record: pending.
+Commit record: implementation commit `69b68ac9 Split expression Pratt parser
+core`; validation passed with `cargo fmt --all --check`, `cargo test -q -p
+ink-compiler
+syntax::expression::tests::token_parser_reproduces_current_expression_baseline`,
+`cargo test -p ink-test --test integration expressions`, and `make gate`.
 
 ### [ ] Task 13: Split Composite Expression Literal Parsing
 
