@@ -1,4 +1,4 @@
-Progress: 4/27
+Progress: 5/27
 
 # Logical Large-File Split Active Plan
 
@@ -146,7 +146,7 @@ story_state::tests::malformed_native_call_underflow_returns_error`, and `make
 gate`. Review found no follow-up changes; completion validation passed with
 the same focused commands and `make gate`.
 
-### [>] Task 05: Split StoryState Function Evaluation API
+### [x] Task 05: Split StoryState Function Evaluation API
 
 Goal: Isolate host-driven function evaluation state transitions from general
 story state.
@@ -172,7 +172,8 @@ functions`; `make gate`.
 Commit record: implementation commit `2a70b7de Split StoryState function
 evaluation`; validation passed with `cargo fmt --all --check`, `cargo test -p
 ink-test --test integration runtime_api`, `cargo test -p ink-test --test
-integration functions`, and `make gate`.
+integration functions`, and `make gate`. Review found no follow-up changes;
+completion validation passed with the same focused commands and `make gate`.
 
 ### [ ] Task 06: Split StoryState Pointer And Choice State Helpers
 
