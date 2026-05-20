@@ -1,0 +1,30 @@
+Three-way relation tracking sample.
+Triangle state: Opening baseline
+Lyra: affection 6 (fond), jealousy 2 (calm).
+Kest: affection 4 (steady), jealousy 5 (watchful).
+Orin: affection 7 (warm), jealousy 3 (sensitive).
+You spend quality time with Lyra and help repair her tools.
+Triangle state: After shared tea with Lyra
+Lyra: affection 9 (warm), jealousy 2 (calm).
+Kest: affection 4 (steady), jealousy 8 (volatile).
+Orin: affection 7 (warm), jealousy 4 (sensitive).
+You witness Kest execute a perfect training pass.
+Triangle state: After sparring praise for Kest
+Lyra: affection 9 (warm), jealousy 2 (calm).
+Kest: affection 8 (warm), jealousy 8 (volatile).
+Orin: affection 7 (warm), jealousy 5 (watchful).
+Orin confides about a mission route and offers quiet advice.
+Triangle state: After private walk with Orin
+Lyra: affection 9 (warm), jealousy 2 (calm).
+Kest: affection 8 (warm), jealousy 9 (volatile).
+Orin: affection 9 (warm), jealousy 5 (watchful).
+You thank the group together at dinner, so jealousy decays for everyone.
+Triangle state: After public reassurance
+Lyra: affection 10 (loved), jealousy 1 (calm).
+Kest: affection 9 (warm), jealousy 8 (volatile).
+Orin: affection 10 (loved), jealousy 4 (sensitive).
+Final scene consequence:
+Kest refuses another order and breaks a teammate promise for a tense showdown.
+Triangle readiness:
+Most favored: Lyra (10).
+Most uneasy: Kest (8).

@@ -1,0 +1,44 @@
+Preflight systems for Arius Cutter.
+Status Pre-damage baseline:
+Engine damage: 2
+Hull damage: 1
+Sensor damage: 3
+Readiness score: 77
+Estimated readiness: Green - full launch window.
+Hull plating scrapes. Engine and hull absorb direct impact.
+Engine damage 5.
+Hull damage 3.
+Sensor damage 4.
+Status After debris strike:
+Engine damage: 5
+Hull damage: 3
+Sensor damage: 4
+Readiness score: 51
+Estimated readiness: Red - launch unsafe.
+Plasma rain punches through thin plating.
+Sensors now 7; hull rises to 5.
+Status After ion storm:
+Engine damage: 5
+Hull damage: 5
+Sensor damage: 7
+Readiness score: 34
+Estimated readiness: Red - launch unsafe.
+Repair to engine. Remaining damage 4.
+Repair to sensors. Remaining damage 6.
+Repair to engine. Remaining damage 3.
+Repair to hull. Remaining damage 4.
+Repair to sensors. Remaining damage 5.
+Repair to hull. Remaining damage 3.
+Repair to engine. Remaining damage 2.
+Repair to sensors. Remaining damage 4.
+Status After allocated repairs:
+Engine damage: 2
+Hull damage: 3
+Sensor damage: 4
+Readiness score: 66
+Estimated readiness: Amber - launch, then slow and conservative.
+Mission status:
+Reduced launch profile accepted.
+You keep range low and avoid sensor-only scouting.
+Crew recommendation:
+Keep the mission on schedule.
