@@ -1,4 +1,4 @@
-Progress: 7/24
+Progress: 8/24
 
 # Compiler Analysis Refactor Active Plan
 
@@ -262,7 +262,7 @@ Review record: Reviewed implementation commit `4b6a2db5` with `git show
 Commit record: Implementation commit `4b6a2db5`; waiting-review record
 `88632b6a`; completion-record commit recorded by this task-list update.
 
-### [>] Task 08: Centralize exact expected-type diagnostics
+### [x] Task 08: Centralize exact expected-type diagnostics
 
 Goal: Reduce duplicated exact expected-type comparison and diagnostic formatting
 without changing messages.
@@ -285,9 +285,14 @@ rewiring.
 Validation commands: `cargo test -p ink-compiler analysis`; `make gate`.
 
 Validation record: `cargo test -p ink-compiler analysis` passed; `make gate`
-passed.
+passed. Review validation repeated after implementation review: `cargo test -p
+ink-compiler analysis` passed; `make gate` passed.
 
-Commit record: Implementation commit `5fde59e2`; completion-record commit TBD.
+Review record: Reviewed implementation commit `5fde59e2` with `git show
+--check`; no follow-up changes required.
+
+Commit record: Implementation commit `5fde59e2`; waiting-review record
+`79561b66`; completion-record commit recorded by this task-list update.
 
 ### [ ] Task 09: Migrate initializers and assignments to shared checker
 
