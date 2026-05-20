@@ -1,0 +1,71 @@
+Rhythm-board minigame score audit.
+Planned move sequence:
+1. Whirlwind Slash (base 12, accuracy 10, timing 9)
+Planned move sequence:
+2. Ridge Jump (base 8, accuracy 6, timing 6)
+Planned move sequence:
+3. Counter Beat (base 10, accuracy 8, timing 7)
+Planned move sequence:
+4. Aerial Feint (base 14, accuracy 9, timing 10)
+Planned move sequence:
+5. Chain Spin (base 9, accuracy 7, timing 5)
+Planned move sequence:
+6. Focus Burst (base 11, accuracy 10, timing 10)
+Planned move sequence:
+7. Final Lock (base 13, accuracy 8, timing 8)
+Planned move sequence:
+Move 1: Whirlwind Slash
+Grade: great
+perfect swing.
+Move gain 16 + combo bonus 2, total 18.
+Current total: 18, current combo 1.
+Move 2: Ridge Jump
+Grade: pass
+borderline swing.
+Move gain 8 + combo bonus 4, total 12.
+Current total: 30, current combo 2.
+Move 3: Counter Beat
+Grade: good
+clean swing.
+Move gain 12 + combo bonus 6, total 18.
+Current total: 48, current combo 3.
+Move 4: Aerial Feint
+Grade: great
+perfect swing.
+Move gain 18 + combo bonus 8, total 26.
+Current total: 74, current combo 4.
+Move 5: Chain Spin
+Grade: pass
+borderline swing.
+Move gain 9 + combo bonus 10, total 19.
+Current total: 93, current combo 5.
+Move 6: Focus Burst
+Grade: great
+perfect swing.
+Move gain 15 + combo bonus 12, total 27.
+Current total: 120, current combo 6.
+Move 7: Final Lock
+Grade: good
+clean swing.
+Move gain 15 + combo bonus 14, total 29.
+Current total: 149, current combo 7.
+Minigame complete.
+Raw move points: 77
+Total combo bonus: 56
+Overall score: 149
+Category: Platinum Run
+Perfect moves: 3
+Misses: 0
+Longest combo: 7
+Medal unlocked: Bronze
+reward: Practice Arena Pass
+Medal unlocked: Silver
+reward: Combat Focus Herb
+Medal unlocked: Gold
+reward: Twin-Reflex Charm
+Medal unlocked: Platinum
+reward: Mythic Trigger Ring
+Unlocked rewards: 4
+Combo award:
+Combo medal unlocked: Momentum Crest (+8% reroll resistance).
+Full medal set unlocked.

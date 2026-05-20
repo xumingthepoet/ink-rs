@@ -1,0 +1,58 @@
+Spy network coverage run begins.
+Network report: Initial
+Nia Voss | cover 16 | suspicion 3 | mission "Standby" | exposure covered
+Kade Morrow | cover 12 | suspicion 5 | mission "Standby" | exposure covered
+Liora Haze | cover 10 | suspicion 7 | mission "Standby" | exposure watchful
+Rooken Vale | cover 8 | suspicion 2 | mission "Standby" | exposure covered
+Mission 1: Canal Courier
+Canal Courier starts for Nia Voss.
+Canal Courier partly covered, but heat is rising.
+Mission outcome:
+Nia Voss: covered to watchful
+Cover delta -2, suspicion delta 5.
+Nia Voss: cover 14, suspicion 8, status watchful
+Mission 2: Council Archive Copy
+Council Archive Copy starts for Kade Morrow.
+Council Archive Copy compromised the cell.
+Mission outcome:
+Kade Morrow: covered to burned
+Cover delta -5, suspicion delta 11.
+Kade Morrow: cover 7, suspicion 16, status burned
+Mission 3: Iron Gate Watch Shift
+Iron Gate Watch Shift starts for Liora Haze.
+Iron Gate Watch Shift compromised the cell.
+Mission outcome:
+Liora Haze: watchful to burned
+Cover delta -3, suspicion delta 10.
+Liora Haze: cover 7, suspicion 17, status burned
+Mission 4: Border Ledger Drop
+Border Ledger Drop starts for Nia Voss.
+Border Ledger Drop compromised the cell.
+Mission outcome:
+Nia Voss: watchful to burned
+Cover delta -3, suspicion delta 8.
+Nia Voss: cover 11, suspicion 16, status burned
+Mission 5: False Permit Planting
+False Permit Planting starts for Rooken Vale.
+False Permit Planting compromised the cell.
+Mission outcome:
+Rooken Vale: covered to compromised
+Cover delta -6, suspicion delta 12.
+Rooken Vale: cover 2, suspicion 14, status compromised
+Network report: Final
+Nia Voss | cover 11 | suspicion 16 | mission "Border Ledger Drop" | exposure burned
+Kade Morrow | cover 7 | suspicion 16 | mission "Council Archive Copy" | exposure burned
+Liora Haze | cover 7 | suspicion 17 | mission "Iron Gate Watch Shift" | exposure burned
+Rooken Vale | cover 2 | suspicion 14 | mission "False Permit Planting" | exposure compromised
+Operational summary:
+Completed clean missions: 0
+Partial missions: 1
+Compromised missions: 4
+Exposure events: 3
+Status tally:
+Covered 0
+Watchful 0
+Compromised 1
+Burned 3
+Average cover: 6, average suspicion: 15.
+Heat remains on the network. Immediate counter-intelligence is required.
