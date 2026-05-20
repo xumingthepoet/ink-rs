@@ -717,7 +717,7 @@ Validation:
 
 Commit record: final validation record (`Record Dict final gate validation`)
 
-### [ ] Task 20: Move Dict Plan To Finished Plans
+### [~] Task 20: Move Dict Plan To Finished Plans
 
 Goal: Close the active plan after implementation and validation are complete.
 
