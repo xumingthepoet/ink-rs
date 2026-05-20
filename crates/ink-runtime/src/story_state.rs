@@ -27,6 +27,7 @@ pub const INK_SAVE_STATE_VERSION: u32 = 2;
 static DEFAULT_FLOW_NAME: &str = "DEFAULT_FLOW";
 
 mod errors;
+mod evaluation_stack;
 mod output;
 mod output_mutation;
 
@@ -123,24 +124,6 @@ impl StoryState {
             .borrow_mut()
             .get_current_element_mut()
             .current_pointer = pointer;
-    }
-
-    pub fn get_in_expression_evaluation(&self) -> bool {
-        self.get_callstack()
-            .borrow()
-            .get_current_element()
-            .in_expression_evaluation
-    }
-
-    pub fn set_in_expression_evaluation(&self, value: bool) {
-        self.get_callstack()
-            .borrow_mut()
-            .get_current_element_mut()
-            .in_expression_evaluation = value;
-    }
-
-    pub fn push_evaluation_stack(&mut self, obj: Rc<dyn RTObject>) {
-        self.evaluation_stack.push(obj);
     }
 
     pub fn set_previous_pointer(&self, p: Pointer) {
@@ -293,29 +276,6 @@ impl StoryState {
         self.patch = None;
     }
 
-    pub fn pop_evaluation_stack(&mut self) -> Result<Rc<dyn RTObject>, StoryError> {
-        self.evaluation_stack
-            .pop()
-            .ok_or_else(|| StoryError::InvalidStoryState("Evaluation stack underflow".to_owned()))
-    }
-
-    pub fn pop_evaluation_stack_multiple(
-        &mut self,
-        number_of_objects: usize,
-    ) -> Result<Vec<Rc<dyn RTObject>>, StoryError> {
-        if self.evaluation_stack.len() < number_of_objects {
-            return Err(StoryError::InvalidStoryState(format!(
-                "Evaluation stack underflow: expected {number_of_objects} value(s), found {}.",
-                self.evaluation_stack.len()
-            )));
-        }
-
-        let start = self.evaluation_stack.len() - number_of_objects;
-        let obj: Vec<Rc<dyn RTObject>> = self.evaluation_stack.drain(start..).collect();
-
-        Ok(obj)
-    }
-
     pub fn set_diverted_pointer(&mut self, p: Pointer) {
         self.diverted_pointer = p;
     }
@@ -393,10 +353,6 @@ impl StoryState {
             }
             i -= 1;
         }
-    }
-
-    pub fn peek_evaluation_stack(&self) -> Option<&Rc<dyn RTObject>> {
-        self.evaluation_stack.last()
     }
 
     pub fn start_function_evaluation_from_game(
