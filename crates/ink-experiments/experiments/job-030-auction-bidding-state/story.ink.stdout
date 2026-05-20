@@ -1,0 +1,39 @@
+Auction with budgets and priorities.
+Opening budgets --
+Lena budget 30 priority 2
+Quinn budget 35 priority 6
+Rook budget 28 priority 3
+Vale budget 40 priority 1
+Auction lot: Aegis Helm
+Lena opens the book on Aegis Helm at 22.
+Quinn outbids Lena at 26.
+Rook bids 14 but does not lead.
+Vale bids 14 but does not lead.
+Quinn wins helm for 26. Budget 9 remains.
+Auction lot: Signal Arrows
+Lena opens the book on Signal Arrows at 10.
+Quinn cannot afford 15 on Signal Arrows (budget 9).
+Rook outbids Lena at 12.
+Vale bids 9 but does not lead.
+Rook wins arrow for 12. Budget 16 remains.
+Auction lot: Fortune Draught
+Lena opens the book on Fortune Draught at 11.
+Quinn cannot afford 15 on Fortune Draught (budget 9).
+Rook outbids Lena at 15.
+Vale bids 12 but does not lead.
+potion reached top bid 15 from Rook, but reserve not met.
+Closing budgets --
+Lena budget 30 priority 2
+Quinn budget 9 priority 6
+Rook budget 16 priority 3
+Vale budget 40 priority 1
+Winning ledger:
+Aegis Helm sold to Quinn for 26.
+reserve met
+Signal Arrows sold to Rook for 12.
+reserve met
+Fortune Draught unsold.
+Auction result:
+Total bids: 12
+Items sold: 2
+Total spend: 38

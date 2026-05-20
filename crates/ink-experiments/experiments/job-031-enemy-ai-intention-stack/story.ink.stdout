@@ -1,0 +1,57 @@
+Enemy AI intention stack simulation.
+Initial --
+Varg | hp 16 | stamina 7 | aggressive | a0 s2
+Shade | hp 12 | stamina 6 | berserk | a1 s0
+Skewer | hp 9 | stamina 5 | normal | a0 s3
+Pup | hp 5 | stamina 4 | normal | a2 s4
+Turn 1
+Turn 1 plan (highest first) --
+Pup guards.
+Varg uses cleave.
+Skewer uses slash.
+Shade uses rupture.
+Turn 1 roster:
+Varg | hp 16 | stamina 5 | aggressive | a2 s2
+Shade | hp 12 | stamina 3 | berserk | a1 s3
+Skewer | hp 9 | stamina 4 | aggressive | a2 s3
+Pup | hp 5 | stamina 5 | guarding | a2 s4
+Turn 2
+Turn 2 plan (highest first) --
+Varg guards.
+Skewer guards.
+Pup guards.
+Shade uses slash.
+Turn 2 roster:
+Varg | hp 16 | stamina 6 | guarding | a1 s1
+Shade | hp 12 | stamina 2 | aggressive | a2 s2
+Skewer | hp 9 | stamina 5 | guarding | a1 s2
+Pup | hp 5 | stamina 6 | guarding | a1 s3
+Turn 3
+Turn 3 plan (highest first) --
+Shade rests.
+Varg uses slash.
+Skewer uses slash.
+Pup uses slash.
+Turn 3 roster:
+Varg | hp 16 | stamina 5 | aggressive | a2 s0
+Shade | hp 12 | stamina 4 | resting | a1 s1
+Skewer | hp 9 | stamina 4 | aggressive | a2 s1
+Pup | hp 5 | stamina 5 | aggressive | a2 s2
+Turn 4
+Turn 4 plan (highest first) --
+Varg guards.
+Skewer guards.
+Pup guards.
+Shade uses slash.
+Turn 4 roster:
+Varg | hp 16 | stamina 6 | guarding | a1 s0
+Shade | hp 12 | stamina 3 | aggressive | a2 s0
+Skewer | hp 9 | stamina 5 | guarding | a1 s0
+Pup | hp 5 | stamina 6 | guarding | a1 s1
+Combat round complete.
+Final --
+Varg | hp 16 | stamina 6 | normal | a0 s0
+Shade | hp 12 | stamina 3 | normal | a1 s0
+Skewer | hp 9 | stamina 5 | normal | a0 s0
+Pup | hp 5 | stamina 6 | normal | a0 s0
+Hero hp left: 0.
