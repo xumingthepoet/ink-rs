@@ -351,7 +351,7 @@ Validation:
 
 Commit record: implementation `c069d330` (`Lower Dict index reads`)
 
-### [ ] Task 10: Lower Dict Writes
+### [~] Task 10: Lower Dict Writes
 
 Goal: Emit runtime instructions for Dict indexed assignment and nested lvalue
 updates.
