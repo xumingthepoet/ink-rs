@@ -2,6 +2,7 @@ use super::{
     Choice, Conditional, ContentList, Expression, Flow, ImportDeclaration, InterfaceDeclaration,
     Module, Object, Story, Weave,
 };
+use crate::source::SourceSpan;
 
 pub(crate) trait ParsedVisitor {
     fn visit_story(&mut self, _story: &Story, _context: &VisitContext) {}
@@ -23,6 +24,7 @@ pub(crate) struct VisitContext {
     pub(crate) inside_function: bool,
     pub(crate) inside_choice_content: bool,
     pub(crate) inside_expression: bool,
+    pub(crate) current_object_span: Option<SourceSpan>,
 }
 
 impl VisitContext {
@@ -34,6 +36,7 @@ impl VisitContext {
             inside_function: false,
             inside_choice_content: false,
             inside_expression: false,
+            current_object_span: None,
         }
     }
 
@@ -50,6 +53,7 @@ impl VisitContext {
             inside_function: self.inside_function || flow.is_function(),
             inside_choice_content: self.inside_choice_content,
             inside_expression: self.inside_expression,
+            current_object_span: self.current_object_span.clone(),
         }
     }
 
@@ -63,6 +67,14 @@ impl VisitContext {
     fn enter_expression(&self) -> Self {
         Self {
             inside_expression: true,
+            ..self.clone()
+        }
+    }
+
+    fn enter_object(&self, object: &Object) -> Self {
+        Self {
+            current_object_span: object_own_span(object)
+                .or_else(|| self.current_object_span.clone()),
             ..self.clone()
         }
     }
@@ -137,39 +149,40 @@ fn walk_object<V>(object: &Object, visitor: &mut V, context: &VisitContext)
 where
     V: ParsedVisitor + ?Sized,
 {
-    visitor.visit_object(object, context);
+    let object_context = context.enter_object(object);
+    visitor.visit_object(object, &object_context);
     match object {
-        Object::ContentList(content) => walk_content_list(content, visitor, context),
+        Object::ContentList(content) => walk_content_list(content, visitor, &object_context),
         Object::Expression(expression) | Object::LogicLine(expression) => {
-            walk_expression(expression, visitor, context)
+            walk_expression(expression, visitor, &object_context)
         }
-        Object::Conditional(conditional) => walk_conditional(conditional, visitor, context),
+        Object::Conditional(conditional) => walk_conditional(conditional, visitor, &object_context),
         Object::ConstantDeclaration(declaration) => {
-            walk_expression(declaration.expression(), visitor, context)
+            walk_expression(declaration.expression(), visitor, &object_context)
         }
-        Object::IncDec(inc_dec) => walk_expression(inc_dec.expression(), visitor, context),
-        Object::Choice(choice) => walk_choice(choice, visitor, context),
+        Object::IncDec(inc_dec) => walk_expression(inc_dec.expression(), visitor, &object_context),
+        Object::Choice(choice) => walk_choice(choice, visitor, &object_context),
         Object::Divert(divert) => {
             for argument in divert.arguments() {
-                walk_expression(argument, visitor, context);
+                walk_expression(argument, visitor, &object_context);
             }
         }
         Object::Return(ret) => {
             if let Some(expression) = ret.returned_expression() {
-                walk_expression(expression, visitor, context);
+                walk_expression(expression, visitor, &object_context);
             }
         }
         Object::TunnelOnwards(tunnel_onwards) => {
             for argument in tunnel_onwards.arguments() {
-                walk_expression(argument, visitor, context);
+                walk_expression(argument, visitor, &object_context);
             }
         }
         Object::VariableAssignment(assignment) => {
             if let Some(expression) = assignment.expression() {
-                walk_expression(expression, visitor, context);
+                walk_expression(expression, visitor, &object_context);
             }
         }
-        Object::Weave(weave) => walk_weave(weave, visitor, context),
+        Object::Weave(weave) => walk_weave(weave, visitor, &object_context),
         Object::AuthorWarning(_)
         | Object::EnumDeclaration(_)
         | Object::ExternalDeclaration(_)
@@ -178,6 +191,31 @@ where
         | Object::StructDeclaration(_)
         | Object::Tag(_)
         | Object::Text(_) => {}
+    }
+}
+
+fn object_own_span(object: &Object) -> Option<SourceSpan> {
+    match object {
+        Object::Choice(choice) => Some(choice.span().clone()),
+        Object::AuthorWarning(author_warning) => Some(author_warning.span().clone()),
+        Object::ConstantDeclaration(declaration) => Some(declaration.span().clone()),
+        Object::Divert(divert) => Some(divert.span().clone()),
+        Object::ExternalDeclaration(external) => Some(external.span().clone()),
+        Object::Gather(gather) => Some(gather.span().clone()),
+        Object::IncDec(inc_dec) => Some(inc_dec.span().clone()),
+        Object::Return(ret) => Some(ret.span().clone()),
+        Object::EnumDeclaration(declaration) => Some(declaration.span().clone()),
+        Object::StructDeclaration(declaration) => Some(declaration.span().clone()),
+        Object::Text(text) => Some(text.span().clone()),
+        Object::TunnelOnwards(tunnel_onwards) => Some(tunnel_onwards.span().clone()),
+        Object::VariableAssignment(assignment) => Some(assignment.span().clone()),
+        Object::ContentList(_)
+        | Object::Conditional(_)
+        | Object::Expression(_)
+        | Object::Glue(_)
+        | Object::LogicLine(_)
+        | Object::Tag(_)
+        | Object::Weave(_) => None,
     }
 }
 

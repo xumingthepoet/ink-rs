@@ -19,7 +19,7 @@ use super::{
     },
     context::{EnumTypeIndex, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
     enums::type_name_contains_enum,
-    expected_expressions::ExpectedExpressionSet,
+    expected_expressions::{expression_context_span, ExpectedExpressionSet},
     indexes::AnalysisIndexes,
     interface_values::{
         check_expression_type_with_expected, ExpectedTypeCheckError, ExpectedTypeInference,
@@ -665,30 +665,20 @@ impl ParsedVisitor for ArrayLiteralChecker<'_> {
     }
 
     fn visit_expression(&mut self, expression: &Expression, context: &VisitContext) {
+        let span = expression_context_span(context);
         match expression {
-            Expression::FunctionCall { name, args } => self.check_function_call_arguments(
-                name,
-                args,
-                &SourceSpan::new(None, 1, 1),
-                context,
-            ),
-            Expression::QualifiedFunctionCall { name, args } => self.check_function_call_arguments(
-                name.as_str(),
-                args,
-                &SourceSpan::new(None, 1, 1),
-                context,
-            ),
+            Expression::FunctionCall { name, args } => {
+                self.check_function_call_arguments(name, args, &span, context)
+            }
+            Expression::QualifiedFunctionCall { name, args } => {
+                self.check_function_call_arguments(name.as_str(), args, &span, context)
+            }
             Expression::DynamicInterfaceFunctionCall {
                 target,
                 member,
                 args,
-            } => self.check_dynamic_interface_function_arguments(
-                target,
-                member,
-                args,
-                &SourceSpan::new(None, 1, 1),
-                context,
-            ),
+            } => self
+                .check_dynamic_interface_function_arguments(target, member, args, &span, context),
             _ => {}
         }
 
@@ -696,7 +686,7 @@ impl ParsedVisitor for ArrayLiteralChecker<'_> {
             && !self.expected_expressions.contains(expression)
         {
             self.diagnostics.push(Diagnostic::error(
-                SourceSpan::new(None, 1, 1),
+                span,
                 "Array literal requires an expected array type",
             ));
         }
@@ -901,6 +891,28 @@ mod tests {
             DiagnosticSeverity::Error,
             "Value for 'ids[1]' has type string but expected int",
         );
+    }
+
+    #[test]
+    fn reports_function_call_array_argument_errors_at_containing_object_span() {
+        let story = parse_story(
+            "=== module game ===\n\
+             == main ==\n\
+             ~ temp value: int = collect([\"bad\"])\n\
+             -> END\n\
+             == function collect(values: int[]) => int ==\n\
+             ~ return values[0]",
+        );
+
+        let diagnostics = array_literal_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Value for 'values[0]' has type string but expected int",
+        );
+        assert_eq!(diagnostics[0].line, 3);
+        assert_eq!(diagnostics[0].column, 1);
     }
 
     #[test]

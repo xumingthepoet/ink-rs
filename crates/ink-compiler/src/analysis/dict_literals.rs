@@ -20,7 +20,7 @@ use super::{
     },
     context::{EnumTypeIndex, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
     enums::type_name_contains_enum,
-    expected_expressions::ExpectedExpressionSet,
+    expected_expressions::{expression_context_span, ExpectedExpressionSet},
     indexes::AnalysisIndexes,
     interface_values::{
         check_expression_type_with_expected, ExpectedTypeCheckError, ExpectedTypeInference,
@@ -699,32 +699,21 @@ impl ParsedVisitor for DictLiteralChecker<'_> {
     }
 
     fn visit_expression(&mut self, expression: &Expression, context: &VisitContext) {
+        let span = expression_context_span(context);
         match expression {
-            Expression::FunctionCall { name, args } => self.check_function_call_arguments(
-                name,
-                args,
-                &SourceSpan::new(None, 1, 1),
-                context,
-            ),
-            Expression::QualifiedFunctionCall { name, args } => self.check_function_call_arguments(
-                name.as_str(),
-                args,
-                &SourceSpan::new(None, 1, 1),
-                context,
-            ),
+            Expression::FunctionCall { name, args } => {
+                self.check_function_call_arguments(name, args, &span, context)
+            }
+            Expression::QualifiedFunctionCall { name, args } => {
+                self.check_function_call_arguments(name.as_str(), args, &span, context)
+            }
             Expression::DynamicInterfaceFunctionCall {
                 target,
                 member,
                 args,
-            } => self.check_dynamic_interface_function_arguments(
-                target,
-                member,
-                args,
-                &SourceSpan::new(None, 1, 1),
-                context,
-            ),
+            } => self
+                .check_dynamic_interface_function_arguments(target, member, args, &span, context),
             Expression::DictLiteral(entries) if !self.expected_expressions.contains(expression) => {
-                let span = SourceSpan::new(None, 1, 1);
                 self.check_dict_literal_key_consistency(entries, "Dict literal", &span);
                 self.diagnostics.push(Diagnostic::error(
                     span,
@@ -904,6 +893,28 @@ mod tests {
             DiagnosticSeverity::Error,
             "Value for 'scores[\"ada\"]' has type string but expected int",
         );
+    }
+
+    #[test]
+    fn reports_function_call_dict_argument_errors_at_containing_object_span() {
+        let story = parse_story(
+            "=== module game ===\n\
+             == main ==\n\
+             ~ temp value: int = total(%{\"one\": \"bad\"})\n\
+             -> END\n\
+             == function total(values: Dict<string, int>) => int ==\n\
+             ~ return 0",
+        );
+
+        let diagnostics = dict_literal_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Value for 'values[\"one\"]' has type string but expected int",
+        );
+        assert_eq!(diagnostics[0].line, 3);
+        assert_eq!(diagnostics[0].column, 1);
     }
 
     #[test]
