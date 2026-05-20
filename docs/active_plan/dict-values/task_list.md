@@ -617,7 +617,7 @@ Validation:
 Commit record: implementation `2167c03e` (`Add Dict runtime fixtures and docs`);
 review fix `0a91453b` (`Clarify Dict empty literal docs`)
 
-### [ ] Task 17: Add Dict Diagnostic Fixtures
+### [~] Task 17: Add Dict Diagnostic Fixtures
 
 Goal: Cover user-facing compiler failures for invalid Dict code.
 
