@@ -20,7 +20,7 @@ use crate::{
     story_error::StoryError,
     tag::Tag,
     value::Value,
-    value_type::ValueType,
+    value_type::{DictKey, DictKeyType, DictValue, ValueType},
     variable_assigment::VariableAssignment,
     variable_reference::VariableReference,
     void::Void,
@@ -224,9 +224,39 @@ fn value_type_to_format_object(value: &ValueType) -> Result<format::Object, Stor
             .map(|(name, value)| Ok((name.clone(), value_type_to_format_object(value)?)))
             .collect::<Result<BTreeMap<_, _>, _>>()
             .map(format::Object::ValueObject),
-        ValueType::Dict(_) => Err(StoryError::BadJson(
-            "Dict values are not supported by the runtime JSON writer yet".to_owned(),
-        )),
+        ValueType::Dict(dict) => runtime_dict_to_format_value(dict).map(format::Object::ValueDict),
+    }
+}
+
+fn runtime_dict_to_format_value(dict: &DictValue) -> Result<format::DictValue, StoryError> {
+    let key_type = runtime_dict_key_type_to_format(dict.key_type());
+    let entries = dict
+        .entries()
+        .iter()
+        .map(
+            |(key, value)| -> Result<(format::DictKey, format::Object), StoryError> {
+                Ok((
+                    runtime_dict_key_to_format(key),
+                    value_type_to_format_object(value)?,
+                ))
+            },
+        )
+        .collect::<Result<BTreeMap<_, _>, _>>()?;
+    format::DictValue::new(key_type, entries)
+        .map_err(|error| StoryError::BadJson(format!("Invalid Dict value: {error}")))
+}
+
+fn runtime_dict_key_type_to_format(key_type: DictKeyType) -> format::DictKeyType {
+    match key_type {
+        DictKeyType::String => format::DictKeyType::String,
+        DictKeyType::Int => format::DictKeyType::Int,
+    }
+}
+
+fn runtime_dict_key_to_format(key: &DictKey) -> format::DictKey {
+    match key {
+        DictKey::String(value) => format::DictKey::String(value.clone()),
+        DictKey::Int(value) => format::DictKey::Int(*value),
     }
 }
 
@@ -392,12 +422,34 @@ mod tests {
             "player".to_string(),
             Rc::new(Value::new_value_type(ValueType::Object(fields))),
         );
+        values.insert(
+            "scores".to_string(),
+            Rc::new(Value::new_value_type(ValueType::Dict(
+                DictValue::new(
+                    DictKeyType::String,
+                    [
+                        (DictKey::String("ada".to_string()), ValueType::Int(10)),
+                        (
+                            DictKey::String("items".to_string()),
+                            ValueType::Array(vec![ValueType::Int(1)]),
+                        ),
+                    ]
+                    .into_iter()
+                    .collect(),
+                )
+                .expect("valid dict"),
+            ))),
+        );
 
         let written = write_dictionary_values(&values).expect("value dictionary should write");
 
         assert_eq!(written["score"], json!(7));
         assert_eq!(written["items"], json!(["^key", true]));
         assert_eq!(written["player"], json!({ "hp": 10 }));
+        assert_eq!(
+            written["scores"],
+            json!(["dict", "string", [["ada", 10], ["items", [1]]]])
+        );
         let read = crate::json::json_read::jobject_to_hashmap_values(
             written.as_object().expect("dictionary should be an object"),
         )
@@ -418,6 +470,14 @@ mod tests {
             panic!("expected player object");
         };
         assert!(matches!(player.get("hp"), Some(ValueType::Int(10))));
+        let Some(ValueType::Dict(scores)) = read.get("scores").map(|value| &value.value) else {
+            panic!("expected scores dict");
+        };
+        assert_eq!(scores.key_type(), DictKeyType::String);
+        assert!(matches!(
+            scores.get(&DictKey::String("ada".to_string())),
+            Some(ValueType::Int(10))
+        ));
     }
 
     #[test]

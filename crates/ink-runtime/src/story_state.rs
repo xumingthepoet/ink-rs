@@ -1125,7 +1125,11 @@ mod tests {
 
     use serde_json::json;
 
-    use crate::{story::Story, story_error::StoryError, value_type::ValueType};
+    use crate::{
+        story::Story,
+        story_error::StoryError,
+        value_type::{DictKey, DictKeyType, DictValue, ValueType},
+    };
 
     const SIMPLE_STORY_JSON: &str = r#"{"inkVersion":1,"root":["done",null]}"#;
 
@@ -1425,6 +1429,62 @@ mod tests {
         assert!(matches!(
             reloaded.get_variable("player"),
             Some(restored) if restored == player
+        ));
+    }
+
+    #[test]
+    fn save_state_roundtrips_dict_variables_and_omits_defaults() {
+        let json = r#"{
+            "inkVersion": 1,
+            "root": [
+                "done",
+                {
+                    "global decl": [
+                        "ev", ["dict", "string", []], {"VAR=": "scores"}, "/ev",
+                        "end",
+                        null
+                    ]
+                }
+            ]
+        }"#;
+        let scores = ValueType::Dict(
+            DictValue::new(
+                DictKeyType::String,
+                [(
+                    DictKey::String("ada".to_string()),
+                    ValueType::Array(vec![ValueType::Int(10)]),
+                )]
+                .into_iter()
+                .collect(),
+            )
+            .expect("valid dict"),
+        );
+
+        let mut story = Story::new(json).expect("valid story");
+        let fresh_save: serde_json::Value =
+            serde_json::from_str(&story.save_state().expect("save state")).expect("valid save");
+        assert_eq!(fresh_save["variablesState"], json!({}));
+
+        story
+            .set_variable("scores", &scores)
+            .expect("dict variable should be set");
+
+        let save_string = story.save_state().expect("save state");
+        let save: serde_json::Value =
+            serde_json::from_str(&save_string).expect("save should be JSON");
+        assert_eq!(
+            save["variablesState"]["scores"],
+            json!(["dict", "string", [["ada", [10]]]])
+        );
+
+        let mut reloaded = Story::new(json).expect("valid story");
+        reloaded
+            .load_state(&save_string)
+            .expect("save state should reload");
+
+        assert!(matches!(
+            reloaded.get_variable("scores"),
+            Some(restored) if restored == scores
         ));
     }
 }

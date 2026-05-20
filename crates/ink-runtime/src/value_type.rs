@@ -24,7 +24,7 @@ pub enum ValueType {
     Dict(DictValue),
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum DictKeyType {
     String,
     Int,
@@ -39,7 +39,7 @@ impl fmt::Display for DictKeyType {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum DictKey {
     String(String),
     Int(i32),

@@ -24,7 +24,7 @@ use crate::{
     story_error::StoryError,
     tag::Tag,
     value::Value,
-    value_type::ValueType,
+    value_type::{DictKey, DictKeyType, DictValue, ValueType},
     variable_assigment::VariableAssignment,
     variable_reference::VariableReference,
     void::Void,
@@ -183,12 +183,11 @@ fn format_object_to_runtime(object: &format::Object) -> Result<Rc<dyn RTObject>,
                     StoryError::BadJson(format!("Unsupported control command token: {token}"))
                 })
         }
-        format::Object::ValueArray(_) | format::Object::ValueObject(_) => Ok(Rc::new(
-            Value::new_value_type(format_object_to_runtime_value(object)?),
-        )),
-        format::Object::ValueDict(_) => Err(StoryError::BadJson(
-            "Dict values are not supported by the runtime loader yet".to_string(),
-        )),
+        format::Object::ValueArray(_)
+        | format::Object::ValueObject(_)
+        | format::Object::ValueDict(_) => Ok(Rc::new(Value::new_value_type(
+            format_object_to_runtime_value(object)?,
+        ))),
         format::Object::Void => Ok(Rc::new(Void::new())),
     }
 }
@@ -216,13 +215,40 @@ fn format_object_to_runtime_value(object: &format::Object) -> Result<ValueType, 
             .map(|(name, value)| Ok((name.clone(), format_object_to_runtime_value(value)?)))
             .collect::<Result<BTreeMap<_, _>, _>>()
             .map(ValueType::Object),
-        format::Object::ValueDict(_) => Err(StoryError::BadJson(
-            "Dict values are not supported by the runtime loader yet".to_string(),
-        )),
+        format::Object::ValueDict(dict) => format_dict_to_runtime_value(dict),
         _ => Err(StoryError::BadJson(format!(
             "Unsupported value object in dynamic value: {:?}",
             object
         ))),
+    }
+}
+
+fn format_dict_to_runtime_value(dict: &format::DictValue) -> Result<ValueType, StoryError> {
+    let key_type = format_dict_key_type_to_runtime(dict.key_type);
+    let entries = dict
+        .entries
+        .iter()
+        .map(|(key, value)| -> Result<(DictKey, ValueType), StoryError> {
+            Ok((
+                format_dict_key_to_runtime(key),
+                format_object_to_runtime_value(value)?,
+            ))
+        })
+        .collect::<Result<BTreeMap<_, _>, _>>()?;
+    DictValue::new(key_type, entries).map(ValueType::Dict)
+}
+
+fn format_dict_key_type_to_runtime(key_type: format::DictKeyType) -> DictKeyType {
+    match key_type {
+        format::DictKeyType::String => DictKeyType::String,
+        format::DictKeyType::Int => DictKeyType::Int,
+    }
+}
+
+fn format_dict_key_to_runtime(key: &format::DictKey) -> DictKey {
+    match key {
+        format::DictKey::String(value) => DictKey::String(value.clone()),
+        format::DictKey::Int(value) => DictKey::Int(*value),
     }
 }
 
@@ -582,6 +608,50 @@ mod tests {
         assert!(matches!(values[1], ValueType::Bool(true)));
         assert!(matches!(values[2], ValueType::Object(_)));
         assert!(matches!(values[3], ValueType::Array(_)));
+    }
+
+    #[test]
+    fn loads_dynamic_dict_values_from_story_json() {
+        let json = r#"{
+            "inkVersion": 1,
+            "root": [
+                ["dict", "string", [["ada", 10], ["items", [1, true]]]],
+                ["dict", "int", [[1, "^one"]]],
+                "done",
+                null
+            ]
+        }"#;
+
+        let root = load_from_string(json).expect("story JSON should load");
+        let string_value = root.content[0]
+            .as_any()
+            .downcast_ref::<Value>()
+            .expect("first root object should be a value");
+        let int_value = root.content[1]
+            .as_any()
+            .downcast_ref::<Value>()
+            .expect("second root object should be a value");
+
+        let ValueType::Dict(string_dict) = &string_value.value else {
+            panic!("expected string-key dict value");
+        };
+        assert_eq!(string_dict.key_type(), DictKeyType::String);
+        assert!(matches!(
+            string_dict.get(&DictKey::String("ada".to_string())),
+            Some(ValueType::Int(10))
+        ));
+        assert!(matches!(
+            string_dict.get(&DictKey::String("items".to_string())),
+            Some(ValueType::Array(_))
+        ));
+
+        let ValueType::Dict(int_dict) = &int_value.value else {
+            panic!("expected int-key dict value");
+        };
+        assert_eq!(int_dict.key_type(), DictKeyType::Int);
+        assert!(
+            matches!(int_dict.get(&DictKey::Int(1)), Some(ValueType::String(value)) if value.string == "one")
+        );
     }
 
     #[test]
