@@ -332,7 +332,7 @@ syntax::expression::tests::tokenizer_tracks_character_columns_for_unicode_prefix
 and `make gate`. Review found no follow-up changes; completion validation
 passed with the same focused commands and `make gate`.
 
-### [ ] Task 11: Split Expression Parse Errors
+### [~] Task 11: Split Expression Parse Errors
 
 Goal: Move structured parse error construction and diagnostic formatting away
 from parser mechanics.
