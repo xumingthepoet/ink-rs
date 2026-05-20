@@ -421,7 +421,7 @@ syntax::expression::tests::tokenizer_covers_struct_literal_tokens`, and `make
 gate`. Review found no follow-up changes; completion validation passed with
 the same focused commands and `make gate`.
 
-### [~] Task 14: Split Dynamic Interface Expression Parsing
+### [>] Task 14: Split Dynamic Interface Expression Parsing
 
 Goal: Give dynamic interface target/member expression syntax its own growth
 point.
@@ -443,7 +443,11 @@ Validation commands: `cargo fmt --all --check`; `cargo test -q -p
 ink-compiler syntax::expression::tests::tokenizer_covers_dynamic_interface_separators`;
 `cargo test -p ink-test --test integration typed_values`; `make gate`.
 
-Commit record: pending.
+Commit record: implementation commit `94b85279 Split dynamic interface
+expression parser`; validation passed with `cargo fmt --all --check`, `cargo
+test -q -p ink-compiler
+syntax::expression::tests::tokenizer_covers_dynamic_interface_separators`,
+`cargo test -p ink-test --test integration typed_values`, and `make gate`.
 
 ### [ ] Task 15: Split Expression String Parsing
 
