@@ -617,7 +617,7 @@ Validation:
 Commit record: implementation `2167c03e` (`Add Dict runtime fixtures and docs`);
 review fix `0a91453b` (`Clarify Dict empty literal docs`)
 
-### [~] Task 17: Add Dict Diagnostic Fixtures
+### [>] Task 17: Add Dict Diagnostic Fixtures
 
 Goal: Cover user-facing compiler failures for invalid Dict code.
 
@@ -633,7 +633,15 @@ Modification boundaries: diagnostics fixtures and tests.
 
 Validation commands: `cargo test -p ink-test diagnostics`
 
-Commit record: pending
+Validation:
+
+- `cargo test -p ink-test diagnostics` passed.
+- `cargo fmt --all --check` passed.
+- Initial default `make gate` reached the workspace doc-test stage but failed
+  by wrapper timeout with no failing tests reported.
+- `make gate UNIT_TEST_TIMEOUT=120s INK_TEST_TIMEOUT=600s` passed.
+
+Commit record: implementation `83012cea` (`Add Dict diagnostic fixtures`)
 
 ### [ ] Task 18: Add Parse Snapshots
 
