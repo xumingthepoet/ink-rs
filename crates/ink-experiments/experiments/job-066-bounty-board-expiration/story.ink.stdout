@@ -1,0 +1,106 @@
+Bounty board runs a full week.
+Board status: Opening board
+Bounty 101: Escort the ferryman
+Target: Night Courier
+Reward: 120
+State: open, remaining 3
+Bounty 102: Recover missing ledgers
+Target: Clerk Rowan
+Reward: 180
+State: open, remaining 2
+Bounty 103: Patrol the west road
+Target: Iron Convoy
+Reward: 140
+State: open, remaining 4
+Bounty 104: Capture false alchemist
+Target: Fraud Alchemist
+Reward: 220
+State: open, remaining 1
+Bounty 101 now has 2 day(s) left.
+Bounty 102 now has 1 day(s) left.
+Bounty 103 now has 3 day(s) left.
+Expiry warning for bounty 104 now reaches zero by next dawn.
+Bounty 101 claimed by Player and paid out 108.
+Bounty 102 claimed by Guild Clerk and payout goes to guild network.
+Archive removes completed bounty 101.
+Archive removes completed bounty 102.
+Board status: After day 1
+Bounty 101 is archived with state archived.
+Last claimant: Player
+Bounty 102 is archived with state archived.
+Last claimant: Guild Clerk
+Bounty 103: Patrol the west road
+Target: Iron Convoy
+Reward: 140
+State: open, remaining 3
+Bounty 104: Capture false alchemist
+Target: Fraud Alchemist
+Reward: 220
+State: open, remaining 0
+Bounty 103 now has 2 day(s) left.
+Bounty 104 has already expired.
+Attempt by Player on bounty 102 fails.
+Archive removes stale bounty 104.
+Board status: After day 2
+Bounty 101 is archived with state archived.
+Last claimant: Player
+Bounty 102 is archived with state archived.
+Last claimant: Guild Clerk
+Bounty 103: Patrol the west road
+Target: Iron Convoy
+Reward: 140
+State: open, remaining 2
+Bounty 104 is archived with state archived.
+No claimant recorded.
+Bounty 103 now has 1 day(s) left.
+Bounty 103 claimed by Mercenary Captain and payout goes to guild network.
+Archive removes completed bounty 103.
+Board status: After day 3
+Bounty 101 is archived with state archived.
+Last claimant: Player
+Bounty 102 is archived with state archived.
+Last claimant: Guild Clerk
+Bounty 103 is archived with state archived.
+Last claimant: Mercenary Captain
+Bounty 104 is archived with state archived.
+No claimant recorded.
+Attempt by Player on bounty 104 fails.
+Board status: After day 4
+Bounty 101 is archived with state archived.
+Last claimant: Player
+Bounty 102 is archived with state archived.
+Last claimant: Guild Clerk
+Bounty 103 is archived with state archived.
+Last claimant: Mercenary Captain
+Bounty 104 is archived with state archived.
+No claimant recorded.
+Attempt by Guild Clerk on bounty 101 fails.
+Board status: After day 5
+Bounty 101 is archived with state archived.
+Last claimant: Player
+Bounty 102 is archived with state archived.
+Last claimant: Guild Clerk
+Bounty 103 is archived with state archived.
+Last claimant: Mercenary Captain
+Bounty 104 is archived with state archived.
+No claimant recorded.
+Daybook complete.
+Board status: Board closes
+Bounty 101 is archived with state archived.
+Last claimant: Player
+Bounty 102 is archived with state archived.
+Last claimant: Guild Clerk
+Bounty 103 is archived with state archived.
+Last claimant: Mercenary Captain
+Bounty 104 is archived with state archived.
+No claimant recorded.
+Board payout summary.
+Open bounties remaining: 0
+Successful claims: 3
+Denied claims: 3
+Cleanup actions: 4
+Gold ledger:
+Player gold: 428
+Guild gold: 572
+Player payouts: 108
+Non-player payouts: 320

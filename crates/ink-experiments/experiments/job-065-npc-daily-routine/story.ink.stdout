@@ -1,0 +1,63 @@
+Municipal routine simulation starts.
+Dawn Watch --
+Block starts on time.
+Ari cannot follow the plan.
+Disruption: lantern rack burns too slow to relight
+Response profile: detour + pace hold
+Ari shifts to North Gate Annex and adjusts task.
+Reroute still fits this block.
+Brin reaches South Gate for call shift bells.
+Lio reaches Outer Wall for check wall torches.
+Block Dawn Watch check complete.
+Midday Patrol --
+Block starts on time.
+Mara cannot follow the plan.
+Disruption: market stampede blocks alley lanes
+Response profile: containment + full reroute
+Mara shifts to Watchtower and adjusts task.
+Response requires next-block borrow.
+Lio reaches River Wharf for escort suppliers.
+Ari reaches City Hall for brief magistrate patrols.
+Soren reaches Temple for check infirmary requests.
+Block Midday Patrol check complete.
+Dusk Sweep --
+Block is delayed by 52 minutes. Backup readiness is increased.
+Soren reaches Residential Ring for visit fire checks.
+Brin cannot follow the plan.
+Disruption: storm drains flood the cargo lane
+Response profile: reroute + compressed route
+Brin shifts to Temple Stair and adjusts task.
+Reroute still fits this block.
+Mara reaches Outer Docks for inspect night stores.
+Ari reaches Watchtower for prepare shift handoff.
+Block Dusk Sweep check complete.
+Night Rounds --
+Block starts on time.
+Lio cannot follow the plan.
+Disruption: wild fox triggers alarm bells
+Response profile: reroute + backup signal
+Lio shifts to Monastery Bell and adjusts task.
+Response requires next-block borrow.
+Brin reaches North Ridge for replace lantern oils.
+Mara reaches Old Mill for guard gate lock.
+Soren reaches Monastery for quiet patrol.
+Block Night Rounds check complete.
+Day schedule complete.
+Municipal day summary.
+Duty outcomes:
+Resolved: 11
+Disrupted: 4
+Total delay minutes: 152
+Backups called: 2
+Carryover minutes: 48
+Ari (warden) disruption hits: 1
+Brin (messenger) disruption hits: 1
+Lio (forager) disruption hits: 1
+Mara (ranger) disruption hits: 1
+Soren (healer) disruption hits: 0
+Roster readiness check.
+Ari can hold position once disrupted.
+Brin can hold position once disrupted.
+Lio can hold position once disrupted.
+Mara can hold position once disrupted.
+Soren held steady with no disruptions.
