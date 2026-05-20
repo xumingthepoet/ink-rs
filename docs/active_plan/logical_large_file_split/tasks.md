@@ -566,7 +566,7 @@ diagnostics`, and `make gate`. Review follow-up commit `63c924ad Include
 target divert checks in analysis source scan`; completion validation passed
 with the same focused commands and `make gate`.
 
-### [~] Task 19: Split Function And External Call Checks
+### [>] Task 19: Split Function And External Call Checks
 
 Goal: Separate ordinary call target and signature validation from built-in and
 interface-specific checks.
@@ -587,7 +587,10 @@ Validation commands: `cargo fmt --all --check`; `cargo test -p ink-test --test
 integration functions`; `cargo test -p ink-test --test integration diagnostics`;
 `make gate`.
 
-Commit record: pending.
+Commit record: implementation commit `181b5dd2 Split function call target
+checks`; validation passed with `cargo fmt --all --check`, `cargo test -p
+ink-test --test integration functions`, `cargo test -p ink-test --test
+integration diagnostics`, and `make gate`.
 
 ### [ ] Task 20: Split Typed Builtin Target Checks
 
