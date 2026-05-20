@@ -1,6 +1,6 @@
 use crate::{
     diagnostic::Diagnostic,
-    parsed::{visit::VisitContext, DivertTarget, Expression, FlowArgument, TypeName},
+    parsed::{visit::VisitContext, DivertTarget, Expression, TypeName},
     source::SourceSpan,
     syntax::parse_initial_expression,
 };
@@ -10,6 +10,7 @@ use super::super::{
     target_symbols::{is_cross_module_stitch_target, resolve_target_symbol},
 };
 use super::checker::CallTargetChecker;
+use super::context::{expression_root_variable_name, resolve_current_flow_argument};
 
 impl<'a> CallTargetChecker<'a> {
     pub(super) fn check_plain_divert_target(
@@ -218,27 +219,4 @@ pub(super) fn static_divert_target_name(target: &DivertTarget) -> Option<&str> {
             None
         }
     }
-}
-
-fn expression_root_variable_name(expression: &Expression) -> Option<&str> {
-    match expression {
-        Expression::VariableReference(name) => Some(name),
-        Expression::QualifiedReference(name) => Some(name.as_str()),
-        Expression::FieldAccess { base, .. } | Expression::IndexAccess { base, .. } => {
-            expression_root_variable_name(base)
-        }
-        Expression::DynamicInterfaceAccess { .. }
-        | Expression::DynamicInterfaceFunctionCall { .. } => None,
-        _ => None,
-    }
-}
-
-fn resolve_current_flow_argument<'a>(
-    target: &str,
-    current_flow_arguments: Option<&'a [FlowArgument]>,
-) -> Option<&'a FlowArgument> {
-    let variable_target_name = target.split('.').next()?;
-    current_flow_arguments?
-        .iter()
-        .find(|argument| argument.name() == variable_target_name)
 }

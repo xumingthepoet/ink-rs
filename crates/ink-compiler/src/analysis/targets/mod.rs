@@ -11,6 +11,7 @@ use super::modules::ModuleAnalysis;
 mod builtins;
 mod calls;
 mod checker;
+mod context;
 mod diverts;
 mod interfaces;
 

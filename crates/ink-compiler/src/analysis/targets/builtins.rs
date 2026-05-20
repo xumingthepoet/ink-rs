@@ -6,7 +6,7 @@ use crate::{
 
 use super::super::interface_values::{check_expression_type_with_expected, ExpectedTypeCheckError};
 use super::checker::CallTargetChecker;
-use super::interfaces::is_interface_module_literal_argument;
+use super::context::{is_interface_module_literal_argument, is_mutable_lvalue};
 
 impl<'a> CallTargetChecker<'a> {
     pub(super) fn check_typed_builtin_call(
@@ -516,19 +516,6 @@ impl<'a> CallTargetChecker<'a> {
                 ),
             )),
         }
-    }
-}
-
-fn is_mutable_lvalue(expression: &Expression) -> bool {
-    match expression {
-        Expression::VariableReference(_) => true,
-        Expression::QualifiedReference(_) => true,
-        Expression::FieldAccess { base, .. } | Expression::IndexAccess { base, .. } => {
-            is_mutable_lvalue(base)
-        }
-        Expression::DynamicInterfaceAccess { .. }
-        | Expression::DynamicInterfaceFunctionCall { .. } => false,
-        _ => false,
     }
 }
 

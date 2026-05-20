@@ -4,7 +4,7 @@ use crate::{
     diagnostic::Diagnostic,
     parsed::{
         visit::{ParsedVisitor, VisitContext},
-        DivertTarget, Expression, Flow, FlowArgument, Object,
+        DivertTarget, Expression, Flow, Object,
     },
     source::SourceSpan,
 };
@@ -13,13 +13,12 @@ use super::super::{
     context::{EnumTypeIndex, FlowContext, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
     enums::is_enum_member_reference,
     expression_types::infer_expression_type,
-    interface_values::{
-        ExpectedTypeInference, InterfaceModuleLiteralUses, ModuleImplementationIndex,
-    },
+    interface_values::{InterfaceModuleLiteralUses, ModuleImplementationIndex},
     interfaces::InterfaceMemberIndex,
     modules::ModuleImportIndex,
     span::object_span,
 };
+use super::context::scoped_context_key;
 use super::diverts::static_divert_target_name;
 
 pub(super) struct CallTargetChecker<'a> {
@@ -32,7 +31,7 @@ pub(super) struct CallTargetChecker<'a> {
     pub(super) module_imports: &'a ModuleImportIndex,
     pub(super) interface_module_literal_uses: &'a InterfaceModuleLiteralUses,
     pub(super) diagnostics: Vec<Diagnostic>,
-    flow_contexts_by_path: HashMap<String, FlowContext>,
+    pub(super) flow_contexts_by_path: HashMap<String, FlowContext>,
 }
 
 impl<'a> CallTargetChecker<'a> {
@@ -58,49 +57,6 @@ impl<'a> CallTargetChecker<'a> {
             diagnostics: Vec::new(),
             flow_contexts_by_path: HashMap::new(),
         }
-    }
-
-    pub(super) fn current_flow_path<'context>(
-        &self,
-        context: &'context VisitContext,
-    ) -> Option<&'context str> {
-        context.current_flow_path.as_deref()
-    }
-
-    pub(super) fn current_module<'context>(
-        &self,
-        context: &'context VisitContext,
-    ) -> Option<&'context str> {
-        context.current_module.as_deref()
-    }
-
-    pub(super) fn expected_type_inference(&self) -> ExpectedTypeInference<'_> {
-        ExpectedTypeInference {
-            variable_scopes: self.variable_scopes,
-            struct_types: self.struct_types,
-            enum_types: self.enum_types,
-            target_symbols: self.target_symbols,
-            module_implementations: self.module_implementations,
-            module_imports: self.module_imports,
-            interface_members: self.interface_members,
-        }
-    }
-
-    fn current_flow_context(&self, context: &VisitContext) -> Option<&FlowContext> {
-        self.current_flow_path(context).and_then(|flow_path| {
-            self.flow_contexts_by_path
-                .get(&scoped_context_key(self.current_module(context), flow_path))
-        })
-    }
-
-    pub(super) fn current_flow_arguments(&self, context: &VisitContext) -> Option<&[FlowArgument]> {
-        self.current_flow_context(context)
-            .map(FlowContext::arguments)
-    }
-
-    fn current_flow_is_function(&self, context: &VisitContext) -> bool {
-        self.current_flow_context(context)
-            .is_some_and(FlowContext::is_function)
     }
 
     pub(super) fn check_expression(
@@ -251,19 +207,6 @@ impl<'a> CallTargetChecker<'a> {
             format!("Unresolved variable: {name}"),
         ));
     }
-}
-
-pub(super) fn is_composite_literal(expression: &Expression) -> bool {
-    matches!(
-        expression,
-        Expression::ArrayLiteral(_) | Expression::StructLiteral { .. } | Expression::DictLiteral(_)
-    )
-}
-
-fn scoped_context_key(module: Option<&str>, flow_path: &str) -> String {
-    module
-        .map(|module| format!("{module}::{flow_path}"))
-        .unwrap_or_else(|| flow_path.to_string())
 }
 
 impl ParsedVisitor for CallTargetChecker<'_> {

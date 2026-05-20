@@ -1,31 +1,17 @@
 use crate::{
     diagnostic::Diagnostic,
-    parsed::{
-        visit::VisitContext, Expression, InterfaceMemberKind, InterfaceMemberSignature, TypeName,
-    },
+    parsed::{visit::VisitContext, Expression, InterfaceMemberKind, InterfaceMemberSignature},
     source::SourceSpan,
 };
 
 use super::super::{
-    argument_resolution::{
-        resolve_dynamic_interface_signature, DynamicInterfaceSignatureError,
-        DynamicInterfaceSignatureInputs,
-    },
+    argument_resolution::{resolve_dynamic_interface_signature, DynamicInterfaceSignatureError},
     interface_values::{check_expression_type_with_expected, ExpectedTypeCheckError},
 };
-use super::checker::{is_composite_literal, CallTargetChecker};
+use super::checker::CallTargetChecker;
+use super::context::{is_composite_literal, is_interface_module_literal_argument};
 
 impl<'a> CallTargetChecker<'a> {
-    fn dynamic_interface_signature_inputs(&self) -> DynamicInterfaceSignatureInputs<'_> {
-        DynamicInterfaceSignatureInputs {
-            variable_scopes: self.variable_scopes,
-            struct_types: self.struct_types,
-            enum_types: self.enum_types,
-            target_symbols: self.target_symbols,
-            interface_members: self.interface_members,
-        }
-    }
-
     pub(super) fn check_dynamic_interface_divert_target(
         &mut self,
         target: &Expression,
@@ -254,12 +240,4 @@ impl<'a> CallTargetChecker<'a> {
             }
         }
     }
-}
-
-pub(super) fn is_interface_module_literal_argument(
-    expression: &Expression,
-    expected_type: &TypeName,
-) -> bool {
-    expected_type.as_interface_name().is_some()
-        && matches!(expression, Expression::VariableReference(_))
 }

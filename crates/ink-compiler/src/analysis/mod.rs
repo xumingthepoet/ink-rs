@@ -225,6 +225,7 @@ mod tests {
         ("targets/calls.rs", include_str!("targets/calls.rs")),
         ("targets/mod.rs", include_str!("targets/mod.rs")),
         ("targets/checker.rs", include_str!("targets/checker.rs")),
+        ("targets/context.rs", include_str!("targets/context.rs")),
         ("targets/diverts.rs", include_str!("targets/diverts.rs")),
         (
             "targets/interfaces.rs",

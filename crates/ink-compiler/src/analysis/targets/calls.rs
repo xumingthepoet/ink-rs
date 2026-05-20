@@ -12,8 +12,10 @@ use super::super::{
     expression_types::{infer_expression_type, is_typed_builtin_function, TypeInferenceError},
     interface_values::{check_expression_type_with_expected, ExpectedTypeCheckError},
 };
-use super::checker::{is_composite_literal, CallTargetChecker};
-use super::interfaces::is_interface_module_literal_argument;
+use super::checker::CallTargetChecker;
+use super::context::{
+    is_composite_literal, is_interface_module_literal_argument, is_runtime_builtin_function,
+};
 
 impl<'a> CallTargetChecker<'a> {
     pub(super) fn check_function_call(
@@ -169,11 +171,4 @@ impl<'a> CallTargetChecker<'a> {
             }
         }
     }
-}
-
-fn is_runtime_builtin_function(name: &str) -> bool {
-    matches!(
-        name,
-        "RANDOM" | "SEED_RANDOM" | "MIN" | "MAX" | "POW" | "FLOOR" | "CEILING" | "INT" | "FLOAT"
-    )
 }
