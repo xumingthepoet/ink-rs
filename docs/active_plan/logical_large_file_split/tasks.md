@@ -451,7 +451,7 @@ syntax::expression::tests::tokenizer_covers_dynamic_interface_separators`,
 Review found no follow-up changes; completion validation passed with the same
 focused commands and `make gate`.
 
-### [~] Task 15: Split Expression String Parsing
+### [>] Task 15: Split Expression String Parsing
 
 Goal: Separate string-expression content parsing from general token expression
 parsing.
@@ -472,7 +472,10 @@ Validation commands: `cargo fmt --all --check`; `cargo test -p ink-test --test
 integration text`; `cargo test -p ink-test --test integration expressions`;
 `make gate`.
 
-Commit record: pending.
+Commit record: implementation commit `8d761283 Split expression string
+parsing`; validation passed with `cargo fmt --all --check`, `cargo test -p
+ink-test --test integration text`, `cargo test -p ink-test --test integration
+expressions`, and `make gate`.
 
 ### [ ] Task 16: Split Expression Argument And Path Utilities
 
