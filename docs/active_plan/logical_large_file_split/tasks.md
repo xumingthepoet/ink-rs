@@ -776,7 +776,7 @@ and builtins`; validation passed with `cargo fmt --all --check`, `cargo test
 integration typed_values`, and `make gate`. Review found no follow-up changes;
 completion validation passed with the same focused commands and `make gate`.
 
-### [~] Task 26: Split Lower Dynamic Interface Expressions
+### [>] Task 26: Split Lower Dynamic Interface Expressions
 
 Goal: Give dynamic interface target/function lowering a focused owner.
 
@@ -798,7 +798,10 @@ Validation commands: `cargo fmt --all --check`; `cargo test -p ink-test --test
 integration modules`; `cargo test -p ink-test --test integration typed_values`;
 `make gate`.
 
-Commit record: pending.
+Commit record: implementation commit `a71e1191 Split lower dynamic
+interface expressions`; validation passed with `cargo fmt --all --check`,
+`cargo test -p ink-test --test integration modules`, `cargo test -p ink-test
+--test integration typed_values`, and `make gate`.
 
 ## Milestone 5: Format JSON Codec Boundary And Closeout
 
