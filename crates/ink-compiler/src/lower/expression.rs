@@ -2,35 +2,26 @@ use std::collections::HashSet;
 
 use ink_story_json_format::{ControlCommand, NativeFunction, Object as RuntimeObject};
 
-use crate::parsed::{
-    AssignmentTarget, Expression, FlowArgument, InterfaceMemberKind, InterfaceMemberSignature,
-    TypeName,
-};
+use crate::parsed::{Expression, InterfaceMemberKind, InterfaceMemberSignature, TypeName};
 
-use super::assignment::{
-    collect_assignment_path, lower_assignment_path_update_value_into,
-    lower_cached_assignment_indexes_into, push_reassignment_for_name, AssignmentUpdateValue,
-};
 use super::composite_literal::lower_dynamic_composite_literal_into;
 use super::context::{ChoicePathMode, LoweringContext};
-use super::indexes::{CallSignature, ConstantValue};
-use super::path::{module_scoped_source_path_to_runtime_path, source_path_to_runtime_path};
+use super::indexes::ConstantValue;
 use super::value::{
     lower_enum_member_expression_value, lower_value_literal, resolve_divert_target_value,
 };
 use super::weave::lower_content_list_into_context;
 
+mod builtins;
+mod calls;
 mod name_resolution;
 mod operators;
 mod types;
 
-use self::name_resolution::{
-    resolve_callable_name, resolve_constant_name, resolve_runtime_variable_name,
-};
-use self::operators::{
-    builtin_native_function, native_function_for_binary_operator,
-    native_function_for_unary_operator,
-};
+pub(super) use self::calls::lower_function_arg_into;
+use self::calls::{lower_function_arg_into_parts, lower_function_call_into};
+use self::name_resolution::{resolve_constant_name, resolve_runtime_variable_name};
+use self::operators::{native_function_for_binary_operator, native_function_for_unary_operator};
 use self::types::infer_lowered_expression_type;
 
 pub(super) fn lower_output_expression_into(
@@ -92,9 +83,9 @@ pub(super) fn lower_expression_with_expected_type_into(
 }
 
 pub(super) struct ExpressionLoweringContext<'a, 'ctx> {
-    context: &'a LoweringContext<'ctx>,
-    has_start_content: bool,
-    visiting_constants: &'a mut HashSet<String>,
+    pub(super) context: &'a LoweringContext<'ctx>,
+    pub(super) has_start_content: bool,
+    pub(super) visiting_constants: &'a mut HashSet<String>,
 }
 
 impl<'ctx> ExpressionLoweringContext<'_, 'ctx> {
@@ -103,7 +94,7 @@ impl<'ctx> ExpressionLoweringContext<'_, 'ctx> {
     }
 }
 
-fn lower_expression_into_with_constants(
+pub(super) fn lower_expression_into_with_constants(
     content: &mut Vec<RuntimeObject>,
     expression: &Expression,
     lowering: &mut ExpressionLoweringContext<'_, '_>,
@@ -437,365 +428,4 @@ fn field_access_base_is_visible_value(base: &Expression, context: &LoweringConte
         }
         _ => true,
     }
-}
-
-fn lower_function_call_into(
-    content: &mut Vec<RuntimeObject>,
-    name: &str,
-    args: &[Expression],
-    lowering: &mut ExpressionLoweringContext<'_, '_>,
-) {
-    let context = lowering.context;
-    let resolved_name =
-        resolve_callable_name(name, context.external_signatures(), context.path_mode());
-    let builtin_function = builtin_native_function(name);
-    match name {
-        "ARRAY_REMOVE" => {
-            lower_array_remove_call_into(content, args, lowering);
-        }
-        "ARRAY_PUSH" => {
-            lower_array_push_call_into(content, args, lowering);
-        }
-        "ARRAY_INSERT" => {
-            lower_array_insert_call_into(content, args, lowering);
-        }
-        "DICT_REMOVE" => {
-            lower_dict_remove_call_into(content, args, lowering);
-        }
-        "RANDOM" => {
-            for arg in args {
-                lower_function_arg_into_parts(content, arg, None, lowering);
-            }
-            content.push(RuntimeObject::ControlCommand(ControlCommand::Random));
-        }
-        "SEED_RANDOM" => {
-            for arg in args {
-                lower_function_arg_into_parts(content, arg, None, lowering);
-            }
-            content.push(RuntimeObject::ControlCommand(ControlCommand::SeedRandom));
-        }
-        _ if builtin_function.is_some() => {
-            for arg in args {
-                lower_function_arg_into_parts(content, arg, None, lowering);
-            }
-            content.push(RuntimeObject::NativeFunction(
-                builtin_function.expect("builtin function guard should provide a native function"),
-            ));
-        }
-        _ if matches!(
-            context.external_signatures().get(resolved_name.as_str()),
-            Some(CallSignature::External { .. })
-        ) =>
-        {
-            for arg in args {
-                lower_function_arg_into_parts(content, arg, None, lowering);
-            }
-            content.push(RuntimeObject::ExternalFunction {
-                target: resolved_name.clone(),
-                args: args.len(),
-            });
-        }
-        _ if matches!(
-            context.external_signatures().get(resolved_name.as_str()),
-            Some(CallSignature::Ink { .. })
-        ) =>
-        {
-            let expected_args = match context.external_signatures().get(resolved_name.as_str()) {
-                Some(CallSignature::Ink { args, .. }) => args.as_slice(),
-                _ => &[],
-            };
-            for (index, arg) in args.iter().enumerate() {
-                lower_function_arg_into_parts(content, arg, expected_args.get(index), lowering);
-            }
-            content.push(RuntimeObject::FunctionDivert {
-                target: runtime_function_target(resolved_name.as_str(), context.path_mode()),
-            });
-        }
-        _ => {
-            for arg in args {
-                lower_function_arg_into_parts(content, arg, None, lowering);
-            }
-            content.push(RuntimeObject::FunctionDivert {
-                target: runtime_function_target(resolved_name.as_str(), context.path_mode()),
-            });
-        }
-    }
-}
-
-fn runtime_function_target(name: &str, path_mode: &ChoicePathMode) -> String {
-    if name.contains("::") {
-        return source_path_to_runtime_path(name);
-    }
-
-    module_scoped_source_path_to_runtime_path(path_mode.current_module_name(), name)
-}
-
-fn lower_array_remove_call_into(
-    content: &mut Vec<RuntimeObject>,
-    args: &[Expression],
-    lowering: &mut ExpressionLoweringContext<'_, '_>,
-) {
-    let context = lowering.context;
-    let (Some(target_expression), Some(index_expression)) = (args.first(), args.get(1)) else {
-        content.push(RuntimeObject::Void);
-        return;
-    };
-    let Some(target) = AssignmentTarget::from_expression(target_expression.clone()) else {
-        content.push(RuntimeObject::Void);
-        return;
-    };
-
-    let mut components = Vec::new();
-    let Some(root_name) = collect_assignment_path(&target, &mut components) else {
-        content.push(RuntimeObject::Void);
-        return;
-    };
-    let cached_components = lower_cached_assignment_indexes_into(content, &components, context);
-    let resolved_root_name =
-        resolve_runtime_variable_name(root_name, context.path_mode(), context.global_variables());
-
-    if cached_components.is_empty() {
-        content.push(RuntimeObject::VariableReference(resolved_root_name.clone()));
-        let previous_has_start_content = lowering.has_start_content;
-        lowering.has_start_content = false;
-        lower_expression_into_with_constants(content, index_expression, lowering);
-        lowering.has_start_content = previous_has_start_content;
-        content.push(RuntimeObject::NativeFunction(NativeFunction::ArrayRemove));
-    } else {
-        lower_assignment_path_update_value_into(
-            content,
-            resolved_root_name.as_str(),
-            &cached_components,
-            0,
-            AssignmentUpdateValue::ArrayRemove {
-                index: index_expression,
-            },
-            context,
-        );
-    }
-
-    push_reassignment_for_name(content, resolved_root_name.as_str(), context.path_mode());
-    content.push(RuntimeObject::Void);
-}
-
-fn lower_array_push_call_into(
-    content: &mut Vec<RuntimeObject>,
-    args: &[Expression],
-    lowering: &mut ExpressionLoweringContext<'_, '_>,
-) {
-    let context = lowering.context;
-    let (Some(target_expression), Some(value_expression)) = (args.first(), args.get(1)) else {
-        content.push(RuntimeObject::Void);
-        return;
-    };
-    let Some(target) = AssignmentTarget::from_expression(target_expression.clone()) else {
-        content.push(RuntimeObject::Void);
-        return;
-    };
-
-    let expected_type = infer_array_element_type(target_expression, context);
-    let mut components = Vec::new();
-    let Some(root_name) = collect_assignment_path(&target, &mut components) else {
-        content.push(RuntimeObject::Void);
-        return;
-    };
-    let cached_components = lower_cached_assignment_indexes_into(content, &components, context);
-    let resolved_root_name =
-        resolve_runtime_variable_name(root_name, context.path_mode(), context.global_variables());
-
-    if cached_components.is_empty() {
-        content.push(RuntimeObject::VariableReference(resolved_root_name.clone()));
-        lower_expression_with_expected_type_into_with_constants(
-            content,
-            value_expression,
-            expected_type.as_ref(),
-            lowering,
-        );
-        content.push(RuntimeObject::NativeFunction(NativeFunction::ArrayPush));
-    } else {
-        lower_assignment_path_update_value_into(
-            content,
-            resolved_root_name.as_str(),
-            &cached_components,
-            0,
-            AssignmentUpdateValue::ArrayPush {
-                value: value_expression,
-                expected_type: expected_type.as_ref(),
-            },
-            context,
-        );
-    }
-
-    push_reassignment_for_name(content, resolved_root_name.as_str(), context.path_mode());
-    content.push(RuntimeObject::Void);
-}
-
-fn lower_array_insert_call_into(
-    content: &mut Vec<RuntimeObject>,
-    args: &[Expression],
-    lowering: &mut ExpressionLoweringContext<'_, '_>,
-) {
-    let context = lowering.context;
-    let (Some(target_expression), Some(index_expression), Some(value_expression)) =
-        (args.first(), args.get(1), args.get(2))
-    else {
-        content.push(RuntimeObject::Void);
-        return;
-    };
-    let Some(target) = AssignmentTarget::from_expression(target_expression.clone()) else {
-        content.push(RuntimeObject::Void);
-        return;
-    };
-
-    let expected_type = infer_array_element_type(target_expression, context);
-    let mut components = Vec::new();
-    let Some(root_name) = collect_assignment_path(&target, &mut components) else {
-        content.push(RuntimeObject::Void);
-        return;
-    };
-    let cached_components = lower_cached_assignment_indexes_into(content, &components, context);
-    let resolved_root_name =
-        resolve_runtime_variable_name(root_name, context.path_mode(), context.global_variables());
-
-    if cached_components.is_empty() {
-        content.push(RuntimeObject::VariableReference(resolved_root_name.clone()));
-        lower_expression_into_with_constants(content, index_expression, lowering);
-        lower_expression_with_expected_type_into_with_constants(
-            content,
-            value_expression,
-            expected_type.as_ref(),
-            lowering,
-        );
-        content.push(RuntimeObject::NativeFunction(NativeFunction::ArrayInsert));
-    } else {
-        lower_assignment_path_update_value_into(
-            content,
-            resolved_root_name.as_str(),
-            &cached_components,
-            0,
-            AssignmentUpdateValue::ArrayInsert {
-                index: index_expression,
-                value: value_expression,
-                expected_type: expected_type.as_ref(),
-            },
-            context,
-        );
-    }
-
-    push_reassignment_for_name(content, resolved_root_name.as_str(), context.path_mode());
-    content.push(RuntimeObject::Void);
-}
-
-fn infer_array_element_type(
-    expression: &Expression,
-    context: &LoweringContext<'_>,
-) -> Option<TypeName> {
-    infer_lowered_expression_type(expression, context)
-        .and_then(|type_name| type_name.array_element_type().cloned())
-}
-
-fn lower_dict_remove_call_into(
-    content: &mut Vec<RuntimeObject>,
-    args: &[Expression],
-    lowering: &mut ExpressionLoweringContext<'_, '_>,
-) {
-    let context = lowering.context;
-    let (Some(target_expression), Some(key_expression)) = (args.first(), args.get(1)) else {
-        content.push(RuntimeObject::Void);
-        return;
-    };
-    let Some(target) = AssignmentTarget::from_expression(target_expression.clone()) else {
-        content.push(RuntimeObject::Void);
-        return;
-    };
-
-    let mut components = Vec::new();
-    let Some(root_name) = collect_assignment_path(&target, &mut components) else {
-        content.push(RuntimeObject::Void);
-        return;
-    };
-    let cached_components = lower_cached_assignment_indexes_into(content, &components, context);
-    let resolved_root_name =
-        resolve_runtime_variable_name(root_name, context.path_mode(), context.global_variables());
-
-    if cached_components.is_empty() {
-        content.push(RuntimeObject::VariableReference(resolved_root_name.clone()));
-        let previous_has_start_content = lowering.has_start_content;
-        lowering.has_start_content = false;
-        lower_expression_into_with_constants(content, key_expression, lowering);
-        lowering.has_start_content = previous_has_start_content;
-        content.push(RuntimeObject::NativeFunction(NativeFunction::DictRemove));
-    } else {
-        lower_assignment_path_update_value_into(
-            content,
-            resolved_root_name.as_str(),
-            &cached_components,
-            0,
-            AssignmentUpdateValue::DictRemove {
-                key: key_expression,
-            },
-            context,
-        );
-    }
-
-    push_reassignment_for_name(content, resolved_root_name.as_str(), context.path_mode());
-    content.push(RuntimeObject::Void);
-}
-
-pub(super) fn lower_function_arg_into(
-    content: &mut Vec<RuntimeObject>,
-    arg: &Expression,
-    expected_arg: Option<&FlowArgument>,
-    context: &LoweringContext<'_>,
-    has_start_content: bool,
-    visiting_constants: &mut HashSet<String>,
-) {
-    let mut lowering = ExpressionLoweringContext {
-        context,
-        has_start_content,
-        visiting_constants,
-    };
-    lower_function_arg_into_parts(content, arg, expected_arg, &mut lowering);
-}
-
-fn lower_function_arg_into_parts(
-    content: &mut Vec<RuntimeObject>,
-    arg: &Expression,
-    expected_arg: Option<&FlowArgument>,
-    lowering: &mut ExpressionLoweringContext<'_, '_>,
-) {
-    let context = lowering.context;
-    if expected_arg.is_some_and(FlowArgument::is_by_reference) {
-        if let Expression::VariableReference(name) = arg {
-            content.push(RuntimeObject::VariablePointer {
-                name: resolve_runtime_variable_name(
-                    name,
-                    context.path_mode(),
-                    context.global_variables(),
-                ),
-                context_index: -1,
-            });
-            return;
-        }
-        if let Expression::QualifiedReference(name) = arg {
-            content.push(RuntimeObject::VariablePointer {
-                name: name.as_str().to_string(),
-                context_index: -1,
-            });
-            return;
-        }
-    }
-
-    if let Some(expected_type) = expected_arg.and_then(FlowArgument::declared_type) {
-        if lower_expression_with_expected_type_into_with_constants(
-            content,
-            arg,
-            Some(expected_type),
-            lowering,
-        ) {
-            return;
-        }
-    }
-
-    lower_expression_into_with_constants(content, arg, lowering);
 }
