@@ -1,0 +1,41 @@
+Library desk opens with 16 investigator-hours.
+Query 1: ARC-01 --
+Investigating ARC-01: ARC branch --
+Topic unlocked.
+Note: Cross-checked archive transfer stamps show late manifest swaps.
+Query 2: LAW-31 --
+Investigating LAW-31: LAW branch --
+Skill check failed. Need 8, have 7.
+Query 3: UNKNOWN-01 --
+No indexed record for topic "UNKNOWN-01".
+Query 4: MEC-77 --
+Investigating MEC-77: MEC branch --
+Topic unlocked.
+Note: Machine-room signatures expose temporary bypass power routing.
+Query 5: LAW-31 --
+Topic "LAW-31" already investigated. Duplicate query skipped.
+Query 6: PHI-19 --
+Investigating PHI-19: PHI branch --
+Skill check failed. Need 9, have 5.
+Query 7: NAV-04 --
+Investigating NAV-04: NAV branch --
+Topic unlocked.
+Note: Dock logs tie the midnight cargo list to an unlogged departure.
+Query 8: ARC-01 --
+Topic "ARC-01" already investigated. Duplicate query skipped.
+Search queue complete.
+Research conclusion pass starts.
+Unlocked note: Cross-checked archive transfer stamps show late manifest swaps.
+LAW-31 blocked during search.
+Unlocked note: Dock logs tie the midnight cargo list to an unlogged departure.
+Unlocked note: Machine-room signatures expose temporary bypass power routing.
+PHI-19 blocked during search.
+End conclusion archive.
+Conclusion index: 75
+Search report --
+Topics investigated: 5
+Topics unlocked: 3
+Missing queries: 1
+Unresolved searches: 2
+Remaining hours: 3
+The research division can build a formal hypothesis.
