@@ -807,7 +807,7 @@ gate`.
 
 ## Milestone 5: Format JSON Codec Boundary And Closeout
 
-### [ ] Task 27: Split Format JSON Codec And Close The Plan
+### [~] Task 27: Split Format JSON Codec And Close The Plan
 
 Goal: Give the compiled-story JSON codec independent modules for program,
 metadata, containers, objects, and dynamic values, then close the active plan.
