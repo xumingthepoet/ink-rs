@@ -1,0 +1,12 @@
+Multi-switch lock attempt sequence.
+Current tumbler states: [up, middle, down]
+Attempt 1: first pull sets [up, down, middle].
+Current tumblers: [up, down, middle]
+Feedback: no alignment.
+Attempt 2: backtrack sets [down, down, up].
+Current tumblers: [down, down, up]
+Feedback: no alignment.
+Attempt 3: aligned reset sets [middle, up, down].
+Current tumblers: [middle, up, down]
+Feedback: all switches align.
+Lock opened in 3 ordered attempts.
