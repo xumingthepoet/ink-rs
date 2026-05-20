@@ -1,4 +1,4 @@
-Progress: 6/20
+Progress: 7/20
 
 # Typed Dict Values Task List
 
@@ -233,7 +233,7 @@ Commit record: implementation `ccfaf4c3` (`Cover Dict signature type positions`)
 
 ## Milestone 3: Format JSON
 
-### [>] Task 07: Add Format Dict Wire Model And Document Encoding
+### [x] Task 07: Add Format Dict Wire Model And Document Encoding
 
 Goal: Make `ink-story-json-format` own a reversible Dict value representation.
 
@@ -265,8 +265,14 @@ Validation:
 - Two subsequent `make gate` runs reached late `ink-test` stages but failed by
   the 120s wrapper timeout with no failing tests reported.
 - Reran `make gate` after incremental compilation; passed.
+- Review fix: covered empty Dict values preserving explicit key type, then
+  reran `cargo test -p ink-story-json-format`, `cargo fmt --all --check`, and
+  `make gate`. The first review `make gate` rerun hit a wrapper timeout with no
+  failing tests reported; `cargo test -p ink-test` passed separately and the
+  final `make gate` rerun passed.
 
-Commit record: implementation `57bd2bc8` (`Add Dict story JSON wire model`)
+Commit record: implementation `57bd2bc8` (`Add Dict story JSON wire model`);
+review fix `69b0abdb` (`Cover empty Dict story JSON values`)
 
 ## Milestone 4: Lowering
 
