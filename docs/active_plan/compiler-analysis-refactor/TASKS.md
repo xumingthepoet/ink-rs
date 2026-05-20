@@ -262,7 +262,7 @@ Review record: Reviewed implementation commit `4b6a2db5` with `git show
 Commit record: Implementation commit `4b6a2db5`; waiting-review record
 `88632b6a`; completion-record commit recorded by this task-list update.
 
-### [ ] Task 08: Centralize exact expected-type diagnostics
+### [>] Task 08: Centralize exact expected-type diagnostics
 
 Goal: Reduce duplicated exact expected-type comparison and diagnostic formatting
 without changing messages.
@@ -284,7 +284,10 @@ rewiring.
 
 Validation commands: `cargo test -p ink-compiler analysis`; `make gate`.
 
-Commit record: Implementation commit TBD; completion-record commit TBD.
+Validation record: `cargo test -p ink-compiler analysis` passed; `make gate`
+passed.
+
+Commit record: Implementation commit `5fde59e2`; completion-record commit TBD.
 
 ### [ ] Task 09: Migrate initializers and assignments to shared checker
 
