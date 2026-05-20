@@ -1,4 +1,4 @@
-Progress: 22/24
+Progress: 23/24
 
 # Compiler Analysis Refactor Active Plan
 
@@ -734,7 +734,7 @@ QualifiedName-owned spans.
 Commit record: Implementation commit `b4a8a9f1`; completion-record commit
 recorded by this task-list update.
 
-### [ ] Task 23: Run focused validation and make gate
+### [x] Task 23: Run focused validation and make gate
 
 Goal: Validate the full refactor as a cohesive compiler-analysis change before
 closing the active plan.
@@ -752,7 +752,19 @@ Modification boundaries: Validation fixes only; no new refactor scope.
 
 Validation commands: `cargo test -p ink-compiler analysis`; `cargo test -p ink-compiler targets`; `cargo test -p ink-compiler modules`; `cargo test -p ink-compiler array_literals dict_literals struct_literals`; `cargo test -p ink-test --test integration typed_values`; `cargo test -p ink-experiments`; `make gate`.
 
-Commit record: Implementation commit TBD; completion-record commit TBD.
+Validation record: `cargo test -p ink-compiler analysis` passed; `cargo test
+-p ink-compiler targets` passed; `cargo test -p ink-compiler modules` passed;
+the literal validation passed via split Cargo filters because Cargo accepts one
+test filter per invocation: `cargo test -p ink-compiler array_literals`, `cargo
+test -p ink-compiler dict_literals`, `cargo test -p ink-compiler
+struct_literals`; `cargo test -p ink-test --test integration typed_values`
+passed; `cargo test -p ink-experiments` passed; `make gate` passed.
+
+Review record: Full focused validation and gate validation passed with no
+follow-up fixes.
+
+Commit record: Implementation commit not applicable; completion-record commit
+recorded by this task-list update.
 
 ### [ ] Task 24: Close active plan and move to finished plans
 
