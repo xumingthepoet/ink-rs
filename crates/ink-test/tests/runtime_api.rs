@@ -2,6 +2,7 @@ use std::{cell::RefCell, collections::BTreeMap, error::Error, rc::Rc};
 
 mod support;
 
+use ink_runtime::value_type::{DictKey, DictKeyType, DictValue};
 use support::{
     compiler::compile_fixture,
     runtime::{ExternalFunction, Story, ValueType},
@@ -12,6 +13,7 @@ struct ExtFunc1;
 struct ExtFunc2;
 struct ExtFunc3;
 struct ExtFunc4;
+struct DictExternal;
 struct MultiplyExternal;
 
 impl ExternalFunction for ExtFunc1 {
@@ -43,12 +45,76 @@ impl ExternalFunction for ExtFunc4 {
     }
 }
 
+impl ExternalFunction for DictExternal {
+    fn call(&mut self, func_name: &str, args: Vec<ValueType>) -> Option<ValueType> {
+        match func_name {
+            "game::bump_score" => {
+                let ValueType::Dict(scores) = args.first()? else {
+                    panic!("expected Dict scores argument");
+                };
+                let ValueType::String(key) = args.get(1)? else {
+                    panic!("expected string key argument");
+                };
+                assert_eq!(scores.key_type(), DictKeyType::String);
+                let score = match scores.get(&DictKey::String(key.string.clone())) {
+                    Some(ValueType::Int(score)) => *score,
+                    _ => panic!("expected int score"),
+                };
+                Some(ValueType::Int(score + 1))
+            }
+            "game::make_scores" => {
+                let seed = args.first()?.get::<i32>()?;
+                Some(string_int_dict([("seed", seed), ("next", seed + 1)]))
+            }
+            _ => panic!("unexpected external function: {func_name}"),
+        }
+    }
+}
+
 impl ExternalFunction for MultiplyExternal {
     fn call(&mut self, _func_name: &str, args: Vec<ValueType>) -> Option<ValueType> {
         let left = args.first()?.get::<i32>()?;
         let right = args.get(1)?.get::<i32>()?;
         Some(ValueType::Int(left * right))
     }
+}
+
+fn dict_value(
+    key_type: DictKeyType,
+    entries: impl IntoIterator<Item = (DictKey, ValueType)>,
+) -> ValueType {
+    ValueType::Dict(
+        DictValue::new(key_type, entries.into_iter().collect::<BTreeMap<_, _>>())
+            .expect("valid Dict"),
+    )
+}
+
+fn string_int_dict<const N: usize>(entries: [(&str, i32); N]) -> ValueType {
+    dict_value(
+        DictKeyType::String,
+        entries
+            .into_iter()
+            .map(|(key, value)| (DictKey::String(key.to_string()), ValueType::Int(value))),
+    )
+}
+
+fn int_string_dict<const N: usize>(entries: [(i32, &str); N]) -> ValueType {
+    dict_value(
+        DictKeyType::Int,
+        entries
+            .into_iter()
+            .map(|(key, value)| (DictKey::Int(key), ValueType::from(value))),
+    )
+}
+
+fn nested_string_int_string_dict() -> ValueType {
+    dict_value(
+        DictKeyType::String,
+        [(
+            DictKey::String("ada".to_string()),
+            int_string_dict([(1, "one"), (2, "two")]),
+        )],
+    )
 }
 
 #[test]
@@ -305,6 +371,59 @@ fn variable_get_set_fixture_runs() {
     story.choose_choice_index(0);
 
     assert_eq!(story.continue_maximally(), "10\n");
+}
+
+#[test]
+fn dict_runtime_api_and_externals_roundtrip() {
+    let compiled = compile_fixture("runtime_api/dict-api.ink");
+    let metadata: serde_json::Value =
+        serde_json::from_str(&compiled.json).expect("compiled JSON should parse");
+    assert_eq!(
+        metadata["internalFunctions"]["game::identity_scores"],
+        serde_json::json!({
+            "path": "game.identity_scores",
+            "args": 1,
+            "argTypes": ["Dict<string, int>"],
+            "returnType": "Dict<string, int>"
+        })
+    );
+    assert_eq!(
+        metadata["internalFunctions"]["game::build_table"]["returnType"],
+        serde_json::json!("Dict<string, Dict<int, string>>")
+    );
+
+    let mut story = Story::new(&compiled.json);
+    for name in ["game::bump_score", "game::make_scores"] {
+        story.bind_external_function(name, Rc::new(RefCell::new(DictExternal)), true);
+    }
+
+    assert_eq!(story.continue_maximally(), "11|7|8\n");
+
+    let nested_scores = nested_string_int_string_dict();
+    story
+        .set_variable("game::host_scores", &nested_scores)
+        .expect("nested Dict variable set should succeed");
+    assert!(matches!(
+        story.get_variable("game::host_scores"),
+        Some(restored) if restored == nested_scores
+    ));
+    story.choose_choice_index(0);
+    assert_eq!(story.continue_maximally(), "one|two\n");
+
+    let mut story = Story::new(&compiled.json);
+    for name in ["game::bump_score", "game::make_scores"] {
+        story.bind_external_function(name, Rc::new(RefCell::new(DictExternal)), true);
+    }
+    let scores = string_int_dict([("ada", 10), ("grace", 11)]);
+    let identity = story
+        .call_internal("game::identity_scores", Some(vec![scores.clone()]))
+        .expect("Dict internal call should succeed");
+    assert!(matches!(identity, Some(restored) if restored == scores));
+
+    let table = story
+        .call_internal("game::build_table", None)
+        .expect("nested Dict internal return should succeed");
+    assert!(matches!(table, Some(restored) if restored == nested_scores));
 }
 
 #[test]

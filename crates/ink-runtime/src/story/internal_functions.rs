@@ -3,7 +3,11 @@ use std::{collections::HashMap, rc::Rc};
 use ink_story_json_format as format;
 
 use crate::{
-    container::Container, path::Path, story::Story, story_error::StoryError, value_type::ValueType,
+    container::Container,
+    path::Path,
+    story::Story,
+    story_error::StoryError,
+    value_type::{DictKeyType, ValueType},
 };
 
 #[derive(Debug, Clone)]
@@ -22,6 +26,10 @@ enum RuntimeType {
     DivertTarget,
     Void,
     Array(Box<RuntimeType>),
+    Dict {
+        key_type: DictKeyType,
+        value_type: Box<RuntimeType>,
+    },
     Object(String),
 }
 
@@ -127,6 +135,7 @@ impl RuntimeType {
         match self {
             Self::DivertTarget => true,
             Self::Array(element) => element.contains_divert_target(),
+            Self::Dict { value_type, .. } => value_type.contains_divert_target(),
             _ => false,
         }
     }
@@ -140,6 +149,12 @@ impl RuntimeType {
             Self::DivertTarget => "->".to_string(),
             Self::Void => "void".to_string(),
             Self::Array(element) => format!("{}[]", element.display_name()),
+            Self::Dict {
+                key_type,
+                value_type,
+            } => {
+                format!("Dict<{key_type}, {}>", value_type.display_name())
+            }
             Self::Object(name) => name.clone(),
         }
     }
@@ -153,18 +168,22 @@ fn parse_runtime_type(type_name: &str) -> Result<RuntimeType, StoryError> {
         base = stripped;
     }
 
-    let mut parsed = match base {
-        "bool" => RuntimeType::Bool,
-        "int" => RuntimeType::Int,
-        "float" => RuntimeType::Float,
-        "string" => RuntimeType::String,
-        "->" => RuntimeType::DivertTarget,
-        "void" => RuntimeType::Void,
-        name if !name.is_empty() => RuntimeType::Object(name.to_string()),
-        _ => {
-            return Err(StoryError::BadJson(format!(
-                "Invalid INTERNAL function type '{type_name}'."
-            )))
+    let mut parsed = if let Some(dict_type) = parse_dict_runtime_type(base)? {
+        dict_type
+    } else {
+        match base {
+            "bool" => RuntimeType::Bool,
+            "int" => RuntimeType::Int,
+            "float" => RuntimeType::Float,
+            "string" => RuntimeType::String,
+            "->" => RuntimeType::DivertTarget,
+            "void" => RuntimeType::Void,
+            name if !name.is_empty() => RuntimeType::Object(name.to_string()),
+            _ => {
+                return Err(StoryError::BadJson(format!(
+                    "Invalid INTERNAL function type '{type_name}'."
+                )))
+            }
         }
     };
 
@@ -173,6 +192,62 @@ fn parse_runtime_type(type_name: &str) -> Result<RuntimeType, StoryError> {
     }
 
     Ok(parsed)
+}
+
+fn parse_dict_runtime_type(type_name: &str) -> Result<Option<RuntimeType>, StoryError> {
+    if !type_name.starts_with("Dict<") {
+        return Ok(None);
+    };
+    let Some(inner) = type_name
+        .strip_prefix("Dict<")
+        .and_then(|value| value.strip_suffix('>'))
+    else {
+        return Err(StoryError::BadJson(format!(
+            "Invalid INTERNAL function type '{type_name}'."
+        )));
+    };
+
+    let comma = top_level_comma(inner).ok_or_else(|| {
+        StoryError::BadJson(format!("Invalid INTERNAL function type '{type_name}'."))
+    })?;
+    let key_type = match inner[..comma].trim() {
+        "string" => DictKeyType::String,
+        "int" => DictKeyType::Int,
+        _ => {
+            return Err(StoryError::BadJson(format!(
+                "Invalid INTERNAL function Dict key type '{type_name}'."
+            )))
+        }
+    };
+    let value_type_text = inner[comma + 1..].trim();
+    if value_type_text.is_empty() {
+        return Err(StoryError::BadJson(format!(
+            "Invalid INTERNAL function type '{type_name}'."
+        )));
+    }
+
+    Ok(Some(RuntimeType::Dict {
+        key_type,
+        value_type: Box::new(parse_runtime_type(value_type_text)?),
+    }))
+}
+
+fn top_level_comma(text: &str) -> Option<usize> {
+    let mut angle_depth = 0_usize;
+    let mut comma = None;
+    for (index, character) in text.char_indices() {
+        match character {
+            '<' => angle_depth += 1,
+            '>' => angle_depth = angle_depth.checked_sub(1)?,
+            ',' if angle_depth == 0 => {
+                if comma.replace(index).is_some() {
+                    return None;
+                }
+            }
+            _ => {}
+        }
+    }
+    (angle_depth == 0).then_some(comma).flatten()
 }
 
 fn validate_arguments(
@@ -235,6 +310,19 @@ fn value_matches_type(value: &ValueType, expected_type: &RuntimeType) -> bool {
         (ValueType::Array(values), RuntimeType::Array(element_type)) => values
             .iter()
             .all(|value| value_matches_type(value, element_type)),
+        (
+            ValueType::Dict(dict),
+            RuntimeType::Dict {
+                key_type,
+                value_type,
+            },
+        ) => {
+            dict.key_type() == *key_type
+                && dict
+                    .entries()
+                    .values()
+                    .all(|value| value_matches_type(value, value_type))
+        }
         (ValueType::Object(_), RuntimeType::Object(_)) => true,
         _ => false,
     }

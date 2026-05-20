@@ -888,9 +888,10 @@ impl StoryState {
                     ValueType::String(v) => Value::new::<&str>(&v.string),
                     ValueType::Array(v) => Value::new_value_type(ValueType::Array(v.clone())),
                     ValueType::Object(v) => Value::new_value_type(ValueType::Object(v.clone())),
+                    ValueType::Dict(v) => Value::new_value_type(ValueType::Dict(v.clone())),
                     _ => {
                         return Err(StoryError::InvalidStoryState("ink arguments when calling EvaluateFunction / ChoosePathStringWithParameters must be \
-                        int, float, string, bool, array or object.".to_owned()));
+                        int, float, string, bool, array, object or dict.".to_owned()));
                     }
                 };
 
