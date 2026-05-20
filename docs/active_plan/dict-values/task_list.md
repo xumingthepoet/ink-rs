@@ -233,7 +233,7 @@ Commit record: implementation `ccfaf4c3` (`Cover Dict signature type positions`)
 
 ## Milestone 3: Format JSON
 
-### [ ] Task 07: Add Format Dict Wire Model And Document Encoding
+### [~] Task 07: Add Format Dict Wire Model And Document Encoding
 
 Goal: Make `ink-story-json-format` own a reversible Dict value representation.
 
