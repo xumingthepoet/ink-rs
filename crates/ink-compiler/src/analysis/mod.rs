@@ -108,7 +108,6 @@ fn run_analysis_passes_with_modules(
     module_analysis: &modules::ModuleAnalysis,
 ) -> Vec<Diagnostic> {
     let analysis_indexes = indexes::AnalysisIndexes::build(story, module_analysis);
-    analysis_indexes.mark_ready_for_incremental_migration();
     let mut diagnostics = Vec::new();
 
     // Constants and author warnings are story-wide discovery passes. They do

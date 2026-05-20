@@ -54,17 +54,4 @@ impl<'a> AnalysisIndexes<'a> {
             interface_module_literal_uses,
         }
     }
-
-    pub(super) fn mark_ready_for_incremental_migration(&self) {
-        let _ = (
-            &self.variable_scopes,
-            &self.struct_types,
-            &self.enum_types,
-            &self.target_symbols,
-            &self.interface_members,
-            self.module_imports,
-            &self.module_implementations,
-            &self.interface_module_literal_uses,
-        );
-    }
 }
