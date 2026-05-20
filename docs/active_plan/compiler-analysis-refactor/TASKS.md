@@ -1,4 +1,4 @@
-Progress: 15/24
+Progress: 16/24
 
 # Compiler Analysis Refactor Active Plan
 
@@ -519,7 +519,7 @@ Review record: Reviewed implementation commit `f67e9cc8` with `git show
 Commit record: Implementation commit `f67e9cc8`; waiting-review record
 `fbee5aaf`; completion-record commit recorded by this task-list update.
 
-### [ ] Task 16: Replace duplicated dispatch in array literal checker
+### [x] Task 16: Replace duplicated dispatch in array literal checker
 
 Goal: Use shared argument dispatch helpers in the array literal checker.
 
@@ -537,7 +537,15 @@ Modification boundaries: Array literal checker dispatch code only.
 
 Validation commands: `cargo test -p ink-compiler array_literals`; `make gate`.
 
-Commit record: Implementation commit TBD; completion-record commit TBD.
+Validation record: `cargo test -p ink-compiler array_literals` passed; `make
+gate` passed.
+
+Review record: Array literal dispatch now calls shared static target,
+function-call, and dynamic interface signature helpers directly; no follow-up
+changes required.
+
+Commit record: Implementation commit `ec6df905`; completion-record commit
+recorded by this task-list update.
 
 ### [ ] Task 17: Replace duplicated dispatch in dict literal checker
 
