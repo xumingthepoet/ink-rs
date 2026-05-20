@@ -776,7 +776,7 @@ and builtins`; validation passed with `cargo fmt --all --check`, `cargo test
 integration typed_values`, and `make gate`. Review found no follow-up changes;
 completion validation passed with the same focused commands and `make gate`.
 
-### [ ] Task 26: Split Lower Dynamic Interface Expressions
+### [~] Task 26: Split Lower Dynamic Interface Expressions
 
 Goal: Give dynamic interface target/function lowering a focused owner.
 
