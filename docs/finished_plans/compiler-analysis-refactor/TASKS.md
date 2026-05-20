@@ -1,4 +1,4 @@
-Progress: 23/24
+Progress: 24/24
 
 # Compiler Analysis Refactor Active Plan
 
@@ -766,7 +766,7 @@ follow-up fixes.
 Commit record: Implementation commit not applicable; completion-record commit
 recorded by this task-list update.
 
-### [ ] Task 24: Close active plan and move to finished plans
+### [x] Task 24: Close active plan and move to finished plans
 
 Goal: Finish active plan bookkeeping after all implementation tasks are
 complete and reviewed.
@@ -787,4 +787,10 @@ Modification boundaries: Plan bookkeeping only.
 
 Validation commands: `make gate`.
 
-Commit record: Implementation commit not applicable; completion-record commit TBD.
+Validation record: `make gate` passed after Tasks 01-23 were confirmed `[x]`.
+
+Review record: Active plan is complete and ready to move to
+`docs/finished_plans/compiler-analysis-refactor/`.
+
+Commit record: Implementation commit not applicable; completion-record commit
+recorded by this task-list update and directory move.
