@@ -450,7 +450,7 @@ Review record: Reviewed implementation commit `11d3f854` with `git show
 Commit record: Implementation commit `11d3f854`; waiting-review record
 `35856a27`; completion-record commit recorded by this task-list update.
 
-### [ ] Task 14: Extract function-call argument resolution helper
+### [>] Task 14: Extract function-call argument resolution helper
 
 Goal: Remove repeated function call argument resolution logic.
 
@@ -468,7 +468,12 @@ Modification boundaries: Shared helper and function-call argument callers.
 
 Validation commands: `cargo test -p ink-compiler targets array_literals dict_literals struct_literals`; `make gate`.
 
-Commit record: Implementation commit TBD; completion-record commit TBD.
+Validation record: `cargo test -p ink-compiler targets` passed; `cargo test -p
+ink-compiler array_literals` passed; `cargo test -p ink-compiler
+dict_literals` passed; `cargo test -p ink-compiler struct_literals` passed;
+`make gate` passed.
+
+Commit record: Implementation commit `75fcf20c`; completion-record commit TBD.
 
 ### [ ] Task 15: Extract dynamic interface signature helper
 
