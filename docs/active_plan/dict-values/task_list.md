@@ -198,7 +198,7 @@ Validation:
 
 Commit record: implementation `b289208d` (`Validate Dict assignment targets`)
 
-### [ ] Task 06: Validate Dict Function And External Signatures
+### [~] Task 06: Validate Dict Function And External Signatures
 
 Goal: Allow Dict types in function, external, internal, constant, struct field,
 and interface-relevant type positions.
