@@ -425,7 +425,7 @@ Validation:
 Commit record: implementation `afe8da16` (`Add runtime Dict value type`);
 review fix `7e7a4d7a` (`Cover Dict default value comparison`)
 
-### [~] Task 12: Runtime Dict INDEX And SET_INDEX
+### [>] Task 12: Runtime Dict INDEX And SET_INDEX
 
 Goal: Execute Dict reads and writes with existing native index operations.
 
@@ -442,7 +442,17 @@ Modification boundaries: runtime native function composite params and tests.
 
 Validation commands: `cargo test -p ink-runtime native_function_call::composite`
 
-Commit record: pending
+Validation:
+
+- `cargo test -p ink-runtime native_function_call::composite` passed.
+- `cargo fmt --all --check` passed.
+- Initial `make gate` reached the final doc-test stage but failed by the 120s
+  wrapper timeout with no failing tests reported.
+- Second `make gate` rerun reached the `ink-test` typed values stage but failed
+  by the same wrapper timeout with no failing tests reported.
+- Reran `make gate` again after incremental compilation; passed.
+
+Commit record: implementation `c50da78d` (`Support runtime Dict index operations`)
 
 ### [ ] Task 13: Runtime Dict Equality
 
