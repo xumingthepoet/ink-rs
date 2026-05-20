@@ -462,7 +462,7 @@ Validation:
 Commit record: implementation `c50da78d` (`Support runtime Dict index operations`);
 review fix `b983c956` (`Preserve SET_INDEX key error ordering`)
 
-### [~] Task 13: Runtime Dict Equality
+### [>] Task 13: Runtime Dict Equality
 
 Goal: Compare Dict values recursively with `==` and `!=`.
 
@@ -478,7 +478,17 @@ Modification boundaries: runtime scalar native functions.
 
 Validation commands: `cargo test -p ink-runtime native_function_call::scalar`
 
-Commit record: pending
+Validation:
+
+- `cargo test -p ink-runtime native_function_call::scalar` passed.
+- `cargo fmt --all --check` passed.
+- Initial `make gate` reached the final doc-test stage but failed by the 120s
+  wrapper timeout with no failing tests reported.
+- Second `make gate` rerun reached the `ink-test` integration stage but failed
+  by the same wrapper timeout with no failing tests reported.
+- Reran `make gate` again after incremental compilation; passed.
+
+Commit record: implementation `dc3cafb8` (`Support runtime Dict equality`)
 
 ### [ ] Task 14: Runtime JSON Load And Save
 
