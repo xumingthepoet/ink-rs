@@ -1,0 +1,24 @@
+Trap detection and disarm checks.
+Perception 2, tool 1.
+Hallway spike floor detected.
+Ceiling dart rail remains hidden.
+Vault door snare remains hidden.
+first scan --
+Hallway spike floor | detected, armed
+Ceiling dart rail | unknown
+Vault door snare | unknown
+The party improves awareness.
+Hallway spike floor already mapped in memory.
+Ceiling dart rail detected.
+Vault door snare remains hidden.
+focused scan --
+Hallway spike floor | detected, armed
+Ceiling dart rail | detected, armed
+Vault door snare | unknown
+Hallway spike floor disarmed successfully.
+Ceiling dart rail disarmed successfully.
+Vault door snare is not detected and cannot be disarmed.
+final state --
+Hallway spike floor | detected, disarmed
+Ceiling dart rail | detected, disarmed
+Vault door snare | unknown

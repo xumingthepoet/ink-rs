@@ -1,0 +1,41 @@
+Boss phase transition test.
+Phase 0 (calm), hp 120.
+initial --
+Obsidian Behemoth at 120 hp, phase 0 (calm).
+Phase 1 not reached.
+Phase 2 not reached.
+Phase 3 not reached.
+Phase 4 not reached.
+Hero strike.
+after first attack --
+Obsidian Behemoth at 90 hp, phase 0 (calm).
+Phase 1 not reached.
+Phase 2 not reached.
+Phase 3 not reached.
+Phase 4 not reached.
+Hero strike.
+Phase 1: phase shift unlocked.
+Phase 2: enrage and counter-attack.
+after second attack --
+Obsidian Behemoth at 55 hp, phase 2 (reckless).
+Phase 1 trigger: berserk roar.
+Phase 2 trigger: recklessness.
+Phase 3 not reached.
+Phase 4 not reached.
+Hero strike.
+Phase 3: rage bloom at close range.
+after third attack --
+Obsidian Behemoth at 15 hp, phase 3 (desperate).
+Phase 1 trigger: berserk roar.
+Phase 2 trigger: recklessness.
+Phase 3 trigger: desperation.
+Phase 4 not reached.
+Hero strike.
+Phase 4: final surge ignites.
+Defeated.
+after final strike --
+Obsidian Behemoth at 0 hp, phase 4 (final surge).
+Phase 1 trigger: berserk roar.
+Phase 2 trigger: recklessness.
+Phase 3 trigger: desperation.
+Phase 4 trigger: final surge.
