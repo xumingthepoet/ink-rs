@@ -196,7 +196,7 @@ Review record: Reviewed implementation commit `53690a65` with `git show
 Commit record: Implementation commit `53690a65`; waiting-review record
 `66d152f8`; completion-record commit recorded by this task-list update.
 
-### [ ] Task 06: Remove obsolete per-pass index construction
+### [>] Task 06: Remove obsolete per-pass index construction
 
 Goal: Delete now-unused repeated index construction from migrated analysis
 passes.
@@ -215,7 +215,10 @@ Modification boundaries: Analysis pass entry points and imports only.
 
 Validation commands: `cargo test -p ink-compiler analysis`; `make gate`.
 
-Commit record: Implementation commit TBD; completion-record commit TBD.
+Validation record: `cargo test -p ink-compiler analysis` passed; `make gate`
+passed.
+
+Commit record: Implementation commit `509a5586`; completion-record commit TBD.
 
 ## Milestone 2: Expected-Type Checking
 
