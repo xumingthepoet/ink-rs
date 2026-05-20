@@ -1,4 +1,4 @@
-Progress: 3/24
+Progress: 4/24
 
 # Compiler Analysis Refactor Active Plan
 
@@ -128,7 +128,7 @@ no follow-up changes required.
 Commit record: Implementation commit `60ace477`; waiting-review record
 `0d326822`; completion-record commit recorded by this task-list update.
 
-### [>] Task 04: Migrate field/index/flow diagnostics
+### [x] Task 04: Migrate field/index/flow diagnostics
 
 Goal: Make field access, index access, and flow diagnostics consume shared
 analysis indexes where they currently rebuild them.
@@ -151,8 +151,16 @@ Validation commands: `cargo test -p ink-compiler flow field_access index_access`
 Validation record: `cargo test -p ink-compiler flow` passed; `cargo test -p
 ink-compiler field_access` passed; `cargo test -p ink-compiler index_access`
 passed; `cargo test -p ink-compiler analysis` passed; `make gate` passed.
+Review validation repeated after implementation review: `cargo test -p
+ink-compiler flow` passed; `cargo test -p ink-compiler field_access` passed;
+`cargo test -p ink-compiler index_access` passed; `cargo test -p ink-compiler
+analysis` passed; `make gate` passed.
 
-Commit record: Implementation commit `bf229a49`; completion-record commit TBD.
+Review record: Reviewed implementation commit `bf229a49` with `git show --check`;
+no follow-up changes required.
+
+Commit record: Implementation commit `bf229a49`; waiting-review record
+`cbc5a4fc`; completion-record commit recorded by this task-list update.
 
 ### [ ] Task 05: Migrate literal diagnostics
 
