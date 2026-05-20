@@ -26,6 +26,7 @@ mod flow_state;
 mod function_eval;
 mod output;
 mod output_mutation;
+mod patch;
 
 pub(crate) struct StoryState {
     pub current_flow: Flow,
@@ -101,89 +102,6 @@ impl StoryState {
             .borrow_mut()
             .get_current_element_mut()
             .current_pointer = Pointer::start_of(self.main_content_container.clone())
-    }
-
-    pub fn copy_and_start_patching(&self, for_background_save: bool) -> StoryState {
-        let mut copy = StoryState::new(self.main_content_container.clone());
-
-        copy.patch = Some(self.patch.clone().unwrap_or_else(StatePatch::new));
-
-        // Hijack the new default flow to become a copy of our current one
-        // If the patch is applied, then this new flow will replace the old one in
-        // _namedFlows
-        copy.current_flow.name = self.current_flow.name.clone();
-        copy.current_flow.callstack = Rc::new(RefCell::new(
-            self.current_flow.callstack.as_ref().borrow().clone(),
-        ));
-        copy.current_flow.output_stream = self.current_flow.output_stream.clone();
-        copy.output_stream_dirty();
-
-        // When background saving we need to make copies of choices since they each have
-        // a snapshot of the thread at the time of generation since the game could progress
-        // significantly and threads modified during the save process.
-        // However, when doing internal saving and restoring of snapshots this isn't an issue,
-        // and we can simply ref-copy the choices with their existing threads.
-        if for_background_save {
-            copy.current_flow.current_choices =
-                Vec::with_capacity(self.current_flow.current_choices.len());
-
-            for choice in self.current_flow.current_choices.iter() {
-                let c = choice.as_ref().clone();
-                copy.current_flow.current_choices.push(Rc::new(c));
-            }
-        } else {
-            copy.current_flow.current_choices = self.current_flow.current_choices.clone();
-        }
-
-        if self.has_error() {
-            copy.current_errors = self.current_errors.clone();
-        }
-
-        if self.has_warning() {
-            copy.current_warnings = self.current_warnings.clone();
-        }
-
-        // ref copy - exactly the same variables state!
-        // we're expecting not to read it only while in patch mode
-        // (though the callstack will be modified)
-        copy.variables_state = self.variables_state.clone();
-        copy.variables_state
-            .set_callstack(copy.get_callstack().clone());
-        copy.variables_state.patch = copy.patch.clone();
-
-        copy.evaluation_stack = self.evaluation_stack.clone();
-
-        if !self.diverted_pointer.is_null() {
-            copy.diverted_pointer = self.diverted_pointer.clone();
-        }
-
-        copy.set_previous_pointer(self.get_previous_pointer().clone());
-
-        copy.story_seed = self.story_seed;
-        copy.previous_random = self.previous_random;
-
-        copy.set_did_safe_exit(self.did_safe_exit);
-
-        copy
-    }
-
-    pub fn restore_after_patch(&mut self) {
-        // VariablesState was being borrowed by the patched
-        // state, so restore it with our own callstack.
-        // _patch will be null normally, but if you're in the
-        // middle of a save, it may contain a _patch for save purpsoes.
-        self.variables_state.callstack = self.get_callstack().clone();
-        self.variables_state.patch = self.patch.clone(); // usually null
-    }
-
-    pub fn apply_any_patch(&mut self) {
-        if self.patch.is_none() {
-            return;
-        }
-
-        self.variables_state.apply_patch();
-
-        self.patch = None;
     }
 
     pub fn to_json(&self) -> Result<String, StoryError> {
