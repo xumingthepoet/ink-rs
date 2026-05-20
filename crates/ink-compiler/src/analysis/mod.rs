@@ -223,6 +223,7 @@ mod tests {
         ("target_symbols.rs", include_str!("target_symbols.rs")),
         ("targets/mod.rs", include_str!("targets/mod.rs")),
         ("targets/checker.rs", include_str!("targets/checker.rs")),
+        ("targets/diverts.rs", include_str!("targets/diverts.rs")),
         ("test_support.rs", include_str!("test_support.rs")),
         ("variables.rs", include_str!("variables.rs")),
         ("warnings.rs", include_str!("warnings.rs")),
