@@ -14,9 +14,10 @@ use crate::{
 use super::{
     argument_resolution::{
         resolve_dynamic_interface_signature, resolve_function_call_expected_arguments,
-        DynamicInterfaceSignatureInputs, FunctionCallArgumentResolution,
+        resolve_static_target_expected_arguments, DynamicInterfaceSignatureInputs,
+        FunctionCallArgumentResolution, ResolvedExpectedArguments,
     },
-    context::{EnumTypeIndex, FlowSymbol, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
+    context::{EnumTypeIndex, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
     enums::type_name_contains_enum,
     expression_types::infer_expression_type,
     indexes::AnalysisIndexes,
@@ -27,8 +28,6 @@ use super::{
     interfaces::InterfaceMemberIndex,
     modules::ModuleImportIndex,
     structs::resolve_struct_symbol,
-    target_symbols::resolve_target_symbol,
-    type_names::qualify_type_name_for_module,
 };
 
 #[cfg(test)]
@@ -184,18 +183,29 @@ impl<'a> StructLiteralChecker<'a> {
         context: &VisitContext,
     ) {
         match target {
-            DivertTarget::Path(target) => {
-                self.check_static_target_arguments(target, arguments, span, context);
-            }
-            DivertTarget::QualifiedPath(target) => {
-                self.check_static_target_arguments(target.as_str(), arguments, span, context);
+            DivertTarget::Path(_) | DivertTarget::QualifiedPath(_) => {
+                if let Some(expected_arguments) = resolve_static_target_expected_arguments(
+                    target,
+                    context.current_module.as_deref(),
+                    context.current_flow_path.as_deref(),
+                    self.target_symbols,
+                ) {
+                    self.check_resolved_expected_arguments(
+                        &expected_arguments,
+                        arguments,
+                        span,
+                        context,
+                    );
+                }
             }
             DivertTarget::Dynamic(Expression::DynamicInterfaceAccess { target, member }) => {
-                if let Some(signature) = self.dynamic_interface_signature(
+                if let Ok(signature) = resolve_dynamic_interface_signature(
                     target,
                     member,
                     InterfaceMemberKind::Knot,
-                    context,
+                    self.dynamic_interface_signature_inputs(),
+                    context.current_module.as_deref(),
+                    context.current_flow_path.as_deref(),
                 ) {
                     self.check_interface_signature_arguments(
                         member, arguments, &signature, span, context,
@@ -207,26 +217,6 @@ impl<'a> StructLiteralChecker<'a> {
             | DivertTarget::End
             | DivertTarget::Empty => {}
         }
-    }
-
-    fn check_static_target_arguments(
-        &mut self,
-        target: &str,
-        arguments: &[Expression],
-        span: &SourceSpan,
-        context: &VisitContext,
-    ) {
-        let Some(symbol) = resolve_target_symbol(
-            target,
-            context.current_module.as_deref(),
-            context.current_flow_path.as_deref(),
-            self.target_symbols,
-        )
-        .cloned() else {
-            return;
-        };
-
-        self.check_flow_symbol_arguments(target, arguments, &symbol, span, context);
     }
 
     fn check_function_call_arguments(
@@ -252,7 +242,7 @@ impl<'a> StructLiteralChecker<'a> {
 
     fn check_resolved_expected_arguments(
         &mut self,
-        expected_arguments: &super::argument_resolution::ResolvedExpectedArguments,
+        expected_arguments: &ResolvedExpectedArguments,
         arguments: &[Expression],
         span: &SourceSpan,
         context: &VisitContext,
@@ -279,39 +269,17 @@ impl<'a> StructLiteralChecker<'a> {
         span: &SourceSpan,
         context: &VisitContext,
     ) {
-        if let Some(signature) =
-            self.dynamic_interface_signature(target, member, InterfaceMemberKind::Function, context)
-        {
+        if let Ok(signature) = resolve_dynamic_interface_signature(
+            target,
+            member,
+            InterfaceMemberKind::Function,
+            self.dynamic_interface_signature_inputs(),
+            context.current_module.as_deref(),
+            context.current_flow_path.as_deref(),
+        ) {
             self.check_interface_signature_arguments(member, args, &signature, span, context);
         }
     }
-
-    fn check_flow_symbol_arguments(
-        &mut self,
-        target_name: &str,
-        arguments: &[Expression],
-        symbol: &FlowSymbol,
-        span: &SourceSpan,
-        context: &VisitContext,
-    ) {
-        let qualified_module = target_name.split_once("::").map(|(module, _)| module);
-        for (argument, parameter) in arguments.iter().zip(symbol.arguments()) {
-            let Some(expected_type) = parameter.declared_type() else {
-                continue;
-            };
-            let expected_type = qualified_module
-                .map(|module| qualify_type_name_for_module(expected_type, module))
-                .unwrap_or_else(|| expected_type.clone());
-            self.check_expression_against_type(
-                argument,
-                &expected_type,
-                parameter.name(),
-                span,
-                context,
-            );
-        }
-    }
-
     fn check_interface_signature_arguments(
         &mut self,
         member: &str,
@@ -333,24 +301,6 @@ impl<'a> StructLiteralChecker<'a> {
                 context,
             );
         }
-    }
-
-    fn dynamic_interface_signature(
-        &self,
-        target: &Expression,
-        member: &str,
-        expected_kind: InterfaceMemberKind,
-        context: &VisitContext,
-    ) -> Option<InterfaceMemberSignature> {
-        resolve_dynamic_interface_signature(
-            target,
-            member,
-            expected_kind,
-            self.dynamic_interface_signature_inputs(),
-            context.current_module.as_deref(),
-            context.current_flow_path.as_deref(),
-        )
-        .ok()
     }
 
     fn visible_declared_type(&self, name: &str, context: &VisitContext) -> Option<TypeName> {
