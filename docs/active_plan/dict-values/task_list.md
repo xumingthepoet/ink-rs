@@ -1,4 +1,4 @@
-Progress: 7/20
+Progress: 8/20
 
 # Typed Dict Values Task List
 
@@ -276,7 +276,7 @@ review fix `69b0abdb` (`Cover empty Dict story JSON values`)
 
 ## Milestone 4: Lowering
 
-### [>] Task 08: Lower Dict Defaults And Literals
+### [x] Task 08: Lower Dict Defaults And Literals
 
 Goal: Emit format Dict values for defaults, constants, global initializers, temp
 initializers, and nested literals.
@@ -306,8 +306,13 @@ Validation:
 - Recorded deferred issue
   `docs/issues_found/2026-05-20-duplicate-dict-literal-keys.md` for duplicate
   Dict literal keys collapsing during lowering.
+- Review fix: covered dynamic Dict literal lowering for expression-valued
+  entries, then reran `cargo test -p ink-test typed_values`,
+  `cargo test -p ink-test --test typed_values`, `cargo fmt --all --check`, and
+  `make gate`.
 
-Commit record: implementation `7a48f0a8` (`Lower Dict defaults and literals`)
+Commit record: implementation `7a48f0a8` (`Lower Dict defaults and literals`);
+review fix `d36bc0c2` (`Cover dynamic Dict literal lowering`)
 
 ### [ ] Task 09: Lower Dict Reads
 
