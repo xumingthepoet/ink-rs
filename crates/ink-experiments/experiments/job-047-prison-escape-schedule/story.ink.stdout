@@ -1,0 +1,59 @@
+Prison break simulation.
+Patrol and distraction map for the shift.
+inner_cell patrol 2-5: Cell block checks every quarter-hour sweep.
+maintenance_bay patrol 6-7: Tool room round when the locks rotate.
+service_tunnel patrol 6-8: Tunnel patrol walks with flash markers.
+shoreline_ramp patrol 10-12: Dock watch shifts near the launch deck.
+inner_cell distraction 5-6: Cell alarm reset drill masks footsteps.
+service_tunnel distraction 7-8: Pipe burst alert pulls patrol attention away.
+shoreline_ramp distraction 12-13: Distant thud on hull delays dock report.
+Route Inner Cell Tunnel to inner_cell, key warden_key, base risk 1
+Route Service Tunnel to service_tunnel, key maintenance_key, base risk 2
+Route Shoreline Ramp to shoreline_ramp, key deck_key, base risk 3
+Attempt 1: Inner Cell Tunnel at hour 4
+Patrol noise and light checks remain in inner_cell.
+No active distraction in inner_cell.
+warden_key is missing. Route cannot be started.
+Warden key drill at hour 4.
+Guard visibility blocks inner_cell collection.
+Warden key drill at hour 5.
+Warden key retrieved.
+Attempt 2: Inner Cell Tunnel at hour 5
+No active guards in inner_cell at hour 5.
+inner_cell is currently under a distraction cue.
+Route cleared. Escape can proceed toward Inner Cell Tunnel.
+Risk score: 0
+Attempt 3: Service Tunnel at hour 6
+Patrol noise and light checks remain in service_tunnel.
+No active distraction in service_tunnel.
+maintenance_key is missing. Route cannot be started.
+Maintenance key drill at hour 6.
+The maintenance cache is inaccessible at hour 6.
+Maintenance key drill at hour 7.
+Maintenance key retrieved.
+Attempt 4: Service Tunnel at hour 7
+Patrol noise and light checks remain in service_tunnel.
+service_tunnel is currently under a distraction cue.
+Route cleared. Escape can proceed toward Service Tunnel.
+Risk score: 3
+Attempt 5: Shoreline Ramp at hour 11
+Patrol noise and light checks remain in shoreline_ramp.
+No active distraction in shoreline_ramp.
+deck_key is missing. Route cannot be started.
+Deck key drill at hour 11.
+Dock control blocks deck key access at hour 11.
+Deck key drill at hour 12.
+Deck key retrieved.
+Attempt 6: Shoreline Ramp at hour 12
+No active guards in shoreline_ramp at hour 12.
+shoreline_ramp is currently under a distraction cue.
+Route cleared. Escape can proceed toward Shoreline Ramp.
+Risk score: 2
+Escape attempts: 6
+Escapes cleared: 3
+Keys --
+warden_key: secured
+maintenance_key: secured
+deck_key: secured
+Overall Outcome --
+All routes were made walkable with the right timing.

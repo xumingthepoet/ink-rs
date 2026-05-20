@@ -1,0 +1,141 @@
+Seasonal crop monitoring begins.
+Day 1 report.
+Ground is warm. Morning irrigation starts with heavy water.
+Tomato is not mature enough for harvest on day 1.
+Barley is not mature enough for harvest on day 1.
+Herb is not mature enough for harvest on day 1.
+Crop states day 1 --
+Tomato | growing | growth 5
+Water 0
+Fertilizer 1
+Pests 0
+Yield banked 0
+Barley | young | growth 2
+Water 0
+Fertilizer 0
+Pests 0
+Yield banked 0
+Herb | young | growth 2
+Water 0
+Fertilizer 0
+Pests 0
+Yield banked 0
+Day 2 report.
+Rainfall is light. Selective tending continues.
+Tomato is harvested on day 2 for 4 units.
+Barley is harvested on day 2 for 3 units.
+Herb is not mature enough for harvest on day 2.
+Crop states day 2 --
+Tomato | near_ripe | growth 9
+Water 0
+Fertilizer 0
+Pests 0
+Yield banked 4
+Barley | near_ripe | growth 7
+Water 0
+Fertilizer 0
+Pests 0
+Yield banked 3
+Herb | young | growth 2
+Water 0
+Fertilizer 0
+Pests 0
+Yield banked 0
+Day 3 report.
+A storm rolls in. Saturating moisture with no care delay.
+Tomato is already harvested.
+Barley is already harvested.
+Tomato is not mature enough for harvest on day 3.
+Barley is not mature enough for harvest on day 3.
+Herb is not mature enough for harvest on day 3.
+Crop states day 3 --
+Tomato | near_ripe | growth 9
+Water 2
+Fertilizer 0
+Pests 1
+Yield banked 4
+Barley | near_ripe | growth 7
+Water 2
+Fertilizer 0
+Pests 0
+Yield banked 3
+Herb | young | growth 3
+Water 0
+Fertilizer 0
+Pests 1
+Yield banked 0
+Day 4 report.
+A dry heat spike. No irrigation and weak guards.
+Herb receives secondary pests from nearby beds.
+Tomato is already harvested.
+Barley is already harvested.
+Tomato is not mature enough for harvest on day 4.
+Barley is not mature enough for harvest on day 4.
+Herb is not mature enough for harvest on day 4.
+Crop states day 4 --
+Tomato | near_ripe | growth 9
+Water 0
+Fertilizer 0
+Pests 1
+Yield banked 4
+Barley | near_ripe | growth 7
+Water 0
+Fertilizer 0
+Pests 0
+Yield banked 3
+Herb | young | growth 1
+Water 0
+Fertilizer 0
+Pests 1
+Yield banked 0
+Day 5 report.
+Targeted spray suppresses pests. Evening hydration is uneven.
+Tomato is already harvested.
+Barley is already harvested.
+Tomato is not mature enough for harvest on day 5.
+Barley is not mature enough for harvest on day 5.
+Herb is not mature enough for harvest on day 5.
+Crop states day 5 --
+Tomato | near_ripe | growth 9
+Water 1
+Fertilizer 0
+Pests 0
+Yield banked 4
+Barley | near_ripe | growth 7
+Water 1
+Fertilizer 0
+Pests 0
+Yield banked 3
+Herb | young | growth 3
+Water 0
+Fertilizer 0
+Pests 0
+Yield banked 0
+Day 6 report.
+Day six finish-up irrigation before harvest.
+Tomato is already harvested.
+Barley is already harvested.
+Tomato is not mature enough for harvest on day 6.
+Barley is not mature enough for harvest on day 6.
+Herb is not mature enough for harvest on day 6.
+Crop states day 6 --
+Tomato | near_ripe | growth 9
+Water 2
+Fertilizer 0
+Pests 0
+Yield banked 4
+Barley | near_ripe | growth 7
+Water 2
+Fertilizer 0
+Pests 0
+Yield banked 3
+Herb | growing | growth 5
+Water 0
+Fertilizer 0
+Pests 0
+Yield banked 0
+Season watch is over.
+Final yield ledger.
+Tomato: 4
+Barley: 3
+Herb: 0
