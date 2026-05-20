@@ -916,6 +916,33 @@ mod tests {
     }
 
     #[test]
+    fn reports_dynamic_interface_function_array_argument_errors_at_containing_object_span() {
+        let story = parse_story(
+            "=== interface IScore ===\n\
+             == function score(values: int[]) => int ==\n\
+             === module game ===\n\
+             FROM left\n\
+             VAR route: interface<IScore> = left\n\
+             == main ==\n\
+             ~ temp value: int = {route}::score([\"bad\"])\n\
+             -> END\n\
+             === module left implements IScore ===\n\
+             == function score(values: int[]) => int ==\n\
+             ~ return values[0]",
+        );
+
+        let diagnostics = array_literal_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Value for 'score.values[0]' has type string but expected int",
+        );
+        assert_eq!(diagnostics[0].line, 7);
+        assert_eq!(diagnostics[0].column, 1);
+    }
+
+    #[test]
     fn accepts_struct_array_literals() {
         let story = parse_story(
             "STRUCT Player {\n\
