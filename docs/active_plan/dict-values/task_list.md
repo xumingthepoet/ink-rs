@@ -1,4 +1,4 @@
-Progress: 14/20
+Progress: 15/20
 
 # Typed Dict Values Task List
 
@@ -535,7 +535,7 @@ Validation:
 
 Commit record: implementation `4fab3f45` (`Load and save runtime Dict JSON`)
 
-### [>] Task 15: Runtime API And Externals
+### [x] Task 15: Runtime API And Externals
 
 Goal: Expose Dict values through host variable and external APIs.
 
@@ -563,6 +563,12 @@ Validation:
   timeouts with no failing tests reported.
 - `make gate UNIT_TEST_TIMEOUT=120s INK_TEST_TIMEOUT=600s` passed, then the
   default `make gate` hot rerun passed.
+- Review found no follow-up code fixes required; reran
+  `cargo test -p ink-test --test runtime_api`,
+  `cargo test -p ink-test --test typed_values`, and `cargo fmt --all --check`.
+- Review `make gate` default reruns reached workspace doc-test stages but
+  failed by the wrapper timeout with no failing tests reported; the full
+  `make gate UNIT_TEST_TIMEOUT=120s INK_TEST_TIMEOUT=600s` rerun passed.
 
 Commit record: implementation `d0c277d8` (`Support Dict runtime APIs`)
 
