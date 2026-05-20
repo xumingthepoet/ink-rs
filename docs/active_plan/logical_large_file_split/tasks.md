@@ -421,7 +421,7 @@ syntax::expression::tests::tokenizer_covers_struct_literal_tokens`, and `make
 gate`. Review found no follow-up changes; completion validation passed with
 the same focused commands and `make gate`.
 
-### [ ] Task 14: Split Dynamic Interface Expression Parsing
+### [~] Task 14: Split Dynamic Interface Expression Parsing
 
 Goal: Give dynamic interface target/member expression syntax its own growth
 point.
