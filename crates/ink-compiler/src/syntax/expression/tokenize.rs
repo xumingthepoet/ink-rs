@@ -1,8 +1,8 @@
 use crate::source::SourceSpan;
 
-use super::{
-    is_identifier_continue,
-    token::{binary_operator_rule, symbol_operator_text, ExpressionToken, ExpressionTokenKind},
+use super::super::is_identifier_continue;
+use super::token::{
+    binary_operator_rule, symbol_operator_text, ExpressionToken, ExpressionTokenKind,
 };
 
 #[cfg(test)]
