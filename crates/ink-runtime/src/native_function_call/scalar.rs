@@ -627,10 +627,14 @@ mod tests {
     }
 
     fn dict_value(key_type: DictKeyType, entries: Vec<(DictKey, ValueType)>) -> Rc<dyn RTObject> {
-        Rc::new(Value::new_value_type(ValueType::Dict(
+        Rc::new(Value::new_value_type(dict_value_type(key_type, entries)))
+    }
+
+    fn dict_value_type(key_type: DictKeyType, entries: Vec<(DictKey, ValueType)>) -> ValueType {
+        ValueType::Dict(
             DictValue::new(key_type, entries.into_iter().collect::<BTreeMap<_, _>>())
                 .expect("test dict entries should match key type"),
-        )))
+        )
     }
 
     fn value_type(value: &dyn RTObject) -> &ValueType {
@@ -691,7 +695,7 @@ mod tests {
                 (DictKey::String("hp".to_string()), ValueType::Int(10)),
                 (
                     DictKey::String("nested".to_string()),
-                    ValueType::Array(vec![ValueType::Int(1)]),
+                    dict_value_type(DictKeyType::Int, vec![(DictKey::Int(1), ValueType::Int(1))]),
                 ),
             ],
         );
@@ -701,7 +705,7 @@ mod tests {
                 (DictKey::String("hp".to_string()), ValueType::Int(10)),
                 (
                     DictKey::String("nested".to_string()),
-                    ValueType::Array(vec![ValueType::Int(1)]),
+                    dict_value_type(DictKeyType::Int, vec![(DictKey::Int(1), ValueType::Int(1))]),
                 ),
             ],
         );
@@ -711,7 +715,7 @@ mod tests {
                 (DictKey::String("hp".to_string()), ValueType::Int(11)),
                 (
                     DictKey::String("nested".to_string()),
-                    ValueType::Array(vec![ValueType::Int(1)]),
+                    dict_value_type(DictKeyType::Int, vec![(DictKey::Int(1), ValueType::Int(1))]),
                 ),
             ],
         );
