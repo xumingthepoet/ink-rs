@@ -10,26 +10,31 @@ use crate::{
 
 use super::{
     context::{EnumTypeIndex, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
-    enums::build_enum_type_index,
     expression_types::infer_expression_type,
-    interfaces::{build_interface_member_index, InterfaceMemberIndex},
-    structs::build_struct_type_index,
-    target_symbols::build_target_symbol_index,
-    variables::build_variable_scope_index,
+    indexes::AnalysisIndexes,
+    interfaces::InterfaceMemberIndex,
 };
 
+#[cfg(test)]
+use super::modules::ModuleAnalysis;
+
+#[cfg(test)]
 pub(super) fn field_access_diagnostics(story: &Story) -> Vec<Diagnostic> {
-    let struct_types = build_struct_type_index(story);
-    let enum_types = build_enum_type_index(story);
-    let variable_scopes = build_variable_scope_index(story);
-    let target_symbols = build_target_symbol_index(story);
-    let interface_members = build_interface_member_index(story);
+    let module_analysis = ModuleAnalysis::build(story);
+    let indexes = AnalysisIndexes::build(story, &module_analysis);
+    field_access_diagnostics_with_indexes(story, &indexes)
+}
+
+pub(super) fn field_access_diagnostics_with_indexes(
+    story: &Story,
+    indexes: &AnalysisIndexes<'_>,
+) -> Vec<Diagnostic> {
     let mut checker = FieldAccessChecker::new(
-        &struct_types,
-        &enum_types,
-        &variable_scopes,
-        &target_symbols,
-        &interface_members,
+        &indexes.struct_types,
+        &indexes.enum_types,
+        &indexes.variable_scopes,
+        &indexes.target_symbols,
+        &indexes.interface_members,
     );
     walk_story(story, &mut checker);
     checker.diagnostics

@@ -32,9 +32,9 @@ use assignments::variable_assignment_diagnostics_with_indexes;
 use constants::constant_redefinition_diagnostics;
 use dict_literals::dict_literal_diagnostics;
 use enums::enum_type_diagnostics;
-use field_access::field_access_diagnostics;
-use flow::flow_diagnostics;
-use index_access::index_access_diagnostics;
+use field_access::field_access_diagnostics_with_indexes;
+use flow::flow_diagnostics_with_indexes;
+use index_access::index_access_diagnostics_with_indexes;
 use initializers::variable_initializer_diagnostics_with_indexes;
 use interfaces::{interface_diagnostics, interface_implementation_diagnostics};
 use names::naming_diagnostics;
@@ -151,7 +151,7 @@ fn run_analysis_passes_with_modules(
     // Flow checks are order-sensitive and should stay before target checks:
     // loose ends, illegal returns, and function body restrictions describe
     // control-flow shape rather than target availability.
-    diagnostics.extend(flow_diagnostics(story));
+    diagnostics.extend(flow_diagnostics_with_indexes(story, &analysis_indexes));
 
     // Target checks build symbol and variable-scope indexes.
     // Keep this after naming/flow diagnostics so resolution errors do not hide
@@ -172,8 +172,14 @@ fn run_analysis_passes_with_modules(
     diagnostics.extend(dict_literal_diagnostics(story));
     diagnostics.extend(struct_literal_diagnostics(story));
     diagnostics.extend(array_literal_diagnostics(story));
-    diagnostics.extend(field_access_diagnostics(story));
-    diagnostics.extend(index_access_diagnostics(story));
+    diagnostics.extend(field_access_diagnostics_with_indexes(
+        story,
+        &analysis_indexes,
+    ));
+    diagnostics.extend(index_access_diagnostics_with_indexes(
+        story,
+        &analysis_indexes,
+    ));
 
     diagnostics
 }

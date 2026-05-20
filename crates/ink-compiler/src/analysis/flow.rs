@@ -10,29 +10,36 @@ use crate::{
 
 use super::{
     context::{EnumTypeIndex, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
-    enums::{build_enum_type_index, is_enum_member_reference},
+    enums::is_enum_member_reference,
     expression_types::{
         infer_binary_operator_type, infer_expression_type, typed_builtin_return_type,
     },
-    interfaces::{build_interface_member_index, InterfaceMemberIndex},
+    indexes::AnalysisIndexes,
+    interfaces::InterfaceMemberIndex,
     span::{first_span_in_weave, object_span},
-    structs::build_struct_type_index,
-    target_symbols::{build_target_symbol_index, resolve_target_symbol},
-    variables::build_variable_scope_index,
+    target_symbols::resolve_target_symbol,
 };
 
+#[cfg(test)]
+use super::modules::ModuleAnalysis;
+
+#[cfg(test)]
 pub(super) fn flow_diagnostics(story: &Story) -> Vec<Diagnostic> {
-    let variable_scopes = build_variable_scope_index(story);
-    let struct_types = build_struct_type_index(story);
-    let enum_types = build_enum_type_index(story);
-    let target_symbols = build_target_symbol_index(story);
-    let interface_members = build_interface_member_index(story);
+    let module_analysis = ModuleAnalysis::build(story);
+    let indexes = AnalysisIndexes::build(story, &module_analysis);
+    flow_diagnostics_with_indexes(story, &indexes)
+}
+
+pub(super) fn flow_diagnostics_with_indexes(
+    story: &Story,
+    indexes: &AnalysisIndexes<'_>,
+) -> Vec<Diagnostic> {
     let analysis = FlowAnalysisIndexes {
-        variable_scopes: &variable_scopes,
-        struct_types: &struct_types,
-        enum_types: &enum_types,
-        target_symbols: &target_symbols,
-        interface_members: &interface_members,
+        variable_scopes: &indexes.variable_scopes,
+        struct_types: &indexes.struct_types,
+        enum_types: &indexes.enum_types,
+        target_symbols: &indexes.target_symbols,
+        interface_members: &indexes.interface_members,
     };
     let mut diagnostics = Vec::new();
     check_global_var_declaration_scope(story, &mut diagnostics);
