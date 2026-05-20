@@ -83,10 +83,10 @@ pub(super) fn field_write(params: &[Rc<dyn RTObject>]) -> Result<Rc<dyn RTObject
 
 pub(super) fn index_write(params: &[Rc<dyn RTObject>]) -> Result<Rc<dyn RTObject>, StoryError> {
     let value = params::value(params, 0, SET_INDEX_ARRAY)?;
-    let new_value = params::value(params, 2, SET_INDEX_NEW_VALUE)?;
     match &value.value {
         ValueType::Array(values) => {
             let index = params::int(params, 1, SET_INDEX_VALUE)?;
+            let new_value = params::value(params, 2, SET_INDEX_NEW_VALUE)?;
             let array_index = params::array_index_in_bounds(index, values.len())?;
 
             let mut updated_values = values.to_vec();
@@ -97,6 +97,7 @@ pub(super) fn index_write(params: &[Rc<dyn RTObject>]) -> Result<Rc<dyn RTObject
         }
         ValueType::Dict(dict) => {
             let key = dict_key_param(params, 1, dict.key_type(), "SET_INDEX")?;
+            let new_value = params::value(params, 2, SET_INDEX_NEW_VALUE)?;
             let mut updated_entries = dict.entries().clone();
             updated_entries.insert(key, new_value.value.clone());
             let updated_dict = DictValue::new(dict.key_type(), updated_entries)?;
@@ -349,6 +350,32 @@ mod tests {
             NativeFunctionCall::new(Op::IndexRead).call(vec![string_dict, string_value("missing")]),
         );
         assert_eq!(missing_key, "Dict key not found: \"missing\"");
+    }
+
+    #[test]
+    fn index_write_reports_key_errors_before_new_value_errors() {
+        let array_error = invalid_state(NativeFunctionCall::new(Op::IndexWrite).call(vec![
+            array_value(vec![ValueType::Int(1)]),
+            string_value("0"),
+            non_value_object(),
+        ]));
+        assert_eq!(
+            array_error,
+            "SET_INDEX expected an int index as its second parameter"
+        );
+
+        let dict_error = invalid_state(NativeFunctionCall::new(Op::IndexWrite).call(vec![
+            dict_value(
+                DictKeyType::Int,
+                vec![(DictKey::Int(1), ValueType::Int(10))],
+            ),
+            string_value("1"),
+            non_value_object(),
+        ]));
+        assert_eq!(
+            dict_error,
+            "SET_INDEX expected an int Dict key as its second parameter"
+        );
     }
 
     #[test]
