@@ -1,4 +1,4 @@
-Progress: 19/20
+Progress: 20/20
 
 # Typed Dict Values Task List
 
@@ -717,7 +717,7 @@ Validation:
 
 Commit record: final validation record (`Record Dict final gate validation`)
 
-### [>] Task 20: Move Dict Plan To Finished Plans
+### [x] Task 20: Move Dict Plan To Finished Plans
 
 Goal: Close the active plan after implementation and validation are complete.
 
@@ -737,5 +737,7 @@ Validation commands: `cargo fmt --all --check`
 Validation:
 
 - `cargo fmt --all --check` passed before moving the plan directory.
+- Review verified no Dict plan remains under `docs/active_plan` and reran
+  `cargo fmt --all --check`.
 
 Commit record: plan move (`Move Dict active plan to finished plans`)
