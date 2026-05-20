@@ -1,4 +1,4 @@
-Progress: 16/27
+Progress: 17/27
 
 # Logical Large-File Split Active Plan
 
@@ -508,7 +508,7 @@ completion validation passed with the same focused commands and `make gate`.
 
 ## Milestone 3: Analysis Target Boundaries
 
-### [>] Task 17: Split Target Checker Module Shell
+### [x] Task 17: Split Target Checker Module Shell
 
 Goal: Create a module boundary for target diagnostics without changing any
 checks yet.
@@ -533,7 +533,9 @@ integration diagnostics`; `make gate`.
 
 Commit record: implementation commit `6e898e83 Split target checker module
 shell`; validation passed with `cargo fmt --all --check`, `cargo test -p
-ink-test --test integration diagnostics`, and `make gate`.
+ink-test --test integration diagnostics`, and `make gate`. Review found no
+follow-up changes; completion validation passed with the same focused command
+and `make gate`.
 
 ### [ ] Task 18: Split Divert Target Checks
 
