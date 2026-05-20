@@ -1,4 +1,4 @@
-Progress: 23/27
+Progress: 24/27
 
 # Logical Large-File Split Active Plan
 
@@ -715,7 +715,7 @@ ink-test --test integration variables`, and `make gate`. Review found no
 follow-up changes; completion validation passed with the same focused commands
 and `make gate`.
 
-### [>] Task 24: Split Lower Expression Type Inference Helpers
+### [x] Task 24: Split Lower Expression Type Inference Helpers
 
 Goal: Give lowering-time type inference and type qualification helpers their
 own module.
@@ -741,7 +741,9 @@ compiler_snapshots`; `make gate`.
 Commit record: implementation commit `17ab200e Split lower expression type
 helpers`; validation passed with `cargo fmt --all --check`, `cargo test -p
 ink-test --test integration typed_values`, `cargo test -p ink-test --test
-integration compiler_snapshots`, and `make gate`.
+integration compiler_snapshots`, and `make gate`. Review found no follow-up
+changes; completion validation passed with the same focused commands and `make
+gate`.
 
 ### [ ] Task 25: Split Lower Expression Calls And Collection Builtins
 
