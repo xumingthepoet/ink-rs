@@ -745,7 +745,7 @@ integration compiler_snapshots`, and `make gate`. Review found no follow-up
 changes; completion validation passed with the same focused commands and `make
 gate`.
 
-### [~] Task 25: Split Lower Expression Calls And Collection Builtins
+### [>] Task 25: Split Lower Expression Calls And Collection Builtins
 
 Goal: Move function call and collection mutation lowering into dedicated
 modules.
@@ -770,7 +770,10 @@ Validation commands: `cargo fmt --all --check`; `cargo test -p ink-test --test
 integration functions`; `cargo test -p ink-test --test integration
 typed_values`; `make gate`.
 
-Commit record: pending.
+Commit record: implementation commit `bc67f273 Split lower expression calls
+and builtins`; validation passed with `cargo fmt --all --check`, `cargo test
+-p ink-test --test integration functions`, `cargo test -p ink-test --test
+integration typed_values`, and `make gate`.
 
 ### [ ] Task 26: Split Lower Dynamic Interface Expressions
 
