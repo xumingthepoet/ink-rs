@@ -12,7 +12,11 @@ use crate::{
 };
 
 use super::{
-    context::{EnumTypeIndex, FlowSymbol, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
+    argument_resolution::{
+        resolve_flow_symbol_expected_arguments, resolve_static_target_expected_arguments,
+        ResolvedExpectedArguments,
+    },
+    context::{EnumTypeIndex, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex},
     enums::type_name_contains_enum,
     expression_types::infer_expression_type,
     indexes::AnalysisIndexes,
@@ -24,7 +28,6 @@ use super::{
     modules::ModuleImportIndex,
     structs::resolve_struct_symbol,
     target_symbols::resolve_target_symbol,
-    type_names::qualify_type_name_for_module,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -174,11 +177,8 @@ impl<'a> ArrayLiteralChecker<'a> {
         context: &VisitContext,
     ) {
         match target {
-            DivertTarget::Path(target) => {
+            DivertTarget::Path(_) | DivertTarget::QualifiedPath(_) => {
                 self.check_static_target_arguments(target, arguments, span, context);
-            }
-            DivertTarget::QualifiedPath(target) => {
-                self.check_static_target_arguments(target.as_str(), arguments, span, context);
             }
             DivertTarget::Dynamic(Expression::DynamicInterfaceAccess { target, member }) => {
                 if let Some(signature) = self.dynamic_interface_signature(
@@ -201,22 +201,21 @@ impl<'a> ArrayLiteralChecker<'a> {
 
     fn check_static_target_arguments(
         &mut self,
-        target: &str,
+        target: &DivertTarget,
         arguments: &[Expression],
         span: &SourceSpan,
         context: &VisitContext,
     ) {
-        let Some(symbol) = resolve_target_symbol(
+        let Some(expected_arguments) = resolve_static_target_expected_arguments(
             target,
             context.current_module.as_deref(),
             context.current_flow_path.as_deref(),
             self.target_symbols,
-        )
-        .cloned() else {
+        ) else {
             return;
         };
 
-        self.check_flow_symbol_arguments(target, arguments, &symbol, span, context);
+        self.check_resolved_expected_arguments(&expected_arguments, arguments, span, context);
     }
 
     fn check_function_call_arguments(
@@ -236,7 +235,8 @@ impl<'a> ArrayLiteralChecker<'a> {
             return;
         };
 
-        self.check_flow_symbol_arguments(name, args, &symbol, span, context);
+        let expected_arguments = resolve_flow_symbol_expected_arguments(name, &symbol);
+        self.check_resolved_expected_arguments(&expected_arguments, args, span, context);
     }
 
     fn check_dynamic_interface_function_arguments(
@@ -254,25 +254,18 @@ impl<'a> ArrayLiteralChecker<'a> {
         }
     }
 
-    fn check_flow_symbol_arguments(
+    fn check_resolved_expected_arguments(
         &mut self,
-        target_name: &str,
+        expected_arguments: &ResolvedExpectedArguments,
         arguments: &[Expression],
-        symbol: &FlowSymbol,
         span: &SourceSpan,
         context: &VisitContext,
     ) {
-        let qualified_module = target_name.split_once("::").map(|(module, _)| module);
-        for (argument, parameter) in arguments.iter().zip(symbol.arguments()) {
-            let Some(expected_type) = parameter.declared_type() else {
-                continue;
-            };
-            let expected_type = qualified_module
-                .map(|module| qualify_type_name_for_module(expected_type, module))
-                .unwrap_or_else(|| expected_type.clone());
+        let _ = expected_arguments.target_name();
+        for (argument, parameter) in arguments.iter().zip(expected_arguments.arguments()) {
             self.check_expression_for_arrays(
                 argument,
-                &expected_type,
+                parameter.declared_type(),
                 parameter.name(),
                 span,
                 context,

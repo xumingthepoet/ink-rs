@@ -1,3 +1,4 @@
+mod argument_resolution;
 mod array_literals;
 mod assignments;
 mod constants;
@@ -197,6 +198,10 @@ mod tests {
     const ANALYSIS_SOURCES: &[(&str, &str)] = &[
         ("mod.rs", include_str!("mod.rs")),
         ("array_literals.rs", include_str!("array_literals.rs")),
+        (
+            "argument_resolution.rs",
+            include_str!("argument_resolution.rs"),
+        ),
         ("assignments.rs", include_str!("assignments.rs")),
         ("constants.rs", include_str!("constants.rs")),
         ("context.rs", include_str!("context.rs")),
