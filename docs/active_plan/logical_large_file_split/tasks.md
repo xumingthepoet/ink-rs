@@ -508,7 +508,7 @@ completion validation passed with the same focused commands and `make gate`.
 
 ## Milestone 3: Analysis Target Boundaries
 
-### [ ] Task 17: Split Target Checker Module Shell
+### [~] Task 17: Split Target Checker Module Shell
 
 Goal: Create a module boundary for target diagnostics without changing any
 checks yet.
