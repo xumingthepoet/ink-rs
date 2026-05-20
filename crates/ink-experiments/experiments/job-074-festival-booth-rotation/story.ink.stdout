@@ -1,0 +1,40 @@
+Festival booths begin rotating through the square.
+Slot 1: Lantern Silk hosts the crowd.
+Demand estimate: 7, sold: 3, reward gain: 24.
+Crowd drops from unmet demand.
+Lantern Silk is now sold out.
+Slot 1 restock: Ink Carvings already full.
+Slot 2: Honeyed Nuts hosts the crowd.
+Demand estimate: 6, sold: 5, reward gain: 30.
+Crowd drops from unmet demand.
+Honeyed Nuts is now sold out.
+Slot 2 restock: Lantern Silk receives 1 unit.
+Slot 3: Ink Carvings hosts the crowd.
+Demand estimate: 9, sold: 4, reward gain: 28.
+Crowd drops from unmet demand.
+Ink Carvings is now sold out.
+Slot 3 restock: Honeyed Nuts receives 1 unit.
+Slot 4: Cider Forge hosts the crowd.
+Demand estimate: 6, sold: 2, reward gain: 20.
+Crowd drops from unmet demand.
+Cider Forge is now sold out.
+Slot 4 restock: Cider Forge receives 1 unit.
+Slot 5: Lantern Silk hosts the crowd.
+Demand estimate: 7, sold: 1, reward gain: 8.
+Crowd drops from unmet demand.
+Lantern Silk is now sold out.
+Slot 5 restock: Lantern Silk receives 1 unit.
+Slot 6: Honeyed Nuts hosts the crowd.
+Demand estimate: 5, sold: 1, reward gain: 6.
+Crowd drops from unmet demand.
+Honeyed Nuts is now sold out.
+Slot 6 restock: Ink Carvings receives 1 unit.
+Rotation complete.
+Booth Lantern Silk final stock: low
+Booth Honeyed Nuts final stock: empty
+Booth Ink Carvings final stock: low
+Booth Cider Forge final stock: low
+Festival attendance index: 0
+Total rewards this event: 116
+Booths visited: 6
+Booths that emptied: 6
