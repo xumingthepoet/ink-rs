@@ -9,6 +9,7 @@ use super::indexes::AnalysisIndexes;
 use super::modules::ModuleAnalysis;
 
 mod checker;
+mod diverts;
 
 use checker::CallTargetChecker;
 
