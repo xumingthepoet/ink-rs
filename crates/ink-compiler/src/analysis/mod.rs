@@ -221,6 +221,7 @@ mod tests {
         ("struct_literals.rs", include_str!("struct_literals.rs")),
         ("structs.rs", include_str!("structs.rs")),
         ("target_symbols.rs", include_str!("target_symbols.rs")),
+        ("targets/calls.rs", include_str!("targets/calls.rs")),
         ("targets/mod.rs", include_str!("targets/mod.rs")),
         ("targets/checker.rs", include_str!("targets/checker.rs")),
         ("targets/diverts.rs", include_str!("targets/diverts.rs")),
