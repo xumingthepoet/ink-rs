@@ -672,7 +672,7 @@ and literal checker function-call paths use that span while retaining the old
 Commit record: Implementation commit `e412de7b`; completion-record commit
 recorded by this task-list update.
 
-### [ ] Task 21: Pass real spans through qualified import-use collection where available
+### [>] Task 21: Pass real spans through qualified import-use collection where available
 
 Goal: Improve qualified import-use diagnostics that currently use fallback
 line 1 column 1 when a containing object span is available.
@@ -692,7 +692,10 @@ tests.
 
 Validation commands: `cargo test -p ink-compiler modules`; `make gate`.
 
-Commit record: Implementation commit TBD; completion-record commit TBD.
+Validation record: `cargo test -p ink-compiler modules` passed; `make gate`
+passed.
+
+Commit record: Implementation commit `7f4bdc7b`; completion-record commit TBD.
 
 ### [ ] Task 22: Add regression tests for diagnostic span accuracy
 
