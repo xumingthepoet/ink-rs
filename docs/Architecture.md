@@ -104,7 +104,10 @@ work. It intentionally omits build output and most upstream reference internals.
 |   |       |   `Program`, `Container`, `NamedContainer`, `Object`,
 |   |       |   `ControlCommand`, and `NativeFunction`.
 |   |       |-- json.rs
-|   |       |   JSON codec for compiled story programs, containers, and objects.
+|   |       |   JSON codec module root for model and `serde_json` conversion.
+|   |       |-- json/
+|   |       |   Program/metadata, container, object, dynamic value, and
+|   |       |   scalar helper codec modules.
 |   |       `-- error.rs
 |   |           Format parse/serialization errors.
 |   |-- ink-runtime/
@@ -370,7 +373,9 @@ Owner: `crates/ink-story-json-format/`
 This crate is the typed owner of compiled-story JSON:
 
 - `model.rs`: Rust model for the wire format.
-- `json.rs`: conversion between model values and `serde_json`.
+- `json.rs`: codec module root with the crate-facing conversion surface.
+- `json/`: conversion owners for programs/metadata, containers, objects,
+  dynamic values/dicts, and scalar helpers.
 - `error.rs`: format errors.
 - `lib.rs`: public exports and `INK_VERSION_CURRENT`.
 
@@ -596,7 +601,7 @@ Use this table to decide where to start.
 | Variable scope, globals, temps, args | `analysis/variables.rs`, `analysis/initializers.rs` | `lower/indexes.rs`, `tests/variables.rs` |
 | Type errors for composites or assignments | `analysis/expression_types.rs`, `analysis/assignments.rs`, `analysis/field_access.rs`, `analysis/index_access.rs` | typed fixtures |
 | Wrong compiled JSON shape | `lower/` owner for the construct | `ink-story-json-format/src/model.rs`, snapshots |
-| Missing or wrong JSON token mapping | `ink-story-json-format/src/model.rs`, `json.rs` | compiler emit and runtime json_read |
+| Missing or wrong JSON token mapping | `ink-story-json-format/src/model.rs`, `json/` | compiler emit and runtime json_read |
 | Runtime cannot load compiled JSON | `ink-runtime/src/json/json_read.rs` | format crate codec |
 | Runtime output differs after load | `story/progress.rs`, `story/control_logic.rs`, `story/navigation.rs` | lowered `Program` and runtime fixture |
 | Choices appear, repeat, or save incorrectly | `story/choices.rs`, `choice_point.rs`, `story_state.rs` | `tests/choices.rs` |
