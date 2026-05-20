@@ -537,7 +537,7 @@ ink-test --test integration diagnostics`, and `make gate`. Review found no
 follow-up changes; completion validation passed with the same focused command
 and `make gate`.
 
-### [~] Task 18: Split Divert Target Checks
+### [>] Task 18: Split Divert Target Checks
 
 Goal: Move static, dynamic, conditional, tunnel, and cross-module divert target
 checking into a focused module.
@@ -559,7 +559,10 @@ Validation commands: `cargo fmt --all --check`; `cargo test -p ink-test --test
 integration diverts`; `cargo test -p ink-test --test integration diagnostics`;
 `make gate`.
 
-Commit record: pending.
+Commit record: implementation commit `3b9d0107 Split divert target checks`;
+validation passed with `cargo fmt --all --check`, `cargo test -p ink-test
+--test integration diverts`, `cargo test -p ink-test --test integration
+diagnostics`, and `make gate`.
 
 ### [ ] Task 19: Split Function And External Call Checks
 
