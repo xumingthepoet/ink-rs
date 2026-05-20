@@ -231,7 +231,7 @@ lifecycle`; validation passed with `cargo fmt --all --check`, `cargo test -q
 runtime_api`, and `make gate`. Review found no follow-up changes; completion
 validation passed with the same focused commands and `make gate`.
 
-### [~] Task 08: Split Runtime Save-State JSON
+### [>] Task 08: Split Runtime Save-State JSON
 
 Goal: Move runtime save/load versioning and JSON shape into a save-state module
 while keeping it runtime-owned.
@@ -258,7 +258,14 @@ ink-runtime story_state::tests::save_state_roundtrips_array_and_object_variables
 `cargo test -q -p ink-runtime story_state::tests::save_state_roundtrips_dict_variables_and_omits_defaults`;
 `make gate`.
 
-Commit record: pending.
+Commit record: implementation commit `a9348c47 Split runtime save-state JSON`;
+validation passed with `cargo fmt --all --check`, `cargo test -q -p
+ink-runtime story_state::tests::save_state_uses_minimal_v2_shape`, `cargo test
+-q -p ink-runtime
+story_state::tests::save_state_roundtrips_array_and_object_variables`, `cargo
+test -q -p ink-runtime
+story_state::tests::save_state_roundtrips_dict_variables_and_omits_defaults`,
+and `make gate`.
 
 ## Milestone 2: Syntax Expression Boundaries
 
