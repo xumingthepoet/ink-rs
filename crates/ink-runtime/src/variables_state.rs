@@ -349,3 +349,58 @@ fn value_type_equal(val: &ValueType, default_val: &ValueType) -> bool {
         _ => false,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+
+    use super::*;
+    use crate::value_type::{DictKey, DictKeyType, DictValue};
+
+    fn dict_value(key_type: DictKeyType, entries: Vec<(DictKey, ValueType)>) -> ValueType {
+        ValueType::Dict(
+            DictValue::new(key_type, entries.into_iter().collect::<BTreeMap<_, _>>())
+                .expect("test dict entries should match key type"),
+        )
+    }
+
+    #[test]
+    fn dict_default_values_compare_key_type_and_nested_entries() {
+        let left = dict_value(
+            DictKeyType::String,
+            vec![
+                (DictKey::String("hp".to_string()), ValueType::Int(7)),
+                (
+                    DictKey::String("tags".to_string()),
+                    ValueType::Array(vec![ValueType::new("ready")]),
+                ),
+            ],
+        );
+        let same = dict_value(
+            DictKeyType::String,
+            vec![
+                (DictKey::String("hp".to_string()), ValueType::Int(7)),
+                (
+                    DictKey::String("tags".to_string()),
+                    ValueType::Array(vec![ValueType::new("ready")]),
+                ),
+            ],
+        );
+        let changed_value = dict_value(
+            DictKeyType::String,
+            vec![
+                (DictKey::String("hp".to_string()), ValueType::Int(8)),
+                (
+                    DictKey::String("tags".to_string()),
+                    ValueType::Array(vec![ValueType::new("ready")]),
+                ),
+            ],
+        );
+        let different_key_type =
+            dict_value(DictKeyType::Int, vec![(DictKey::Int(7), left.clone())]);
+
+        assert!(value_type_equal(&left, &same));
+        assert!(!value_type_equal(&left, &changed_value));
+        assert!(!value_type_equal(&left, &different_key_type));
+    }
+}
