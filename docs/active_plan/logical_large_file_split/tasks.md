@@ -300,7 +300,7 @@ syntax::expression::tests::operator_rule_table_drill_covers_tokenizer_and_parser
 Review found no follow-up changes; completion validation passed with the same
 focused commands and `make gate`.
 
-### [ ] Task 10: Split Expression Tokenizer
+### [~] Task 10: Split Expression Tokenizer
 
 Goal: Give lexical scanning for expressions an independent module.
 
