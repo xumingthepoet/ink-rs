@@ -1,0 +1,37 @@
+Endgame state recap aggregation.
+Flag 1: reactor_stable = true
+Reactor remains under local control.
+Flag 2: relay_network_secure = false
+Long-range messaging requires escort encryption.
+Flag 3: colony_fed = true
+Food lines stabilize across all sectors.
+Flag 4: treaty_signed = true
+Frontier treaty remains enforceable.
+Flag 5: archive_recovered = false
+Forecasting remains incomplete without archives.
+Flag 6: captain_trusted = true
+Command authority remains publicly accepted.
+Flag 7: evacuation_prepared = true
+Emergency corridors stay clear for civilians.
+Flag 8: mutiny_prevented = true
+Internal order holds after the final operation.
+Prior flag aggregation complete.
+Chapter score adjustments:
+Reputation 74: +12
+Resources 61: +10
+Security 48: -8
+Science 55: +6
+Unity 72: +8
+Debt 18: +2
+Casualties 12: -5
+Final ending classification: Radiant Recovery
+Ending title: The Long Dawn
+Ending points: 47
+Positive flags: 6
+Negative flags: 2
+Recap consequences:
+Relay routes require manual encryption escorts.
+Science board proceeds with incomplete projections.
+Border posts keep expanded watch rotations.
+Two districts continue under recovery leave.
+Coalition leadership confirms a stable reconstruction term.

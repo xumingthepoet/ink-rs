@@ -1,0 +1,35 @@
+Messenger relay network simulation.
+Hop 1: Relay-A to Relay-B
+Delay this hop: 8
+Interception risk this hop: 18
+Interception status: no active probe.
+Incident on hop 2: Relay-B outage.
+Hop 2: Relay-B to Relay-C
+Delay this hop: 23
+Interception risk this hop: 51
+Interception status: channel compromised.
+Repair complete for Relay-B after 2 cycles.
+Hop 3: Relay-C to Relay-D
+Delay this hop: 17
+Interception risk this hop: 32
+Interception status: active probe detected.
+Hop 4: Relay-D to Relay-E
+Delay this hop: 9
+Interception risk this hop: 21
+Interception status: no active probe.
+Relay traversal complete.
+Relay network summary:
+Total delay: 57
+Cumulative interception risk: 122
+Max hop risk: 51
+Intercepted attempts: 2
+Compromised hops: 1
+Incidents seen: 1
+Repairs completed: 1
+Repair cycles spent: 2
+Relay-A: online true, hops 1, exposure 18, load 0
+Relay-B: online true, hops 1, exposure 51, load 2
+Relay-C: online true, hops 1, exposure 32, load 3
+Relay-D: online true, hops 1, exposure 21, load 1
+Relay-E: online true, hops 0, exposure 0, load 1
+Delivery outcome: delivered with delays and partial exposure.

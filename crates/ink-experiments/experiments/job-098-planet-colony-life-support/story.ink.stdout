@@ -1,0 +1,75 @@
+Planet colony life support simulation.
+Initial reserves:
+Oxygen 58, Water 54, Power 43
+Cycle 1 start.
+Baseline life support demand applied.
+Oxygen Scrubber online contribution applied.
+Water Recycler online contribution applied.
+Power Hub online contribution applied.
+No failures this cycle.
+All resources above critical thresholds.
+End cycle 1 reserves:
+Oxygen 61, Water 56, Power 43
+Cycle 2 start.
+Baseline life support demand applied.
+Oxygen Scrubber online contribution applied.
+Water Recycler online contribution applied.
+Power Hub online contribution applied.
+Failure: Water Recycler
+Emergency loss O:0 W:12 P:4
+Repair completed for Water Recycler in 3 hours.
+All resources above critical thresholds.
+End cycle 2 reserves:
+Oxygen 64, Water 53, Power 40
+Cycle 3 start.
+Baseline life support demand applied.
+Oxygen Scrubber online contribution applied.
+Water Recycler online contribution applied.
+Power Hub online contribution applied.
+No failures this cycle.
+All resources above critical thresholds.
+End cycle 3 reserves:
+Oxygen 67, Water 55, Power 40
+Cycle 4 start.
+Baseline life support demand applied.
+Oxygen Scrubber online contribution applied.
+Water Recycler online contribution applied.
+Power Hub online contribution applied.
+Failure: Oxygen Scrubber
+Emergency loss O:15 W:0 P:3
+Repair completed for Oxygen Scrubber in 4 hours.
+All resources above critical thresholds.
+End cycle 4 reserves:
+Oxygen 63, Water 58, Power 37
+Cycle 5 start.
+Baseline life support demand applied.
+Oxygen Scrubber online contribution applied.
+Water Recycler online contribution applied.
+Power Hub online contribution applied.
+Failure: Power Hub
+Emergency loss O:0 W:0 P:18
+Repair completed for Power Hub in 5 hours.
+All resources above critical thresholds.
+End cycle 5 reserves:
+Oxygen 66, Water 60, Power 29
+Cycle 6 start.
+Baseline life support demand applied.
+Oxygen Scrubber online contribution applied.
+Water Recycler online contribution applied.
+Power Hub online contribution applied.
+No failures this cycle.
+All resources above critical thresholds.
+End cycle 6 reserves:
+Oxygen 69, Water 62, Power 29
+Life support cycle log complete.
+Life support summary:
+Total failures: 3
+Total repairs: 3
+Repair hours: 12
+Critical cycles: 0
+Final reserves:
+Oxygen 69, Water 62, Power 29
+Oxygen Scrubber: failures 1, repairs 1
+Water Recycler: failures 1, repairs 1
+Power Hub: failures 1, repairs 1
+Survival outcome: colony survives but remains fragile.
