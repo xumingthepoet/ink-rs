@@ -451,7 +451,7 @@ syntax::expression::tests::tokenizer_covers_dynamic_interface_separators`,
 Review found no follow-up changes; completion validation passed with the same
 focused commands and `make gate`.
 
-### [ ] Task 15: Split Expression String Parsing
+### [~] Task 15: Split Expression String Parsing
 
 Goal: Separate string-expression content parsing from general token expression
 parsing.
