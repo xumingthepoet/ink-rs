@@ -24,6 +24,33 @@ Each entry should include:
 - migration guidance
 - tests
 
+## 2026-05-20: Typed Dict Values
+
+- status: supported
+- upstream behavior: upstream Ink does not have explicit generic `Dict<K, V>`
+  value types with checked key and value types.
+- ink-rs behavior: `Dict<string, V>` and `Dict<int, V>` are supported value
+  types. Dict literals use string or integer keys, `{}` is an empty Dict when
+  the expected type is known, omitted `VAR` initializers default to an empty
+  Dict with the declared key type, and index reads/writes use `dict[key]`.
+  Assigning through an index inserts or replaces an entry, missing-key reads are
+  runtime errors, and Dict values compare recursively with `==` and `!=`.
+  Dict values can appear in globals, temps, constants, function parameters and
+  returns, external signatures, struct fields, arrays, and host variable/API
+  values.
+- documentation effect: `SyntaxReference.md` documents the current
+  `Dict<string, V>` and `Dict<int, V>` syntax, literals, defaulting, index
+  read/write semantics, equality, function/external use, and V1 non-goals.
+- rationale: story code needs typed key/value maps without losing integer key
+  identity or weakening composite type checks.
+- migration guidance: use `Dict<string, V>` or `Dict<int, V>` instead of
+  encoding map-like data as parallel arrays or structs with open-ended fields.
+  Use arrays or explicit structs when order or fixed field shape matters.
+- tests: parser, analysis, lowering, format, runtime, save/load, runtime API,
+  typed fixture, diagnostics, and parse snapshot coverage exercises string and
+  integer keys, nested Dicts, defaults, literals, reads, writes, equality,
+  functions, constants, externals, and host set/get.
+
 ## 2026-05-20: Interface-Typed Dynamic Module Access
 
 - status: supported

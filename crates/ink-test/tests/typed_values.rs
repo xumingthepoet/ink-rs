@@ -4,6 +4,7 @@ use serde_json::json;
 
 mod support;
 
+use ink_runtime::value_type::{DictKey, DictKeyType, DictValue};
 use support::{
     compiler::{
         assert_diagnostic, assert_json_sequence, assert_story_output, compile_fixture,
@@ -484,6 +485,49 @@ fn dict_typed_values_index_writes_lower_to_set_index_tokens() {
 }
 
 #[test]
+fn dict_typed_values_run_at_runtime() {
+    let compiled = compile_fixture("typed/dicts-runtime.ink");
+    let json = compiled.program.to_json_value();
+
+    assert_json_sequence(
+        &json,
+        vec![
+            json!(["dict", "string", []]),
+            json!({"VAR=": "game::default_scores"}),
+        ],
+    );
+    assert_json_sequence(
+        &json,
+        vec![
+            json!(["dict", "string", [["ada", 10]]]),
+            json!({"VAR=": "game::scores"}),
+        ],
+    );
+    assert_json_sequence(
+        &json,
+        vec![
+            json!(["dict", "int", [[1, "^one"]]]),
+            json!({"VAR=": "game::names"}),
+        ],
+    );
+
+    let mut story = Story::new(&compiled.json);
+    for name in ["game::make_dict_scores", "game::pick_dict_score"] {
+        story.bind_external_function(name, Rc::new(RefCell::new(TypedExternal)), true);
+    }
+
+    assert_eq!(
+        story.continue_maximally(),
+        "Dict<string>{}|10|one|one|10|one\n11|12|two|13|14\ntrue|true\n23|10\n5|6\n"
+    );
+    assert!(
+        story.get_current_errors().is_empty(),
+        "story should not emit runtime errors: {:#?}",
+        story.get_current_errors()
+    );
+}
+
+#[test]
 fn index_assignment_copies_array_values_at_runtime() {
     let compiled = compile_fixture("typed/index-assignment-copy.ink");
 
@@ -622,7 +666,36 @@ impl ExternalFunction for TypedExternal {
                 fields.insert("hp".to_string(), ValueType::Int(7));
                 Some(ValueType::Object(fields))
             }
+            "make_dict_scores" | "game::make_dict_scores" => {
+                let seed = args.first()?.get::<i32>()?;
+                Some(string_int_dict([("seed", seed), ("next", seed + 1)]))
+            }
+            "pick_dict_score" | "game::pick_dict_score" => {
+                let ValueType::Dict(scores) = args.first()? else {
+                    panic!("expected Dict scores argument");
+                };
+                let ValueType::String(key) = args.get(1)? else {
+                    panic!("expected string key argument");
+                };
+                match scores.get(&DictKey::String(key.string.clone())) {
+                    Some(ValueType::Int(score)) => Some(ValueType::Int(*score)),
+                    _ => panic!("expected int score"),
+                }
+            }
             _ => panic!("unexpected external function: {func_name}"),
         }
     }
+}
+
+fn string_int_dict<const N: usize>(entries: [(&str, i32); N]) -> ValueType {
+    ValueType::Dict(
+        DictValue::new(
+            DictKeyType::String,
+            entries
+                .into_iter()
+                .map(|(key, value)| (DictKey::String(key.to_string()), ValueType::Int(value)))
+                .collect(),
+        )
+        .expect("valid Dict"),
+    )
 }

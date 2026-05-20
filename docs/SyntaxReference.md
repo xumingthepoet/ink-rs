@@ -1208,7 +1208,7 @@ Note the level 2 gather point directly below the first option: there's nothing t
 So far we've made conditional text and conditional choices using explicit
 variables, labels, and expressions.
 
-**ink** also supports variables, both temporary and global, storing typed values such as numbers, booleans, strings, enums, structs, and arrays. It is fully-featured in terms of logic, and contains a few additional structures to help keep the often complex logic of a branching story better organised.
+**ink** also supports variables, both temporary and global, storing typed values such as numbers, booleans, strings, enums, structs, arrays, and dictionaries. It is fully-featured in terms of logic, and contains a few additional structures to help keep the often complex logic of a branching story better organised.
 
 
 ## 1) Global Variables
@@ -1235,10 +1235,11 @@ use the type's default value.
 	VAR infection_ratio: float = 0.25
 	VAR discovered_clues: string[] = ["ticket", "cipher"]
 	VAR unopened_doors: int[]
+	VAR clue_scores: Dict<string, int> = {"ticket": 2}
 	VAR retreat: -> = -> everybody_dies
 	VAR checkpoints: ->[] = [-> the_train]
 
-The primitive source types are `int`, `float`, `bool`, `string`, and `->`. The `->` type stores a divert target value such as `-> knot` or `-> knot.stitch`. Array types are written as `T[]`, so `string[]` means an array of strings, `int[][]` means an array of integer arrays, and `->[]` means an array of divert targets. Empty array literals are valid when the expected type is known, such as in `VAR unopened_doors: int[] = []`.
+The primitive source types are `int`, `float`, `bool`, `string`, and `->`. The `->` type stores a divert target value such as `-> knot` or `-> knot.stitch`. Array types are written as `T[]`, so `string[]` means an array of strings, `int[][]` means an array of integer arrays, and `->[]` means an array of divert targets. Dict types are written as `Dict<string, V>` or `Dict<int, V>`, where `V` is any supported value type. Empty array and Dict literals are valid when the expected type is known, such as in `VAR unopened_doors: int[] = []` or `VAR clue_scores: Dict<string, int> = {}`.
 
 Long `VAR` and `CONST` initializers can spread array and struct literals across
 multiple lines:
@@ -1308,6 +1309,49 @@ Struct literals can omit fields whose type has a default value; fields of type `
 	{current_player.stats.hp}
 	~ current_player.stats.hp += 1
 	~ party[1].stats.hp += 1
+
+### Dictionaries
+
+Use `Dict<string, V>` or `Dict<int, V>` for typed key/value maps. The key type
+is part of the value's runtime shape, so integer keys are not converted to
+string field names. The value type can be primitive, enum, struct, array,
+another Dict, or any other supported value type.
+
+	VAR scores: Dict<string, int> = {"ada": 10, "grace": 11}
+	VAR names: Dict<int, string> = {1: "one"}
+	VAR nested: Dict<string, Dict<int, string>> = {"ada": {1: "ready"}}
+	VAR empty_scores: Dict<string, int>
+
+String-key Dict literals use quoted string keys. Int-key Dict literals use
+integer keys. Empty `{}` is valid only when the expected type is known, such as
+in a typed declaration, assignment, function argument, or return context. An
+omitted Dict initializer defaults to an empty Dict with the declared key type.
+
+Read and write entries with index syntax:
+
+	{scores["ada"]}
+	~ scores["bea"] = 12
+	~ nested["ada"][2] = "done"
+
+A write inserts the key when it is absent or replaces the existing value when
+it is present. A read from a missing key is a runtime error. Key expressions
+must match the declared key type: `Dict<string, V>` requires a string key and
+`Dict<int, V>` requires an int key.
+
+Dicts can be stored in globals, temps, constants, arrays, and struct fields,
+and can be passed through function and external signatures:
+
+	CONST BASE_SCORES: Dict<string, int> = {"ada": 10}
+
+	== function score_for(values: Dict<string, int>, key: string) => int ==
+	~ return values[key]
+
+	EXTERNAL load_scores(seed: int) => Dict<string, int>
+
+Dict equality compares key type and entries recursively with `==` and `!=`.
+Dict V1 intentionally has no collection builtins such as length, contains,
+remove, iteration, or key enumeration. Use explicit story data or host code for
+those operations.
 
 ### Enums
 
@@ -1972,7 +2016,7 @@ Wrapping up simple operations in function can also provide a simple place to put
 
 Interactive stories often rely on state machines, tracking what stage some higher level process has reached. There are lots of ways to do this, but the most conveninent is to use constants.
 
-In ink-rs, every module-level constant declaration must include an explicit type using `CONST name: Type = value`. Constants can use the same maintained value types as variables, including structs and arrays such as `Player` and `Player[]`.
+In ink-rs, every module-level constant declaration must include an explicit type using `CONST name: Type = value`. Constants can use the same maintained value types as variables, including structs, arrays, and Dicts such as `Player`, `Player[]`, and `Dict<string, int>`.
 
 Sometimes, it's convenient to define constants to be strings, so you can print them out, for gameplay or debugging purposes.
 
@@ -2030,6 +2074,7 @@ In ink-rs, every `EXTERNAL` declaration is module-level and needs a typed signat
 
 	EXTERNAL next_score(value: int) => int
 	EXTERNAL make_scores() => int[]
+	EXTERNAL load_scores(seed: int) => Dict<string, int>
 	EXTERNAL make_player() => Player
 	EXTERNAL next_scene(name: string) => ->
 	EXTERNAL log_event(message: string) => void
@@ -2037,8 +2082,9 @@ In ink-rs, every `EXTERNAL` declaration is module-level and needs a typed signat
 External calls are type-checked like Ink function calls. Host bindings use the
 module-qualified source name, such as `audio::next_score`. Host return values
 must match the declared runtime shape: primitive values for primitive returns,
-arrays for `T[]`, objects with matching fields for struct returns, and divert
-target values for `->` returns.
+arrays for `T[]`, Dict values with the declared key type for `Dict<K, V>`,
+objects with matching fields for struct returns, and divert target values for
+`->` returns.
 
 `INTERNAL` declarations expose ink functions for host code to call through the
 runtime API:
