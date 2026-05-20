@@ -8,6 +8,7 @@ use super::indexes::AnalysisIndexes;
 #[cfg(test)]
 use super::modules::ModuleAnalysis;
 
+mod builtins;
 mod calls;
 mod checker;
 mod diverts;
