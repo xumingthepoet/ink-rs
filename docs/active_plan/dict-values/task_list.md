@@ -314,7 +314,7 @@ Validation:
 Commit record: implementation `7a48f0a8` (`Lower Dict defaults and literals`);
 review fix `d36bc0c2` (`Cover dynamic Dict literal lowering`)
 
-### [ ] Task 09: Lower Dict Reads
+### [~] Task 09: Lower Dict Reads
 
 Goal: Emit runtime instructions for Dict index reads through existing expression
 lowering.
