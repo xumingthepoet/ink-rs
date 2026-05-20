@@ -8,6 +8,7 @@ mod expression_types;
 mod field_access;
 mod flow;
 mod index_access;
+mod indexes;
 mod initializers;
 mod interface_values;
 mod interfaces;
@@ -106,6 +107,8 @@ fn run_analysis_passes_with_modules(
     story: &Story,
     module_analysis: &modules::ModuleAnalysis,
 ) -> Vec<Diagnostic> {
+    let analysis_indexes = indexes::AnalysisIndexes::build(story, module_analysis);
+    analysis_indexes.mark_ready_for_incremental_migration();
     let mut diagnostics = Vec::new();
 
     // Constants and author warnings are story-wide discovery passes. They do
@@ -180,6 +183,7 @@ mod tests {
         ("field_access.rs", include_str!("field_access.rs")),
         ("flow.rs", include_str!("flow.rs")),
         ("index_access.rs", include_str!("index_access.rs")),
+        ("indexes.rs", include_str!("indexes.rs")),
         ("initializers.rs", include_str!("initializers.rs")),
         ("interface_values.rs", include_str!("interface_values.rs")),
         ("interfaces.rs", include_str!("interfaces.rs")),
