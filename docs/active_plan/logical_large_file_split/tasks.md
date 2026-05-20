@@ -1,4 +1,4 @@
-Progress: 11/27
+Progress: 12/27
 
 # Logical Large-File Split Active Plan
 
@@ -362,7 +362,7 @@ syntax::expression::tests::token_parser_reports_structured_errors_with_spans`,
 Review found no follow-up changes; completion validation passed with the same
 focused commands and `make gate`.
 
-### [>] Task 12: Split Expression Pratt Parser Core
+### [x] Task 12: Split Expression Pratt Parser Core
 
 Goal: Isolate the expression parser state machine from literal-specific parse
 helpers.
@@ -389,6 +389,8 @@ core`; validation passed with `cargo fmt --all --check`, `cargo test -q -p
 ink-compiler
 syntax::expression::tests::token_parser_reproduces_current_expression_baseline`,
 `cargo test -p ink-test --test integration expressions`, and `make gate`.
+Review found no follow-up changes; completion validation passed with the same
+focused commands and `make gate`.
 
 ### [ ] Task 13: Split Composite Expression Literal Parsing
 
