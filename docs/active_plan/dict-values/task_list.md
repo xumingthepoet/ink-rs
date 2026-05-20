@@ -1,4 +1,4 @@
-Progress: 13/20
+Progress: 14/20
 
 # Typed Dict Values Task List
 
@@ -497,7 +497,7 @@ Validation:
 Commit record: implementation `dc3cafb8` (`Support runtime Dict equality`);
 review fix `55709dfa` (`Cover nested Dict equality`)
 
-### [>] Task 14: Runtime JSON Load And Save
+### [x] Task 14: Runtime JSON Load And Save
 
 Goal: Load and save Dict values through the format crate.
 
@@ -528,6 +528,10 @@ Validation:
   wrapper timeout with no failing tests reported.
 - `make gate INK_TEST_TIMEOUT=240s` passed, then the default `make gate` hot
   rerun passed.
+- Review found no follow-up code fixes required; reran
+  `cargo test -p ink-runtime json`, `cargo test -p ink-runtime variables_state`,
+  `cargo test -p ink-runtime story_state::tests::save_state_roundtrips_dict_variables_and_omits_defaults`,
+  `cargo fmt --all --check`, and `make gate`.
 
 Commit record: implementation `4fab3f45` (`Load and save runtime Dict JSON`)
 
