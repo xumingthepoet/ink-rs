@@ -332,7 +332,7 @@ syntax::expression::tests::tokenizer_tracks_character_columns_for_unicode_prefix
 and `make gate`. Review found no follow-up changes; completion validation
 passed with the same focused commands and `make gate`.
 
-### [~] Task 11: Split Expression Parse Errors
+### [>] Task 11: Split Expression Parse Errors
 
 Goal: Move structured parse error construction and diagnostic formatting away
 from parser mechanics.
@@ -354,7 +354,11 @@ Validation commands: `cargo fmt --all --check`; `cargo test -q -p
 ink-compiler syntax::expression::tests::token_parser_reports_structured_errors_with_spans`;
 `cargo test -p ink-test --test integration diagnostics`; `make gate`.
 
-Commit record: pending.
+Commit record: implementation commit `416d4012 Split expression parse errors`;
+validation passed with `cargo fmt --all --check`, `cargo test -q -p
+ink-compiler
+syntax::expression::tests::token_parser_reports_structured_errors_with_spans`,
+`cargo test -p ink-test --test integration diagnostics`, and `make gate`.
 
 ### [ ] Task 12: Split Expression Pratt Parser Core
 
