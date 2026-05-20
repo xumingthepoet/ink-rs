@@ -7,7 +7,7 @@ use crate::{
     InterfaceMemberKind, InternalFunction, NamedContainer, NativeFunction, Object, Program,
     DICT_VALUE_MARKER, DYNAMIC_INTERFACE_ARGS_KEY, DYNAMIC_INTERFACE_FUNCTION_KEY,
     DYNAMIC_INTERFACE_NAME_KEY, DYNAMIC_INTERFACE_TARGET_KEY, INTERFACES_METADATA_KEY,
-    INTERFACE_IMPLEMENTATIONS_KEY, INTERFACE_MEMBERS_KEY,
+    INTERFACE_IMPLEMENTATIONS_KEY, INTERFACE_MEMBERS_KEY, TAG_END_TOKEN, TAG_START_TOKEN,
 };
 
 pub(crate) fn program_from_str(input: &str) -> Result<Program, FormatError> {
@@ -420,9 +420,14 @@ pub(crate) fn object_to_value(object: &Object) -> JsonValue {
             JsonValue::Object(obj)
         }
         Object::Glue => JsonValue::String("<>".to_string()),
-        Object::Tag { is_start } => {
-            JsonValue::String(if *is_start { "#" } else { "/#" }.to_string())
-        }
+        Object::Tag { is_start } => JsonValue::String(
+            if *is_start {
+                TAG_START_TOKEN
+            } else {
+                TAG_END_TOKEN
+            }
+            .to_string(),
+        ),
         Object::Bool(value) => JsonValue::Bool(*value),
         Object::Int(value) => JsonValue::Number((*value).into()),
         Object::Float(value) => JsonValue::Number(
@@ -480,11 +485,11 @@ fn string_object_from_token(token: &str) -> Result<Object, FormatError> {
         return Ok(Object::Void);
     }
 
-    if token == "#" {
+    if token == TAG_START_TOKEN {
         return Ok(Object::Tag { is_start: true });
     }
 
-    if token == "/#" {
+    if token == TAG_END_TOKEN {
         return Ok(Object::Tag { is_start: false });
     }
 

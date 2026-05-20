@@ -170,13 +170,11 @@ fn format_object_to_runtime(object: &format::Object) -> Result<Rc<dyn RTObject>,
         }
         format::Object::Glue => Ok(Rc::new(Glue::new())),
         format::Object::Tag { is_start } => {
-            let token_value = format::Object::Tag {
-                is_start: *is_start,
-            }
-            .to_json_value();
-            let token = token_value
-                .as_str()
-                .expect("format tag object must serialize to a string token");
+            let token = if *is_start {
+                format::TAG_START_TOKEN
+            } else {
+                format::TAG_END_TOKEN
+            };
             ControlCommand::new_from_name(token)
                 .map(|command| Rc::new(command) as Rc<dyn RTObject>)
                 .ok_or_else(|| {

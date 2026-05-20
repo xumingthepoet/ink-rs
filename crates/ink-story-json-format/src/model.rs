@@ -60,6 +60,12 @@ pub const DYNAMIC_INTERFACE_NAME_KEY: &str = "interface";
 /// Object key for the argument count on dynamic interface function instruction objects.
 pub const DYNAMIC_INTERFACE_ARGS_KEY: &str = "args";
 
+/// String token for the start of a tag in compiled-story JSON.
+pub const TAG_START_TOKEN: &str = "#";
+
+/// String token for the end of a tag in compiled-story JSON.
+pub const TAG_END_TOKEN: &str = "/#";
+
 /// Array marker token for dynamic Dict values.
 pub const DICT_VALUE_MARKER: &str = "dict";
 
