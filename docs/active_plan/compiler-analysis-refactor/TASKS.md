@@ -128,7 +128,7 @@ no follow-up changes required.
 Commit record: Implementation commit `60ace477`; waiting-review record
 `0d326822`; completion-record commit recorded by this task-list update.
 
-### [ ] Task 04: Migrate field/index/flow diagnostics
+### [>] Task 04: Migrate field/index/flow diagnostics
 
 Goal: Make field access, index access, and flow diagnostics consume shared
 analysis indexes where they currently rebuild them.
@@ -148,7 +148,11 @@ analysis pass orchestration.
 
 Validation commands: `cargo test -p ink-compiler flow field_access index_access`; `cargo test -p ink-compiler analysis`; `make gate`.
 
-Commit record: Implementation commit TBD; completion-record commit TBD.
+Validation record: `cargo test -p ink-compiler flow` passed; `cargo test -p
+ink-compiler field_access` passed; `cargo test -p ink-compiler index_access`
+passed; `cargo test -p ink-compiler analysis` passed; `make gate` passed.
+
+Commit record: Implementation commit `bf229a49`; completion-record commit TBD.
 
 ### [ ] Task 05: Migrate literal diagnostics
 
