@@ -1,16 +1,21 @@
 use std::rc::Rc;
 
 use super::params;
-use crate::{object::RTObject, story_error::StoryError, value::Value, value_type::ValueType};
+use crate::{
+    object::RTObject,
+    story_error::StoryError,
+    value::Value,
+    value_type::{DictKey, DictKeyType, DictValue, ValueType},
+};
 
 const FIELD_OBJECT: &str = "FIELD expected an object value as its first parameter";
 const FIELD_NAME: &str = "FIELD expected a string field name as its second parameter";
-const INDEX_ARRAY: &str = "INDEX expected an array value as its first parameter";
+const INDEX_ARRAY: &str = "INDEX expected an array or dict value as its first parameter";
 const INDEX_VALUE: &str = "INDEX expected an int index as its second parameter";
 const SET_FIELD_OBJECT: &str = "SET_FIELD expected an object value as its first parameter";
 const SET_FIELD_NAME: &str = "SET_FIELD expected a string field name as its second parameter";
 const SET_FIELD_VALUE: &str = "SET_FIELD expected a value as its third parameter";
-const SET_INDEX_ARRAY: &str = "SET_INDEX expected an array value as its first parameter";
+const SET_INDEX_ARRAY: &str = "SET_INDEX expected an array or dict value as its first parameter";
 const SET_INDEX_VALUE: &str = "SET_INDEX expected an int index as its second parameter";
 const SET_INDEX_NEW_VALUE: &str = "SET_INDEX expected a value as its third parameter";
 const LEN_ARRAY: &str = "LEN expected an array value as its parameter";
@@ -34,11 +39,27 @@ pub(super) fn field_read(params: &[Rc<dyn RTObject>]) -> Result<Rc<dyn RTObject>
 
 pub(super) fn index_read(params: &[Rc<dyn RTObject>]) -> Result<Rc<dyn RTObject>, StoryError> {
     let value = params::value(params, 0, INDEX_ARRAY)?;
-    let index = params::int(params, 1, INDEX_VALUE)?;
-    let values = params::array_values(value, INDEX_ARRAY)?;
-    let array_index = params::array_index_in_bounds(index, values.len())?;
-
-    Ok(Rc::new(Value::new_value_type(values[array_index].clone())))
+    match &value.value {
+        ValueType::Array(values) => {
+            let index = params::int(params, 1, INDEX_VALUE)?;
+            let array_index = params::array_index_in_bounds(index, values.len())?;
+            Ok(Rc::new(Value::new_value_type(values[array_index].clone())))
+        }
+        ValueType::Dict(dict) => {
+            let key = dict_key_param(params, 1, dict.key_type(), "INDEX")?;
+            dict.get(&key)
+                .cloned()
+                .map(Value::new_value_type)
+                .map(|value| Rc::new(value) as Rc<dyn RTObject>)
+                .ok_or_else(|| {
+                    StoryError::InvalidStoryState(format!(
+                        "Dict key not found: {}",
+                        dict_key_description(&key)
+                    ))
+                })
+        }
+        _ => Err(StoryError::InvalidStoryState(INDEX_ARRAY.to_owned())),
+    }
 }
 
 pub(super) fn field_write(params: &[Rc<dyn RTObject>]) -> Result<Rc<dyn RTObject>, StoryError> {
@@ -62,16 +83,62 @@ pub(super) fn field_write(params: &[Rc<dyn RTObject>]) -> Result<Rc<dyn RTObject
 
 pub(super) fn index_write(params: &[Rc<dyn RTObject>]) -> Result<Rc<dyn RTObject>, StoryError> {
     let value = params::value(params, 0, SET_INDEX_ARRAY)?;
-    let index = params::int(params, 1, SET_INDEX_VALUE)?;
     let new_value = params::value(params, 2, SET_INDEX_NEW_VALUE)?;
-    let values = params::array_values(value, SET_INDEX_ARRAY)?;
-    let array_index = params::array_index_in_bounds(index, values.len())?;
+    match &value.value {
+        ValueType::Array(values) => {
+            let index = params::int(params, 1, SET_INDEX_VALUE)?;
+            let array_index = params::array_index_in_bounds(index, values.len())?;
 
-    let mut updated_values = values.to_vec();
-    updated_values[array_index] = new_value.value.clone();
-    Ok(Rc::new(Value::new_value_type(ValueType::Array(
-        updated_values,
-    ))))
+            let mut updated_values = values.to_vec();
+            updated_values[array_index] = new_value.value.clone();
+            Ok(Rc::new(Value::new_value_type(ValueType::Array(
+                updated_values,
+            ))))
+        }
+        ValueType::Dict(dict) => {
+            let key = dict_key_param(params, 1, dict.key_type(), "SET_INDEX")?;
+            let mut updated_entries = dict.entries().clone();
+            updated_entries.insert(key, new_value.value.clone());
+            let updated_dict = DictValue::new(dict.key_type(), updated_entries)?;
+            Ok(Rc::new(Value::new_value_type(ValueType::Dict(
+                updated_dict,
+            ))))
+        }
+        _ => Err(StoryError::InvalidStoryState(SET_INDEX_ARRAY.to_owned())),
+    }
+}
+
+fn dict_key_param(
+    params: &[Rc<dyn RTObject>],
+    index: usize,
+    key_type: DictKeyType,
+    op_name: &str,
+) -> Result<DictKey, StoryError> {
+    let value = params::value(params, index, "Dict key expected")?;
+    match (key_type, &value.value) {
+        (DictKeyType::String, ValueType::String(value)) => {
+            Ok(DictKey::String(value.string.clone()))
+        }
+        (DictKeyType::Int, ValueType::Int(value)) => Ok(DictKey::Int(*value)),
+        _ => Err(StoryError::InvalidStoryState(format!(
+            "{op_name} expected {} Dict key as its second parameter",
+            dict_key_type_name_with_article(key_type)
+        ))),
+    }
+}
+
+fn dict_key_type_name_with_article(key_type: DictKeyType) -> &'static str {
+    match key_type {
+        DictKeyType::String => "a string",
+        DictKeyType::Int => "an int",
+    }
+}
+
+fn dict_key_description(key: &DictKey) -> String {
+    match key {
+        DictKey::String(value) => format!("\"{value}\""),
+        DictKey::Int(value) => value.to_string(),
+    }
 }
 
 pub(super) fn len(params: &[Rc<dyn RTObject>]) -> Result<Rc<dyn RTObject>, StoryError> {
@@ -99,7 +166,12 @@ mod tests {
     use std::{collections::BTreeMap, rc::Rc};
 
     use super::super::{NativeFunctionCall, Op};
-    use crate::{object::RTObject, story_error::StoryError, value::Value, value_type::ValueType};
+    use crate::{
+        object::RTObject,
+        story_error::StoryError,
+        value::Value,
+        value_type::{DictKey, DictKeyType, DictValue, ValueType},
+    };
 
     fn int_value(value: i32) -> Rc<dyn RTObject> {
         Rc::new(Value::new::<i32>(value))
@@ -119,6 +191,13 @@ mod tests {
             object_fields.insert(name.to_string(), value);
         }
         Rc::new(Value::new_value_type(ValueType::Object(object_fields)))
+    }
+
+    fn dict_value(key_type: DictKeyType, entries: Vec<(DictKey, ValueType)>) -> Rc<dyn RTObject> {
+        Rc::new(Value::new_value_type(ValueType::Dict(
+            DictValue::new(key_type, entries.into_iter().collect::<BTreeMap<_, _>>())
+                .expect("test dict entries should match key type"),
+        )))
     }
 
     fn non_value_object() -> Rc<dyn RTObject> {
@@ -184,6 +263,92 @@ mod tests {
             .call(vec![updated])
             .expect("len should succeed");
         assert!(matches!(value_type(len.as_ref()), ValueType::Int(2)));
+    }
+
+    #[test]
+    fn dict_index_read_supports_string_and_int_keys() {
+        let string_dict = dict_value(
+            DictKeyType::String,
+            vec![(DictKey::String("ada".to_string()), ValueType::Int(10))],
+        );
+        let int_dict = dict_value(
+            DictKeyType::Int,
+            vec![(DictKey::Int(1), ValueType::new("one"))],
+        );
+
+        let string_read = NativeFunctionCall::new(Op::IndexRead)
+            .call(vec![string_dict, string_value("ada")])
+            .expect("string-key dict read should succeed");
+        assert!(matches!(
+            value_type(string_read.as_ref()),
+            ValueType::Int(10)
+        ));
+
+        let int_read = NativeFunctionCall::new(Op::IndexRead)
+            .call(vec![int_dict, int_value(1)])
+            .expect("int-key dict read should succeed");
+        assert!(
+            matches!(value_type(int_read.as_ref()), ValueType::String(value) if value.string == "one")
+        );
+    }
+
+    #[test]
+    fn dict_index_write_inserts_and_replaces_without_mutating_original() {
+        let original = dict_value(
+            DictKeyType::String,
+            vec![(DictKey::String("ada".to_string()), ValueType::Int(10))],
+        );
+        let inserted = NativeFunctionCall::new(Op::IndexWrite)
+            .call(vec![original.clone(), string_value("bea"), int_value(11)])
+            .expect("dict insert should succeed");
+        let replaced = NativeFunctionCall::new(Op::IndexWrite)
+            .call(vec![inserted.clone(), string_value("ada"), int_value(12)])
+            .expect("dict replace should succeed");
+
+        assert!(
+            matches!(value_type(original.as_ref()), ValueType::Dict(dict) if matches!(dict.get(&DictKey::String("bea".to_string())), None))
+        );
+        assert!(
+            matches!(value_type(inserted.as_ref()), ValueType::Dict(dict) if matches!(dict.get(&DictKey::String("bea".to_string())), Some(ValueType::Int(11))))
+        );
+        assert!(
+            matches!(value_type(replaced.as_ref()), ValueType::Dict(dict) if matches!(dict.get(&DictKey::String("ada".to_string())), Some(ValueType::Int(12))))
+        );
+    }
+
+    #[test]
+    fn dict_index_operations_reject_wrong_keys_and_missing_reads() {
+        let string_dict = dict_value(
+            DictKeyType::String,
+            vec![(DictKey::String("ada".to_string()), ValueType::Int(10))],
+        );
+        let int_dict = dict_value(
+            DictKeyType::Int,
+            vec![(DictKey::Int(1), ValueType::Int(10))],
+        );
+
+        let wrong_string_key = invalid_state(
+            NativeFunctionCall::new(Op::IndexRead).call(vec![string_dict.clone(), int_value(1)]),
+        );
+        assert_eq!(
+            wrong_string_key,
+            "INDEX expected a string Dict key as its second parameter"
+        );
+
+        let wrong_int_key = invalid_state(NativeFunctionCall::new(Op::IndexWrite).call(vec![
+            int_dict,
+            string_value("1"),
+            int_value(11),
+        ]));
+        assert_eq!(
+            wrong_int_key,
+            "SET_INDEX expected an int Dict key as its second parameter"
+        );
+
+        let missing_key = invalid_state(
+            NativeFunctionCall::new(Op::IndexRead).call(vec![string_dict, string_value("missing")]),
+        );
+        assert_eq!(missing_key, "Dict key not found: \"missing\"");
     }
 
     #[test]
