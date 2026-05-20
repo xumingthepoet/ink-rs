@@ -478,7 +478,7 @@ ink-test --test integration text`, `cargo test -p ink-test --test integration
 expressions`, and `make gate`. Review found no follow-up changes; completion
 validation passed with the same focused commands and `make gate`.
 
-### [~] Task 16: Split Expression Argument And Path Utilities
+### [>] Task 16: Split Expression Argument And Path Utilities
 
 Goal: Keep reusable top-level expression helpers separate from parser internals.
 
@@ -500,7 +500,10 @@ Validation commands: `cargo fmt --all --check`; `cargo test -p ink-test --test
 integration functions`; `cargo test -p ink-test --test integration diverts`;
 `make gate`.
 
-Commit record: pending.
+Commit record: implementation commit `24345619 Split expression argument
+utilities`; validation passed with `cargo fmt --all --check`, `cargo test -p
+ink-test --test integration functions`, `cargo test -p ink-test --test
+integration diverts`, and `make gate`.
 
 ## Milestone 3: Analysis Target Boundaries
 
