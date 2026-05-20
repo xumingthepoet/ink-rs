@@ -26,6 +26,27 @@ Each entry should include:
 - migration guidance
 - tests
 
+## 2026-05-21: Array Append And Insert Helpers
+
+- status: supported
+- upstream behavior: upstream Ink does not have typed dynamic arrays or typed
+  array mutation helpers.
+- ink-rs behavior: arrays now support `ARRAY_PUSH(array, value) => void` and
+  `ARRAY_INSERT(array, index, value) => void`. Both require a mutable lvalue and
+  preserve the array element type. `ARRAY_INSERT` inserts before `index`, allows
+  `index == LEN(array)`, and rejects indexes outside `0..=LEN(array)`.
+- documentation effect: `SyntaxReference.md` documents `ARRAY_PUSH` and
+  `ARRAY_INSERT` with the existing array builtins.
+- rationale: growable logs, queues, plans, ledgers, and result lists should not
+  require preallocated empty struct slots or separate depth counters.
+- migration guidance: replace slot-fill patterns such as `items[count] = value`
+  followed by `count = count + 1` with `ARRAY_PUSH(items, value)`. Use
+  `ARRAY_INSERT` only when inserting before an existing position is required.
+- tests: format, runtime native function, compiler analysis, lowering, typed
+  integration, and experiment validation cover append, insert at head/middle/end,
+  nested lvalue writeback, element type checking, and out-of-bounds runtime
+  errors.
+
 ## 2026-05-21: Dict Collection Helpers
 
 - status: supported

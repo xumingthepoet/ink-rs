@@ -301,13 +301,20 @@ fn infer_dynamic_interface_function_call_type(
 pub(super) fn is_typed_builtin_function(name: &str) -> bool {
     matches!(
         name,
-        "ARRAY_REMOVE" | "LEN" | "DICT_HAS" | "DICT_SIZE" | "DICT_REMOVE" | "DICT_KEYS"
+        "ARRAY_REMOVE"
+            | "ARRAY_PUSH"
+            | "ARRAY_INSERT"
+            | "LEN"
+            | "DICT_HAS"
+            | "DICT_SIZE"
+            | "DICT_REMOVE"
+            | "DICT_KEYS"
     )
 }
 
 pub(super) fn typed_builtin_return_type(name: &str) -> Option<TypeName> {
     match name {
-        "ARRAY_REMOVE" => Some(TypeName::void()),
+        "ARRAY_REMOVE" | "ARRAY_PUSH" | "ARRAY_INSERT" => Some(TypeName::void()),
         "LEN" => Some(TypeName::int()),
         "DICT_HAS" => Some(TypeName::bool()),
         "DICT_SIZE" => Some(TypeName::int()),

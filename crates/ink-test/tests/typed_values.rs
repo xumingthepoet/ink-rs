@@ -594,6 +594,23 @@ fn array_remove_mutates_arrays_and_returns_void_at_runtime() {
 }
 
 #[test]
+fn array_push_and_insert_grow_arrays_at_runtime() {
+    let compiled = compile_fixture("typed/array-push-insert.ink");
+
+    assert_story_output(
+        &compiled,
+        "beforeafter|1|1\n\
+         1|2|3|3\n\
+         0|4|5\n\
+         5|7|2\n\
+         game::State.Idle|game::State.Busy|2\n\
+         10|1\n\
+         2|3|2\n\
+         7|8|2\n",
+    );
+}
+
+#[test]
 fn string_concatenation_runs_at_runtime() {
     let compiled = compile_fixture("typed/string-concat.ink");
 

@@ -471,6 +471,8 @@ pub enum NativeFunction {
     IndexWrite,
     Len,
     ArrayRemove,
+    ArrayPush,
+    ArrayInsert,
     DictHas,
     DictSize,
     DictRemove,
@@ -478,7 +480,7 @@ pub enum NativeFunction {
 }
 
 impl NativeFunction {
-    pub const ALL: [Self; 34] = [
+    pub const ALL: [Self; 36] = [
         Self::Add,
         Self::Subtract,
         Self::Divide,
@@ -509,6 +511,8 @@ impl NativeFunction {
         Self::IndexWrite,
         Self::Len,
         Self::ArrayRemove,
+        Self::ArrayPush,
+        Self::ArrayInsert,
         Self::DictHas,
         Self::DictSize,
         Self::DictRemove,
@@ -547,6 +551,8 @@ impl NativeFunction {
             "SET_INDEX" => Some(Self::IndexWrite),
             "LEN" => Some(Self::Len),
             "ARRAY_REMOVE" => Some(Self::ArrayRemove),
+            "ARRAY_PUSH" => Some(Self::ArrayPush),
+            "ARRAY_INSERT" => Some(Self::ArrayInsert),
             "DICT_HAS" => Some(Self::DictHas),
             "DICT_SIZE" => Some(Self::DictSize),
             "DICT_REMOVE" => Some(Self::DictRemove),
@@ -587,6 +593,8 @@ impl NativeFunction {
             Self::IndexWrite => "SET_INDEX",
             Self::Len => "LEN",
             Self::ArrayRemove => "ARRAY_REMOVE",
+            Self::ArrayPush => "ARRAY_PUSH",
+            Self::ArrayInsert => "ARRAY_INSERT",
             Self::DictHas => "DICT_HAS",
             Self::DictSize => "DICT_SIZE",
             Self::DictRemove => "DICT_REMOVE",
@@ -626,6 +634,8 @@ impl NativeFunction {
             Self::IndexWrite => 3,
             Self::Len => 1,
             Self::ArrayRemove => 2,
+            Self::ArrayPush => 2,
+            Self::ArrayInsert => 3,
             Self::DictHas => 2,
             Self::DictSize => 1,
             Self::DictRemove => 2,
@@ -673,6 +683,8 @@ mod tests {
             (NativeFunction::IndexWrite, "SET_INDEX", 3),
             (NativeFunction::Len, "LEN", 1),
             (NativeFunction::ArrayRemove, "ARRAY_REMOVE", 2),
+            (NativeFunction::ArrayPush, "ARRAY_PUSH", 2),
+            (NativeFunction::ArrayInsert, "ARRAY_INSERT", 3),
             (NativeFunction::DictHas, "DICT_HAS", 2),
             (NativeFunction::DictSize, "DICT_SIZE", 1),
             (NativeFunction::DictRemove, "DICT_REMOVE", 2),

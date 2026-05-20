@@ -1590,6 +1590,14 @@ Strings of type `string` can also be concatenated with `+`.
 	~ ARRAY_REMOVE(clues, 1)
 	{clues[0]} and {clues[1]} remain.
 
+`ARRAY_PUSH(array, value)` appends a value to the end of an array and returns
+`void`. `ARRAY_INSERT(array, index, value)` inserts before `index`; `index` may
+equal `LEN(array)` to insert at the end. The inserted value must match the array
+element type.
+
+	~ ARRAY_PUSH(clues, "map")
+	~ ARRAY_INSERT(clues, 0, "riddle")
+
 Arrays and structs compare by value, so equality checks recurse through nested arrays and fields.
 
 	VAR first_scores: int[] = [1, 2]
