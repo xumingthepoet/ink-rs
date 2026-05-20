@@ -1,4 +1,4 @@
-Progress: 8/24
+Progress: 9/24
 
 # Compiler Analysis Refactor Active Plan
 
@@ -294,7 +294,7 @@ Review record: Reviewed implementation commit `5fde59e2` with `git show
 Commit record: Implementation commit `5fde59e2`; waiting-review record
 `79561b66`; completion-record commit recorded by this task-list update.
 
-### [ ] Task 09: Migrate initializers and assignments to shared checker
+### [x] Task 09: Migrate initializers and assignments to shared checker
 
 Goal: Make initializer and assignment type checks use the centralized
 expected-type checker.
@@ -313,7 +313,16 @@ Modification boundaries: Initializer and assignment type checking only.
 
 Validation commands: `cargo test -p ink-compiler initializers assignments interface_module`; `make gate`.
 
-Commit record: Implementation commit TBD; completion-record commit TBD.
+Validation record: `cargo test -p ink-compiler initializers` passed; `cargo
+test -p ink-compiler assignments` passed; `cargo test -p ink-compiler
+interface_module` passed; `make gate` passed.
+
+Review record: Initializer and simple assignment shared-checker migration was
+covered by Task 07 implementation commit `4b6a2db5` and Task 08 implementation
+commit `5fde59e2`; no additional code changes were required for this task.
+
+Commit record: Implementation covered by commits `4b6a2db5` and `5fde59e2`;
+completion-record commit recorded by this task-list update.
 
 ### [ ] Task 10: Migrate static function and flow arguments
 
