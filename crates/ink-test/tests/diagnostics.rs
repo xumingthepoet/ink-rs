@@ -105,6 +105,45 @@ fn dict_literal_diagnostics_report_invalid_literals() {
 }
 
 #[test]
+fn dict_type_name_diagnostics_report_invalid_generics() {
+    let diagnostics = diagnostics_for_fixture("diagnostics/dicts/type-names.ink");
+
+    for message in [
+        "Dict key type must be string or int, got bool",
+        "Dict type names must separate key and value types with `,`",
+        "Dict type names must close with `>`",
+    ] {
+        assert_diagnostic(&diagnostics, DiagnosticSeverity::Error, message);
+    }
+}
+
+#[test]
+fn dict_index_diagnostics_report_invalid_indexing() {
+    let diagnostics = diagnostics_for_fixture("diagnostics/dicts/indexing.ink");
+
+    for message in [
+        "Index expression has type int but expected string",
+        "Cannot index non-array/non-Dict type int",
+        "Index for assignment target 'scores[Number(1)]' has type int but expected string",
+        "Cannot index non-array/non-Dict assignment target type int",
+    ] {
+        assert_diagnostic(&diagnostics, DiagnosticSeverity::Error, message);
+    }
+}
+
+#[test]
+fn dict_builtin_diagnostics_report_unsupported_collection_builtins() {
+    let diagnostics = diagnostics_for_fixture("diagnostics/dicts/builtins.ink");
+
+    for message in [
+        "Argument for builtin 'LEN' has type Dict<string, int> but expected array",
+        "First argument for builtin 'ARRAY_REMOVE' has type Dict<string, int> but expected array",
+    ] {
+        assert_diagnostic(&diagnostics, DiagnosticSeverity::Error, message);
+    }
+}
+
+#[test]
 fn interface_body_diagnostics_reject_executable_content() {
     let diagnostics = diagnostics_for_fixture("diagnostics/interface-invalid-body.ink");
 
