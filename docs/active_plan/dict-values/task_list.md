@@ -646,7 +646,7 @@ Validation:
 
 Commit record: implementation `83012cea` (`Add Dict diagnostic fixtures`)
 
-### [ ] Task 18: Add Parse Snapshots
+### [~] Task 18: Add Parse Snapshots
 
 Goal: Pin the visible parsed model for Dict source syntax.
 
