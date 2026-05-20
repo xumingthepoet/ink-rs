@@ -388,7 +388,7 @@ Commit record: implementation `2d50da09` (`Lower Dict index writes`)
 
 ## Milestone 5: Runtime Values
 
-### [~] Task 11: Add Runtime Dict Value Type
+### [>] Task 11: Add Runtime Dict Value Type
 
 Goal: Represent Dict values in runtime-owned value data.
 
@@ -404,7 +404,18 @@ Modification boundaries: runtime value modules.
 
 Validation commands: `cargo test -p ink-runtime value_type value`
 
-Commit record: pending
+Validation:
+
+- `cargo test -p ink-runtime value_type` passed.
+- `cargo test -p ink-runtime value` passed.
+- `cargo fmt --all --check` passed.
+- Initial `make gate` reached the final doc-test stage but failed by the 120s
+  wrapper timeout with no failing tests reported.
+- Second `make gate` rerun reached the `ink-test` integration stage but failed
+  by the same wrapper timeout with no failing tests reported.
+- Reran `make gate` again after incremental compilation; passed.
+
+Commit record: implementation `afe8da16` (`Add runtime Dict value type`)
 
 ### [ ] Task 12: Runtime Dict INDEX And SET_INDEX
 
