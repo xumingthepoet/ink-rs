@@ -1,4 +1,4 @@
-Progress: 4/24
+Progress: 5/24
 
 # Compiler Analysis Refactor Active Plan
 
@@ -162,7 +162,7 @@ no follow-up changes required.
 Commit record: Implementation commit `bf229a49`; waiting-review record
 `cbc5a4fc`; completion-record commit recorded by this task-list update.
 
-### [>] Task 05: Migrate literal diagnostics
+### [x] Task 05: Migrate literal diagnostics
 
 Goal: Make array, dict, and struct literal diagnostics consume shared analysis
 indexes.
@@ -185,9 +185,16 @@ Validation commands: `cargo test -p ink-compiler array_literals dict_literals st
 Validation record: `cargo test -p ink-compiler array_literals` passed; `cargo
 test -p ink-compiler dict_literals` passed; `cargo test -p ink-compiler
 struct_literals` passed; `cargo test -p ink-compiler analysis` passed; `make
-gate` passed.
+gate` passed. Review validation repeated after implementation review: `cargo
+test -p ink-compiler array_literals` passed; `cargo test -p ink-compiler
+dict_literals` passed; `cargo test -p ink-compiler struct_literals` passed;
+`cargo test -p ink-compiler analysis` passed; `make gate` passed.
 
-Commit record: Implementation commit `53690a65`; completion-record commit TBD.
+Review record: Reviewed implementation commit `53690a65` with `git show
+--check`; no follow-up changes required.
+
+Commit record: Implementation commit `53690a65`; waiting-review record
+`66d152f8`; completion-record commit recorded by this task-list update.
 
 ### [ ] Task 06: Remove obsolete per-pass index construction
 
