@@ -2,7 +2,7 @@ use crate::{
     diagnostic::Diagnostic,
     parsed::{
         visit::{walk_story, ParsedVisitor, VisitContext},
-        AssignmentTarget, IncDec, Object, Story, TypeName, VariableAssignment,
+        AssignmentTarget, DictKeyType, IncDec, Object, Story, TypeName, VariableAssignment,
     },
 };
 
@@ -257,28 +257,48 @@ impl<'a> VariableAssignmentChecker<'a> {
                         return None;
                     }
                 };
-                if index_type != TypeName::int() {
-                    self.diagnostics.push(Diagnostic::error(
-                        span.clone(),
-                        format!(
-                            "Index for assignment target '{}' has type {} but expected int",
-                            target.display_name(),
-                            index_type.display_name()
-                        ),
-                    ));
-                    return None;
+                if let Some(element_type) = base_type.array_element_type() {
+                    if index_type != TypeName::int() {
+                        self.diagnostics.push(Diagnostic::error(
+                            span.clone(),
+                            format!(
+                                "Index for assignment target '{}' has type {} but expected int",
+                                target.display_name(),
+                                index_type.display_name()
+                            ),
+                        ));
+                        return None;
+                    }
+
+                    return Some(element_type.clone());
                 }
 
-                base_type.array_element_type().cloned().or_else(|| {
-                    self.diagnostics.push(Diagnostic::error(
-                        span.clone(),
-                        format!(
-                            "Cannot index non-array assignment target type {}",
-                            base_type.display_name()
-                        ),
-                    ));
-                    None
-                })
+                if let Some((key_type, value_type)) = base_type.dict_key_value_types() {
+                    let expected_key_type = dict_assignment_key_type(key_type);
+                    if index_type != expected_key_type {
+                        self.diagnostics.push(Diagnostic::error(
+                            span.clone(),
+                            format!(
+                                "Index for assignment target '{}' has type {} but expected {}",
+                                target.display_name(),
+                                index_type.display_name(),
+                                expected_key_type.display_name()
+                            ),
+                        ));
+                        return None;
+                    }
+
+                    return Some(value_type.clone());
+                }
+
+                self.diagnostics.push(Diagnostic::error(
+                    span.clone(),
+                    format!(
+                        "Cannot index non-array/non-Dict assignment target type {}",
+                        base_type.display_name()
+                    ),
+                ));
+                None
             }
         }
     }
@@ -397,6 +417,13 @@ impl<'a> VariableAssignmentChecker<'a> {
             )),
             None => {}
         }
+    }
+}
+
+fn dict_assignment_key_type(key_type: DictKeyType) -> TypeName {
+    match key_type {
+        DictKeyType::String => TypeName::string(),
+        DictKeyType::Int => TypeName::int(),
     }
 }
 
@@ -724,6 +751,35 @@ mod tests {
     }
 
     #[test]
+    fn accepts_dict_index_assignments() {
+        let story = parse_story(
+            "VAR scores: Dict<string, int> = {\"ada\": 1}\n\
+             ~ scores[\"ada\"] = 2\n\
+             ~ scores[\"grace\"] = 3\n\
+             -> DONE",
+        );
+
+        assert_eq!(variable_assignment_diagnostics(&story), []);
+    }
+
+    #[test]
+    fn accepts_nested_dict_lvalue_assignment_and_compound_assignment() {
+        let story = parse_story(
+            "STRUCT Player {\n\
+             hp: int\n\
+             }\n\
+             VAR players: Dict<string, Player> = {\"ada\": { hp: 10 }}\n\
+             VAR table: Dict<int, Dict<string, string>> = {1: {\"name\": \"Ada\"}}\n\
+             ~ players[\"ada\"].hp = 11\n\
+             ~ players[\"ada\"].hp += 1\n\
+             ~ table[1][\"name\"] = \"Grace\"\n\
+             -> DONE",
+        );
+
+        assert_eq!(variable_assignment_diagnostics(&story), []);
+    }
+
+    #[test]
     fn reports_invalid_field_assignment_type() {
         let story = parse_story(
             "STRUCT Player {\n\
@@ -757,6 +813,40 @@ mod tests {
             &diagnostics,
             DiagnosticSeverity::Error,
             "Assignment to variable 'scores[Number(0)]' has type string but declared type is int",
+        );
+    }
+
+    #[test]
+    fn reports_invalid_dict_key_assignment_type() {
+        let story = parse_story(
+            "VAR scores: Dict<string, int> = {\"ada\": 1}\n\
+             ~ scores[1] = 2\n\
+             -> DONE",
+        );
+
+        let diagnostics = variable_assignment_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Index for assignment target 'scores[Number(1)]' has type int but expected string",
+        );
+    }
+
+    #[test]
+    fn reports_invalid_dict_value_assignment_type() {
+        let story = parse_story(
+            "VAR scores: Dict<string, int> = {\"ada\": 1}\n\
+             ~ scores[\"ada\"] = \"two\"\n\
+             -> DONE",
+        );
+
+        let diagnostics = variable_assignment_diagnostics(&story);
+
+        assert_single_diagnostic(
+            &diagnostics,
+            DiagnosticSeverity::Error,
+            "Assignment to variable 'scores[String(\"ada\")]' has type string but declared type is int",
         );
     }
 
