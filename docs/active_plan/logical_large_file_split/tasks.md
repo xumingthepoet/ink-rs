@@ -270,7 +270,7 @@ passed with the same focused commands and `make gate`.
 
 ## Milestone 2: Syntax Expression Boundaries
 
-### [~] Task 09: Split Expression Token Model And Operator Tables
+### [>] Task 09: Split Expression Token Model And Operator Tables
 
 Goal: Separate expression token data definitions from tokenization and parsing.
 
@@ -292,7 +292,11 @@ Validation commands: `cargo fmt --all --check`; `cargo test -q -p
 ink-compiler syntax::expression::tests::operator_rule_table_drill_covers_tokenizer_and_parser_lookup`;
 `cargo test -p ink-test --test integration expressions`; `make gate`.
 
-Commit record: pending.
+Commit record: implementation commit `d788f0fe Split expression token model`;
+validation passed with `cargo fmt --all --check`, `cargo test -q -p
+ink-compiler
+syntax::expression::tests::operator_rule_table_drill_covers_tokenizer_and_parser_lookup`,
+`cargo test -p ink-test --test integration expressions`, and `make gate`.
 
 ### [ ] Task 10: Split Expression Tokenizer
 
