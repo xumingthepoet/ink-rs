@@ -621,7 +621,7 @@ ink-test --test integration typed_values`, `cargo test -p ink-test --test
 integration diagnostics`, and `make gate`. Review found no follow-up changes;
 completion validation passed with the same focused commands and `make gate`.
 
-### [~] Task 21: Split Dynamic Interface Target Checks
+### [>] Task 21: Split Dynamic Interface Target Checks
 
 Goal: Give dynamic interface target and function call validation a module that
 can grow with interface semantics.
@@ -645,7 +645,10 @@ Validation commands: `cargo fmt --all --check`; `cargo test -p ink-test --test
 integration modules`; `cargo test -p ink-test --test integration typed_values`;
 `make gate`.
 
-Commit record: pending.
+Commit record: implementation commit `3ed1ac8b Split dynamic interface
+target checks`; validation passed with `cargo fmt --all --check`, `cargo
+test -p ink-test --test integration modules`, `cargo test -p ink-test --test
+integration typed_values`, and `make gate`.
 
 ### [ ] Task 22: Split Target Context Helpers
 
