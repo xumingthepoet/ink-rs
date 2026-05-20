@@ -56,3 +56,8 @@ resolver = "2"
 edition = "2021"
 repository = "https://github.com/xumingthepoet/ink-rs"
 keywords = ["ink", "interactive-fiction", "narrative", "game"]
+
+[profile.dev]
+opt-level = 0
+debug = 0
+codegen-units = 256
