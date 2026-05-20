@@ -14,6 +14,7 @@ VAR literal_by_id: Dict<int, string> = {1: "one"}
 VAR nested_scores: Dict<int, Dict<string, int>> = {1: {"ada": 10}}
 VAR score_tables: Dict<string, int>[] = [{"ada": 10}, {}]
 VAR sheet: Sheet = { hp: 3, scores: {"luck": 7} }
+VAR dynamic_scores: Dict<string, int> = {"sum": 1 + 1}
 
 == main ==
 ~ temp local_default: Dict<int, string>

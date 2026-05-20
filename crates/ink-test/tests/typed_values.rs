@@ -225,6 +225,18 @@ fn dict_typed_values_defaults_and_literals_are_lowered_to_json() {
     assert_json_sequence(
         &json,
         vec![
+            json!(["dict", "string", []]),
+            json!("^sum"),
+            json!(1),
+            json!(1),
+            json!("+"),
+            json!("SET_INDEX"),
+            json!({"VAR=": "game::dynamic_scores"}),
+        ],
+    );
+    assert_json_sequence(
+        &json,
+        vec![
             json!("ev"),
             json!(["dict", "int", []]),
             json!("/ev"),
