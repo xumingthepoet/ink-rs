@@ -1324,7 +1324,7 @@ another Dict, or any other supported value type.
 
 String-key Dict literals use quoted string keys. Int-key Dict literals use
 integer keys. Empty `{}` is valid only when the expected type is known, such as
-in a typed declaration, assignment, function argument, or return context. An
+in a typed declaration, assignment to a typed variable, or typed return context. An
 omitted Dict initializer defaults to an empty Dict with the declared key type.
 
 Read and write entries with index syntax:
