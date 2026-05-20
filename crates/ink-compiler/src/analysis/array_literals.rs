@@ -187,14 +187,28 @@ impl<'a> ArrayLiteralChecker<'a> {
     ) {
         match target {
             DivertTarget::Path(_) | DivertTarget::QualifiedPath(_) => {
-                self.check_static_target_arguments(target, arguments, span, context);
+                if let Some(expected_arguments) = resolve_static_target_expected_arguments(
+                    target,
+                    context.current_module.as_deref(),
+                    context.current_flow_path.as_deref(),
+                    self.target_symbols,
+                ) {
+                    self.check_resolved_expected_arguments(
+                        &expected_arguments,
+                        arguments,
+                        span,
+                        context,
+                    );
+                }
             }
             DivertTarget::Dynamic(Expression::DynamicInterfaceAccess { target, member }) => {
-                if let Some(signature) = self.dynamic_interface_signature(
+                if let Ok(signature) = resolve_dynamic_interface_signature(
                     target,
                     member,
                     InterfaceMemberKind::Knot,
-                    context,
+                    self.dynamic_interface_signature_inputs(),
+                    context.current_module.as_deref(),
+                    context.current_flow_path.as_deref(),
                 ) {
                     self.check_interface_signature_arguments(
                         member, arguments, &signature, span, context,
@@ -206,25 +220,6 @@ impl<'a> ArrayLiteralChecker<'a> {
             | DivertTarget::End
             | DivertTarget::Empty => {}
         }
-    }
-
-    fn check_static_target_arguments(
-        &mut self,
-        target: &DivertTarget,
-        arguments: &[Expression],
-        span: &SourceSpan,
-        context: &VisitContext,
-    ) {
-        let Some(expected_arguments) = resolve_static_target_expected_arguments(
-            target,
-            context.current_module.as_deref(),
-            context.current_flow_path.as_deref(),
-            self.target_symbols,
-        ) else {
-            return;
-        };
-
-        self.check_resolved_expected_arguments(&expected_arguments, arguments, span, context);
     }
 
     fn check_function_call_arguments(
@@ -256,9 +251,14 @@ impl<'a> ArrayLiteralChecker<'a> {
         span: &SourceSpan,
         context: &VisitContext,
     ) {
-        if let Some(signature) =
-            self.dynamic_interface_signature(target, member, InterfaceMemberKind::Function, context)
-        {
+        if let Ok(signature) = resolve_dynamic_interface_signature(
+            target,
+            member,
+            InterfaceMemberKind::Function,
+            self.dynamic_interface_signature_inputs(),
+            context.current_module.as_deref(),
+            context.current_flow_path.as_deref(),
+        ) {
             self.check_interface_signature_arguments(member, args, &signature, span, context);
         }
     }
@@ -302,24 +302,6 @@ impl<'a> ArrayLiteralChecker<'a> {
         }
     }
 
-    fn dynamic_interface_signature(
-        &self,
-        target: &Expression,
-        member: &str,
-        expected_kind: InterfaceMemberKind,
-        context: &VisitContext,
-    ) -> Option<InterfaceMemberSignature> {
-        resolve_dynamic_interface_signature(
-            target,
-            member,
-            expected_kind,
-            self.dynamic_interface_signature_inputs(),
-            context.current_module.as_deref(),
-            context.current_flow_path.as_deref(),
-        )
-        .ok()
-    }
-
     fn visible_declared_type(&self, name: &str, context: &VisitContext) -> Option<TypeName> {
         self.variable_scopes
             .visible_variable_declared_type(
@@ -329,7 +311,6 @@ impl<'a> ArrayLiteralChecker<'a> {
             )
             .and_then(|declared_type| declared_type.cloned())
     }
-
     fn check_expression_for_arrays(
         &mut self,
         expression: &Expression,
