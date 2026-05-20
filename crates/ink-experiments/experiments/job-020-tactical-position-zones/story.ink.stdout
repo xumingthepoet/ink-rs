@@ -1,0 +1,69 @@
+Tactical position zone prototype.
+Initial deployment
+Warrior: Front
+Rogue: Flank
+Mage: Rear
+Goblin Skirmisher: Front
+Goblin Archer: Mid
+Ogre Bruiser: Rear
+Warrior to Goblin Skirmisher: Melee
+Warrior to Goblin Archer: Short range
+Warrior to Ogre Bruiser: Long range
+Rogue to Goblin Skirmisher: Mid range
+Rogue to Goblin Archer: Short range
+Rogue to Ogre Bruiser: Short range
+Mage to Goblin Skirmisher: Long range
+Mage to Goblin Archer: Mid range
+Mage to Ogre Bruiser: Melee
+Rogue moves from Flank to Front.
+After Rogue rushes forward
+Warrior: Front
+Rogue: Front
+Mage: Rear
+Goblin Skirmisher: Front
+Goblin Archer: Mid
+Ogre Bruiser: Rear
+Warrior to Goblin Skirmisher: Melee
+Warrior to Goblin Archer: Short range
+Warrior to Ogre Bruiser: Long range
+Rogue to Goblin Skirmisher: Melee
+Rogue to Goblin Archer: Short range
+Rogue to Ogre Bruiser: Long range
+Mage to Goblin Skirmisher: Long range
+Mage to Goblin Archer: Mid range
+Mage to Ogre Bruiser: Melee
+Goblin Skirmisher slips from Front to Flank.
+After Skirmisher repositions
+Warrior: Front
+Rogue: Front
+Mage: Rear
+Goblin Skirmisher: Flank
+Goblin Archer: Mid
+Ogre Bruiser: Rear
+Warrior to Goblin Skirmisher: Mid range
+Warrior to Goblin Archer: Short range
+Warrior to Ogre Bruiser: Long range
+Rogue to Goblin Skirmisher: Mid range
+Rogue to Goblin Archer: Short range
+Rogue to Ogre Bruiser: Long range
+Mage to Goblin Skirmisher: Short range
+Mage to Goblin Archer: Mid range
+Mage to Ogre Bruiser: Melee
+Ogre Bruiser slips from Rear to Flank.
+Warrior moves from Front to Mid.
+After Ogre pressure and Warrior advance
+Warrior: Mid
+Rogue: Front
+Mage: Rear
+Goblin Skirmisher: Flank
+Goblin Archer: Mid
+Ogre Bruiser: Flank
+Warrior to Goblin Skirmisher: Short range
+Warrior to Goblin Archer: Melee
+Warrior to Ogre Bruiser: Short range
+Rogue to Goblin Skirmisher: Mid range
+Rogue to Goblin Archer: Short range
+Rogue to Ogre Bruiser: Mid range
+Mage to Goblin Skirmisher: Short range
+Mage to Goblin Archer: Mid range
+Mage to Ogre Bruiser: Short range
