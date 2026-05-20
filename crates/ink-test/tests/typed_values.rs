@@ -103,6 +103,13 @@ fn interface_values_lower_to_runtime_strings() {
 }
 
 #[test]
+fn interface_module_literals_run_as_static_flow_arguments() {
+    let compiled = compile_fixture("typed/interface-argument-module-literals.ink");
+
+    assert_story_output(&compiled, "damage_event|heal_event\n");
+}
+
+#[test]
 fn functions_return_typed_values() {
     let compiled = compile_fixture("typed/functions.ink");
     assert_story_output(&compiled, "5|Ada!|7\n2|3\n");

@@ -685,6 +685,9 @@ impl<'a> CallTargetChecker<'a> {
                         "{name} hasn't been marked as a function, but it's being called as one. Do you need to declare the knot as '== function {name} =='?"
                     ),
                 ));
+                for arg in args {
+                    self.check_expression(arg, span, context);
+                }
             } else {
                 self.check_function_call_signature(name, args, &symbol, span, context);
             }
@@ -693,10 +696,9 @@ impl<'a> CallTargetChecker<'a> {
                 span.clone(),
                 format!("Function '{name}' is not declared"),
             ));
-        }
-
-        for arg in args {
-            self.check_expression(arg, span, context);
+            for arg in args {
+                self.check_expression(arg, span, context);
+            }
         }
     }
 
@@ -855,29 +857,51 @@ impl<'a> CallTargetChecker<'a> {
                     args.len()
                 ),
             ));
+            for arg in args {
+                self.check_expression(arg, span, context);
+            }
             return;
         }
 
         for (argument, parameter) in args.iter().zip(parameters) {
             let Some(expected_type) = parameter.declared_type() else {
+                self.check_expression(argument, span, context);
                 continue;
             };
             let expected_type = qualified_module
                 .map(|module| qualify_type_name_for_module(expected_type, module))
                 .unwrap_or_else(|| expected_type.clone());
             if is_composite_literal(argument) {
+                self.check_expression(argument, span, context);
                 continue;
             }
-            match infer_expression_type(
+            let argument_type = infer_expected_interface_expression_type(
                 argument,
+                &expected_type,
                 self.variable_scopes,
                 self.struct_types,
                 self.enum_types,
                 self.target_symbols,
+                self.module_implementations,
+                self.module_imports,
                 self.interface_members,
                 self.current_module(context),
                 self.current_flow_path(context),
-            ) {
+            )
+            .unwrap_or_else(|| {
+                infer_expression_type(
+                    argument,
+                    self.variable_scopes,
+                    self.struct_types,
+                    self.enum_types,
+                    self.target_symbols,
+                    self.interface_members,
+                    self.current_module(context),
+                    self.current_flow_path(context),
+                )
+            });
+
+            match argument_type {
                 Ok(actual_type) if actual_type != expected_type => {
                     self.diagnostics.push(Diagnostic::error(
                         span.clone(),
@@ -888,8 +912,13 @@ impl<'a> CallTargetChecker<'a> {
                             expected_type.display_name()
                         ),
                     ));
+                    self.check_expression(argument, span, context);
                 }
-                Ok(_) => {}
+                Ok(_) => {
+                    if !is_interface_module_literal_argument(argument, &expected_type) {
+                        self.check_expression(argument, span, context);
+                    }
+                }
                 Err(error) => self.diagnostics.push(Diagnostic::error(
                     span.clone(),
                     format!(
@@ -1844,6 +1873,144 @@ mod tests {
         );
 
         assert_eq!(call_target_diagnostics(&story), []);
+    }
+
+    #[test]
+    fn accepts_interface_module_literals_as_static_divert_arguments() {
+        let story = parse_story(
+            "=== interface IItem ===\n\
+             == target ==\n\
+             === module game ===\n\
+             FROM left\n\
+             == main ==\n\
+             -> register(left)\n\
+             == register(next: interface<IItem>) ==\n\
+             -> END\n\
+             === module left implements IItem ===\n\
+             == target ==\n\
+             -> END",
+        );
+
+        assert_eq!(super::super::run_analysis_passes(&story), []);
+    }
+
+    #[test]
+    fn accepts_interface_module_literals_as_function_call_arguments() {
+        let story = parse_story(
+            "=== interface IItem ===\n\
+             == target ==\n\
+             === module game ===\n\
+             FROM left\n\
+             == main ==\n\
+             ~ temp route: interface<IItem> = select(left)\n\
+             -> END\n\
+             == function select(next: interface<IItem>) => interface<IItem> ==\n\
+             ~ return next\n\
+             === module left implements IItem ===\n\
+             == target ==\n\
+             -> END",
+        );
+
+        assert_eq!(super::super::run_analysis_passes(&story), []);
+    }
+
+    #[test]
+    fn accepts_interface_module_literals_as_qualified_static_arguments() {
+        let story = parse_story(
+            "=== interface IItem ===\n\
+             == target ==\n\
+             === module game ===\n\
+             FROM left\n\
+             FROM registry IMPORT register, select\n\
+             == main ==\n\
+             -> registry::register(left)\n\
+             ~ temp route: interface<IItem> = registry::select(left)\n\
+             -> END\n\
+             === module registry ===\n\
+             == register(next: interface<IItem>) ==\n\
+             -> END\n\
+             == function select(next: interface<IItem>) => interface<IItem> ==\n\
+             ~ return next\n\
+             === module left implements IItem ===\n\
+             == target ==\n\
+             -> END",
+        );
+
+        assert_eq!(super::super::run_analysis_passes(&story), []);
+    }
+
+    #[test]
+    fn visible_variables_take_precedence_over_interface_module_literals_in_arguments() {
+        let story = parse_story(
+            "=== interface IItem ===\n\
+             == target ==\n\
+             === module game ===\n\
+             FROM left\n\
+             == main ==\n\
+             ~ temp left: int = 1\n\
+             ~ temp route: interface<IItem> = select(left)\n\
+             -> END\n\
+             == function select(next: interface<IItem>) => interface<IItem> ==\n\
+             ~ return next\n\
+             === module left implements IItem ===\n\
+             == target ==\n\
+             -> END",
+        );
+
+        assert_single_diagnostic(
+            &call_target_diagnostics(&story),
+            DiagnosticSeverity::Error,
+            "Argument 'next' for function 'select' has type int but expected interface<IItem>",
+        );
+    }
+
+    #[test]
+    fn reports_missing_import_for_interface_module_literals_in_arguments() {
+        let story = parse_story(
+            "=== interface IItem ===\n\
+             == target ==\n\
+             === module game ===\n\
+             == main ==\n\
+             ~ temp route: interface<IItem> = select(left)\n\
+             -> END\n\
+             == function select(next: interface<IItem>) => interface<IItem> ==\n\
+             ~ return next\n\
+             === module left implements IItem ===\n\
+             == target ==\n\
+             -> END",
+        );
+
+        assert_single_diagnostic(
+            &call_target_diagnostics(&story),
+            DiagnosticSeverity::Error,
+            "Cannot type-check argument 'next' for function 'select': Module literal 'left' requires a bare import in module 'game': FROM left",
+        );
+    }
+
+    #[test]
+    fn reports_wrong_interface_for_interface_module_literals_in_arguments() {
+        let story = parse_story(
+            "=== interface IItem ===\n\
+             == target ==\n\
+             === interface IOther ===\n\
+             == target ==\n\
+             === module game ===\n\
+             FROM left\n\
+             == main ==\n\
+             ~ temp route: interface<IItem> = select(left)\n\
+             -> END\n\
+             == function select(next: interface<IItem>) => interface<IItem> ==\n\
+             ~ return next\n\
+             === module left implements IOther ===\n\
+             == target ==\n\
+             -> END",
+        );
+
+        assert_single_diagnostic(
+            &call_target_diagnostics(&story),
+            DiagnosticSeverity::Error,
+            "Cannot type-check argument 'next' for function 'select': Module 'left' does not implement interface 'IItem'",
+        );
     }
 
     #[test]
