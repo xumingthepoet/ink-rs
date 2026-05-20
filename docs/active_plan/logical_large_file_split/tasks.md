@@ -1,4 +1,4 @@
-Progress: 12/27
+Progress: 13/27
 
 # Logical Large-File Split Active Plan
 
@@ -392,7 +392,7 @@ syntax::expression::tests::token_parser_reproduces_current_expression_baseline`,
 Review found no follow-up changes; completion validation passed with the same
 focused commands and `make gate`.
 
-### [>] Task 13: Split Composite Expression Literal Parsing
+### [x] Task 13: Split Composite Expression Literal Parsing
 
 Goal: Give array, struct, and dict expression literals a focused parser owner.
 
@@ -418,7 +418,8 @@ Commit record: implementation commit `446322e8 Split composite expression
 literals`; validation passed with `cargo fmt --all --check`, `cargo test -p
 ink-test --test integration typed_values`, `cargo test -q -p ink-compiler
 syntax::expression::tests::tokenizer_covers_struct_literal_tokens`, and `make
-gate`.
+gate`. Review found no follow-up changes; completion validation passed with
+the same focused commands and `make gate`.
 
 ### [ ] Task 14: Split Dynamic Interface Expression Parsing
 
