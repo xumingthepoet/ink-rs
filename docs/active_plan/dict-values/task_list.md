@@ -497,7 +497,7 @@ Validation:
 Commit record: implementation `dc3cafb8` (`Support runtime Dict equality`);
 review fix `55709dfa` (`Cover nested Dict equality`)
 
-### [ ] Task 14: Runtime JSON Load And Save
+### [~] Task 14: Runtime JSON Load And Save
 
 Goal: Load and save Dict values through the format crate.
 
