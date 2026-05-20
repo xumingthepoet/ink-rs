@@ -482,7 +482,7 @@ Review record: Reviewed implementation commit `75fcf20c` with `git show
 Commit record: Implementation commit `75fcf20c`; waiting-review record
 `a5664873`; completion-record commit recorded by this task-list update.
 
-### [ ] Task 15: Extract dynamic interface signature helper
+### [>] Task 15: Extract dynamic interface signature helper
 
 Goal: Replace duplicated dynamic interface signature lookup code.
 
@@ -503,7 +503,12 @@ Modification boundaries: Dynamic interface signature lookup only.
 
 Validation commands: `cargo test -p ink-compiler targets interface_module array_literals dict_literals struct_literals`; `make gate`.
 
-Commit record: Implementation commit TBD; completion-record commit TBD.
+Validation record: `cargo test -p ink-compiler targets` passed; `cargo test -p
+ink-compiler interface_module` passed; `cargo test -p ink-compiler
+array_literals` passed; `cargo test -p ink-compiler dict_literals` passed;
+`cargo test -p ink-compiler struct_literals` passed; `make gate` passed.
+
+Commit record: Implementation commit `f67e9cc8`; completion-record commit TBD.
 
 ### [ ] Task 16: Replace duplicated dispatch in array literal checker
 
