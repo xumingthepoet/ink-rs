@@ -1,4 +1,4 @@
-Progress: 20/27
+Progress: 21/27
 
 # Logical Large-File Split Active Plan
 
@@ -621,7 +621,7 @@ ink-test --test integration typed_values`, `cargo test -p ink-test --test
 integration diagnostics`, and `make gate`. Review found no follow-up changes;
 completion validation passed with the same focused commands and `make gate`.
 
-### [>] Task 21: Split Dynamic Interface Target Checks
+### [x] Task 21: Split Dynamic Interface Target Checks
 
 Goal: Give dynamic interface target and function call validation a module that
 can grow with interface semantics.
@@ -648,7 +648,8 @@ integration modules`; `cargo test -p ink-test --test integration typed_values`;
 Commit record: implementation commit `3ed1ac8b Split dynamic interface
 target checks`; validation passed with `cargo fmt --all --check`, `cargo
 test -p ink-test --test integration modules`, `cargo test -p ink-test --test
-integration typed_values`, and `make gate`.
+integration typed_values`, and `make gate`. Review found no follow-up changes;
+completion validation passed with the same focused commands and `make gate`.
 
 ### [ ] Task 22: Split Target Context Helpers
 
