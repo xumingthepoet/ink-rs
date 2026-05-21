@@ -28,31 +28,17 @@ VAR targets: Target[] = [
 == main ==
 Turn start.
 Focus: {focus}
--> dynamic_choices(LEN(actions), -> action_option, -1, 0)
-
-== dynamic_choices(count: int, render: ->, context: int, index: int) ==
-{ if index >= count:
-    -> DONE
-- else:
-    <- {render}(context, index)
-    -> dynamic_choices(count, render, context, index + 1)
-}
-
-== action_option(context: int, index: int) ==
-* {actions[index].enabled}: {actions[index].name} ({actions[index].kind})
-    -> choose_action(index)
+* [action_index, action in actions] {action.enabled}: {action.name} ({action.kind})
+    -> choose_action(action_index)
 
 == choose_action(action_index: int) ==
 { if actions[action_index].needs_target:
     Choose target for {actions[action_index].name}.
-    -> dynamic_choices(LEN(targets), -> target_option, action_index, 0)
+    * [target_index, target in targets] {target.alive}: {target.name} ({target.hp} hp)
+        -> resolve_action(action_index, target_index)
 - else:
     -> resolve_action(action_index, -1)
 }
-
-== target_option(action_index: int, index: int) ==
-* {targets[index].alive}: {targets[index].name} ({targets[index].hp} hp)
-    -> resolve_action(action_index, index)
 
 == resolve_action(action_index: int, target_index: int) ==
 { if target_index >= 0:

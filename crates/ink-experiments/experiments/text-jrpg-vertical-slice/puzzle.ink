@@ -1,5 +1,6 @@
 === module puzzle ===
 
+CONST rune_choices: int[] = [1, 2, 3]
 VAR input: int[] = []
 VAR failed_attempts: int = 0
 VAR solved: bool = false
@@ -7,12 +8,8 @@ VAR solved: bool = false
 == gate ==
 The mine gate waits for three runes.
 Input: {sequence_label()}.
-* Sun
-    -> choose_rune(1)
-* Moon
-    -> choose_rune(2)
-* Star
-    -> choose_rune(3)
+* [rune_id in rune_choices] {rune_choice_label(rune_id)}
+    -> choose_rune(rune_id)
 
 == choose_rune(rune_id: int) ==
 ~ ARRAY_PUSH(input, rune_id)
@@ -55,4 +52,14 @@ Input: {sequence_label()}.
     ~ return "moon"
 - else:
     ~ return "star"
+}
+
+== function rune_choice_label(rune_id: int) => string ==
+{ switch rune_id:
+- 1:
+    ~ return "Sun"
+- 2:
+    ~ return "Moon"
+- else:
+    ~ return "Star"
 }

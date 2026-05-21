@@ -53,32 +53,16 @@ Ship {ship_names[ship_id]}: {ship_status(ship_id, size)}
     * Restart
         -> restart
 - else:
-    * Row 1
-        -> choose_column(0)
-    * Row 2
-        -> choose_column(1)
-    * Row 3
-        -> choose_column(2)
-    * Row 4
-        -> choose_column(3)
-    * Row 5
-        -> choose_column(4)
+    * [row in rows] Row {row_label(row)}
+        -> choose_column(row)
     * Restart
         -> restart
 }
 
 == choose_column(row: int) ==
 Choose column for row {row_label(row)}.
-* A{row_label(row)}
-    -> fire(row, 0)
-* B{row_label(row)}
-    -> fire(row, 1)
-* C{row_label(row)}
-    -> fire(row, 2)
-* D{row_label(row)}
-    -> fire(row, 3)
-* E{row_label(row)}
-    -> fire(row, 4)
+* [col in cols] {col_label(col)}{row_label(row)}
+    -> fire(row, col)
 * Back
     -> board_prompt
 

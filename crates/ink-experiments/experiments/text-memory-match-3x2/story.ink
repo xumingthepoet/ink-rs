@@ -47,18 +47,8 @@ Pairs: {pair_progress()}
     * Restart
         -> restart
 - else:
-    * Slot 1
-        -> choose_slot(0)
-    * Slot 2
-        -> choose_slot(1)
-    * Slot 3
-        -> choose_slot(2)
-    * Slot 4
-        -> choose_slot(3)
-    * Slot 5
-        -> choose_slot(4)
-    * Slot 6
-        -> choose_slot(5)
+    * [index, card in cards] Slot {slot_label(index)}
+        -> choose_slot(index)
     * Restart
         -> restart
 }

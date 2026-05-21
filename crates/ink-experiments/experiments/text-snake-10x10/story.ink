@@ -3,6 +3,19 @@
 ENUM Direction { Up Down Left Right }
 ENUM GameState { Playing Dead Won }
 
+STRUCT MoveOption {
+    text: string
+    label: string
+    direction: Direction
+}
+
+CONST move_options: MoveOption[] = [
+    %MoveOption{ text: "上", label: "up", direction: Direction.Up },
+    %MoveOption{ text: "下", label: "down", direction: Direction.Down },
+    %MoveOption{ text: "左", label: "left", direction: Direction.Left },
+    %MoveOption{ text: "右", label: "right", direction: Direction.Right }
+]
+
 VAR width: int = 10
 VAR height: int = 10
 VAR snake_x: int[] = [4, 3, 2]
@@ -49,14 +62,8 @@ Length: {LEN(snake_x)}
     * 重新开始
         -> restart
 - else:
-    * 上
-        -> move_snake(Direction.Up, "up")
-    * 下
-        -> move_snake(Direction.Down, "down")
-    * 左
-        -> move_snake(Direction.Left, "left")
-    * 右
-        -> move_snake(Direction.Right, "right")
+    * [move in move_options] {move.text}
+        -> move_snake(move.direction, move.label)
     * 过
         -> move_snake(current_direction, "wait")
 }

@@ -198,6 +198,20 @@ fn dynamic_choice_threads_survive_save_load() {
 }
 
 #[test]
+fn dynamic_choice_leading_braced_expression_is_text_without_colon() {
+    let compiled = compile_fixture("choices/dynamic-choice-leading-expression-text.ink");
+    let mut story = Story::new(&compiled.json);
+
+    assert_eq!(story.continue_maximally(), "");
+    let choices = story.get_current_choices();
+    assert_eq!(choices.len(), 2);
+    assert_eq!(choices[0].text, "Alpha");
+    assert_eq!(choices[1].text, "Beta");
+    story.choose_choice_index(1);
+    assert_eq!(story.continue_maximally(), "picked Beta.\n");
+}
+
+#[test]
 fn dynamic_choices_can_nest_and_capture_outer_bindings() {
     let compiled = compile_fixture("choices/dynamic-choice-nested.ink");
     let mut story = Story::new(&compiled.json);

@@ -55,24 +55,8 @@ Turn {turn}
     * Restart
         -> restart
 - else:
-    * Cell 1
-        -> player_move(0)
-    * Cell 2
-        -> player_move(1)
-    * Cell 3
-        -> player_move(2)
-    * Cell 4
-        -> player_move(3)
-    * Cell 5
-        -> player_move(4)
-    * Cell 6
-        -> player_move(5)
-    * Cell 7
-        -> player_move(6)
-    * Cell 8
-        -> player_move(7)
-    * Cell 9
-        -> player_move(8)
+    * [index, mark in board] Cell {cell_label(index)}
+        -> player_move(index)
     * Restart
         -> restart
 }

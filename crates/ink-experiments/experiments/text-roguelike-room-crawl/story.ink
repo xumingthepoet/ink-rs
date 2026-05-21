@@ -9,6 +9,12 @@ STRUCT RoomDef {
     amount: int
 }
 
+STRUCT MoveOption {
+    text: string
+    label: string
+    direction: Direction
+}
+
 CONST width: int = 5
 CONST height: int = 5
 CONST rows: int[] = [0, 1, 2, 3, 4]
@@ -27,6 +33,12 @@ CONST rooms: Dict<int, RoomDef> = %{
     8: %RoomDef{ kind: RoomKind.Monster, amount: 2 },
     9: %RoomDef{ kind: RoomKind.Exit, amount: 0 }
 }
+CONST move_options: MoveOption[] = [
+    %MoveOption{ text: "Up", label: "up", direction: Direction.Up },
+    %MoveOption{ text: "Down", label: "down", direction: Direction.Down },
+    %MoveOption{ text: "Left", label: "left", direction: Direction.Left },
+    %MoveOption{ text: "Right", label: "right", direction: Direction.Right }
+]
 
 VAR player_x: int = 0
 VAR player_y: int = 0
@@ -61,14 +73,8 @@ Key: {key_label()}
     * Restart
         -> restart
 - else:
-    * Up
-        -> move_player(Direction.Up, "up")
-    * Down
-        -> move_player(Direction.Down, "down")
-    * Left
-        -> move_player(Direction.Left, "left")
-    * Right
-        -> move_player(Direction.Right, "right")
+    * [move in move_options] {move.text}
+        -> move_player(move.direction, move.label)
     * Restart
         -> restart
 }

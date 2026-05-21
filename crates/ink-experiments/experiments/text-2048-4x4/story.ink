@@ -15,6 +15,12 @@ STRUCT Pair {
     right: int
 }
 
+STRUCT MoveOption {
+    text: string
+    label: string
+    direction: Direction
+}
+
 CONST initial_tiles: int[] = [
     2, 4, 8, 16,
     32, 64, 128, 256,
@@ -72,6 +78,12 @@ CONST merge_pairs: Pair[] = [
     %Pair{ left: 7, right: 11 },
     %Pair{ left: 11, right: 15 }
 ]
+CONST move_options: MoveOption[] = [
+    %MoveOption{ text: "上", label: "up", direction: Direction.Up },
+    %MoveOption{ text: "下", label: "down", direction: Direction.Down },
+    %MoveOption{ text: "左", label: "left", direction: Direction.Left },
+    %MoveOption{ text: "右", label: "right", direction: Direction.Right }
+]
 VAR tiles: int[] = initial_tiles
 VAR scratch: int[] = []
 VAR merged: int[] = []
@@ -104,14 +116,8 @@ Score: {score}
     * 重新开始
         -> restart
 - else:
-    * 上
-        -> move_board(Direction.Up, "up")
-    * 下
-        -> move_board(Direction.Down, "down")
-    * 左
-        -> move_board(Direction.Left, "left")
-    * 右
-        -> move_board(Direction.Right, "right")
+    * [move in move_options] {move.text}
+        -> move_board(move.direction, move.label)
 }
 
 == restart ==

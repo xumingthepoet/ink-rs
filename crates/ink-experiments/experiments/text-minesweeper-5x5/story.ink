@@ -72,16 +72,8 @@ Moves: {moves}
     * 重新开始
         -> restart
 - else:
-    * 选择行 1
-        -> choose_column(0)
-    * 选择行 2
-        -> choose_column(1)
-    * 选择行 3
-        -> choose_column(2)
-    * 选择行 4
-        -> choose_column(3)
-    * 选择行 5
-        -> choose_column(4)
+    * [row in row_indices] 选择行 {row_label(row)}
+        -> choose_column(row)
     * 切换标记模式
         -> toggle_mode
     * 重新开始
@@ -90,16 +82,8 @@ Moves: {moves}
 
 == choose_column(row: int) ==
 选择第 {row_label(row)} 行.
-* A{row_label(row)}
-    -> act(row, 0)
-* B{row_label(row)}
-    -> act(row, 1)
-* C{row_label(row)}
-    -> act(row, 2)
-* D{row_label(row)}
-    -> act(row, 3)
-* E{row_label(row)}
-    -> act(row, 4)
+* [col in columns] {col_label(col)}{row_label(row)}
+    -> act(row, col)
 * 返回
     -> board_prompt
 

@@ -53,7 +53,8 @@ pub(super) fn parse_choice(parser: &mut RuleParser<'_>) -> Option<Choice> {
         ));
         return None;
     }
-    let (condition, choice_body) = parse_choice_conditions(&choice_body)?;
+    let (condition, choice_body) =
+        parse_choice_conditions(&choice_body, dynamic_binding.is_some())?;
 
     // Handle fallback choices like "* -> " which have no text content
     // and the -> is a divert to empty (fall through to gather)
@@ -201,9 +202,14 @@ fn parse_choice_identifier(choice_body: &str) -> (Option<String>, String) {
     )
 }
 
-fn parse_choice_conditions(choice_body: &str) -> Option<(Option<Expression>, String)> {
+fn parse_choice_conditions(
+    choice_body: &str,
+    dynamic_choice: bool,
+) -> Option<(Option<Expression>, String)> {
+    let original_body = choice_body.to_string();
     let mut remaining = choice_body.trim_start();
     let mut conditions = Vec::new();
+    let mut found_boundary = false;
 
     while let Some(after_open) = remaining.strip_prefix('{') {
         let close_index = scan::find_matching_delimiter(after_open, '{', '}')?;
@@ -212,8 +218,13 @@ fn parse_choice_conditions(choice_body: &str) -> Option<(Option<Expression>, Str
         remaining = after_open[close_index + 1..].trim_start();
         if let Some(after_boundary) = remaining.strip_prefix(':') {
             remaining = after_boundary.trim_start();
+            found_boundary = true;
             break;
         }
+    }
+
+    if dynamic_choice && !conditions.is_empty() && !found_boundary {
+        return Some((None, original_body));
     }
 
     Some((
@@ -300,14 +311,18 @@ mod tests {
     }
 
     fn assert_single_dynamic_text(choice: &Choice, expected_name: &str) {
+        assert_single_expression_text(choice, expected_name);
+    }
+
+    fn assert_single_expression_text(choice: &Choice, expected_source: &str) {
         let start_content = choice.start_content().expect("expected display text");
         assert!(matches!(
             start_content.objects(),
             [Object::ContentList(content)]
                 if matches!(
                     content.objects(),
-                    [Object::Expression(Expression::VariableReference(name))]
-                        if name == expected_name
+                    [Object::Expression(expression)]
+                        if expression.to_source_string() == expected_source
                 )
         ));
     }
@@ -349,6 +364,27 @@ mod tests {
             Expression::VariableReference(name) if name == "visible"
         ));
         assert_single_dynamic_text(&choice, "label");
+    }
+
+    #[test]
+    fn dynamic_choice_braced_text_without_colon_is_display_text() {
+        let choice = parse_choice_line("* [move in moves] {move.text}");
+
+        assert!(choice.dynamic_binding().is_some());
+        assert!(choice.condition().is_none());
+        assert_single_expression_text(&choice, "move.text");
+    }
+
+    #[test]
+    fn dynamic_choice_condition_requires_colon_boundary() {
+        let choice = parse_choice_line("* [option in options] {option.enabled}: {option.text}");
+
+        assert!(choice.dynamic_binding().is_some());
+        assert!(matches!(
+            choice.condition(),
+            Some(Expression::FieldAccess { field, .. }) if field == "enabled"
+        ));
+        assert_single_expression_text(&choice, "option.text");
     }
 
     #[test]

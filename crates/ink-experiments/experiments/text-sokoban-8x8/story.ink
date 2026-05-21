@@ -8,6 +8,12 @@ STRUCT Pos {
     y: int
 }
 
+STRUCT MoveOption {
+    text: string
+    label: string
+    direction: Direction
+}
+
 CONST width: int = 8
 CONST height: int = 8
 CONST rows: int[] = [0, 1, 2, 3, 4, 5, 6, 7]
@@ -30,6 +36,12 @@ CONST walls: Pos[] = [
     %Pos{ x: 0, y: 5 }, %Pos{ x: 4, y: 5 }, %Pos{ x: 7, y: 5 },
     %Pos{ x: 0, y: 6 }, %Pos{ x: 7, y: 6 },
     %Pos{ x: 0, y: 7 }, %Pos{ x: 1, y: 7 }, %Pos{ x: 2, y: 7 }, %Pos{ x: 3, y: 7 }, %Pos{ x: 4, y: 7 }, %Pos{ x: 5, y: 7 }, %Pos{ x: 6, y: 7 }, %Pos{ x: 7, y: 7 }
+]
+CONST move_options: MoveOption[] = [
+    %MoveOption{ text: "Up", label: "up", direction: Direction.Up },
+    %MoveOption{ text: "Down", label: "down", direction: Direction.Down },
+    %MoveOption{ text: "Left", label: "left", direction: Direction.Left },
+    %MoveOption{ text: "Right", label: "right", direction: Direction.Right }
 ]
 
 VAR player: Pos = initial_player
@@ -54,14 +66,8 @@ Boxes on goals: {boxes_on_goals()}/{LEN(goals)}
     * Restart
         -> restart
 - else:
-    * Up
-        -> move_player(Direction.Up, "up")
-    * Down
-        -> move_player(Direction.Down, "down")
-    * Left
-        -> move_player(Direction.Left, "left")
-    * Right
-        -> move_player(Direction.Right, "right")
+    * [move in move_options] {move.text}
+        -> move_player(move.direction, move.label)
     * Restart
         -> restart
 }

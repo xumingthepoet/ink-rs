@@ -65,7 +65,8 @@ Each entry should include:
   selected-choice body, tags, and nested choices. Dynamic choices may use any
   choice depth marker such as `*`, `**`, or `***`, and may mix with authored
   static choices. Static choice labels are unchanged, but dynamic choices do
-  not support labels.
+  not support labels. Dynamic choice conditions require the `:` boundary; a
+  leading `{expr}` without `:` is displayed choice text, not a condition.
 - documentation effect: `SyntaxReference.md` documents dynamic array choices
   as the current data-driven choice syntax, keeps square brackets literal
   except for the exact dynamic-choice prefix position, and removes the old

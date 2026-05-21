@@ -701,6 +701,12 @@ choices; conditions filter individual generated choices; fallback choices still
 run if no visible choices remain; and generated choices save/load with their
 captured runtime state.
 
+Dynamic choice conditions use an explicit colon boundary. Without the colon, a
+leading braced expression is displayed as choice text:
+
+	* [move in moves] {move.text}
+	* [move in moves] {move.enabled}: {move.text}
+
 The dynamic variables are visible in the choice condition, displayed choice
 text, selected-choice body, tags, and nested choices:
 
@@ -2678,10 +2684,9 @@ The array expression is evaluated once before expansion. Each generated choice
 captures its own `i` and `option` values in the normal choice thread, so pending
 choices can be saved and loaded without regenerating the list.
 
-The colon after `{option.enabled}` is deliberate. At the beginning of a choice
-line, braced expressions are parsed as choice conditions. The colon ends the
-condition prefix, so the following `{option.text}` is parsed as dynamic choice
-text instead of another condition.
+The colon after `{option.enabled}` is deliberate. In a dynamic choice, a
+condition prefix must end with a colon; without it, a leading braced expression
+such as `{option.text}` is parsed as displayed choice text.
 
 # Part 5: International character support in identifiers
 
