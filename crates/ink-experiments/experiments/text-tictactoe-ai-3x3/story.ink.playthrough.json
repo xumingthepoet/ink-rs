@@ -1,0 +1,26 @@
+[
+  {
+    "output": "Text tic-tac-toe AI 3x3.\nTurn 0\n1|2|3\n4|5|6\n7|8|9\nX moves first; O uses a simple blocking AI.\n",
+    "choices": ["Cell 1", "Cell 2", "Cell 3", "Cell 4", "Cell 5", "Cell 6", "Cell 7", "Cell 8", "Cell 9", "Restart"],
+    "choose": 0
+  },
+  {
+    "output": "Turn 1\nX|2|3\n4|O|6\n7|8|9\nX moves; O takes cell 5.\n",
+    "choices": ["Cell 1", "Cell 2", "Cell 3", "Cell 4", "Cell 5", "Cell 6", "Cell 7", "Cell 8", "Cell 9", "Restart"],
+    "choose": 1
+  },
+  {
+    "output": "Turn 2\nX|X|O\n4|O|6\n7|8|9\nX moves; O takes cell 3.\n",
+    "choices": ["Cell 1", "Cell 2", "Cell 3", "Cell 4", "Cell 5", "Cell 6", "Cell 7", "Cell 8", "Cell 9", "Restart"],
+    "choose": 6
+  },
+  {
+    "output": "Turn 3\nX|X|O\nO|O|6\nX|8|9\nX moves; O takes cell 4.\n",
+    "choices": ["Cell 1", "Cell 2", "Cell 3", "Cell 4", "Cell 5", "Cell 6", "Cell 7", "Cell 8", "Cell 9", "Restart"],
+    "choose": 8
+  },
+  {
+    "output": "Turn 4\nX|X|O\nO|O|O\nX|8|X\nX moves; O takes cell 6.\nResult: O wins.\n",
+    "choices": ["Restart"]
+  }
+]
