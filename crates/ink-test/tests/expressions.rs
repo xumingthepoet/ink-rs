@@ -60,3 +60,13 @@ fn expression_string_inline_tokens_are_literals() {
         vec![json!("str"), json!("^# <> -> <-"), json!("/str")],
     );
 }
+
+#[test]
+fn logical_operators_short_circuit_right_hand_side() {
+    let compiled = compile_fixture("expressions/logical-operators-short-circuit.ink");
+
+    assert_story_output(
+        &compiled,
+        "false\ntrue\nfalse\ntrue\ntrue\ntrue\nEffects: 2\n",
+    );
+}

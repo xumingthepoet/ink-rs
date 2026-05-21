@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 
-use ink_story_json_format::{ControlCommand, NativeFunction, Object as RuntimeObject};
+use ink_story_json_format::{Container, ControlCommand, NativeFunction, Object as RuntimeObject};
 
-use crate::parsed::{Expression, TypeName};
+use crate::parsed::{BinaryOperator, Expression, TypeName};
 
 use super::composite_literal::lower_dynamic_composite_literal_into;
 use super::context::{ChoicePathMode, LoweringContext};
@@ -221,6 +221,9 @@ pub(super) fn lower_expression_into_with_constants(
             left,
             right,
         } => {
+            if lower_short_circuit_binary_into(content, *operator, left, right, lowering) {
+                return;
+            }
             lower_expression_into_with_constants(content, left, lowering);
             lower_expression_into_with_constants(content, right, lowering);
             content.push(RuntimeObject::NativeFunction(
@@ -245,6 +248,80 @@ pub(super) fn lower_expression_into_with_constants(
             }
         }
     }
+}
+
+fn lower_short_circuit_binary_into(
+    content: &mut Vec<RuntimeObject>,
+    operator: BinaryOperator,
+    left: &Expression,
+    right: &Expression,
+    lowering: &mut ExpressionLoweringContext<'_, '_>,
+) -> bool {
+    let short_circuit_result = match operator {
+        BinaryOperator::And | BinaryOperator::AndSymbol => false,
+        BinaryOperator::Or | BinaryOperator::OrSymbol => true,
+        _ => return false,
+    };
+
+    let mut expression_content = Vec::new();
+    lower_expression_into_with_constants(&mut expression_content, left, lowering);
+    if !short_circuit_result {
+        expression_content.push(RuntimeObject::NativeFunction(NativeFunction::Not));
+    }
+
+    let branch_index = expression_content.len();
+    let mut branch_container = Container::unnamed(vec![RuntimeObject::ConditionalDivert {
+        target: ".^.b".to_string(),
+    }]);
+    branch_container.named_content.push(super::named_content(
+        "b",
+        short_circuit_branch_content(short_circuit_result),
+    ));
+    expression_content.push(RuntimeObject::Container(branch_container));
+
+    lower_expression_into_with_constants(&mut expression_content, right, lowering);
+    let rejoin_index = expression_content.len();
+    set_short_circuit_rejoin_target(&mut expression_content, branch_index, rejoin_index);
+    expression_content.push(RuntimeObject::ControlCommand(ControlCommand::NoOp));
+
+    content.push(RuntimeObject::Container(Container::unnamed(
+        expression_content,
+    )));
+    true
+}
+
+fn short_circuit_branch_content(result: bool) -> Vec<RuntimeObject> {
+    vec![
+        RuntimeObject::Bool(result),
+        RuntimeObject::Divert {
+            target: String::new(),
+            variable: false,
+        },
+    ]
+}
+
+fn set_short_circuit_rejoin_target(
+    content: &mut [RuntimeObject],
+    branch_index: usize,
+    rejoin_index: usize,
+) {
+    let RuntimeObject::Container(branch_container) = &mut content[branch_index] else {
+        panic!("short-circuit branch must lower to a container");
+    };
+    let branch = branch_container
+        .named_content
+        .iter_mut()
+        .find(|named| named.name == "b")
+        .expect("short-circuit branch must contain named content");
+    let RuntimeObject::Divert { target, .. } = branch
+        .container
+        .content
+        .last_mut()
+        .expect("short-circuit branch must end with a divert")
+    else {
+        panic!("short-circuit branch must end with a divert");
+    };
+    *target = format!(".^.^.^.{rejoin_index}");
 }
 
 fn lower_constant_expression_into(

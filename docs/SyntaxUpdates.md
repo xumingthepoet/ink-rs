@@ -26,6 +26,29 @@ Each entry should include:
 - migration guidance
 - tests
 
+## 2026-05-21: Explicit Logical Operators Short-Circuit
+
+- status: supported
+- upstream behavior: upstream Ink lowers `and` / `&&` and `or` / `||` as eager
+  binary native-function calls, so both operands are evaluated before the
+  operator runs.
+- ink-rs behavior: explicit logical operators now short-circuit inside a single
+  expression. `and` / `&&` skips the right-hand side when the left-hand side is
+  `false`; `or` / `||` skips the right-hand side when the left-hand side is
+  `true`. Adjacent choice condition blocks such as `{a}{b}` remain independent
+  conditions and both blocks are evaluated.
+- documentation effect: `SyntaxReference.md` documents short-circuit behavior
+  for explicit logical operators and clarifies that multiple choice condition
+  blocks are not themselves a short-circuit chain.
+- rationale: guard expressions such as `index < LEN(items) && items[index] == x`
+  should not evaluate an unsafe read after the guard fails.
+- migration guidance: keep side effects that must always run in separate logic
+  lines or separate choice condition blocks. Put side effects inside `&&` or
+  `||` only when skipping them is intended.
+- tests: expression and choice integration fixtures cover skipped out-of-bounds
+  reads, word and symbol operators, RHS side effects when evaluation is still
+  required, and eager evaluation between adjacent choice condition blocks.
+
 ## 2026-05-21: Array Append And Insert Helpers
 
 - status: supported
