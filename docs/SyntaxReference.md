@@ -1681,6 +1681,54 @@ switch fallback.
 Keywordless multiline forms such as `{ x > 0:` and `{ x:` are not control
 blocks in ink-rs. Use `if` or `switch` explicitly.
 
+### For blocks
+
+Typed arrays and Dicts can be iterated with a multiline `for` control block.
+This is source-level compiler syntax; it lowers to existing runtime variables,
+conditionals, and collection helper calls.
+
+Array loops can bind only the item, or both the zero-based index and item:
+
+	{ for item in items:
+		Item {item.name}
+		~ total += item.score
+	}
+
+	{ for index, item in items:
+		{index}: {item.name}
+	}
+
+Dict loops bind both key and value. Key-only Dict loops are not supported:
+
+	{ for key, value in scores:
+		{key}: {value}
+	}
+
+For `Dict<string, V>`, `key` is a `string`; for `Dict<int, V>`, `key` is an
+`int`. Dict keys are iterated in the same stable order as `DICT_KEYS`: string
+keys in lexical order and int keys in ascending order.
+
+Loop variables are scoped to the loop body and can shadow outer source names.
+They are visible inside nested `if`, `switch`, and nested `for` blocks, but not
+after the loop.
+
+For loop bodies may contain text lines with inline expressions, `~` logic
+lines including typed `temp` declarations and assignments, simple `if` blocks,
+extended `if:` blocks, `switch` blocks, and nested `for` blocks. The same
+subset applies recursively inside nested branches and loops.
+
+Choices, threads, diverts, tunnels, tunnel onwards, gathers, flow
+declarations, `~ return`, global `VAR`, `CONST`, `ENUM`, `STRUCT`,
+`EXTERNAL`, tags, and author warnings are not supported inside `for` blocks.
+Use an ordinary knot/function helper when iteration needs arbitrary flow
+control or generated choices.
+
+Array loops fix `LEN(array)` once before the loop starts. Each iteration still
+reads `array[index]`. Dict loops fix `DICT_KEYS(dict)` once before the loop
+starts. Each iteration still reads `dict[key]`. If the body mutates the
+iterated collection and a later fixed index or key is no longer readable, the
+normal runtime array index or Dict missing-key error is preserved.
+
 For flow checking, an `if`/`else` block or switch block closes the current flow
 when every branch ends in a divert, `-> DONE`, `-> END`, choice, or return and
 the block has an `else` branch. A bool switch that explicitly covers both

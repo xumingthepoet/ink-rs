@@ -7,6 +7,7 @@ mod context;
 mod divert;
 mod expression;
 mod flow;
+mod for_loop;
 mod indexes;
 mod labels;
 mod path;
@@ -37,6 +38,7 @@ use divert::{
 };
 use expression::{lower_expression_into, lower_logic_line_into, lower_output_expression_into};
 use flow::lower_module_flow;
+use for_loop::lower_for_loop_into;
 use indexes::{
     ConstantValues, EnumDefinitions, LoweringIndexes, RuntimeLenEstimator, StructDefinitions,
 };
@@ -400,6 +402,7 @@ fn lower_object_into_with_context_count(
             lower_output_expression_into(content, expression, context)
         }
         Object::Conditional(conditional) => lower_conditional_into(content, conditional, context),
+        Object::ForLoop(for_loop) => lower_for_loop_into(content, for_loop, context),
         Object::LogicLine(expression) => {
             lower_logic_line_into(content, expression, context);
         }

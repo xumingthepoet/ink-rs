@@ -11,7 +11,7 @@ use super::name_resolution::{
     resolve_callable_name, resolve_constant_name, resolve_runtime_variable_name,
 };
 
-pub(super) fn infer_lowered_expression_type(
+pub(in crate::lower) fn infer_lowered_expression_type(
     expression: &Expression,
     context: &LoweringContext<'_>,
 ) -> Option<TypeName> {

@@ -11,7 +11,6 @@ use super::{
     modules::{ModuleAnalysis, ModuleImportIndex},
     structs::build_struct_type_index,
     target_symbols::build_target_symbol_index,
-    variables::build_variable_scope_index,
 };
 
 pub(super) struct AnalysisIndexes<'a> {
@@ -27,11 +26,17 @@ pub(super) struct AnalysisIndexes<'a> {
 
 impl<'a> AnalysisIndexes<'a> {
     pub(super) fn build(story: &Story, module_analysis: &'a ModuleAnalysis) -> Self {
-        let variable_scopes = build_variable_scope_index(story);
         let struct_types = build_struct_type_index(story);
         let enum_types = build_enum_type_index(story);
         let target_symbols = build_target_symbol_index(story);
         let interface_members = build_interface_member_index(story);
+        let variable_scopes = super::variables::build_variable_scope_index_with_type_indexes(
+            story,
+            &struct_types,
+            &enum_types,
+            &target_symbols,
+            &interface_members,
+        );
         let module_implementations = build_module_implementation_index(story);
         let interface_module_literal_uses = collect_interface_module_literal_uses(
             story,

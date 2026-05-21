@@ -8,6 +8,7 @@ mod enum_declaration;
 mod expression;
 mod external_declaration;
 mod flow;
+mod for_loop;
 mod gather;
 mod glue;
 mod inc_dec;
@@ -38,6 +39,7 @@ pub use expression::{
 };
 pub use external_declaration::ExternalDeclaration;
 pub use flow::{Flow, FlowArgument, FlowLevel, FlowParts};
+pub use for_loop::{ForLoop, ForLoopVariable};
 pub use gather::Gather;
 pub use glue::Glue;
 pub use inc_dec::IncDec;
@@ -61,6 +63,7 @@ pub enum Object {
     ContentList(ContentList),
     Expression(Expression),
     Conditional(Conditional),
+    ForLoop(ForLoop),
     ConstantDeclaration(ConstantDeclaration),
     LogicLine(Expression),
     Glue(Glue),
@@ -98,6 +101,10 @@ impl Object {
             Object::Conditional(conditional) => {
                 out.push('\n');
                 conditional.write_parse_snapshot(out, indent);
+            }
+            Object::ForLoop(for_loop) => {
+                out.push('\n');
+                for_loop.write_parse_snapshot(out, indent);
             }
             Object::ConstantDeclaration(declaration) => {
                 declaration.write_parse_snapshot(out, indent)

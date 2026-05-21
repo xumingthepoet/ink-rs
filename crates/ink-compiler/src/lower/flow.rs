@@ -2,9 +2,10 @@ use std::collections::{HashMap, HashSet};
 
 use ink_story_json_format::{Container, Object as RuntimeObject};
 
-use crate::parsed::{ContentList, Flow, Object, TypeName, Weave};
+use crate::parsed::{ContentList, DictKeyType, Flow, Object, TypeName, Weave};
 
 use super::context::{ChoicePathMode, LoweringContext};
+use super::expression::infer_lowered_expression_type;
 use super::indexes::LoweringIndexes;
 use super::path::LabelIndex;
 use super::weave::{
@@ -57,7 +58,12 @@ fn lower_flow_with_context(flow: &Flow, context: &FlowLoweringContext<'_, '_>) -
         .map(|module| format!("{module}.{source_flow_path}"))
         .unwrap_or_else(|| source_flow_path.clone());
     let local_variables = collect_flow_local_variables(flow);
-    let local_variable_types = collect_flow_local_variable_types(flow);
+    let local_variable_types = collect_flow_local_variable_types(
+        flow,
+        context.module_name,
+        &source_flow_path,
+        context.indexes,
+    );
 
     lower_flow_arguments_into(&mut content, flow);
 
@@ -195,7 +201,12 @@ pub(super) fn collect_flow_local_variables(flow: &Flow) -> HashSet<String> {
     local_variables
 }
 
-fn collect_flow_local_variable_types(flow: &Flow) -> HashMap<String, TypeName> {
+fn collect_flow_local_variable_types(
+    flow: &Flow,
+    module_name: Option<&str>,
+    source_flow_path: &str,
+    indexes: &LoweringIndexes<'_>,
+) -> HashMap<String, TypeName> {
     let mut local_variable_types = flow
         .arguments()
         .iter()
@@ -207,6 +218,14 @@ fn collect_flow_local_variable_types(flow: &Flow) -> HashMap<String, TypeName> {
         })
         .collect::<HashMap<_, _>>();
     collect_local_variable_types_in_weave(flow.weave(), &mut local_variable_types);
+    collect_loop_variable_types_in_weave(
+        flow.weave(),
+        flow.name(),
+        module_name,
+        source_flow_path,
+        indexes,
+        &mut local_variable_types,
+    );
     local_variable_types
 }
 
@@ -256,6 +275,15 @@ fn collect_local_variables_in_object(object: &Object, local_variables: &mut Hash
                 collect_local_variables_in_weave(branch.content(), local_variables);
             }
         }
+        Object::ForLoop(for_loop) => {
+            local_variables.insert(for_loop.index_name());
+            local_variables.insert(for_loop.limit_name());
+            local_variables.insert(for_loop.keys_name());
+            for variable in for_loop.variables() {
+                local_variables.insert(variable.runtime_name().to_string());
+            }
+            collect_local_variables_in_weave(for_loop.body(), local_variables);
+        }
         Object::Choice(choice) => {
             if let Some(content) = choice.start_content() {
                 collect_local_variables_in_content_list(content, local_variables);
@@ -285,6 +313,11 @@ fn collect_local_variable_types_in_object(
                 collect_local_variable_types_in_weave(branch.content(), local_variable_types);
             }
         }
+        Object::ForLoop(for_loop) => {
+            local_variable_types.insert(for_loop.index_name(), TypeName::int());
+            local_variable_types.insert(for_loop.limit_name(), TypeName::int());
+            collect_local_variable_types_in_weave(for_loop.body(), local_variable_types);
+        }
         Object::Choice(choice) => {
             if let Some(content) = choice.start_content() {
                 collect_local_variable_types_in_content_list(content, local_variable_types);
@@ -298,5 +331,206 @@ fn collect_local_variable_types_in_object(
             collect_local_variable_types_in_weave(weave, local_variable_types);
         }
         _ => {}
+    }
+}
+
+fn collect_loop_variable_types_in_weave(
+    weave: &Weave,
+    flow_name: &str,
+    module_name: Option<&str>,
+    source_flow_path: &str,
+    indexes: &LoweringIndexes<'_>,
+    local_variable_types: &mut HashMap<String, TypeName>,
+) {
+    for object in weave.content() {
+        collect_loop_variable_types_in_object(
+            object,
+            flow_name,
+            module_name,
+            source_flow_path,
+            indexes,
+            local_variable_types,
+        );
+    }
+}
+
+fn collect_loop_variable_types_in_content_list(
+    content_list: &ContentList,
+    flow_name: &str,
+    module_name: Option<&str>,
+    source_flow_path: &str,
+    indexes: &LoweringIndexes<'_>,
+    local_variable_types: &mut HashMap<String, TypeName>,
+) {
+    for object in content_list.objects() {
+        collect_loop_variable_types_in_object(
+            object,
+            flow_name,
+            module_name,
+            source_flow_path,
+            indexes,
+            local_variable_types,
+        );
+    }
+}
+
+fn collect_loop_variable_types_in_object(
+    object: &Object,
+    flow_name: &str,
+    module_name: Option<&str>,
+    source_flow_path: &str,
+    indexes: &LoweringIndexes<'_>,
+    local_variable_types: &mut HashMap<String, TypeName>,
+) {
+    match object {
+        Object::ForLoop(for_loop) => {
+            if let Some(iterable_type) = infer_loop_iterable_type(
+                for_loop,
+                flow_name,
+                module_name,
+                source_flow_path,
+                indexes,
+                local_variable_types,
+            ) {
+                insert_loop_variable_types(for_loop, &iterable_type, local_variable_types);
+            }
+            collect_loop_variable_types_in_weave(
+                for_loop.body(),
+                flow_name,
+                module_name,
+                source_flow_path,
+                indexes,
+                local_variable_types,
+            );
+        }
+        Object::ContentList(content_list) => collect_loop_variable_types_in_content_list(
+            content_list,
+            flow_name,
+            module_name,
+            source_flow_path,
+            indexes,
+            local_variable_types,
+        ),
+        Object::Conditional(conditional) => {
+            for branch in conditional.branches() {
+                collect_loop_variable_types_in_weave(
+                    branch.content(),
+                    flow_name,
+                    module_name,
+                    source_flow_path,
+                    indexes,
+                    local_variable_types,
+                );
+            }
+        }
+        Object::Choice(choice) => {
+            if let Some(content) = choice.start_content() {
+                collect_loop_variable_types_in_content_list(
+                    content,
+                    flow_name,
+                    module_name,
+                    source_flow_path,
+                    indexes,
+                    local_variable_types,
+                );
+            }
+            collect_loop_variable_types_in_content_list(
+                choice.inner_content(),
+                flow_name,
+                module_name,
+                source_flow_path,
+                indexes,
+                local_variable_types,
+            );
+        }
+        Object::Weave(weave) => collect_loop_variable_types_in_weave(
+            weave,
+            flow_name,
+            module_name,
+            source_flow_path,
+            indexes,
+            local_variable_types,
+        ),
+        _ => {}
+    }
+}
+
+fn infer_loop_iterable_type(
+    for_loop: &crate::parsed::ForLoop,
+    flow_name: &str,
+    module_name: Option<&str>,
+    source_flow_path: &str,
+    indexes: &LoweringIndexes<'_>,
+    local_variable_types: &HashMap<String, TypeName>,
+) -> Option<TypeName> {
+    let local_variables = local_variable_types.keys().cloned().collect::<HashSet<_>>();
+    let path_mode = ChoicePathMode::Flow {
+        module_name: module_name.map(str::to_string),
+        flow_name: flow_name.to_string(),
+        container_path: source_flow_path.to_string(),
+        parent_flow_name: source_flow_path
+            .rsplit_once('.')
+            .map(|(parent, _)| parent.to_string()),
+        sibling_stitch_names: Vec::new(),
+        local_variables,
+        local_variable_types: local_variable_types.clone(),
+        self_target_relative: false,
+        fallback_gather_target: None,
+    };
+    let choice_labels = LabelIndex::new();
+    let context = LoweringContext::new(
+        path_mode,
+        &choice_labels,
+        &indexes.global_labels,
+        &indexes.global_variables,
+        &indexes.global_variable_types,
+        &indexes.external_signatures,
+        &indexes.interface_members,
+        &indexes.constants,
+        &indexes.struct_definitions,
+        &indexes.enum_definitions,
+    );
+    infer_lowered_expression_type(for_loop.iterable(), &context)
+}
+
+fn insert_loop_variable_types(
+    for_loop: &crate::parsed::ForLoop,
+    iterable_type: &TypeName,
+    local_variable_types: &mut HashMap<String, TypeName>,
+) {
+    local_variable_types.insert(for_loop.index_name(), TypeName::int());
+    local_variable_types.insert(for_loop.limit_name(), TypeName::int());
+
+    if let Some(element_type) = iterable_type.array_element_type() {
+        match for_loop.variables() {
+            [item] => {
+                local_variable_types.insert(item.runtime_name().to_string(), element_type.clone());
+            }
+            [index, item] => {
+                local_variable_types.insert(index.runtime_name().to_string(), TypeName::int());
+                local_variable_types.insert(item.runtime_name().to_string(), element_type.clone());
+            }
+            _ => {}
+        }
+        return;
+    }
+
+    if let Some((key_type, value_type)) = iterable_type.dict_key_value_types() {
+        local_variable_types.insert(
+            for_loop.keys_name(),
+            TypeName::array(dict_key_type_name(key_type)),
+        );
+        if let [key, value] = for_loop.variables() {
+            local_variable_types
+                .insert(key.runtime_name().to_string(), dict_key_type_name(key_type));
+            local_variable_types.insert(value.runtime_name().to_string(), value_type.clone());
+        }
+    }
+}
+
+fn dict_key_type_name(key_type: DictKeyType) -> TypeName {
+    match key_type {
+        DictKeyType::String => TypeName::string(),
+        DictKeyType::Int => TypeName::int(),
     }
 }

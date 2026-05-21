@@ -400,6 +400,20 @@ fn collect_qualified_uses_in_object(
                 );
             }
         }
+        Object::ForLoop(for_loop) => {
+            collect_qualified_uses_in_expression(
+                current_module,
+                for_loop.iterable(),
+                &object_span,
+                uses,
+            );
+            collect_qualified_uses_in_objects(
+                current_module,
+                for_loop.body().content(),
+                &object_span,
+                uses,
+            );
+        }
         Object::Choice(choice) => {
             if let Some(condition) = choice.condition() {
                 collect_qualified_uses_in_expression(current_module, condition, &object_span, uses);
@@ -521,6 +535,7 @@ fn object_qualified_use_span(object: &Object) -> Option<SourceSpan> {
         Object::VariableAssignment(assignment) => Some(assignment.span().clone()),
         Object::ContentList(_)
         | Object::Conditional(_)
+        | Object::ForLoop(_)
         | Object::Expression(_)
         | Object::Glue(_)
         | Object::LogicLine(_)

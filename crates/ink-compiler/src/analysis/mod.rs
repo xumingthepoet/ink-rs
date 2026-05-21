@@ -9,6 +9,7 @@ mod expected_expressions;
 mod expression_types;
 mod field_access;
 mod flow;
+mod for_loops;
 mod index_access;
 mod indexes;
 mod initializers;
@@ -36,6 +37,7 @@ use dict_literals::dict_literal_diagnostics_with_indexes;
 use enums::enum_type_diagnostics;
 use field_access::field_access_diagnostics_with_indexes;
 use flow::flow_diagnostics_with_indexes;
+use for_loops::for_loop_diagnostics_with_indexes;
 use index_access::index_access_diagnostics_with_indexes;
 use initializers::variable_initializer_diagnostics_with_indexes;
 use interfaces::{interface_diagnostics, interface_implementation_diagnostics};
@@ -153,6 +155,7 @@ fn run_analysis_passes_with_modules(
     // loose ends, illegal returns, and function body restrictions describe
     // control-flow shape rather than target availability.
     diagnostics.extend(flow_diagnostics_with_indexes(story, &analysis_indexes));
+    diagnostics.extend(for_loop_diagnostics_with_indexes(story, &analysis_indexes));
 
     // Target checks build symbol and variable-scope indexes.
     // Keep this after naming/flow diagnostics so resolution errors do not hide

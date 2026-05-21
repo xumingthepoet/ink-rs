@@ -30,6 +30,39 @@ fn arrays_run() {
 }
 
 #[test]
+fn for_loops_run_over_arrays_dicts_and_nested_arrays() {
+    let compiled = compile_fixture("typed/for-loops.ink");
+    assert_story_output(
+        &compiled,
+        "small 1\nother\nbig 2\ntwo\nbig 3\nother\ntotal 6\n0:Ada\n1:Grace\nada=1\ngrace=2\n1=one\n2=two\nrow\n1\n2\nrow\n3\n",
+    );
+}
+
+#[test]
+fn array_for_loops_keep_entry_length_and_use_normal_later_read_errors() {
+    let compiled = compile_fixture("typed/for-loop-array-mutation-error.ink");
+    let mut story = ink_runtime::story::Story::new(&compiled.json).expect("story should load");
+
+    assert!(story.continue_maximally().is_err());
+    assert!(story
+        .get_current_errors()
+        .iter()
+        .any(|error| error.contains("Array index out of bounds: 2")));
+}
+
+#[test]
+fn dict_for_loops_keep_entry_keys_and_use_normal_later_read_errors() {
+    let compiled = compile_fixture("typed/for-loop-dict-mutation-error.ink");
+    let mut story = ink_runtime::story::Story::new(&compiled.json).expect("story should load");
+
+    assert!(story.continue_maximally().is_err());
+    assert!(story
+        .get_current_errors()
+        .iter()
+        .any(|error| error.contains("Dict key not found: \"grace\"")));
+}
+
+#[test]
 fn inline_array_arguments_run() {
     let compiled = compile_fixture("typed/inline-array-arguments.ink");
     assert_story_output(&compiled, "First 101.\nCount 3.\nCopied 8.\n");

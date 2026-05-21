@@ -204,6 +204,13 @@ fn collect_variable_declarations_in_object<'a>(
                 );
             }
         }
+        Object::ForLoop(for_loop) => {
+            collect_variable_declarations_in_objects(
+                for_loop.body().content(),
+                module_name,
+                declarations,
+            );
+        }
         Object::Choice(choice) => {
             if let Some(content) = choice.start_content() {
                 collect_variable_declarations_in_content_list(content, module_name, declarations);
@@ -359,6 +366,13 @@ fn collect_enum_definitions_in_object(
                 );
             }
         }
+        Object::ForLoop(for_loop) => {
+            collect_enum_definitions_in_objects(
+                for_loop.body().content(),
+                module_name,
+                definitions,
+            );
+        }
         Object::Choice(choice) => {
             if let Some(content) = choice.start_content() {
                 collect_enum_definitions_in_content_list(content, module_name, definitions);
@@ -434,6 +448,13 @@ fn collect_struct_definitions_in_object(
                     definitions,
                 );
             }
+        }
+        Object::ForLoop(for_loop) => {
+            collect_struct_definitions_in_objects(
+                for_loop.body().content(),
+                module_name,
+                definitions,
+            );
         }
         Object::Choice(choice) => {
             if let Some(content) = choice.start_content() {
@@ -560,6 +581,9 @@ fn collect_constant_values_in_object(
                     constants,
                 );
             }
+        }
+        Object::ForLoop(for_loop) => {
+            collect_constant_values_in_objects(for_loop.body().content(), module_name, constants);
         }
         Object::Choice(choice) => {
             if let Some(content) = choice.start_content() {
@@ -699,6 +723,13 @@ fn collect_external_signatures_in_object(
                     signatures,
                 );
             }
+        }
+        Object::ForLoop(for_loop) => {
+            collect_external_signatures_in_objects(
+                for_loop.body().content(),
+                module_name,
+                signatures,
+            );
         }
         Object::Choice(choice) => {
             if let Some(content) = choice.start_content() {

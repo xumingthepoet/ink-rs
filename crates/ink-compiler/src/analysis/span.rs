@@ -38,6 +38,7 @@ pub(super) fn object_span(object: &Object) -> SourceSpan {
             .next()
             .map(object_span)
             .unwrap_or_else(default_span),
+        Object::ForLoop(for_loop) => for_loop.span().clone(),
         Object::Weave(weave) => first_span_in_weave(weave),
         Object::Expression(_) | Object::Glue(_) | Object::LogicLine(_) | Object::Tag(_) => {
             default_span()

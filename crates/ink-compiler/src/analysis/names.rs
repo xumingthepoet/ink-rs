@@ -119,6 +119,11 @@ fn collect_global_variables_in_object(object: &Object, global_variables: &mut Ha
                 }
             }
         }
+        Object::ForLoop(for_loop) => {
+            for object in for_loop.body().content() {
+                collect_global_variables_in_object(object, global_variables);
+            }
+        }
         Object::Weave(weave) => collect_global_variables(weave, global_variables),
         Object::AuthorWarning(_)
         | Object::Choice(_)
@@ -296,6 +301,12 @@ fn check_temporary_names_against_arguments_in_object(
                 );
             }
         }
+        Object::ForLoop(for_loop) => check_temporary_names_against_arguments_in_weave(
+            for_loop.body(),
+            flow_name,
+            argument_names,
+            diagnostics,
+        ),
         Object::ContentList(content) => check_temporary_names_against_arguments_in_content_list(
             content,
             flow_name,
@@ -372,6 +383,9 @@ fn check_weave_point_names(
                     check_weave_point_names(branch.content(), global_variables, diagnostics);
                 }
             }
+            Object::ForLoop(for_loop) => {
+                check_weave_point_names(for_loop.body(), global_variables, diagnostics);
+            }
             Object::ContentList(content) => {
                 check_weave_point_names_in_content_list(content, global_variables, diagnostics)
             }
@@ -406,6 +420,9 @@ fn check_weave_point_names_in_content_list(
                 for branch in conditional.branches() {
                     check_weave_point_names(branch.content(), global_variables, diagnostics);
                 }
+            }
+            Object::ForLoop(for_loop) => {
+                check_weave_point_names(for_loop.body(), global_variables, diagnostics);
             }
             Object::ContentList(content) => {
                 check_weave_point_names_in_content_list(content, global_variables, diagnostics)

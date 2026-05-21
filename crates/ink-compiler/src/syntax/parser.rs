@@ -95,8 +95,10 @@ pub(crate) fn parse_source(source: SourceFile) -> StageOutput<Story> {
 
 pub(super) struct Parser {
     source: SourceFile,
-    diagnostics: Vec<Diagnostic>,
+    pub(super) diagnostics: Vec<Diagnostic>,
     allow_global_var_declarations: bool,
+    loop_aliases: Vec<super::for_loop::LoopAlias>,
+    next_for_loop_id: usize,
 }
 
 impl Parser {
@@ -105,7 +107,46 @@ impl Parser {
             source,
             diagnostics: Vec::new(),
             allow_global_var_declarations: true,
+            loop_aliases: Vec::new(),
+            next_for_loop_id: 0,
         }
+    }
+
+    pub(super) fn loop_aliases(&self) -> &[super::for_loop::LoopAlias] {
+        &self.loop_aliases
+    }
+
+    pub(super) fn next_for_loop_id(&mut self) -> usize {
+        let id = self.next_for_loop_id;
+        self.next_for_loop_id += 1;
+        id
+    }
+
+    pub(super) fn push_loop_aliases(&mut self, aliases: Vec<super::for_loop::LoopAlias>) {
+        self.loop_aliases.extend(aliases);
+    }
+
+    pub(super) fn pop_loop_aliases(&mut self) {
+        // For loops add all their source aliases together and remove them
+        // together. The parser never pushes an empty alias set.
+        if let Some(last_id) = self.loop_aliases.last().and_then(|alias| {
+            alias
+                .runtime_name
+                .split_once("_v")
+                .map(|(prefix, _)| prefix.to_string())
+        }) {
+            while self
+                .loop_aliases
+                .last()
+                .is_some_and(|alias| alias.runtime_name.starts_with(&last_id))
+            {
+                self.loop_aliases.pop();
+            }
+        }
+    }
+
+    fn apply_loop_aliases(&self, objects: Vec<Object>) -> Vec<Object> {
+        super::for_loop::rewrite_objects(objects, &self.loop_aliases)
     }
 
     fn parse_story(&mut self) -> Story {
@@ -286,7 +327,7 @@ impl Parser {
         }
 
         if let Some(objects) = self.parse_gather_line(line) {
-            return objects;
+            return self.apply_loop_aliases(objects);
         }
 
         let mut line_parser = RuleParser::new(line);
@@ -296,7 +337,7 @@ impl Parser {
                 debug_assert!(!rule.name.is_empty());
                 debug_assert!(rule_match.metadata.is_forward());
                 self.diagnostics.extend(line_parser.finish());
-                return rule_match.value;
+                return self.apply_loop_aliases(rule_match.value);
             }
 
             if line_parser.had_error() {
@@ -788,18 +829,25 @@ impl Parser {
         if let Some(parsed) = self.parse_multiline_rule(index, |parser, index| {
             parser.parse_choice_with_continuation(lines, index)
         }) {
-            return Some(parsed);
+            return Some(self.apply_loop_aliases(parsed));
         }
 
         if let Some(parsed) = self.parse_multiline_rule(index, |parser, index| {
             parser.reject_removed_multiline_sequence(lines, index)
         }) {
-            return Some(parsed);
+            return Some(self.apply_loop_aliases(parsed));
+        }
+
+        if let Some(parsed) = self.parse_multiline_rule(index, |parser, index| {
+            parser.parse_multiline_for_loop(lines, index)
+        }) {
+            return Some(self.apply_loop_aliases(parsed));
         }
 
         self.parse_multiline_rule(index, |parser, index| {
             parser.parse_multiline_conditional(lines, index)
         })
+        .map(|parsed| self.apply_loop_aliases(parsed))
     }
 
     pub(super) fn parse_multiline_rule<T>(

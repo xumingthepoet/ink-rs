@@ -4,6 +4,7 @@ mod declaration;
 mod divert;
 mod error;
 mod expression;
+mod for_loop;
 mod gather;
 mod import;
 mod interface;
