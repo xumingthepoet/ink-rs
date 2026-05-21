@@ -1,17 +1,18 @@
 === module game ===
 
+ENUM Direction { Up Down Left Right }
+ENUM GameState { Playing Dead Won }
+
 VAR width: int = 10
 VAR height: int = 10
 VAR snake_x: int[] = [4, 3, 2]
 VAR snake_y: int[] = [4, 4, 4]
-VAR direction_x: int = 1
-VAR direction_y: int = 0
+VAR current_direction: Direction = Direction.Right
 VAR apple_xs: int[] = [6, 6, 8]
 VAR apple_ys: int[] = [4, 5, 5]
 VAR apple_index: int = 0
 VAR move_count: int = 0
-VAR game_over: bool = false
-VAR won: bool = false
+VAR state: GameState = GameState.Playing
 VAR last_message: string = "Use choices to steer the snake."
 
 == main ==
@@ -39,8 +40,8 @@ Length: {LEN(snake_x)}
     Apple: ({apple_xs[apple_index]},{apple_ys[apple_index]})
 }
 {last_message}
-{ if game_over:
-    { if won:
+{ if state != GameState.Playing:
+    { if state == GameState.Won:
         Result: all apples collected.
     - else:
         Result: dead.
@@ -49,52 +50,50 @@ Length: {LEN(snake_x)}
         -> restart
 - else:
     * 上
-        -> move_snake(0, -1, "up")
+        -> move_snake(Direction.Up, "up")
     * 下
-        -> move_snake(0, 1, "down")
+        -> move_snake(Direction.Down, "down")
     * 左
-        -> move_snake(-1, 0, "left")
+        -> move_snake(Direction.Left, "left")
     * 右
-        -> move_snake(1, 0, "right")
+        -> move_snake(Direction.Right, "right")
     * 过
-        -> move_snake(direction_x, direction_y, "wait")
+        -> move_snake(current_direction, "wait")
 }
 
 == restart ==
 ~ snake_x = [4, 3, 2]
 ~ snake_y = [4, 4, 4]
-~ direction_x = 1
-~ direction_y = 0
+~ current_direction = Direction.Right
 ~ apple_index = 0
 ~ move_count = 0
-~ game_over = false
-~ won = false
+~ state = GameState.Playing
 ~ last_message = "Restarted."
 -> board_prompt
 
-== move_snake(dx: int, dy: int, label: string) ==
+== move_snake(next_direction: Direction, label: string) ==
 ~ move_count = move_count + 1
+~ temp dx: int = direction_dx(next_direction)
+~ temp dy: int = direction_dy(next_direction)
 ~ temp next_x: int = snake_x[0] + dx
 ~ temp next_y: int = snake_y[0] + dy
 { if next_x < 0 || next_x >= width || next_y < 0 || next_y >= height:
-    ~ game_over = true
+    ~ state = GameState.Dead
     ~ last_message = "Move " + label + " hits the wall."
 - else:
     ~ temp grows: bool = is_food_cell(next_x, next_y)
     { if snake_hits_self(next_x, next_y, grows, 0):
-        ~ game_over = true
+        ~ state = GameState.Dead
         ~ last_message = "Move " + label + " hits the snake body."
     - else:
-        ~ direction_x = dx
-        ~ direction_y = dy
+        ~ current_direction = next_direction
         ~ ARRAY_INSERT(snake_x, 0, next_x)
         ~ ARRAY_INSERT(snake_y, 0, next_y)
         { if grows:
             ~ apple_index = apple_index + 1
             ~ last_message = "Move " + label + " eats an apple."
             { if apple_index >= LEN(apple_xs):
-                ~ won = true
-                ~ game_over = true
+                ~ state = GameState.Won
                 ~ last_message = "Move " + label + " eats the final apple."
             }
         - else:
@@ -105,6 +104,26 @@ Length: {LEN(snake_x)}
     }
 }
 -> board_prompt
+
+== function direction_dx(direction: Direction) => int ==
+{ switch direction:
+- Direction.Left:
+    ~ return -1
+- Direction.Right:
+    ~ return 1
+- else:
+    ~ return 0
+}
+
+== function direction_dy(direction: Direction) => int ==
+{ switch direction:
+- Direction.Up:
+    ~ return -1
+- Direction.Down:
+    ~ return 1
+- else:
+    ~ return 0
+}
 
 == function border_row(x: int, text: string) => string ==
 { if x >= width + 2:
