@@ -14,6 +14,12 @@ use serde_json::Value;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Experiment {
     path: PathBuf,
+    sources: Vec<ExperimentSource>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ExperimentSource {
+    path: PathBuf,
     source: String,
 }
 
@@ -34,7 +40,25 @@ impl Experiment {
     pub fn from_path(path: impl Into<PathBuf>) -> io::Result<Self> {
         let path = path.into();
         let source = fs::read_to_string(&path)?;
-        Ok(Self { path, source })
+        Ok(Self {
+            path: path.clone(),
+            sources: vec![ExperimentSource { path, source }],
+        })
+    }
+
+    pub fn from_bundle(path: impl Into<PathBuf>, source_paths: Vec<PathBuf>) -> io::Result<Self> {
+        let path = path.into();
+        let sources = source_paths
+            .into_iter()
+            .map(|source_path| {
+                let source = fs::read_to_string(&source_path)?;
+                Ok(ExperimentSource {
+                    path: source_path,
+                    source,
+                })
+            })
+            .collect::<io::Result<Vec<_>>>()?;
+        Ok(Self { path, sources })
     }
 
     pub fn path(&self) -> &Path {
@@ -50,7 +74,7 @@ impl Experiment {
     }
 
     pub fn source(&self) -> &str {
-        &self.source
+        &self.sources[0].source
     }
 
     pub fn stdout_path(&self) -> PathBuf {
@@ -84,8 +108,12 @@ impl Experiment {
     }
 
     pub fn compile(&self) -> Result<CompiledStory, ExperimentCompileError> {
-        let output =
-            Compiler::default().compile(SourceInput::named(self.source.clone(), self.name()));
+        let inputs = self
+            .sources
+            .iter()
+            .map(|source| SourceInput::named(source.source.clone(), source_name(&source.path)))
+            .collect();
+        let output = Compiler::default().compile_sources(inputs);
         let diagnostics = output.diagnostics;
 
         if diagnostics
@@ -274,28 +302,57 @@ pub fn experiments_root() -> PathBuf {
 }
 
 pub fn discover_experiments() -> io::Result<Vec<Experiment>> {
-    let mut paths = Vec::new();
-    collect_ink_paths(&experiments_root(), &mut paths)?;
-    paths.sort();
-
-    paths
-        .into_iter()
-        .map(Experiment::from_path)
-        .collect::<io::Result<Vec<_>>>()
+    let mut experiments = Vec::new();
+    collect_experiments(&experiments_root(), &mut experiments)?;
+    experiments.sort_by_key(|experiment| experiment.path.clone());
+    Ok(experiments)
 }
 
-fn collect_ink_paths(directory: &Path, paths: &mut Vec<PathBuf>) -> io::Result<()> {
+fn collect_experiments(directory: &Path, experiments: &mut Vec<Experiment>) -> io::Result<()> {
+    let story_path = directory.join("story.ink");
+    if story_path.exists() {
+        let mut source_paths = Vec::new();
+        collect_direct_ink_paths(directory, &mut source_paths)?;
+        source_paths.sort();
+        if let Some(story_index) = source_paths.iter().position(|path| path == &story_path) {
+            source_paths.swap(0, story_index);
+        }
+        experiments.push(Experiment::from_bundle(story_path, source_paths)?);
+        return Ok(());
+    }
+
     for entry in fs::read_dir(directory)? {
         let entry = entry?;
         let path = entry.path();
         let file_type = entry.file_type()?;
 
         if file_type.is_dir() {
-            collect_ink_paths(&path, paths)?;
+            collect_experiments(&path, experiments)?;
         } else if path.extension().is_some_and(|extension| extension == "ink") {
+            experiments.push(Experiment::from_path(path)?);
+        }
+    }
+
+    Ok(())
+}
+
+fn collect_direct_ink_paths(directory: &Path, paths: &mut Vec<PathBuf>) -> io::Result<()> {
+    for entry in fs::read_dir(directory)? {
+        let entry = entry?;
+        let path = entry.path();
+        if entry.file_type()?.is_file()
+            && path.extension().is_some_and(|extension| extension == "ink")
+        {
             paths.push(path);
         }
     }
 
     Ok(())
+}
+
+fn source_name(path: &Path) -> String {
+    path.strip_prefix(experiments_root())
+        .unwrap_or(path)
+        .display()
+        .to_string()
 }
