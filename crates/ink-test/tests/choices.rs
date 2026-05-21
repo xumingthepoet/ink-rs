@@ -219,6 +219,24 @@ fn choice_condition_colon_boundary_allows_dynamic_choice_text() {
 }
 
 #[test]
+fn choice_condition_blocks_stay_eager_while_inner_logical_ops_short_circuit() {
+    let compiled = compile_fixture("choices/choice-condition-short-circuit-boundaries.ink");
+    let mut story = Story::new(&compiled.json);
+
+    assert_eq!(story.continue_maximally(), "");
+    assert_eq!(
+        Some(2),
+        story
+            .get_variable("game::hits")
+            .and_then(|value| value.get::<i32>())
+    );
+    let choices = story.get_current_choices();
+    assert_eq!(choices.len(), 2);
+    assert_eq!(choices[0].text, "inner and evaluates right");
+    assert_eq!(choices[1].text, "inner or short-circuits");
+}
+
+#[test]
 fn save_load_preserves_generated_choices_without_regeneration() {
     let compiled = compile_fixture("choices/choice-save-load.ink");
     let mut story = Story::new(&compiled.json);

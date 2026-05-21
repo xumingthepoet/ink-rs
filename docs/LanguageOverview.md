@@ -121,6 +121,10 @@ threads, conditionals, expressions, glue, tags, and temp variables. `VAR`
 declarations are module-top-level globals; local calculation state uses typed
 `temp` declarations inside logic lines.
 
+Explicit `and` / `&&` and `or` / `||` short-circuit inside a single expression,
+so guard checks can protect later array or Dict reads. Adjacent choice condition
+blocks remain separate tests and are all evaluated.
+
 ```ink
 == main ==
 ~ temp visits: int = 0

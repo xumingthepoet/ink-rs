@@ -686,7 +686,7 @@ Use explicit variables when a condition needs to remember authored state.
 
 #### Advanced: multiple conditions
 
-You can use several logical tests on an option; if you do, *all* the tests must all be passed for the option to appear.
+You can use several logical tests on an option; if you do, *all* the tests must all be passed for the option to appear. Adjacent condition blocks are evaluated as separate tests, so every block runs even if an earlier block is false.
 
 	*	{ not has_visited_paris } 	Go to Paris -> visit_paris
 	* 	{ has_visited_paris } { not bored_of_paris }
@@ -700,11 +700,17 @@ colon after the condition prefix to make the boundary explicit:
 
 #### Logical operators: AND and OR
 
-The above "multiple conditions" are really just conditions with an the usual programming AND operator. Ink supports `and` (also written as `&&`) and `or` (also written as `||`) in the usual way, as well as brackets.
+Inside a single expression, ink-rs supports `and` (also written as `&&`) and `or` (also written as `||`) in the usual way, as well as brackets.
 
 	*	{ not (visited_paris or visited_rome) && (visited_london || visited_new_york) } Wait. Go where? I'm confused. -> visit_someplace
 
 For non-programmers `X and Y` means both X and Y must be true. `X or Y` means either or both. We don't have a `xor`.
+
+Explicit `and` / `&&` and `or` / `||` short-circuit. `X and Y` skips `Y` when `X` is false; `X or Y` skips `Y` when `X` is true. This makes guard expressions safe:
+
+	{ index < LEN(items) && items[index] == target }
+
+Short-circuiting only applies inside the expression. Separate choice condition blocks such as `{a}{b}` are still separate tests, and both blocks are evaluated.
 
 You can also use the standard `!` for `not`, though we recommend using `not` because it reads more clearly in prose-heavy source.
 
