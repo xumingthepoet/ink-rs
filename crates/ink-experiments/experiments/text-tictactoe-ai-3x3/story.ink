@@ -4,9 +4,9 @@ ENUM Mark { Empty X O }
 ENUM GameState { Playing XWon OWon Draw }
 
 STRUCT Line {
-a: int
-b: int
-c: int
+    a: int
+    b: int
+    c: int
 }
 
 CONST rows: int[] = [0, 1, 2]

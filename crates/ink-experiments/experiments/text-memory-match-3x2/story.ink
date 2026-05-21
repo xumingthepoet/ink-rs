@@ -3,8 +3,8 @@
 ENUM TurnPhase { NeedFirst NeedSecond Won }
 
 STRUCT Card {
-id: int
-matched: bool
+    id: int
+    matched: bool
 }
 
 CONST rows: int[] = [0, 1]

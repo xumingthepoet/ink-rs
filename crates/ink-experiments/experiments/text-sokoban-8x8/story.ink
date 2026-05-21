@@ -4,8 +4,8 @@ ENUM Direction { Up Down Left Right }
 ENUM GameState { Playing Won }
 
 STRUCT Pos {
-x: int
-y: int
+    x: int
+    y: int
 }
 
 CONST width: int = 8

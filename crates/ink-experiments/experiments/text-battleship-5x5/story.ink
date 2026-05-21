@@ -3,9 +3,9 @@
 ENUM GameState { Playing Won }
 
 STRUCT ShipCell {
-x: int
-y: int
-ship_id: int
+    x: int
+    y: int
+    ship_id: int
 }
 
 CONST width: int = 5

@@ -43,6 +43,13 @@ optionally selects a choice:
 ]
 ```
 
+## Source Style
+
+Keep experiment ink readable enough to serve as syntax examples. Indent fields
+inside `STRUCT` declarations with four spaces, matching `docs/SyntaxReference.md`.
+The parser accepts flush-left fields, but experiments should prefer the
+documented style.
+
 ## Bug Rule
 
 Do not work around a compiler or runtime bug in experiment ink. Stop at the

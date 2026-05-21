@@ -4,15 +4,15 @@ ENUM Direction { Up Down Left Right }
 ENUM GameState { Playing Failed Won }
 
 STRUCT Line {
-i0: int
-i1: int
-i2: int
-i3: int
+    i0: int
+    i1: int
+    i2: int
+    i3: int
 }
 
 STRUCT Pair {
-left: int
-right: int
+    left: int
+    right: int
 }
 
 CONST initial_tiles: int[] = [

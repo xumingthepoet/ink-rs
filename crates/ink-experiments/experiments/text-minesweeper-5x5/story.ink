@@ -4,8 +4,8 @@ ENUM ActionMode { Reveal Flag }
 ENUM GameState { Playing Dead Won }
 
 STRUCT NeighborOffset {
-dr: int
-dc: int
+    dr: int
+    dc: int
 }
 
 CONST width: int = 5

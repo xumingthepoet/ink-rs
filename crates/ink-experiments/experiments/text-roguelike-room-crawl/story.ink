@@ -5,8 +5,8 @@ ENUM GameState { Playing Dead Won }
 ENUM RoomKind { Key Chest Trap Monster Exit }
 
 STRUCT RoomDef {
-kind: RoomKind
-amount: int
+    kind: RoomKind
+    amount: int
 }
 
 CONST width: int = 5
