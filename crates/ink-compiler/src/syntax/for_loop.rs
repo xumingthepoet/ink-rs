@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use crate::{
     diagnostic::{Diagnostic, DiagnosticCode},
     parsed::{
@@ -9,7 +11,7 @@ use crate::{
 };
 
 use super::{
-    is_identifier, parse_initial_expression, parser::Parser, scan, weave::weave_from_objects,
+    is_identifier, knot, parse_initial_expression, parser::Parser, scan, weave::weave_from_objects,
 };
 
 #[derive(Clone)]
@@ -204,6 +206,18 @@ impl Parser {
                 }
             }
 
+            if is_flow_declaration_line(current_trimmed) {
+                self.diagnostics.push(
+                    Diagnostic::error(
+                        current_line.span.clone(),
+                        "Flow declarations are not allowed inside for loops.",
+                    )
+                    .with_code(DiagnosticCode::InvalidInlineSyntax),
+                );
+                *index += 1;
+                continue;
+            }
+
             body.extend(self.parse_statement(current_line));
             *index += 1;
         }
@@ -269,6 +283,9 @@ fn parse_for_header(
     if !variable_names.iter().all(|name| is_identifier(name.trim())) {
         return None;
     }
+    if has_duplicate_variable_names(&variable_names) {
+        return None;
+    }
 
     let iterable = rewrite_expression(parse_initial_expression(iterable_source.trim())?, aliases);
     let variables = variable_names
@@ -296,6 +313,15 @@ fn split_for_header(source: &str) -> Option<(&str, &str)> {
         }
     }
     None
+}
+
+fn has_duplicate_variable_names(variable_names: &[&str]) -> bool {
+    let mut seen = HashSet::new();
+    variable_names.iter().any(|name| !seen.insert(name.trim()))
+}
+
+fn is_flow_declaration_line(source: &str) -> bool {
+    knot::is_knot_declaration_line(source) || knot::is_stitch_declaration_line(source)
 }
 
 fn alias_for(name: &str, aliases: &[LoopAlias]) -> Option<String> {
@@ -491,6 +517,47 @@ mod tests {
         assert_eq!(
             output.diagnostics[0].message,
             "Invalid for loop header. Use `{ for item in items: }`, `{ for index, item in items: }`, or `{ for key, value in dict: }`."
+        );
+    }
+
+    #[test]
+    fn rejects_duplicate_for_header_variables() {
+        let output = parse(SourceInput::new(
+            "=== module game ===\n\
+             VAR scores: Dict<string, int> = %{\"ada\": 1}\n\
+             == main ==\n\
+             { for key, key in scores:\n\
+                 {key}\n\
+             }",
+        ));
+
+        assert_eq!(output.diagnostics.len(), 1, "{:#?}", output.diagnostics);
+        assert_eq!(
+            output.diagnostics[0].message,
+            "Invalid for loop header. Use `{ for item in items: }`, `{ for index, item in items: }`, or `{ for key, value in dict: }`."
+        );
+    }
+
+    #[test]
+    fn rejects_flow_declarations_in_for_body() {
+        let output = parse(SourceInput::new(
+            "=== module game ===\n\
+             VAR values: int[] = [1]\n\
+             == main ==\n\
+             { for value in values:\n\
+                 == bad ==\n\
+                 bad\n\
+             }",
+        ));
+
+        assert!(
+            output
+                .diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.message
+                    == "Flow declarations are not allowed inside for loops."),
+            "{:#?}",
+            output.diagnostics
         );
     }
 
