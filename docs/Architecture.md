@@ -9,7 +9,7 @@ layout, fixture categories, or the compile/runtime data flow change.
 
 `ink-rs` is a Rust implementation and language fork of Ink. The implementation
 is split into a compiler, a shared compiled-story JSON format crate, a runtime,
-integration tests, and a small CLI.
+an optional Dioxus game adapter, integration tests, and a small CLI.
 
 ```text
 Ink source
@@ -35,6 +35,7 @@ ink-compiler ----------+
                        |
 ink-runtime -----------+
 
+ink-dioxus -> ink-compiler + ink-runtime + ink-story-json-format
 ink-test  -> ink-compiler + ink-runtime
 ink-tools -> ink-compiler
 ```
@@ -53,6 +54,9 @@ Ownership rules:
   containers and objects.
 - Runtime save-state JSON is separate from compiled-story JSON and remains
   runtime-owned.
+- `crates/ink-dioxus` owns reusable Dioxus-facing game UI glue: embedded source
+  list helpers, Ink runtime/app wrappers, shared UI tag interpretation, text
+  reveal, toast handling, and the optional web shell.
 
 ## Repository Tree
 
@@ -147,6 +151,28 @@ work. It intentionally omits build output and most upstream reference internals.
 |   |       |-- variable_assigment.rs
 |   |       |-- variable_reference.rs
 |   |       `-- void.rs
+|   |-- ink-dioxus/
+|   |   |-- Cargo.toml
+|   |   |-- README.md
+|   |   `-- src/
+|   |       |-- lib.rs
+|   |       |   Public Dioxus adapter surface.
+|   |       |-- runtime.rs
+|   |       |   Compile embedded `InkSource` values and run stories to pauses.
+|   |       |-- app.rs
+|   |       |   Choice prompts, title/prompt/toast control tags, and app state.
+|   |       |-- tags.rs
+|   |       |   Shared key/value, marker, and boolean Ink tag parsing.
+|   |       |-- styled_text.rs
+|   |       |   `[style ...]` markup and tag-derived style segments.
+|   |       |-- transcript.rs
+|   |       |   Transcript paragraph buffering.
+|   |       |-- build.rs
+|   |       |   Build-script helper for generated embedded Ink source lists.
+|   |       |-- web.rs
+|   |       |   Optional Dioxus web UI shell behind the `web` feature.
+|   |       `-- web.css
+|   |           Default web shell CSS embedded by `web.rs`.
 |   |-- ink-test/
 |   |   |-- Cargo.toml
 |   |   |-- src/lib.rs
@@ -610,6 +636,7 @@ Use this table to decide where to start.
 | Native operation or typed runtime value wrong | `native_function_call/`, `value_type.rs`, `value.rs` | typed value tests |
 | Variable get/set wrong | `variables_state.rs`, `story/state.rs` | runtime API and variables tests |
 | Save/load bug | `story_state.rs`, `json/json_write.rs`, `flow.rs`, `callstack.rs` | choices/runtime save-load tests |
+| Dioxus game UI, shared UI tags, embedded Ink source lists | `crates/ink-dioxus/src/` | `cargo test -p ink-dioxus`, `cargo check -p ink-dioxus --features web` |
 | CLI compile behavior | `crates/ink-tools/src/main.rs` | compiler API tests |
 | Test harness or fixture policy | `crates/ink-test/tests/support/`, `integration_policy.rs` | `cargo test -p ink-test --test integration integration_policy` |
 

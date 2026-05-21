@@ -35,6 +35,7 @@ ink-story-json-format = { version = "0.1.0", path = "crates/ink-story-json-forma
 [workspace]
 members = [
     "crates/ink-compiler",
+    "crates/ink-dioxus",
     "crates/ink-story-json-format",
     "crates/ink-runtime",
     "crates/ink-experiments",
@@ -44,6 +45,7 @@ members = [
 default-members = [
     ".",
     "crates/ink-compiler",
+    "crates/ink-dioxus",
     "crates/ink-story-json-format",
     "crates/ink-runtime",
     "crates/ink-experiments",
