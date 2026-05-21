@@ -65,9 +65,9 @@ VAR objective_progress: Dict<int, int> = %{}
 ~ temp text: string = ""
 { for objective_id, progress in objective_progress:
     { if text == "":
-        ~ text = objective_label(objective_id) + " " + count_label(progress)
+        ~ text = objective_label(objective_id) + " " + to_str(progress)
     - else:
-        ~ text = text + ", " + objective_label(objective_id) + " " + count_label(progress)
+        ~ text = text + ", " + objective_label(objective_id) + " " + to_str(progress)
     }
 }
 { if text == "":
@@ -103,14 +103,4 @@ VAR objective_progress: Dict<int, int> = %{}
     ~ return "complete"
 - else:
     ~ return "hidden"
-}
-
-== function count_label(value: int) => string ==
-{ switch value:
-- 0:
-    ~ return "0"
-- 1:
-    ~ return "1"
-- else:
-    ~ return "2"
 }

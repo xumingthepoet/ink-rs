@@ -153,6 +153,7 @@ mod tests {
             (NativeFunction::Ceiling, Op::Ceiling),
             (NativeFunction::Int, Op::Int),
             (NativeFunction::Float, Op::Float),
+            (NativeFunction::ToStr, Op::ToStr),
             (NativeFunction::Has, Op::Has),
             (NativeFunction::Hasnt, Op::Hasnt),
             (NativeFunction::FieldRead, Op::FieldRead),

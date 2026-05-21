@@ -185,9 +185,9 @@ Control commands are special instructions to the text engine to perform various 
 
 These are mathematical, logical, and dynamic-value functions that pop arguments from the evaluation stack, evaluate the result, and push the result back onto the evaluation stack. The following operators are supported:
 
-`"+"`, `"-"`, `"/"`, `"*"`, `"%"` (mod), `"_"` (unary negate), `"=="`, `">"`, `"<"`, `">="`, `"<="`, `"!="`, `"!"` (unary 'not'), `"&&"`, `"||"`, `"MIN"`, `"MAX"`, `"FIELD"`, `"INDEX"`, `"SET_FIELD"`, `"SET_INDEX"`, `"LEN"`, `"ARRAY_REMOVE"`, `"ARRAY_PUSH"`, `"ARRAY_INSERT"`, `"DICT_HAS"`, `"DICT_SIZE"`, `"DICT_REMOVE"`, `"DICT_KEYS"`
+`"+"`, `"-"`, `"/"`, `"*"`, `"%"` (mod), `"_"` (unary negate), `"=="`, `">"`, `"<"`, `">="`, `"<="`, `"!="`, `"!"` (unary 'not'), `"&&"`, `"||"`, `"MIN"`, `"MAX"`, `"to_str"`, `"FIELD"`, `"INDEX"`, `"SET_FIELD"`, `"SET_INDEX"`, `"LEN"`, `"ARRAY_REMOVE"`, `"ARRAY_PUSH"`, `"ARRAY_INSERT"`, `"DICT_HAS"`, `"DICT_SIZE"`, `"DICT_REMOVE"`, `"DICT_KEYS"`
 
-`"FIELD"` and `"INDEX"` read object fields and array or Dict elements. `"SET_FIELD"` and `"SET_INDEX"` return updated object, array, or Dict values; assignment instructions store the updated value back into the target variable. `"LEN"` returns an array length as an integer. `"ARRAY_REMOVE"`, `"ARRAY_PUSH"`, and `"ARRAY_INSERT"` return updated array copies; assignment lowering stores them back into the source lvalue. `"DICT_HAS"`, `"DICT_SIZE"`, `"DICT_REMOVE"`, and `"DICT_KEYS"` provide typed Dict collection helpers.
+`"to_str"` converts one typed runtime value to a string. `"FIELD"` and `"INDEX"` read object fields and array or Dict elements. `"SET_FIELD"` and `"SET_INDEX"` return updated object, array, or Dict values; assignment instructions store the updated value back into the target variable. `"LEN"` returns an array length as an integer. `"ARRAY_REMOVE"`, `"ARRAY_PUSH"`, and `"ARRAY_INSERT"` return updated array copies; assignment lowering stores them back into the source lvalue. `"DICT_HAS"`, `"DICT_SIZE"`, `"DICT_REMOVE"`, and `"DICT_KEYS"` provide typed Dict collection helpers.
 
 Boolean values are represented as JSON booleans and runtime `bool` values. Some
 numeric operations still accept C-style truthiness where non-zero integers or

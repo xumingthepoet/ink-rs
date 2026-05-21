@@ -2,7 +2,7 @@
 FROM encounters IMPORT encounter_name, encounter_enemy_ids, encounter_loot_table, ENCOUNTER_MINE
 FROM enemies IMPORT enemy_name, enemy_max_hp, enemy_action_text, enemy_damage
 FROM party IMPORT party_summary, damage_actor, heal_actor, spend_mp, add_exp, ACTOR_HERO, ACTOR_REN
-FROM items IMPORT remove_item, count_label, ITEM_POTION
+FROM items IMPORT remove_item, ITEM_POTION
 FROM skills IMPORT use_skill, SKILL_SPARK, SKILL_GUARD, SKILL_STRIKE
 FROM loot IMPORT resolve
 FROM events IMPORT set_flag, FLAG_MINE_BATTLE_WON, FLAG_MINE_LOOT_RESOLVED
@@ -39,10 +39,10 @@ Mine battle begins: {encounters::encounter_name(encounter_id)}.
 ->->
 
 == battle_prompt ==
-Turn {items::count_label(turn)}
+Turn {to_str(turn)}
 Party: {party::party_summary()}
 Enemies: {enemy_summary()}
-Poison turns: {items::count_label(poison_turns)}
+Poison turns: {to_str(poison_turns)}
 * Hero Spark
     -> hero_spark
 * Use Potion
@@ -103,7 +103,7 @@ EXP result: {level_text}.
 
 == enemy_turn ==
 ~ temp attacker_id: int = enemy_ids_by_slot[ENEMY_WARDEN_SLOT]
-{enemies::enemy_action_text(attacker_id, guarded)} for {items::count_label(enemies::enemy_damage(attacker_id, guarded))} damage.
+{enemies::enemy_action_text(attacker_id, guarded)} for {to_str(enemies::enemy_damage(attacker_id, guarded))} damage.
 ~ party::damage_actor(party::ACTOR_HERO, enemies::enemy_damage(attacker_id, guarded))
 { if guarded:
     ~ guarded = false
@@ -124,7 +124,7 @@ EXP result: {level_text}.
 ~ temp text: string = ""
 { for slot in active_enemy_slots:
     ~ temp enemy_id: int = enemy_ids_by_slot[slot]
-    ~ temp slot_text: string = enemies::enemy_name(enemy_id) + " " + items::count_label(enemy_hp[slot])
+    ~ temp slot_text: string = enemies::enemy_name(enemy_id) + " " + to_str(enemy_hp[slot])
     { if text == "":
         ~ text = slot_text
     - else:

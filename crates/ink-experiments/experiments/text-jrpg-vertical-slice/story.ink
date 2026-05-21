@@ -3,7 +3,7 @@ FROM dialogue IMPORT elder_start, apothecary_start, ren_join, ren_scouts, ren_re
 FROM events IMPORT set_flag, flag_summary, FLAG_MAIN_ACCEPTED, FLAG_SIDE_ACCEPTED, FLAG_REN_JOINED, FLAG_REN_SCOUTING, FLAG_REN_REJOINED, FLAG_MOONLEAF_GATHERED, FLAG_VILLAGE_SAVE_WRITTEN, FLAG_GATE_OPENED, FLAG_CARAVAN_RESCUED, FLAG_MAIN_COMPLETE, FLAG_SIDE_COMPLETE
 FROM quests IMPORT accept_main, accept_side, set_objective, complete_main, complete_side, quest_log, objective_summary, OBJ_MAIN_REN, OBJ_MAIN_GATE, OBJ_MAIN_BATTLE, OBJ_SIDE_MOONLEAF
 FROM party IMPORT join_ren, leave_ren, rejoin_ren, party_summary, damage_actor, ACTOR_HERO, ACTOR_REN
-FROM items IMPORT add_item, add_gold, inventory_summary, count_label, gold, ITEM_POTION, ITEM_ANTIDOTE, ITEM_MINE_CHARM
+FROM items IMPORT add_item, add_gold, inventory_summary, gold, ITEM_POTION, ITEM_ANTIDOTE, ITEM_MINE_CHARM
 FROM equipment IMPORT equip, equipment_summary, EQUIP_GUARD_BADGE
 FROM shop IMPORT show_village_shop, buy
 FROM save IMPORT write_checkpoint, load_checkpoint, show_checkpoint
@@ -68,9 +68,9 @@ Flags: {events::flag_summary()}.
 == load_test_scene ==
 ~ items::add_gold(3)
 ~ party::damage_actor(party::ACTOR_HERO, 4)
-Temporary state before load: gold {items::count_label(items::gold)}, party {party::party_summary()}.
+Temporary state before load: gold {to_str(items::gold)}, party {party::party_summary()}.
 -> save::load_checkpoint ->
-State after load: gold {items::count_label(items::gold)}, party {party::party_summary()}.
+State after load: gold {to_str(items::gold)}, party {party::party_summary()}.
 * Recruit Ren
     -> recruit_scene
 

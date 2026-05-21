@@ -1,5 +1,5 @@
 === module loot ===
-FROM items IMPORT add_item, add_gold, item_name, count_label, ITEM_MOONLEAF, ITEM_MINE_CHARM
+FROM items IMPORT add_item, add_gold, item_name, ITEM_MOONLEAF, ITEM_MINE_CHARM
 
 STRUCT LootEntry {
     item_id: int
@@ -23,11 +23,11 @@ Loot table {label(table_id)}.
 { for entry in loot_tables[table_id]:
     { if entry.item_id > 0:
         ~ items::add_item(entry.item_id, entry.quantity)
-        Gained {items::item_name(entry.item_id)} x{items::count_label(entry.quantity)}.
+        Gained {items::item_name(entry.item_id)} x{to_str(entry.quantity)}.
     }
     { if entry.gold > 0:
         ~ items::add_gold(entry.gold)
-        Gained {items::count_label(entry.gold)} gold.
+        Gained {to_str(entry.gold)} gold.
     }
 }
 ->->

@@ -1,7 +1,7 @@
 === module save ===
-FROM items IMPORT gold, item_count, count_label, set_gold, set_item_count, ITEM_POTION, ITEM_ANTIDOTE, ITEM_MOONLEAF, ITEM_MINE_CHARM
+FROM items IMPORT gold, item_count, set_gold, set_item_count, ITEM_POTION, ITEM_ANTIDOTE, ITEM_MOONLEAF, ITEM_MINE_CHARM
 FROM world IMPORT current_location_id, current_location_name, location_name, travel_to
-FROM party IMPORT party_summary, is_active, actor_hp, actor_mp, actor_exp, actor_level, restore_roster, set_actor_state, count_label, ACTOR_HERO, ACTOR_REN
+FROM party IMPORT party_summary, is_active, actor_hp, actor_mp, actor_exp, actor_level, restore_roster, set_actor_state, ACTOR_HERO, ACTOR_REN
 FROM quests IMPORT QuestState, quest_state_value, objective_value, restore_quest, set_objective, state_label, QUEST_MAIN, QUEST_SIDE, OBJ_MAIN_REN, OBJ_MAIN_GATE, OBJ_MAIN_BATTLE, OBJ_SIDE_MOONLEAF
 FROM events IMPORT has_flag, set_flag_to, flag_label, FLAG_MAIN_ACCEPTED, FLAG_SIDE_ACCEPTED, FLAG_REN_JOINED, FLAG_REN_SCOUTING, FLAG_REN_REJOINED, FLAG_MOONLEAF_GATHERED, FLAG_VILLAGE_SAVE_WRITTEN, FLAG_FOREST_ENCOUNTER_CLEARED, FLAG_GATE_OPENED, FLAG_MINE_BATTLE_WON, FLAG_MINE_LOOT_RESOLVED, FLAG_CARAVAN_RESCUED, FLAG_MAIN_COMPLETE, FLAG_SIDE_COMPLETE
 
@@ -151,7 +151,7 @@ Saved party: {saved_party_summary()}.
 
 == show_checkpoint ==
 { if slot.written:
-    Checkpoint: {world::location_name(slot.location_id)}; gold {items::count_label(slot.gold)}; potions {items::count_label(slot.potion_count)}; moonleaf {items::count_label(slot.moonleaf_count)}.
+    Checkpoint: {world::location_name(slot.location_id)}; gold {to_str(slot.gold)}; potions {to_str(slot.potion_count)}; moonleaf {to_str(slot.moonleaf_count)}.
     Saved party: {saved_party_summary()}.
     Saved quests: main {quests::state_label(slot.main_state)}, side {quests::state_label(slot.side_state)}.
     Saved flags: {saved_flag_summary()}.
@@ -162,9 +162,9 @@ Saved party: {saved_party_summary()}.
 
 == function saved_party_summary() => string ==
 { if slot.ren_active:
-    ~ return "Lio HP " + party::count_label(slot.hero_hp) + " MP " + party::count_label(slot.hero_mp) + ", Ren HP " + party::count_label(slot.ren_hp) + " MP " + party::count_label(slot.ren_mp)
+    ~ return "Lio HP " + to_str(slot.hero_hp) + " MP " + to_str(slot.hero_mp) + ", Ren HP " + to_str(slot.ren_hp) + " MP " + to_str(slot.ren_mp)
 - else:
-    ~ return "Lio HP " + party::count_label(slot.hero_hp) + " MP " + party::count_label(slot.hero_mp)
+    ~ return "Lio HP " + to_str(slot.hero_hp) + " MP " + to_str(slot.hero_mp)
 }
 
 == function saved_flag_summary() => string ==

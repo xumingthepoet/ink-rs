@@ -38,6 +38,7 @@ pub(super) fn builtin_native_function(name: &str) -> Option<NativeFunction> {
         "CEILING" => Some(NativeFunction::Ceiling),
         "INT" => Some(NativeFunction::Int),
         "FLOAT" => Some(NativeFunction::Float),
+        "to_str" => Some(NativeFunction::ToStr),
         "LEN" => Some(NativeFunction::Len),
         "ARRAY_PUSH" => Some(NativeFunction::ArrayPush),
         "ARRAY_INSERT" => Some(NativeFunction::ArrayInsert),

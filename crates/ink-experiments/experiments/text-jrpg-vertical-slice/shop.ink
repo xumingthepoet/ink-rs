@@ -1,6 +1,6 @@
 === module shop ===
 FROM events IMPORT has_flag, flag_label, FLAG_FOREST_ENCOUNTER_CLEARED
-FROM items IMPORT item_name, item_price, item_count, spend_gold, add_item, gold, count_label, ITEM_POTION, ITEM_ANTIDOTE, ITEM_MINE_CHARM
+FROM items IMPORT item_name, item_price, item_count, spend_gold, add_item, gold, ITEM_POTION, ITEM_ANTIDOTE, ITEM_MINE_CHARM
 
 STRUCT ShopStock {
     item_id: int
@@ -16,10 +16,10 @@ CONST village_stock: ShopStock[] = [
 
 == show_village_shop ==
 Village shop stock.
-Gold: {items::count_label(items::gold)}
+Gold: {to_str(items::gold)}
 { for stock in village_stock:
 { if stock_is_available(stock):
-{items::item_name(stock.item_id)} price {items::count_label(items::item_price(stock.item_id))} owned {items::count_label(items::item_count(stock.item_id))}
+{items::item_name(stock.item_id)} price {to_str(items::item_price(stock.item_id))} owned {to_str(items::item_count(stock.item_id))}
 - else:
 {items::item_name(stock.item_id)} locked by {events::flag_label(stock.unlock_flag)}
 }
@@ -32,12 +32,12 @@ Gold: {items::count_label(items::gold)}
 - else:
     { if items::spend_gold(items::item_price(item_id)):
         ~ items::add_item(item_id, 1)
-        Bought {items::item_name(item_id)} for {items::count_label(items::item_price(item_id))} gold.
+        Bought {items::item_name(item_id)} for {to_str(items::item_price(item_id))} gold.
     - else:
-        Could not buy {items::item_name(item_id)}; need {items::count_label(items::item_price(item_id))} gold.
+        Could not buy {items::item_name(item_id)}; need {to_str(items::item_price(item_id))} gold.
     }
 }
-Gold now {items::count_label(items::gold)}.
+Gold now {to_str(items::gold)}.
 ->->
 
 == function stock_is_available(stock: ShopStock) => bool ==

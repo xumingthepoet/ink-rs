@@ -114,6 +114,13 @@ known. Reads and writes use index syntax:
 Assigning through a Dict index inserts or replaces an entry. Reading a missing
 key is a runtime error.
 
+Use `to_str(value)` when building string values from non-string state:
+
+```ink
+VAR hp: int = 20
+VAR label: string = "HP " + to_str(hp)
+```
+
 ## Flow And Logic
 
 Knot and stitch content can use text, choices, gathers, diverts, tunnels,

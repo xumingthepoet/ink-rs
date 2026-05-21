@@ -469,6 +469,7 @@ pub enum NativeFunction {
     Ceiling,
     Int,
     Float,
+    ToStr,
     Has,
     Hasnt,
     FieldRead,
@@ -486,7 +487,7 @@ pub enum NativeFunction {
 }
 
 impl NativeFunction {
-    pub const ALL: [Self; 36] = [
+    pub const ALL: [Self; 37] = [
         Self::Add,
         Self::Subtract,
         Self::Divide,
@@ -509,6 +510,7 @@ impl NativeFunction {
         Self::Ceiling,
         Self::Int,
         Self::Float,
+        Self::ToStr,
         Self::Has,
         Self::Hasnt,
         Self::FieldRead,
@@ -549,6 +551,7 @@ impl NativeFunction {
             "CEILING" => Some(Self::Ceiling),
             "INT" => Some(Self::Int),
             "FLOAT" => Some(Self::Float),
+            "to_str" => Some(Self::ToStr),
             "?" => Some(Self::Has),
             "!?" => Some(Self::Hasnt),
             "FIELD" => Some(Self::FieldRead),
@@ -591,6 +594,7 @@ impl NativeFunction {
             Self::Ceiling => "CEILING",
             Self::Int => "INT",
             Self::Float => "FLOAT",
+            Self::ToStr => "to_str",
             Self::Has => "?",
             Self::Hasnt => "!?",
             Self::FieldRead => "FIELD",
@@ -632,6 +636,7 @@ impl NativeFunction {
             Self::Ceiling => 1,
             Self::Int => 1,
             Self::Float => 1,
+            Self::ToStr => 1,
             Self::Has => 2,
             Self::Hasnt => 2,
             Self::FieldRead => 2,
@@ -681,6 +686,7 @@ mod tests {
             (NativeFunction::Ceiling, "CEILING", 1),
             (NativeFunction::Int, "INT", 1),
             (NativeFunction::Float, "FLOAT", 1),
+            (NativeFunction::ToStr, "to_str", 1),
             (NativeFunction::Has, "?", 2),
             (NativeFunction::Hasnt, "!?", 2),
             (NativeFunction::FieldRead, "FIELD", 2),

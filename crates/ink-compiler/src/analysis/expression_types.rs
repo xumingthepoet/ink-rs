@@ -309,6 +309,7 @@ pub(super) fn is_typed_builtin_function(name: &str) -> bool {
             | "DICT_SIZE"
             | "DICT_REMOVE"
             | "DICT_KEYS"
+            | "to_str"
     )
 }
 
@@ -319,6 +320,7 @@ pub(super) fn typed_builtin_return_type(name: &str) -> Option<TypeName> {
         "DICT_HAS" => Some(TypeName::bool()),
         "DICT_SIZE" => Some(TypeName::int()),
         "DICT_REMOVE" => Some(TypeName::void()),
+        "to_str" => Some(TypeName::string()),
         _ => None,
     }
 }

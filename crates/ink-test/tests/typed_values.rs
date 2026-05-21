@@ -18,6 +18,16 @@ fn primitives_run() {
 }
 
 #[test]
+fn to_str_builtin_runs() {
+    let compiled = compile_fixture("typed/to-str.ink");
+    assert_story_output(
+        &compiled,
+        "7|1.5|true|ok|game::State.Busy|hp 10|[1, 2]|{hp: 10, name: Ada}|Dict<string>{\"ada\": 10}\n",
+    );
+    assert_json_sequence(&compiled.program.to_json_value(), vec![json!("to_str")]);
+}
+
+#[test]
 fn structs_run() {
     let compiled = compile_fixture("typed/structs.ink");
     assert_story_output(&compiled, "10|3|false|Ada\n");

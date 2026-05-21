@@ -8,6 +8,7 @@ pub(super) fn call(op: Op, params: Vec<Rc<dyn RTObject>>) -> Result<Rc<dyn RTObj
         Op::Add => return add(&params),
         Op::Equal => return equal(&params),
         Op::NotEquals => return not_equals(&params),
+        Op::ToStr => return to_str(&params),
         _ => {}
     }
 
@@ -39,6 +40,7 @@ fn call_type(op: Op, coerced_params: &[Rc<Value>]) -> Result<Rc<dyn RTObject>, S
         Op::Ceiling => ceiling_op(coerced_params),
         Op::Int => int_op(coerced_params),
         Op::Float => float_op(coerced_params),
+        Op::ToStr => unreachable!("to_str uses uncoerced parameters"),
         Op::Has => has(coerced_params),
         Op::Hasnt => hasnt(coerced_params),
         Op::FieldRead => unreachable!("field read uses uncoerced parameters"),
@@ -97,6 +99,11 @@ fn not_equals(params: &[Rc<dyn RTObject>]) -> Result<Rc<dyn RTObject>, StoryErro
     })?;
 
     Ok(Rc::new(Value::new::<bool>(!equals)))
+}
+
+fn to_str(params: &[Rc<dyn RTObject>]) -> Result<Rc<dyn RTObject>, StoryError> {
+    let value = params::value_for_operation(params, 0, "to_str")?;
+    Ok(Rc::new(Value::new::<&str>(&value.to_string())))
 }
 
 fn coerce_values_to_single_type(

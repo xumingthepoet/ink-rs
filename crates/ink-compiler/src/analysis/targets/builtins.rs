@@ -43,6 +43,10 @@ impl<'a> CallTargetChecker<'a> {
                 self.check_dict_keys_call(args, span, context);
                 Vec::new()
             }
+            "to_str" => {
+                self.check_to_str_call(args, span, context);
+                Vec::new()
+            }
             _ => Vec::new(),
         }
     }
@@ -139,6 +143,31 @@ impl<'a> CallTargetChecker<'a> {
                     error.message()
                 ),
             )),
+        }
+    }
+
+    fn check_to_str_call(
+        &mut self,
+        args: &[Expression],
+        span: &SourceSpan,
+        context: &VisitContext,
+    ) {
+        if args.len() != 1 {
+            self.diagnostics.push(Diagnostic::error(
+                span.clone(),
+                format!("Builtin 'to_str' expects 1 argument but got {}", args.len()),
+            ));
+            return;
+        }
+
+        if let Err(error) = self.infer_call_argument_type(&args[0], context) {
+            self.diagnostics.push(Diagnostic::error(
+                span.clone(),
+                format!(
+                    "Cannot type-check argument for builtin 'to_str': {}",
+                    error.message()
+                ),
+            ));
         }
     }
 

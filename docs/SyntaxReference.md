@@ -782,9 +782,11 @@ or:
 
 ## 9) Game Queries and Functions
 
-**ink-rs** provides builtin functions for random numbers, numeric conversion, math, and typed collection helpers.
+**ink-rs** provides builtin functions for random numbers, numeric conversion,
+string conversion, math, and typed collection helpers.
 
-The convention is to name these in capital letters.
+Most builtin functions are named in capital letters. `to_str(value)` is lower
+case because it is commonly used inside string-building expressions.
 
 ### Author state uses variables
 
@@ -1582,6 +1584,17 @@ Strings of type `string` can also be concatenated with `+`.
 	VAR greeting: string = "Hello"
 	VAR name: string = "Ada"
 	{greeting + ", " + name + "!"}
+
+Use `to_str(value)` when a non-string value is needed inside a string
+expression:
+
+	VAR hp: int = 20
+	VAR ready: bool = true
+	{"HP " + to_str(hp) + " ready " + to_str(ready)}
+
+`to_str(value)` returns a `string`. It can stringify primitives, enum values,
+arrays, structs, and Dicts using the same display form that text interpolation
+uses.
 
 ### Array builtins
 

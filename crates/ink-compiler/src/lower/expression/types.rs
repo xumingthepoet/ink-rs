@@ -123,6 +123,7 @@ fn builtin_return_type_for_call(
         "ARRAY_REMOVE" | "ARRAY_PUSH" | "ARRAY_INSERT" | "DICT_REMOVE" => Some(TypeName::void()),
         "LEN" | "DICT_SIZE" => Some(TypeName::int()),
         "DICT_HAS" => Some(TypeName::bool()),
+        "to_str" => Some(TypeName::string()),
         "DICT_KEYS" => {
             let dict_type = infer_lowered_expression_type(args.first()?, context)?;
             let (key_type, _) = dict_type.dict_key_value_types()?;

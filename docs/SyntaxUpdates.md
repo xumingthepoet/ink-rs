@@ -26,6 +26,29 @@ Each entry should include:
 - migration guidance
 - tests
 
+## 2026-05-22: `to_str` Builtin
+
+- status: supported
+- upstream behavior: upstream Ink can print values in text interpolation, but
+  does not expose an explicit `to_str(value)` source builtin for string
+  concatenation.
+- ink-rs behavior: `to_str(value) => string` converts any typed runtime value
+  with a known source type into its display string. It is useful when building
+  strings with `+`, such as `"HP " + to_str(hp)`.
+- documentation effect: `SyntaxReference.md`,
+  `docs/ink_JSON_runtime_format.md`, and the current-language overview mention
+  the builtin.
+- rationale: experiment code should not need repeated hand-written
+  `count_label()` helpers just to concatenate numeric, boolean, enum, or
+  composite values into text.
+- migration guidance: replace local numeric/stringification helpers with
+  `to_str(value)` when a real `string` value is needed. Plain text
+  interpolation like `{hp}` remains valid when no string concatenation is
+  needed.
+- tests: format native-function metadata, runtime native-function metadata,
+  compiler lowering, and typed integration tests cover the new native token and
+  runtime output for primitive and composite values.
+
 ## 2026-05-21: Array And Dict For Control Blocks
 
 - status: supported
