@@ -10,6 +10,7 @@ crates remain available when a project wants tighter dependency control.
 - `ink-runtime`: runtime story engine for compiled story JSON.
 - `ink-compiler`: compiler from ink-rs source to compiled story JSON.
 - `ink-story-json-format`: typed compiled story JSON wire model and codec.
+- `ink-dioxus`: reusable Dioxus UI adapter for ink-rs game crates.
 
 `ink-test` and `ink-tools` are repository-internal crates and are not published.
 
@@ -31,6 +32,16 @@ ink-rs = { version = "0.1", features = ["compiler"] }
 ```
 
 Use `full` to enable both runtime and compiler APIs explicitly.
+
+## Dioxus Game Adapter
+
+Game crates that want the shared Dioxus UI shell can depend on `ink-dioxus` with
+the `web` feature. The game crate owns its `.ink` files and passes embedded
+`InkSource` values to `ink_dioxus::web::launch`.
+
+`ink-dioxus` also exposes a build-script helper that generates that embedded
+source list from `assets/ink/src`, so adding or renaming `.ink` files does not
+require manually editing an `include_str!` array.
 
 ## Runtime Use
 
