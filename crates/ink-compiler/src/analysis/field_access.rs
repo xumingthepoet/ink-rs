@@ -329,7 +329,7 @@ mod tests {
              - (gatherpoint) Some content.\n\
              -> knot.stitch_two\n\
              = stitch_two\n\
-             * {knot.stitch_one.gatherpoint} Found gatherpoint\n\
+             * {knot.stitch_one.gatherpoint}: Found gatherpoint\n\
              -> DONE",
         );
 

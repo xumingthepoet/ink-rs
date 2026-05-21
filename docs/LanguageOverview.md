@@ -129,8 +129,9 @@ declarations are module-top-level globals; local calculation state uses typed
 `temp` declarations inside logic lines.
 
 Explicit `and` / `&&` and `or` / `||` short-circuit inside a single expression,
-so guard checks can protect later array or Dict reads. Adjacent choice condition
-blocks remain separate tests and are all evaluated.
+so guard checks can protect later array or Dict reads. Choice conditions use a
+colon boundary, as in `* {enabled}: Text`; adjacent condition blocks in that
+prefix remain separate tests and are all evaluated.
 
 Typed arrays and Dicts can use multiline source-level `for` blocks:
 `{ for item in items: ... }`, `{ for index, item in items: ... }`, and

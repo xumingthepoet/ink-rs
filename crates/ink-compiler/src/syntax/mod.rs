@@ -194,7 +194,7 @@ mod tests {
 
     #[test]
     fn parses_choice_condition_with_dotted_path() {
-        let output = parse(SourceInput::new("* {knot.stitch.label} Text"));
+        let output = parse(SourceInput::new("* {knot.stitch.label}: Text"));
         assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
         let story = output.artifact.unwrap();
 

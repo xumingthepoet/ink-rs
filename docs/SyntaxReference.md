@@ -609,10 +609,10 @@ track that state explicitly and put a condition on the choice:
 	== find_help ==
 
 		You search desperately for a friendly face in the crowd.
-		*	{ not asked_hat } The woman in the hat?
+		*	{ not asked_hat }: The woman in the hat?
 			~ asked_hat = true
 			The woman in the hat pushes you roughly aside. -> find_help
-		*	{ not asked_briefcase } The man with the briefcase?
+		*	{ not asked_briefcase }: The man with the briefcase?
 			~ asked_briefcase = true
 			The man with the briefcase looks disgusted as you stumble past him. -> find_help
 
@@ -639,10 +639,10 @@ both visible options have been hidden:
 	== find_help ==
 
 		You search desperately for a friendly face in the crowd.
-		*	{ not asked_hat } The woman in the hat?
+		*	{ not asked_hat }: The woman in the hat?
 			~ asked_hat = true
 			The woman in the hat pushes you roughly aside. -> find_help
-		*	{ not asked_briefcase } The man with the briefcase?
+		*	{ not asked_briefcase }: The man with the briefcase?
 			~ asked_briefcase = true
 			The man with the briefcase looks disgusted as you stumble past him. -> find_help
 		*	->
@@ -701,11 +701,13 @@ choices; conditions filter individual generated choices; fallback choices still
 run if no visible choices remain; and generated choices save/load with their
 captured runtime state.
 
-Dynamic choice conditions use an explicit colon boundary. Without the colon, a
-leading braced expression is displayed as choice text:
+Choice conditions use an explicit colon boundary. Without the colon, a leading
+braced expression is displayed as choice text:
 
 	* [move in moves] {move.text}
 	* [move in moves] {move.enabled}: {move.text}
+	* {ready} Label
+	* {ready}: Label
 
 The dynamic variables are visible in the choice condition, displayed choice
 text, selected-choice body, tags, and nested choices:
@@ -733,10 +735,10 @@ For example:
 	VAR has_visited_paris: bool = false
 	VAR met_estelle: bool = false
 
-	*	{ not has_visited_paris } 	Go to Paris -> visit_paris
-	* 	{ has_visited_paris } 		Return to Paris -> visit_paris
+	*	{ not has_visited_paris }: 	Go to Paris -> visit_paris
+	* 	{ has_visited_paris }: 		Return to Paris -> visit_paris
 
-	*	{ met_estelle } Telephone Mme Estelle -> phone_estelle
+	*	{ met_estelle }: Telephone Mme Estelle -> phone_estelle
 
 Use explicit variables when a condition needs to remember authored state.
 
@@ -744,12 +746,17 @@ Use explicit variables when a condition needs to remember authored state.
 
 You can use several logical tests on an option; if you do, *all* the tests must all be passed for the option to appear. Adjacent condition blocks are evaluated as separate tests, so every block runs even if an earlier block is false.
 
-	*	{ not has_visited_paris } 	Go to Paris -> visit_paris
-	* 	{ has_visited_paris } { not bored_of_paris }
+	*	{ not has_visited_paris }: 	Go to Paris -> visit_paris
+	* 	{ has_visited_paris } { not bored_of_paris }:
 		Return to Paris -> visit_paris
 
-When the visible choice text itself starts with a dynamic expression, put a
-colon after the condition prefix to make the boundary explicit:
+The colon after the condition prefix is required. Without it, a leading braced
+expression is parsed as visible text:
+
+	*	{ has_key } Open the door
+
+This displays a choice like `true Open the door` or `false Open the door`,
+depending on the value of `has_key`. Write this when you mean a condition:
 
 	*	{ has_key }: {locked_door_label} -> open_door
 	*	{ has_visited_paris } { not bored_of_paris }: {return_label} -> visit_paris
@@ -758,7 +765,7 @@ colon after the condition prefix to make the boundary explicit:
 
 Inside a single expression, ink-rs supports `and` (also written as `&&`) and `or` (also written as `||`) in the usual way, as well as brackets.
 
-	*	{ not (visited_paris or visited_rome) && (visited_london || visited_new_york) } Wait. Go where? I'm confused. -> visit_someplace
+	*	{ not (visited_paris or visited_rome) && (visited_london || visited_new_york) }: Wait. Go where? I'm confused. -> visit_someplace
 
 For non-programmers `X and Y` means both X and Y must be true. `X or Y` means either or both. We don't have a `xor`.
 
@@ -766,7 +773,9 @@ Explicit `and` / `&&` and `or` / `||` short-circuit. `X and Y` skips `Y` when `X
 
 	{ index < LEN(items) && items[index] == target }
 
-Short-circuiting only applies inside the expression. Separate choice condition blocks such as `{a}{b}` are still separate tests, and both blocks are evaluated.
+Short-circuiting only applies inside the expression. Separate choice condition
+blocks in a colon-terminated prefix, such as `{a}{b}:`, are still separate
+tests, and both blocks are evaluated.
 
 You can also use the standard `!` for `not`, though we recommend using `not` because it reads more clearly in prose-heavy source.
 
@@ -776,7 +785,7 @@ Conditions use explicit variables or expressions:
 
 	VAR has_seen_clue: bool = false
 
-	*	{has_seen_clue} Accuse Mr Jefferson
+	*	{has_seen_clue}: Accuse Mr Jefferson
 
 
 #### Advanced: more logic
@@ -851,7 +860,7 @@ Use variables for authored state that needs to persist across choices or knots:
 	VAR choices_seen: int = 0
 	VAR has_slept: bool = false
 
-	*	{not has_slept} Sleep
+	*	{not has_slept}: Sleep
 		~ has_slept = true
 		You sleep.
 		-> END
@@ -1148,11 +1157,11 @@ These addresses can be used in conditional tests, which can be useful for creati
 
 	- 	'Hmm,' replies the guard.
 
-	*	{greet} 	'Having a nice day?' // only if you greeted him
+	*	{greet}: 	'Having a nice day?' // only if you greeted him
 
 	* 	'Hmm?' you reply.
 
-	*	{get_out} Shove him aside 	 // only if you threatened him
+	*	{get_out}: Shove him aside 	 // only if you threatened him
 		You shove him sharply. He stares in reply, and draws his sword!
 		-> fight_guard 			// this route diverts out of the weave
 
@@ -1167,18 +1176,18 @@ Inside the same block of weave, you can simply use the label name; from outside 
 	= stitch_one
 		- (gatherpoint) Some content.
 	= stitch_two
-		*	{stitch_one.gatherpoint} Option
+		*	{stitch_one.gatherpoint}: Option
 
 or pointing into another knot:
 
 	== knot_one ==
 	-	(gather_one)
-		* {knot_two.stitch_two.gather_two} Option
+		* {knot_two.stitch_two.gather_two}: Option
 
 	== knot_two ==
 	= stitch_two
 		- (gather_two)
-			*	{knot_one.gather_one} Option
+			*	{knot_one.gather_one}: Option
 
 
 #### Advanced: all options can be labelled
@@ -1209,7 +1218,7 @@ Labelling allows us to create loops inside weaves. Here's a standard pattern for
 		*	'Are there dogs?'
 			'Hundreds,' the guard answers, with a toothy grin. 'Hungry devils, too.'
 		// We require the player to ask at least one question
-		*	{loop} Enough talking
+		*	{loop}: Enough talking
 			-> done
 	- (loop)
 		~ guard_question_loops = guard_question_loops + 1
@@ -1237,7 +1246,7 @@ Options can also be diverted to: the divert goes to the output of having chosen 
 	*	(shove) Shove the guard aside
 		You shove the guard to one side, but he comes back swinging.
 
-	*	{shove} Grapple and fight -> fight_the_guard
+	*	{shove}: Grapple and fight -> fight_the_guard
 
 	- 	-> opts
 
@@ -1504,8 +1513,8 @@ We can test global variables to control options, and provide conditional text, i
 
 	== the_train ==
 		The train jolted and rattled. { mood > 0:I was feeling positive enough, however, and did not mind the odd bump|It was more than I could bear}.
-		*	{ not knows_about_wager } 'But, Monsieur, why are we travelling?' I asked.
-		* 	{ knows_about_wager} I contemplated our strange adventure. Would it be possible?
+		*	{ not knows_about_wager }: 'But, Monsieur, why are we travelling?' I asked.
+		* 	{ knows_about_wager}: I contemplated our strange adventure. Would it be possible?
 
 #### Advanced: divert target variables
 
@@ -1996,7 +2005,7 @@ Functions are called by name, and with brackets, even if they have no parameters
 
 	~ temp x: float = lerp(2.0, 8.0, 0.3)
 
-	*	{say_yes_to_everything()} 'Yes.'
+	*	{say_yes_to_everything()}: 'Yes.'
 
 As in any other language, a function, once done, returns the flow to wherever it was called from - and despite not being allowed to divert the flow, functions can still call other functions.
 
@@ -2584,7 +2593,7 @@ Threads can be used to add the same choice into lots of different places. When u
 			-> top
 
 	== review_case_notes(go_back_to: ->) ==
-	*	{not reviewed_notes_recently}
+	*	{not reviewed_notes_recently}:
 		Review my case notes
 		// the explicit variable controls whether this option repeats immediately
 		~ reviewed_notes_recently = true
@@ -2684,9 +2693,9 @@ The array expression is evaluated once before expansion. Each generated choice
 captures its own `i` and `option` values in the normal choice thread, so pending
 choices can be saved and loaded without regenerating the list.
 
-The colon after `{option.enabled}` is deliberate. In a dynamic choice, a
-condition prefix must end with a colon; without it, a leading braced expression
-such as `{option.text}` is parsed as displayed choice text.
+The colon after `{option.enabled}` is deliberate. In any choice, a condition
+prefix must end with a colon; without it, a leading braced expression such as
+`{option.text}` is parsed as displayed choice text.
 
 # Part 5: International character support in identifiers
 

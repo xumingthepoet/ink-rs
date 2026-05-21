@@ -163,6 +163,19 @@ fn square_brackets_in_choice_text_are_literal() {
 }
 
 #[test]
+fn choice_leading_braced_expression_without_colon_is_text() {
+    let compiled = compile_fixture("choices/choice-leading-expression-text.ink");
+    let mut story = Story::new(&compiled.json);
+
+    assert_eq!(story.continue_maximally(), "");
+    let choices = story.get_current_choices();
+    assert_eq!(choices.len(), 1);
+    assert_eq!(choices[0].text, "true Label");
+    story.choose_choice_index(0);
+    assert_eq!(story.continue_maximally(), "picked.\n");
+}
+
+#[test]
 fn dynamic_choices_expand_from_arrays_and_mix_with_static_choices() {
     let compiled = compile_fixture("choices/dynamic-choice.ink");
     let mut story = Story::new(&compiled.json);

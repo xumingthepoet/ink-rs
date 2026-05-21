@@ -2,15 +2,15 @@
 
 == main ==
 Test conditional choices
-* {true && false} not displayed
+* {true && false}: not displayed
     -> DONE
-* {true && true && true && true} one
+* {true && true && true && true}: one
     -> DONE
-* {false} not displayed
+* {false}: not displayed
     -> DONE
-* {true} two
+* {true}: two
     -> DONE
-* {true && true} three
+* {true && true}: three
     -> DONE
-* {true} four
+* {true}: four
     -> DONE

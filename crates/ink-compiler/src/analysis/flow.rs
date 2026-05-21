@@ -971,7 +971,7 @@ mod tests {
              { if ready:\n\
                Conditional text.\n\
              }\n\
-             * { ready } Choice text\n\
+             * { ready }: Choice text\n\
              -> DONE",
         );
 
@@ -1016,7 +1016,7 @@ mod tests {
             ),
             (
                 "VAR label: string = \"yes\"\n\
-                 * { label } Choice text",
+                 * { label }: Choice text",
                 "Choice condition has type string but expected bool",
             ),
             (

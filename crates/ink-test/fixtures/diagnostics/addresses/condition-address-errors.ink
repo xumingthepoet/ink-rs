@@ -3,7 +3,7 @@
 -> duckburg
 
 == duckburg ==
-*   {bin} But we had already visited the money bin.
+*   {bin}: But we had already visited the money bin.
 *   -> END
 
 == money_bin ==

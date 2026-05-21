@@ -5,7 +5,7 @@ VAR open: bool = false
 -> menu
 
 == menu ==
-* {open} Open path
+* {open}: Open path
     Done.
     -> DONE
 * Toggle

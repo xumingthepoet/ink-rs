@@ -26,6 +26,26 @@ Each entry should include:
 - migration guidance
 - tests
 
+## 2026-05-22: Explicit Choice Condition Boundaries
+
+- status: supported
+- upstream behavior: upstream Ink treats leading braced expressions on choice
+  lines as choice conditions without requiring a colon boundary.
+- ink-rs behavior: choice conditions now require a colon after the leading
+  condition prefix, such as `* {enabled}: Text` or `* {a}{b}: Text`. Without
+  the colon, leading braced expressions are visible choice text, so
+  `* {enabled} Text` displays the value of `enabled` followed by `Text`.
+- documentation effect: `SyntaxReference.md` and `LanguageOverview.md`
+  document the explicit boundary and update choice-condition examples.
+- rationale: the same braced inline expression syntax is used for visible text.
+  Requiring `:` for conditions removes the ambiguity and lets data-driven
+  choices naturally start with `{item.text}`.
+- migration guidance: replace old choice conditions written as
+  `* {condition} Text` with `* {condition}: Text`. Use adjacent braced
+  condition blocks only inside the colon-terminated condition prefix.
+- tests: parser tests and choice integration fixtures cover both
+  `* {ready} Label` as visible text and colon-terminated choice conditions.
+
 ## 2026-05-22: `to_str` Builtin
 
 - status: supported
@@ -126,16 +146,16 @@ Each entry should include:
 - ink-rs behavior: explicit logical operators now short-circuit inside a single
   expression. `and` / `&&` skips the right-hand side when the left-hand side is
   `false`; `or` / `||` skips the right-hand side when the left-hand side is
-  `true`. Adjacent choice condition blocks such as `{a}{b}` remain independent
-  conditions and both blocks are evaluated.
+  `true`. Adjacent choice condition blocks in a colon-terminated prefix, such
+  as `{a}{b}:`, remain independent conditions and both blocks are evaluated.
 - documentation effect: `SyntaxReference.md` documents short-circuit behavior
   for explicit logical operators and clarifies that multiple choice condition
   blocks are not themselves a short-circuit chain.
 - rationale: guard expressions such as `index < LEN(items) && items[index] == x`
   should not evaluate an unsafe read after the guard fails.
 - migration guidance: keep side effects that must always run in separate logic
-  lines or separate choice condition blocks. Put side effects inside `&&` or
-  `||` only when skipping them is intended.
+  lines or separate colon-terminated choice condition blocks. Put side effects
+  inside `&&` or `||` only when skipping them is intended.
 - tests: expression and choice integration fixtures cover skipped out-of-bounds
   reads, word and symbol operators, RHS side effects when evaluation is still
   required, and eager evaluation between adjacent choice condition blocks.
@@ -518,7 +538,7 @@ Each entry should include:
   Keeping the old tutorial and unused flags made the current repeatable choice
   model look inconsistent.
 - migration guidance: replace reliance on implicit `*` disappearance with a
-  typed variable and a choice condition such as `* { not asked } Ask`.
+  typed variable and a choice condition such as `* { not asked }: Ask`.
 - tests: `star_and_plus_choices_are_repeatable`,
   `choice_conditions_still_control_visibility`, compiler choice parser tests,
   and full compiler/runtime gates.

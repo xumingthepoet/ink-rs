@@ -53,8 +53,7 @@ pub(super) fn parse_choice(parser: &mut RuleParser<'_>) -> Option<Choice> {
         ));
         return None;
     }
-    let (condition, choice_body) =
-        parse_choice_conditions(&choice_body, dynamic_binding.is_some())?;
+    let (condition, choice_body) = parse_choice_conditions(&choice_body)?;
 
     // Handle fallback choices like "* -> " which have no text content
     // and the -> is a divert to empty (fall through to gather)
@@ -202,10 +201,7 @@ fn parse_choice_identifier(choice_body: &str) -> (Option<String>, String) {
     )
 }
 
-fn parse_choice_conditions(
-    choice_body: &str,
-    dynamic_choice: bool,
-) -> Option<(Option<Expression>, String)> {
+fn parse_choice_conditions(choice_body: &str) -> Option<(Option<Expression>, String)> {
     let original_body = choice_body.to_string();
     let mut remaining = choice_body.trim_start();
     let mut conditions = Vec::new();
@@ -223,7 +219,7 @@ fn parse_choice_conditions(
         }
     }
 
-    if dynamic_choice && !conditions.is_empty() && !found_boundary {
+    if !conditions.is_empty() && !found_boundary {
         return Some((None, original_body));
     }
 
@@ -367,6 +363,24 @@ mod tests {
     }
 
     #[test]
+    fn braced_text_without_colon_is_display_text() {
+        let choice = parse_choice_line("* {ready} Label");
+
+        assert!(choice.dynamic_binding().is_none());
+        assert!(choice.condition().is_none());
+        let start_content = choice.start_content().expect("expected display text");
+        assert!(matches!(
+            start_content.objects(),
+            [Object::ContentList(content), Object::Text(text)]
+                if matches!(
+                    content.objects(),
+                    [Object::Expression(Expression::VariableReference(name))]
+                        if name == "ready"
+                ) && text.text() == " Label"
+        ));
+    }
+
+    #[test]
     fn dynamic_choice_braced_text_without_colon_is_display_text() {
         let choice = parse_choice_line("* [move in moves] {move.text}");
 
@@ -388,28 +402,27 @@ mod tests {
     }
 
     #[test]
-    fn adjacent_leading_braces_remain_multiple_conditions() {
+    fn adjacent_leading_braces_without_colon_are_display_text() {
         let choice = parse_choice_line("* {enabled}{label}");
 
-        let Some(Expression::MultipleCondition(conditions)) = choice.condition() else {
-            panic!("expected multiple condition");
-        };
-        assert_eq!(conditions.len(), 2);
-        assert!(choice.start_content().is_none());
-    }
-
-    #[test]
-    fn multiple_conditions_without_colon_keep_existing_text_boundary() {
-        let choice = parse_choice_line("* {enabled} {visible} Label");
-
-        let Some(Expression::MultipleCondition(conditions)) = choice.condition() else {
-            panic!("expected multiple condition");
-        };
-        assert_eq!(conditions.len(), 2);
+        assert!(choice.condition().is_none());
         let start_content = choice.start_content().expect("expected display text");
         assert!(matches!(
             start_content.objects(),
-            [Object::Text(text)] if text.text() == "Label"
+            [Object::ContentList(_), Object::ContentList(_)]
+        ));
+    }
+
+    #[test]
+    fn multiple_conditions_without_colon_are_display_text() {
+        let choice = parse_choice_line("* {enabled} {visible} Label");
+
+        assert!(choice.condition().is_none());
+        let start_content = choice.start_content().expect("expected display text");
+        assert!(matches!(
+            start_content.objects(),
+            [Object::ContentList(_), Object::Text(text), Object::ContentList(_), Object::Text(label)]
+                if text.text() == " " && label.text() == " Label"
         ));
     }
 }

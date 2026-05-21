@@ -7,12 +7,12 @@ VAR hits: int = 0
 ~ return value
 
 == main ==
-* {false}{mark(true)} separate blocks stay eager
+* {false}{mark(true)}: separate blocks stay eager
   Hidden.
   -> END
-* {true && mark(true)} inner and evaluates right
+* {true && mark(true)}: inner and evaluates right
   Inner and.
   -> END
-* {true || mark(true)} inner or short-circuits
+* {true || mark(true)}: inner or short-circuits
   Inner or.
   -> END
