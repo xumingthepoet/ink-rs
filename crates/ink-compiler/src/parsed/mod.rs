@@ -27,7 +27,7 @@ pub(crate) mod visit;
 mod weave;
 
 pub use author_warning::AuthorWarning;
-pub use choice::Choice;
+pub use choice::{Choice, DynamicChoiceBinding, DynamicChoiceVariable};
 pub use conditional::{Conditional, ConditionalBranch, ConditionalKind};
 pub use constant_declaration::ConstantDeclaration;
 pub use content_list::ContentList;

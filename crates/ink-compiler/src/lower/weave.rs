@@ -1,6 +1,8 @@
-use ink_story_json_format::{Container, ControlCommand, NamedContainer, Object as RuntimeObject};
+use ink_story_json_format::{
+    Container, ControlCommand, NamedContainer, NativeFunction, Object as RuntimeObject,
+};
 
-use crate::parsed::{Choice, ContentList, Object, Weave};
+use crate::parsed::{Choice, ContentList, DynamicChoiceBinding, Object, Weave};
 
 use super::context::{ChoicePathMode, LoweringContext};
 use super::expression::lower_expression_into;
@@ -382,16 +384,28 @@ fn lower_choice_in_section(
     let gather_container_name = next_gather_name(objects, *index + 1, section.gather_count);
     let choice_container_path = section.path_mode.choice_point_target(choice_index);
 
-    match choice_outer(
-        choice,
-        &choice_container_path,
-        content.len(),
-        section.path_mode,
-        section.choice_labels,
-        section.context,
-    ) {
-        ChoiceOuter::Inline(objects) => content.extend(objects),
-        ChoiceOuter::Nested(container) => content.push(RuntimeObject::Container(container)),
+    if let Some(binding) = choice.dynamic_binding() {
+        lower_dynamic_choice_outer(
+            content,
+            choice,
+            binding,
+            &choice_container_path,
+            section.path_mode,
+            section.choice_labels,
+            section.context,
+        );
+    } else {
+        match choice_outer(
+            choice,
+            &choice_container_path,
+            content.len(),
+            section.path_mode,
+            section.choice_labels,
+            section.context,
+        ) {
+            ChoiceOuter::Inline(objects) => content.extend(objects),
+            ChoiceOuter::Nested(container) => content.push(RuntimeObject::Container(container)),
+        }
     }
 
     let mut choice_content = Vec::new();
@@ -597,6 +611,152 @@ fn choice_outer(
         .push(named_content("s", start_content));
 
     ChoiceOuter::Nested(outer_container)
+}
+
+fn lower_dynamic_choice_outer(
+    content: &mut Vec<RuntimeObject>,
+    choice: &Choice,
+    binding: &DynamicChoiceBinding,
+    choice_container_path: &str,
+    path_mode: &ChoicePathMode,
+    choice_labels: &LabelIndex,
+    context: &LoweringContext<'_>,
+) {
+    assign_temp_with(content, binding.array_name(), |content| {
+        lower_expression_into(content, binding.iterable(), context, false);
+    });
+    assign_temp_with(content, binding.limit_name(), |content| {
+        content.push(RuntimeObject::VariableReference(
+            binding.array_name().to_string(),
+        ));
+        content.push(RuntimeObject::NativeFunction(NativeFunction::Len));
+    });
+    assign_int_temp(content, binding.index_name(), 0);
+
+    let loop_index = content.len();
+    let loop_target = path_mode.runtime_index_path(loop_index);
+    let rejoin_target = path_mode.runtime_index_path(loop_index + 1);
+    let body_path_mode = path_mode.for_conditional_branch(loop_index);
+    let body_context = context.with_path_mode(body_path_mode.clone());
+
+    let mut body_content = Vec::new();
+    assign_dynamic_choice_variables(&mut body_content, binding);
+    match choice_outer(
+        choice,
+        choice_container_path,
+        body_content.len(),
+        &body_path_mode,
+        choice_labels,
+        &body_context,
+    ) {
+        ChoiceOuter::Inline(objects) => body_content.extend(objects),
+        ChoiceOuter::Nested(container) => body_content.push(RuntimeObject::Container(container)),
+    }
+    increment_loop_index(&mut body_content, binding.index_name());
+    body_content.push(RuntimeObject::Divert {
+        target: loop_target,
+        variable: false,
+    });
+
+    content.push(RuntimeObject::Container(dynamic_choice_loop_container(
+        binding,
+        body_content,
+        rejoin_target,
+    )));
+    content.push(RuntimeObject::ControlCommand(ControlCommand::NoOp));
+}
+
+fn dynamic_choice_loop_container(
+    binding: &DynamicChoiceBinding,
+    body_content: Vec<RuntimeObject>,
+    rejoin_target: String,
+) -> Container {
+    let mut container = Container::unnamed(vec![
+        RuntimeObject::ControlCommand(ControlCommand::EvalStart),
+        RuntimeObject::VariableReference(binding.index_name().to_string()),
+        RuntimeObject::VariableReference(binding.limit_name().to_string()),
+        RuntimeObject::NativeFunction(NativeFunction::Less),
+        RuntimeObject::ControlCommand(ControlCommand::EvalEnd),
+        RuntimeObject::ConditionalDivert {
+            target: ".^.b".to_string(),
+        },
+        RuntimeObject::Divert {
+            target: rejoin_target,
+            variable: false,
+        },
+    ]);
+    container
+        .named_content
+        .push(named_content("b", body_content));
+    container
+}
+
+fn assign_dynamic_choice_variables(
+    content: &mut Vec<RuntimeObject>,
+    binding: &DynamicChoiceBinding,
+) {
+    match binding.variables() {
+        [item] => assign_dynamic_array_item(content, item.runtime_name(), binding),
+        [index, item] => {
+            assign_temp_from_variable(content, index.runtime_name(), binding.index_name());
+            assign_dynamic_array_item(content, item.runtime_name(), binding);
+        }
+        _ => {}
+    }
+}
+
+fn assign_dynamic_array_item(
+    content: &mut Vec<RuntimeObject>,
+    target_name: &str,
+    binding: &DynamicChoiceBinding,
+) {
+    assign_temp_with(content, target_name, |content| {
+        content.push(RuntimeObject::VariableReference(
+            binding.array_name().to_string(),
+        ));
+        content.push(RuntimeObject::VariableReference(
+            binding.index_name().to_string(),
+        ));
+        content.push(RuntimeObject::NativeFunction(NativeFunction::IndexRead));
+    });
+}
+
+fn assign_int_temp(content: &mut Vec<RuntimeObject>, name: &str, value: i32) {
+    assign_temp_with(content, name, |content| {
+        content.push(RuntimeObject::Int(value));
+    });
+}
+
+fn assign_temp_from_variable(
+    content: &mut Vec<RuntimeObject>,
+    target_name: &str,
+    source_name: &str,
+) {
+    assign_temp_with(content, target_name, |content| {
+        content.push(RuntimeObject::VariableReference(source_name.to_string()));
+    });
+}
+
+fn assign_temp_with(
+    content: &mut Vec<RuntimeObject>,
+    name: &str,
+    build_value: impl FnOnce(&mut Vec<RuntimeObject>),
+) {
+    content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
+    build_value(content);
+    content.push(RuntimeObject::ControlCommand(ControlCommand::EvalEnd));
+    content.push(RuntimeObject::VariableAssignment(name.to_string()));
+}
+
+fn increment_loop_index(content: &mut Vec<RuntimeObject>, index_name: &str) {
+    content.push(RuntimeObject::ControlCommand(ControlCommand::EvalStart));
+    content.push(RuntimeObject::VariableReference(index_name.to_string()));
+    content.push(RuntimeObject::Int(1));
+    content.push(RuntimeObject::NativeFunction(NativeFunction::Add));
+    content.push(RuntimeObject::TempVariableReassignment(
+        index_name.to_string(),
+    ));
+    content.push(RuntimeObject::ControlCommand(ControlCommand::EvalEnd));
 }
 
 fn lower_content_list_with_context(

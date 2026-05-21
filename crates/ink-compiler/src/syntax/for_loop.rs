@@ -3,9 +3,9 @@ use std::collections::HashSet;
 use crate::{
     diagnostic::{Diagnostic, DiagnosticCode},
     parsed::{
-        AssignmentTarget, Conditional, ConditionalBranch, ContentList, DictLiteralEntry,
-        Expression, ForLoop, ForLoopVariable, IncDec, Object, StructLiteralField,
-        VariableAssignment,
+        AssignmentTarget, Choice, Conditional, ConditionalBranch, ContentList, DictLiteralEntry,
+        Divert, DivertTarget, DynamicChoiceBinding, Expression, ForLoop, ForLoopVariable, IncDec,
+        Object, Return, StructLiteralField, TunnelOnwards, VariableAssignment, Weave,
     },
     source::{SourceLine, SourceSpan},
 };
@@ -332,7 +332,7 @@ fn alias_for(name: &str, aliases: &[LoopAlias]) -> Option<String> {
         .map(|alias| alias.runtime_name.clone())
 }
 
-fn rewrite_object(object: Object, aliases: &[LoopAlias]) -> Object {
+pub(super) fn rewrite_object(object: Object, aliases: &[LoopAlias]) -> Object {
     match object {
         Object::ContentList(content) => Object::ContentList(rewrite_content_list(content, aliases)),
         Object::Expression(expression) => {
@@ -341,31 +341,104 @@ fn rewrite_object(object: Object, aliases: &[LoopAlias]) -> Object {
         Object::Conditional(conditional) => {
             Object::Conditional(rewrite_conditional(conditional, aliases))
         }
-        Object::ForLoop(for_loop) => Object::ForLoop(for_loop),
+        Object::ForLoop(for_loop) => Object::ForLoop(rewrite_for_loop(for_loop, aliases)),
         Object::ConstantDeclaration(declaration) => Object::ConstantDeclaration(declaration),
         Object::LogicLine(expression) => Object::LogicLine(rewrite_expression(expression, aliases)),
         Object::IncDec(inc_dec) => Object::IncDec(rewrite_inc_dec(inc_dec, aliases)),
-        Object::Return(ret) => Object::Return(ret),
+        Object::Choice(choice) => Object::Choice(rewrite_choice(choice, aliases)),
+        Object::Divert(divert) => Object::Divert(rewrite_divert(divert, aliases)),
+        Object::Return(ret) => Object::Return(rewrite_return(ret, aliases)),
         Object::VariableAssignment(assignment) => {
             Object::VariableAssignment(rewrite_assignment(assignment, aliases))
         }
+        Object::TunnelOnwards(tunnel_onwards) => {
+            Object::TunnelOnwards(rewrite_tunnel_onwards(tunnel_onwards, aliases))
+        }
+        Object::Weave(weave) => Object::Weave(Weave::new(
+            rewrite_objects(weave.content().to_vec(), aliases),
+            weave.base_indent(),
+        )),
         Object::Text(_)
         | Object::AuthorWarning(_)
         | Object::Glue(_)
-        | Object::Choice(_)
-        | Object::Divert(_)
         | Object::EnumDeclaration(_)
         | Object::ExternalDeclaration(_)
         | Object::Gather(_)
         | Object::StructDeclaration(_)
-        | Object::Tag(_)
-        | Object::TunnelOnwards(_)
-        | Object::Weave(_) => object,
+        | Object::Tag(_) => object,
     }
 }
 
-fn rewrite_content_list(content: ContentList, aliases: &[LoopAlias]) -> ContentList {
+pub(super) fn rewrite_content_list(content: ContentList, aliases: &[LoopAlias]) -> ContentList {
     ContentList::new(rewrite_objects(content.into_objects(), aliases))
+}
+
+pub(super) fn dynamic_choice_aliases(binding: &DynamicChoiceBinding) -> Vec<LoopAlias> {
+    binding
+        .variables()
+        .iter()
+        .map(|variable| LoopAlias {
+            source_name: variable.source_name().to_string(),
+            runtime_name: variable.runtime_name().to_string(),
+        })
+        .collect()
+}
+
+pub(super) fn rewrite_choice_own_dynamic_aliases(choice: Choice) -> Choice {
+    let Some(binding) = choice.dynamic_binding().cloned() else {
+        return choice;
+    };
+    let aliases = dynamic_choice_aliases(&binding);
+    rewrite_choice_parts(choice, &aliases, false)
+}
+
+fn rewrite_choice(choice: Choice, aliases: &[LoopAlias]) -> Choice {
+    rewrite_choice_parts(choice, aliases, true)
+}
+
+fn rewrite_choice_parts(
+    choice: Choice,
+    aliases: &[LoopAlias],
+    rewrite_dynamic_iterable: bool,
+) -> Choice {
+    let start_content = choice
+        .start_content()
+        .cloned()
+        .map(|content| rewrite_content_list(content, aliases));
+    let inner_content = rewrite_content_list(choice.inner_content().clone(), aliases);
+    let condition = choice
+        .condition()
+        .cloned()
+        .map(|condition| rewrite_expression(condition, aliases));
+    let dynamic_binding = choice.dynamic_binding().cloned().map(|binding| {
+        if rewrite_dynamic_iterable {
+            let iterable = rewrite_expression(binding.iterable().clone(), aliases);
+            binding.with_iterable(iterable)
+        } else {
+            binding
+        }
+    });
+
+    let mut rewritten = Choice::new(start_content, inner_content, choice.span().clone());
+    rewritten.set_identifier(choice.identifier().map(str::to_string));
+    rewritten.set_is_invisible_default(choice.is_invisible_default());
+    rewritten.set_indentation_depth(choice.indentation_depth());
+    rewritten.set_condition(condition);
+    rewritten.set_dynamic_binding(dynamic_binding);
+    rewritten
+}
+
+fn rewrite_for_loop(for_loop: ForLoop, aliases: &[LoopAlias]) -> ForLoop {
+    ForLoop::new(
+        for_loop.id(),
+        for_loop.variables().to_vec(),
+        rewrite_expression(for_loop.iterable().clone(), aliases),
+        Weave::new(
+            rewrite_objects(for_loop.body().content().to_vec(), aliases),
+            for_loop.body().base_indent(),
+        ),
+        for_loop.span().clone(),
+    )
 }
 
 fn rewrite_conditional(conditional: Conditional, aliases: &[LoopAlias]) -> Conditional {
@@ -413,6 +486,60 @@ fn rewrite_assignment(assignment: VariableAssignment, aliases: &[LoopAlias]) -> 
         assignment.is_temporary(),
         assignment.span().clone(),
     )
+}
+
+fn rewrite_divert(divert: Divert, aliases: &[LoopAlias]) -> Divert {
+    let target = rewrite_divert_target(divert.target().clone(), aliases);
+    let arguments = divert
+        .arguments()
+        .iter()
+        .cloned()
+        .map(|argument| rewrite_expression(argument, aliases))
+        .collect();
+    let mut rewritten = if divert.has_argument_list() {
+        Divert::with_arguments(target, arguments, divert.span().clone())
+    } else {
+        Divert::new(target, divert.span().clone())
+    };
+    if divert.is_tunnel() {
+        rewritten = rewritten.with_tunnel();
+    }
+    if divert.is_thread() {
+        rewritten = rewritten.with_thread();
+    }
+    rewritten
+}
+
+fn rewrite_divert_target(target: DivertTarget, aliases: &[LoopAlias]) -> DivertTarget {
+    match target {
+        DivertTarget::Dynamic(expression) => {
+            DivertTarget::Dynamic(rewrite_expression(expression, aliases))
+        }
+        _ => target,
+    }
+}
+
+fn rewrite_return(ret: Return, aliases: &[LoopAlias]) -> Return {
+    Return::new(
+        ret.returned_expression()
+            .cloned()
+            .map(|expression| rewrite_expression(expression, aliases)),
+        ret.span().clone(),
+    )
+}
+
+fn rewrite_tunnel_onwards(tunnel_onwards: TunnelOnwards, aliases: &[LoopAlias]) -> TunnelOnwards {
+    let override_target = tunnel_onwards
+        .override_target()
+        .cloned()
+        .map(|target| rewrite_divert_target(target, aliases));
+    let arguments = tunnel_onwards
+        .arguments()
+        .iter()
+        .cloned()
+        .map(|argument| rewrite_expression(argument, aliases))
+        .collect();
+    TunnelOnwards::with_arguments(override_target, arguments, tunnel_onwards.span().clone())
 }
 
 fn rewrite_inc_dec(inc_dec: IncDec, aliases: &[LoopAlias]) -> IncDec {

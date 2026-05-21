@@ -163,6 +163,89 @@ fn square_brackets_in_choice_text_are_literal() {
 }
 
 #[test]
+fn dynamic_choices_expand_from_arrays_and_mix_with_static_choices() {
+    let compiled = compile_fixture("choices/dynamic-choice.ink");
+    let mut story = Story::new(&compiled.json);
+
+    assert_eq!(story.continue_maximally(), "");
+    let choices = story.get_current_choices();
+    assert_eq!(choices.len(), 4);
+    assert_eq!(choices[0].text, "Fixed first");
+    assert_eq!(choices[1].text, "0:Alpha");
+    assert_eq!(choices[2].text, "2:Beta");
+    assert_eq!(choices[3].text, "Fixed last");
+    story.choose_choice_index(2);
+    assert_eq!(story.continue_maximally(), "picked 2:Beta.\n");
+}
+
+#[test]
+fn dynamic_choice_threads_survive_save_load() {
+    let compiled = compile_fixture("choices/dynamic-choice.ink");
+    let mut story = Story::new(&compiled.json);
+
+    assert_eq!(story.continue_maximally(), "");
+    let save_string = story.save_state();
+    let save: serde_json::Value = serde_json::from_str(&save_string).expect("valid save JSON");
+    assert!(save.get("choiceThreads").is_some());
+
+    let mut reloaded = Story::new(&compiled.json);
+    reloaded.load_state(&save_string);
+    let choices = reloaded.get_current_choices();
+    assert_eq!(choices.len(), 4);
+    assert_eq!(choices[2].text, "2:Beta");
+    reloaded.choose_choice_index(2);
+    assert_eq!(reloaded.continue_maximally(), "picked 2:Beta.\n");
+}
+
+#[test]
+fn dynamic_choices_can_nest_and_capture_outer_bindings() {
+    let compiled = compile_fixture("choices/dynamic-choice-nested.ink");
+    let mut story = Story::new(&compiled.json);
+
+    assert_eq!(story.continue_maximally(), "");
+    assert_eq!(story.get_current_choices().len(), 1);
+    assert_eq!(story.get_current_choices()[0].text, "Topic menu");
+    story.choose_choice_index(0);
+    assert_eq!(story.continue_maximally(), "");
+
+    let topic_choices = story.get_current_choices();
+    assert_eq!(topic_choices.len(), 2);
+    assert_eq!(topic_choices[0].text, "Topic 0:East");
+    assert_eq!(topic_choices[1].text, "Topic 1:West");
+    story.choose_choice_index(1);
+    assert_eq!(story.continue_maximally(), "topic West.\n");
+
+    let detail_choices = story.get_current_choices();
+    assert_eq!(detail_choices.len(), 1);
+    assert_eq!(detail_choices[0].text, "Detail West-W1");
+    story.choose_choice_index(0);
+    assert_eq!(story.continue_maximally(), "detail West:W1.\n");
+}
+
+#[test]
+fn dynamic_choice_bindings_are_visible_inside_for_blocks() {
+    let compiled = compile_fixture("choices/dynamic-choice-for-body.ink");
+    let mut story = Story::new(&compiled.json);
+
+    assert_eq!(story.continue_maximally(), "");
+    let choices = story.get_current_choices();
+    assert_eq!(choices.len(), 2);
+    assert_eq!(choices[0].text, "Group 0");
+    assert_eq!(choices[1].text, "Group 1");
+    story.choose_choice_index(0);
+    assert_eq!(story.continue_maximally(), "Item A.\nItem B.\n");
+}
+
+#[test]
+fn empty_dynamic_choice_allows_invisible_fallback() {
+    let compiled = compile_fixture("choices/dynamic-choice-empty-fallback.ink");
+    let mut story = Story::new(&compiled.json);
+
+    assert_eq!(story.continue_maximally(), "Empty fallback.\n");
+    assert!(story.get_current_choices().is_empty());
+}
+
+#[test]
 fn star_choices_are_repeatable() {
     let compiled = compile_fixture("choices/repeatable-choices.ink");
     let mut story = Story::new(&compiled.json);

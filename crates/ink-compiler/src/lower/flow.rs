@@ -285,6 +285,14 @@ fn collect_local_variables_in_object(object: &Object, local_variables: &mut Hash
             collect_local_variables_in_weave(for_loop.body(), local_variables);
         }
         Object::Choice(choice) => {
+            if let Some(binding) = choice.dynamic_binding() {
+                local_variables.insert(binding.array_name().to_string());
+                local_variables.insert(binding.index_name().to_string());
+                local_variables.insert(binding.limit_name().to_string());
+                for variable in binding.variables() {
+                    local_variables.insert(variable.runtime_name().to_string());
+                }
+            }
             if let Some(content) = choice.start_content() {
                 collect_local_variables_in_content_list(content, local_variables);
             }
@@ -403,6 +411,42 @@ fn collect_loop_variable_types_in_object(
                 local_variable_types,
             );
         }
+        Object::Choice(choice) => {
+            if let Some(binding) = choice.dynamic_binding() {
+                if let Some(iterable_type) = infer_dynamic_choice_iterable_type(
+                    binding.iterable(),
+                    flow_name,
+                    module_name,
+                    source_flow_path,
+                    indexes,
+                    local_variable_types,
+                ) {
+                    insert_dynamic_choice_variable_types(
+                        binding,
+                        &iterable_type,
+                        local_variable_types,
+                    );
+                }
+            }
+            if let Some(content) = choice.start_content() {
+                collect_loop_variable_types_in_content_list(
+                    content,
+                    flow_name,
+                    module_name,
+                    source_flow_path,
+                    indexes,
+                    local_variable_types,
+                );
+            }
+            collect_loop_variable_types_in_content_list(
+                choice.inner_content(),
+                flow_name,
+                module_name,
+                source_flow_path,
+                indexes,
+                local_variable_types,
+            );
+        }
         Object::ContentList(content_list) => collect_loop_variable_types_in_content_list(
             content_list,
             flow_name,
@@ -422,26 +466,6 @@ fn collect_loop_variable_types_in_object(
                     local_variable_types,
                 );
             }
-        }
-        Object::Choice(choice) => {
-            if let Some(content) = choice.start_content() {
-                collect_loop_variable_types_in_content_list(
-                    content,
-                    flow_name,
-                    module_name,
-                    source_flow_path,
-                    indexes,
-                    local_variable_types,
-                );
-            }
-            collect_loop_variable_types_in_content_list(
-                choice.inner_content(),
-                flow_name,
-                module_name,
-                source_flow_path,
-                indexes,
-                local_variable_types,
-            );
         }
         Object::Weave(weave) => collect_loop_variable_types_in_weave(
             weave,
@@ -493,6 +517,44 @@ fn infer_loop_iterable_type(
     infer_lowered_expression_type(for_loop.iterable(), &context)
 }
 
+fn infer_dynamic_choice_iterable_type(
+    iterable: &crate::parsed::Expression,
+    flow_name: &str,
+    module_name: Option<&str>,
+    source_flow_path: &str,
+    indexes: &LoweringIndexes<'_>,
+    local_variable_types: &HashMap<String, TypeName>,
+) -> Option<TypeName> {
+    let local_variables = local_variable_types.keys().cloned().collect::<HashSet<_>>();
+    let path_mode = ChoicePathMode::Flow {
+        module_name: module_name.map(str::to_string),
+        flow_name: flow_name.to_string(),
+        container_path: source_flow_path.to_string(),
+        parent_flow_name: source_flow_path
+            .rsplit_once('.')
+            .map(|(parent, _)| parent.to_string()),
+        sibling_stitch_names: Vec::new(),
+        local_variables,
+        local_variable_types: local_variable_types.clone(),
+        self_target_relative: false,
+        fallback_gather_target: None,
+    };
+    let choice_labels = LabelIndex::new();
+    let context = LoweringContext::new(
+        path_mode,
+        &choice_labels,
+        &indexes.global_labels,
+        &indexes.global_variables,
+        &indexes.global_variable_types,
+        &indexes.external_signatures,
+        &indexes.interface_members,
+        &indexes.constants,
+        &indexes.struct_definitions,
+        &indexes.enum_definitions,
+    );
+    infer_lowered_expression_type(iterable, &context)
+}
+
 fn insert_loop_variable_types(
     for_loop: &crate::parsed::ForLoop,
     iterable_type: &TypeName,
@@ -525,6 +587,30 @@ fn insert_loop_variable_types(
                 .insert(key.runtime_name().to_string(), dict_key_type_name(key_type));
             local_variable_types.insert(value.runtime_name().to_string(), value_type.clone());
         }
+    }
+}
+
+fn insert_dynamic_choice_variable_types(
+    binding: &crate::parsed::DynamicChoiceBinding,
+    iterable_type: &TypeName,
+    local_variable_types: &mut HashMap<String, TypeName>,
+) {
+    local_variable_types.insert(binding.array_name().to_string(), iterable_type.clone());
+    local_variable_types.insert(binding.index_name().to_string(), TypeName::int());
+    local_variable_types.insert(binding.limit_name().to_string(), TypeName::int());
+
+    let Some(element_type) = iterable_type.array_element_type() else {
+        return;
+    };
+    match binding.variables() {
+        [item] => {
+            local_variable_types.insert(item.runtime_name().to_string(), element_type.clone());
+        }
+        [index, item] => {
+            local_variable_types.insert(index.runtime_name().to_string(), TypeName::int());
+            local_variable_types.insert(item.runtime_name().to_string(), element_type.clone());
+        }
+        _ => {}
     }
 }
 

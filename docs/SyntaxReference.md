@@ -165,7 +165,9 @@ This produces the following game:
 	> 1
 	Nice to hear from you!
 
-Square brackets in choice lines are ordinary text characters. A choice such as `* Ask [again]` displays as `Ask [again]`.
+Square brackets in choice lines are ordinary text characters except for the
+dynamic-choice prefix described in [Varying Choices](#7-varying-choices). A
+choice such as `* Ask [again]` displays as `Ask [again]`.
 
 This is most useful when writing dialogue choices:
 
@@ -668,6 +670,54 @@ Fallback choices can repeat too.
 		*	Talk about the children -> chat_children
 		*	-> sit_in_silence_again
 
+### Dynamic Choices From Arrays
+
+A choice can expand at runtime from an array by putting a binding prefix
+immediately after the `*` marker:
+
+	VAR options: string[] = ["Alpha", "Hidden", "Beta"]
+	VAR enabled: bool[] = [true, false, true]
+
+	== main ==
+		* Fixed first
+			You picked the fixed first option.
+			-> DONE
+		* [i, option in options] {enabled[i]}: {i}: {option}
+			You picked {i}: {option}.
+			-> DONE
+		* Fixed last
+			You picked the fixed last option.
+			-> DONE
+
+The binding can name only the item, as in `[option in options]`, or both the
+zero-based index and item, as in `[i, option in options]`. The expression after
+`in` must have an array type. The array expression is evaluated once before
+choices are generated; each generated choice then receives its own index and
+item values.
+
+Dynamic choices behave like ordinary choices after expansion. They may use any
+choice depth marker such as `*`, `**`, or `***`; they may mix with static
+choices; conditions filter individual generated choices; fallback choices still
+run if no visible choices remain; and generated choices save/load with their
+captured runtime state.
+
+The dynamic variables are visible in the choice condition, displayed choice
+text, selected-choice body, tags, and nested choices:
+
+	VAR topics: string[] = ["East", "West"]
+	VAR details: string[][] = [["E1", "E2"], ["W1"]]
+
+	== main ==
+		* Topic menu
+			** [i, topic in topics] Topic {i}: {topic}
+				*** [detail in details[i]] Detail {topic}: {detail}
+					You picked {topic}: {detail}.
+					-> DONE
+
+Static choices and gathers can still use `(label)` labels. Dynamic choices do
+not support labels; use item data, explicit state, or gather labels when a
+generated option needs an addressable outcome.
+
 ### Conditional Choices
 
 You can also turn choices on and off by hand. Conditions are still supported and should be based on explicit variables or typed expressions.
@@ -1072,13 +1122,14 @@ But should we want to remember what the player has seen, we can - we add in labe
 
 ### Gathers and options can be labelled
 
-Gather points at any nested level can be labelled using brackets.
+Gather points at any nested level can be labelled using parentheses.
 
 	-  (top)
 
 Once labelled, gather points can be diverted to, or tested for in conditionals, just like knots and stitches. This means you can use previous decisions to alter later outcomes inside the weave, while still keeping all the advantages of a clear, reliable forward-flow.
 
-Options can also be labelled, just like gather points, using brackets. Label brackets come before conditions in the line.
+Options can also be labelled, just like gather points, using parentheses.
+Labels come before conditions in the line.
 
 These addresses can be used in conditional tests, which can be useful for creating options unlocked by other options.
 
@@ -1126,7 +1177,7 @@ or pointing into another knot:
 
 #### Advanced: all options can be labelled
 
-In truth, all content in ink is a weave, even if there are no gathers in sight. That means you can label *any* option in the game with a bracket label, and then reference it using the addressing syntax. In particular, this means you can test *which* option a player took to reach a particular outcome.
+In truth, all content in ink is a weave, even if there are no gathers in sight. That means you can label *any* static option in the game with a parenthesized label, and then reference it using the addressing syntax. In particular, this means you can test *which* option a player took to reach a particular outcome.
 
 	== fight_guard ==
 	...
@@ -1733,8 +1784,9 @@ subset applies recursively inside nested branches and loops.
 Choices, threads, diverts, tunnels, tunnel onwards, gathers, flow
 declarations, `~ return`, global `VAR`, `CONST`, `ENUM`, `STRUCT`,
 `EXTERNAL`, tags, and author warnings are not supported inside `for` blocks.
+Use dynamic choices when an array should produce a runtime number of choices.
 Use an ordinary knot/function helper when iteration needs arbitrary flow
-control or generated choices.
+control beyond the supported block subset.
 
 Array loops fix `LEN(array)` once before the loop starts. Each iteration still
 reads `array[index]`. Dict loops fix `DICT_KEYS(dict)` once before the loop
@@ -2579,95 +2631,57 @@ A game which uses ink as a script rather than a literal output might often gener
 
 #### Example: generating choices from an array
 
-Threads can also generate a runtime number of choices from data. There is no
-source-level `for` loop that expands an array into `*` lines, but a recursive
-thread can walk an array and offer one choice for each enabled element.
-
-The choice behavior still needs to live in authored knots or stitches. Store
-those targets in the data as `->` values, then use an explicit dynamic divert
-when a generated choice is selected.
+Use dynamic choices when an array should produce a runtime number of choices.
+The dynamic binding goes immediately after the choice marker and the generated
+choices behave like ordinary choices.
 
 ```
 === module game ===
 
 STRUCT ChoiceOption {
 	text: string
-	target: ->
 	enabled: bool
 }
 
 VAR options: ChoiceOption[] = [
-	{
+	%ChoiceOption{
 		text: "A",
-		target: -> a,
 		enabled: true
 	},
-	{
+	%ChoiceOption{
 		text: "B",
-		target: -> b,
 		enabled: true
 	},
-	{
+	%ChoiceOption{
 		text: "C",
-		target: -> c,
 		enabled: false
 	},
-	{
+	%ChoiceOption{
 		text: "D",
-		target: -> d,
 		enabled: true
 	}
 ]
 
 == main ==
-<- emit_options(LEN(options) - 1)
--> DONE
-
-== emit_options(i: int) ==
-{ if i >= 0:
-	<- emit_options(i - 1)
-
-	~ temp option: ChoiceOption = options[i]
-	* {option.enabled}: {option.text}
-		-> {option.target}
-}
--> DONE
-
-== a ==
-A chosen.
--> END
-
-== b ==
-B chosen.
--> END
-
-== c ==
-C chosen.
--> END
-
-== d ==
-D chosen.
--> END
+* [i, option in options] {option.enabled}: {option.text}
+	Choice {i}: {option.text}.
+	-> DONE
+* ->
+	No options remain.
+	-> DONE
 ```
 
 This presents `A`, `B`, and `D`; `C` is skipped because its `enabled` field is
 false.
 
-The helper starts at `LEN(options) - 1` so the displayed choices keep array
-order. A thread runs the forked content first, then returns to the current fork,
-so each layer first asks the previous index to generate its choices and then
-generates its own.
+The array expression is evaluated once before expansion. Each generated choice
+captures its own `i` and `option` values in the normal choice thread, so pending
+choices can be saved and loaded without regenerating the list.
 
-The local `option` temp is deliberate. A generated choice captures the thread at
-the time the choice was created, so copying `options[i]` before the `*` line
-keeps the displayed text and selected target together. Without that temp, later
-changes to shared global data can make a pending generated choice run with data
-that contradicts what the player saw.
-
-The colon after `{option.enabled}` is also deliberate. At the beginning of a
-choice line, braced expressions are parsed as choice conditions. The colon ends
-the condition prefix, so the following `{option.text}` is parsed as dynamic
-choice text instead of another condition.
+The colon after `{option.enabled}` is deliberate. At the beginning of a choice
+line, braced expressions are parsed as choice conditions. The colon ends the
+condition prefix, so the following `{option.text}` is parsed as dynamic choice
+text instead of another condition.
 
 # Part 5: International character support in identifiers
 

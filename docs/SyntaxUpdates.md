@@ -49,6 +49,42 @@ Each entry should include:
   compiler lowering, and typed integration tests cover the new native token and
   runtime output for primitive and composite values.
 
+## 2026-05-22: Dynamic Array Choices
+
+- status: supported
+- upstream behavior: upstream Ink does not have a built-in source form that
+  expands one `*` choice line into a runtime number of choices from typed array
+  data.
+- ink-rs behavior: a choice marker may be followed by a dynamic binding prefix:
+  `* [item in items] Text {item}` or
+  `* [index, item in items] {condition}: {index}:{item}`. The iterable must be
+  an array expression. The array is evaluated and stored once before expansion;
+  each element then emits an ordinary runtime `ChoicePoint` with per-choice
+  thread state, so save/load preserves already generated dynamic choices.
+  Binding variables are visible in the choice condition, displayed choice text,
+  selected-choice body, tags, and nested choices. Dynamic choices may use any
+  choice depth marker such as `*`, `**`, or `***`, and may mix with authored
+  static choices. Static choice labels are unchanged, but dynamic choices do
+  not support labels.
+- documentation effect: `SyntaxReference.md` documents dynamic array choices
+  as the current data-driven choice syntax, keeps square brackets literal
+  except for the exact dynamic-choice prefix position, and removes the old
+  thread workaround as the recommended approach. `LanguageOverview.md`
+  mentions dynamic choices next to current flow syntax.
+- rationale: data-driven choice counts are a common host and game-state need.
+  Lowering dynamic choices to an explicit runtime loop around ordinary
+  `ChoicePoint`s keeps save-state behavior and fallthrough semantics aligned
+  with existing choices while avoiding source-level `for` restrictions.
+- migration guidance: replace recursive thread helpers that only walk an array
+  to offer choices with a dynamic choice line. Keep threads or helper knots for
+  genuinely parallel flow, cross-location choice collection, or non-array
+  control flow.
+- tests: choice integration fixtures cover mixed static/dynamic choices,
+  conditional filtering, index/value bindings, nested dynamic choices that
+  capture outer variables, empty arrays with fallback choices, and save/load of
+  generated dynamic choices. Diagnostics fixtures reject dynamic labels and
+  non-array iterables.
+
 ## 2026-05-21: Array And Dict For Control Blocks
 
 - status: supported

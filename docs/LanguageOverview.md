@@ -137,10 +137,15 @@ Typed arrays and Dicts can use multiline source-level `for` blocks:
 `{ for key, value in scores: ... }`. Nested `for` blocks are supported, but
 choices and diverts stay outside `for` bodies.
 
+Array-backed choices use a dynamic choice prefix after the choice marker:
+`* [item in items] Text {item}` or
+`* [index, item in items] {enabled[index]}: {item}`. The generated options
+behave like ordinary choices and save/load with their captured choice state.
+
 ```ink
 == main ==
 ~ temp visits: int = 0
-* [Look around]
+* Look around
   ~ visits += 1
   The room is quiet.
   -> END
