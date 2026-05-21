@@ -3,11 +3,28 @@
 ENUM ActionMode { Reveal Flag }
 ENUM GameState { Playing Dead Won }
 
-VAR width: int = 5
-VAR height: int = 5
-VAR mine_count: int = 3
-VAR safe_count: int = 22
-VAR mines: bool[] = [
+STRUCT NeighborOffset {
+dr: int
+dc: int
+}
+
+CONST width: int = 5
+CONST height: int = 5
+CONST mine_count: int = 3
+CONST safe_count: int = 22
+CONST row_indices: int[] = [0, 1, 2, 3, 4]
+CONST columns: int[] = [0, 1, 2, 3, 4]
+CONST neighbor_offsets: NeighborOffset[] = [
+    %NeighborOffset{ dr: -1, dc: -1 },
+    %NeighborOffset{ dr: -1, dc: 0 },
+    %NeighborOffset{ dr: -1, dc: 1 },
+    %NeighborOffset{ dr: 0, dc: -1 },
+    %NeighborOffset{ dr: 0, dc: 1 },
+    %NeighborOffset{ dr: 1, dc: -1 },
+    %NeighborOffset{ dr: 1, dc: 0 },
+    %NeighborOffset{ dr: 1, dc: 1 }
+]
+CONST mines: bool[] = [
     false, false, false, false, false,
     false, true, false, false, false,
     false, false, false, true, false,
@@ -41,11 +58,9 @@ Text minesweeper 5x5.
 Mode: {mode_label(mode)}
 Mines: {mine_count}
     A B C D E
-1 {row_cells(0, 0, "")}
-2 {row_cells(1, 0, "")}
-3 {row_cells(2, 0, "")}
-4 {row_cells(3, 0, "")}
-5 {row_cells(4, 0, "")}
+{ for row in row_indices:
+{row_label(row)} {row_cells(row)}
+}
 Moves: {moves}
 {last_message}
 { if state != GameState.Playing:
@@ -174,33 +189,31 @@ Moves: {moves}
 
 == function check_win() => void ==
 { if state == GameState.Playing:
-    { if revealed_safe_count(0) >= safe_count:
+    { if revealed_safe_count() >= safe_count:
         ~ state = GameState.Won
         ~ last_message = last_message + " All safe cells are clear."
     }
 }
 
-== function revealed_safe_count(index: int) => int ==
-{ if index >= LEN(revealed):
-    ~ return 0
-- else:
-    { if revealed[index] && !mines[index]:
-        ~ return 1 + revealed_safe_count(index + 1)
-    - else:
-        ~ return revealed_safe_count(index + 1)
+== function revealed_safe_count() => int ==
+~ temp count: int = 0
+{ for index, is_revealed in revealed:
+    { if is_revealed && !mines[index]:
+        ~ count += 1
     }
 }
+~ return count
 
-== function row_cells(row: int, col: int, text: string) => string ==
-{ if col >= width:
-    ~ return text
-- else:
-    { if col == width - 1:
-        ~ return row_cells(row, col + 1, text + cell_char(row, col))
+== function row_cells(row: int) => string ==
+~ temp text: string = ""
+{ for col in columns:
+    { if col == 0:
+        ~ text = cell_char(row, col)
     - else:
-        ~ return row_cells(row, col + 1, text + cell_char(row, col) + " ")
+        ~ text = text + " " + cell_char(row, col)
     }
 }
+~ return text
 
 == function cell_char(row: int, col: int) => string ==
 ~ temp index: int = cell_index(row, col)
@@ -241,7 +254,11 @@ Moves: {moves}
 }
 
 == function adjacent_mines(row: int, col: int) => int ==
-~ return mine_at(row - 1, col - 1) + mine_at(row - 1, col) + mine_at(row - 1, col + 1) + mine_at(row, col - 1) + mine_at(row, col + 1) + mine_at(row + 1, col - 1) + mine_at(row + 1, col) + mine_at(row + 1, col + 1)
+~ temp count: int = 0
+{ for offset in neighbor_offsets:
+    ~ count += mine_at(row + offset.dr, col + offset.dc)
+}
+~ return count
 
 == function mine_at(row: int, col: int) => int ==
 { if row < 0 || row >= height || col < 0 || col >= width:

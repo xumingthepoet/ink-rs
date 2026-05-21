@@ -3,15 +3,79 @@
 ENUM Direction { Up Down Left Right }
 ENUM GameState { Playing Failed Won }
 
-VAR tiles: int[] = [
+STRUCT Line {
+i0: int
+i1: int
+i2: int
+i3: int
+}
+
+STRUCT Pair {
+left: int
+right: int
+}
+
+CONST initial_tiles: int[] = [
     2, 4, 8, 16,
     32, 64, 128, 256,
     512, 1024, 2, 4,
     8, 16, 32, 0
 ]
+CONST row_starts: int[] = [0, 4, 8, 12]
+CONST left_lines: Line[] = [
+    %Line{ i0: 0, i1: 1, i2: 2, i3: 3 },
+    %Line{ i0: 4, i1: 5, i2: 6, i3: 7 },
+    %Line{ i0: 8, i1: 9, i2: 10, i3: 11 },
+    %Line{ i0: 12, i1: 13, i2: 14, i3: 15 }
+]
+CONST right_lines: Line[] = [
+    %Line{ i0: 3, i1: 2, i2: 1, i3: 0 },
+    %Line{ i0: 7, i1: 6, i2: 5, i3: 4 },
+    %Line{ i0: 11, i1: 10, i2: 9, i3: 8 },
+    %Line{ i0: 15, i1: 14, i2: 13, i3: 12 }
+]
+CONST up_lines: Line[] = [
+    %Line{ i0: 0, i1: 4, i2: 8, i3: 12 },
+    %Line{ i0: 1, i1: 5, i2: 9, i3: 13 },
+    %Line{ i0: 2, i1: 6, i2: 10, i3: 14 },
+    %Line{ i0: 3, i1: 7, i2: 11, i3: 15 }
+]
+CONST down_lines: Line[] = [
+    %Line{ i0: 12, i1: 8, i2: 4, i3: 0 },
+    %Line{ i0: 13, i1: 9, i2: 5, i3: 1 },
+    %Line{ i0: 14, i1: 10, i2: 6, i3: 2 },
+    %Line{ i0: 15, i1: 11, i2: 7, i3: 3 }
+]
+CONST merge_pairs: Pair[] = [
+    %Pair{ left: 0, right: 1 },
+    %Pair{ left: 1, right: 2 },
+    %Pair{ left: 2, right: 3 },
+    %Pair{ left: 4, right: 5 },
+    %Pair{ left: 5, right: 6 },
+    %Pair{ left: 6, right: 7 },
+    %Pair{ left: 8, right: 9 },
+    %Pair{ left: 9, right: 10 },
+    %Pair{ left: 10, right: 11 },
+    %Pair{ left: 12, right: 13 },
+    %Pair{ left: 13, right: 14 },
+    %Pair{ left: 14, right: 15 },
+    %Pair{ left: 0, right: 4 },
+    %Pair{ left: 4, right: 8 },
+    %Pair{ left: 8, right: 12 },
+    %Pair{ left: 1, right: 5 },
+    %Pair{ left: 5, right: 9 },
+    %Pair{ left: 9, right: 13 },
+    %Pair{ left: 2, right: 6 },
+    %Pair{ left: 6, right: 10 },
+    %Pair{ left: 10, right: 14 },
+    %Pair{ left: 3, right: 7 },
+    %Pair{ left: 7, right: 11 },
+    %Pair{ left: 11, right: 15 }
+]
+VAR tiles: int[] = initial_tiles
 VAR scratch: int[] = []
 VAR merged: int[] = []
-VAR spawn_values: int[] = [2, 4, 2, 2]
+CONST spawn_values: int[] = [2, 4, 2, 2]
 VAR spawn_cursor: int = 0
 VAR move_count: int = 0
 VAR score: int = 0
@@ -26,14 +90,10 @@ Text 2048 4x4.
 Move {move_count}
 Score: {score}
 |----|----|----|----|
-|{tile_label(tiles[0])}|{tile_label(tiles[1])}|{tile_label(tiles[2])}|{tile_label(tiles[3])}|
+{ for row_start in row_starts:
+|{tile_label(tiles[row_start])}|{tile_label(tiles[row_start + 1])}|{tile_label(tiles[row_start + 2])}|{tile_label(tiles[row_start + 3])}|
 |----|----|----|----|
-|{tile_label(tiles[4])}|{tile_label(tiles[5])}|{tile_label(tiles[6])}|{tile_label(tiles[7])}|
-|----|----|----|----|
-|{tile_label(tiles[8])}|{tile_label(tiles[9])}|{tile_label(tiles[10])}|{tile_label(tiles[11])}|
-|----|----|----|----|
-|{tile_label(tiles[12])}|{tile_label(tiles[13])}|{tile_label(tiles[14])}|{tile_label(tiles[15])}|
-|----|----|----|----|
+}
 {last_message}
 { if state != GameState.Playing:
     { if state == GameState.Won:
@@ -55,7 +115,7 @@ Score: {score}
 }
 
 == restart ==
-~ tiles = [2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2, 4, 8, 16, 32, 0]
+~ tiles = initial_tiles
 ~ scratch = []
 ~ merged = []
 ~ spawn_cursor = 0
@@ -70,13 +130,13 @@ Score: {score}
 ~ temp changed: bool = false
 { switch direction:
 - Direction.Left:
-    ~ changed = apply_lines_left()
+    ~ changed = apply_lines(left_lines)
 - Direction.Right:
-    ~ changed = apply_lines_right()
+    ~ changed = apply_lines(right_lines)
 - Direction.Up:
-    ~ changed = apply_lines_up()
+    ~ changed = apply_lines(up_lines)
 - else:
-    ~ changed = apply_lines_down()
+    ~ changed = apply_lines(down_lines)
 }
 { if changed:
     ~ spawn_first_empty(0)
@@ -87,36 +147,13 @@ Score: {score}
 ~ update_game_state()
 -> board_prompt
 
-== function apply_lines_left() => bool ==
+== function apply_lines(lines: Line[]) => bool ==
 ~ temp changed: bool = false
-~ changed = apply_line(0, 1, 2, 3) || changed
-~ changed = apply_line(4, 5, 6, 7) || changed
-~ changed = apply_line(8, 9, 10, 11) || changed
-~ changed = apply_line(12, 13, 14, 15) || changed
-~ return changed
-
-== function apply_lines_right() => bool ==
-~ temp changed: bool = false
-~ changed = apply_line(3, 2, 1, 0) || changed
-~ changed = apply_line(7, 6, 5, 4) || changed
-~ changed = apply_line(11, 10, 9, 8) || changed
-~ changed = apply_line(15, 14, 13, 12) || changed
-~ return changed
-
-== function apply_lines_up() => bool ==
-~ temp changed: bool = false
-~ changed = apply_line(0, 4, 8, 12) || changed
-~ changed = apply_line(1, 5, 9, 13) || changed
-~ changed = apply_line(2, 6, 10, 14) || changed
-~ changed = apply_line(3, 7, 11, 15) || changed
-~ return changed
-
-== function apply_lines_down() => bool ==
-~ temp changed: bool = false
-~ changed = apply_line(12, 8, 4, 0) || changed
-~ changed = apply_line(13, 9, 5, 1) || changed
-~ changed = apply_line(14, 10, 6, 2) || changed
-~ changed = apply_line(15, 11, 7, 3) || changed
+{ for line in lines:
+    { if apply_line(line.i0, line.i1, line.i2, line.i3):
+        ~ changed = true
+    }
+}
 ~ return changed
 
 == function apply_line(i0: int, i1: int, i2: int, i3: int) => bool ==
@@ -184,7 +221,7 @@ Score: {score}
 ~ return spawn_values[spawn_cursor]
 
 == function update_game_state() => void ==
-{ if has_tile_at_least(2048, 0):
+{ if has_tile_at_least(2048):
     ~ state = GameState.Won
 - else:
     { if !can_move():
@@ -194,38 +231,37 @@ Score: {score}
 }
 
 == function can_move() => bool ==
-~ return has_empty(0) || has_any_horizontal_merge() || has_any_vertical_merge()
+~ return has_empty() || has_any_merge()
 
-== function has_empty(index: int) => bool ==
-{ if index >= LEN(tiles):
-    ~ return false
-- else:
-    { if tiles[index] == 0:
-        ~ return true
-    - else:
-        ~ return has_empty(index + 1)
+== function has_empty() => bool ==
+~ temp found: bool = false
+{ for tile in tiles:
+    { if tile == 0:
+        ~ found = true
     }
 }
+~ return found
 
-== function has_any_horizontal_merge() => bool ==
-~ return same_nonzero(0, 1) || same_nonzero(1, 2) || same_nonzero(2, 3) || same_nonzero(4, 5) || same_nonzero(5, 6) || same_nonzero(6, 7) || same_nonzero(8, 9) || same_nonzero(9, 10) || same_nonzero(10, 11) || same_nonzero(12, 13) || same_nonzero(13, 14) || same_nonzero(14, 15)
-
-== function has_any_vertical_merge() => bool ==
-~ return same_nonzero(0, 4) || same_nonzero(4, 8) || same_nonzero(8, 12) || same_nonzero(1, 5) || same_nonzero(5, 9) || same_nonzero(9, 13) || same_nonzero(2, 6) || same_nonzero(6, 10) || same_nonzero(10, 14) || same_nonzero(3, 7) || same_nonzero(7, 11) || same_nonzero(11, 15)
+== function has_any_merge() => bool ==
+~ temp found: bool = false
+{ for pair in merge_pairs:
+    { if same_nonzero(pair.left, pair.right):
+        ~ found = true
+    }
+}
+~ return found
 
 == function same_nonzero(left: int, right: int) => bool ==
 ~ return tiles[left] != 0 && tiles[left] == tiles[right]
 
-== function has_tile_at_least(target: int, index: int) => bool ==
-{ if index >= LEN(tiles):
-    ~ return false
-- else:
-    { if tiles[index] >= target:
-        ~ return true
-    - else:
-        ~ return has_tile_at_least(target, index + 1)
+== function has_tile_at_least(target: int) => bool ==
+~ temp found: bool = false
+{ for tile in tiles:
+    { if tile >= target:
+        ~ found = true
     }
 }
+~ return found
 
 == function tile_label(value: int) => string ==
 { switch value:

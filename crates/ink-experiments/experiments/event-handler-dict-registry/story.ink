@@ -78,20 +78,11 @@ VAR one_shot: Dict<int, bool> = %{}
 }
 
 == print_registry ==
-~ temp event_ids: int[] = DICT_KEYS(handlers)
 Registry has {DICT_SIZE(handlers)} active handlers.
--> print_registry_ids(event_ids, 0) ->
-->->
-
-== print_registry_ids(event_ids: int[], index: int) ==
-{ if index >= LEN(event_ids):
-    ->->
-- else:
-    ~ temp event_id: int = event_ids[index]
-    ~ temp handler: interface<IEventHandler> = handlers[event_id]
+{ for event_id, handler in handlers:
     Handler {event_id}: {{handler}::label()}
-    -> print_registry_ids(event_ids, index + 1)
 }
+->->
 
 === module heal_event implements IEventHandler ===
 == function label() => string ==
