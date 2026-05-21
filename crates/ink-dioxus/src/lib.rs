@@ -1,8 +1,8 @@
 //! Reusable Dioxus-facing application layer for ink-rs games.
 //!
 //! Game crates provide Ink source files as [`InkSource`] values. This crate
-//! compiles those sources through `ink-rs`, runs the story, interprets shared
-//! UI tags, and exposes a Dioxus web shell behind the `web` feature.
+//! compiles those sources, runs the story, interprets shared UI tags, and
+//! exposes a Dioxus web shell behind the `web` feature.
 
 pub mod app;
 #[cfg(not(target_arch = "wasm32"))]

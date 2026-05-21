@@ -35,7 +35,7 @@ ink-compiler ----------+
                        |
 ink-runtime -----------+
 
-ink-dioxus -> ink-rs facade -> ink-compiler + ink-runtime
+ink-dioxus -> ink-compiler + ink-runtime + ink-story-json-format
 ink-test  -> ink-compiler + ink-runtime
 ink-tools -> ink-compiler
 ```

@@ -1,4 +1,5 @@
-use ink_rs::{Compiler, CompilerOptions, DiagnosticsPolicy, SourceInput, Story, ValueType};
+use ink_compiler::{format_diagnostics, Compiler, CompilerOptions, DiagnosticsPolicy, SourceInput};
+use ink_runtime::{story::Story, value_type::ValueType};
 use std::{error::Error, fmt};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -138,14 +139,10 @@ impl InkRuntime {
         });
         let result = compiler.compile_sources(inputs);
         if result.failed() {
-            return Err(InkError::Compile(ink_rs::format_diagnostics(
-                &result.diagnostics,
-            )));
+            return Err(InkError::Compile(format_diagnostics(&result.diagnostics)));
         }
         let Some(compiled) = result.artifact else {
-            return Err(InkError::Compile(ink_rs::format_diagnostics(
-                &result.diagnostics,
-            )));
+            return Err(InkError::Compile(format_diagnostics(&result.diagnostics)));
         };
 
         let story = Story::new(&compiled.json).map_err(|error| {
