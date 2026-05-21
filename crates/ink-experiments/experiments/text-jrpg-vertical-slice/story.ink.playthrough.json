@@ -15,22 +15,32 @@
     "choose": 0
   },
   {
-    "output": "Village shop stock.\nGold: 10\nPotion price 6 owned 1\nAntidote price 8 owned 0\nMine Charm price 10 owned 0\n",
+    "output": "Village shop stock.\nGold: 10\nPotion price 6 owned 1\nAntidote price 8 owned 0\nMine Charm locked by forest clear\n",
     "choices": ["Buy Potion"],
     "choose": 0
   },
   {
     "output": "Bought Potion for 6 gold.\nGold now 4.\nInventory: Potion x2.\n",
+    "choices": ["Try Antidote"],
+    "choose": 0
+  },
+  {
+    "output": "Could not buy Antidote; need 8 gold.\nGold now 4.\n",
     "choices": ["Try Mine Charm"],
     "choose": 0
   },
   {
-    "output": "Could not buy Mine Charm; need 10 gold.\nGold now 4.\n",
+    "output": "Mine Charm is not stocked yet.\nGold now 4.\n",
     "choices": ["Use save shrine"],
     "choose": 0
   },
   {
-    "output": "Save written at Brindle Village.\nSaved party: Lio HP 20/20 MP 6.\nFlags: main accepted, side accepted, saved.\n",
+    "output": "Save written at Brindle Village.\nSaved party: Lio HP 20 MP 6.\nFlags: main accepted, side accepted, saved.\n",
+    "choices": ["Stress load checkpoint"],
+    "choose": 0
+  },
+  {
+    "output": "Temporary state before load: gold 7, party Lio HP 16/20 MP 6.\nCheckpoint loaded at Brindle Village.\nLoaded party: Lio HP 20/20 MP 6.\nState after load: gold 4, party Lio HP 20/20 MP 6.\n",
     "choices": ["Recruit Ren"],
     "choose": 0
   },
@@ -90,22 +100,22 @@
     "choose": 0
   },
   {
-    "output": "Location: Old Mine.\nMine battle begins: Cave Imp and Mine Warden.\nTurn 1\nParty: Lio HP 20/20 MP 6, Ren HP 24/24 MP 2\nEnemies: imp 6, warden 10\nPoison turns: 0\n",
+    "output": "Location: Old Mine.\nMine battle begins: Mine Warden patrol.\nTurn 1\nParty: Lio HP 20/20 MP 6, Ren HP 24/24 MP 2\nEnemies: Cave Imp 6, Mine Warden 10\nPoison turns: 0\n",
     "choices": ["Hero Spark", "Use Potion", "Ren Guard", "Hero Strike"],
     "choose": 0
   },
   {
-    "output": "Skill Spark dispatches to spark effect.\nSpark hits enemy slot 2.\nLio spends 2 MP; the warden is poisoned.\nMine Warden strikes Lio for 3 damage.\nPoison ticks on the warden for 2.\nTurn 2\nParty: Lio HP 17/20 MP 4, Ren HP 24/24 MP 2\nEnemies: imp 6, warden 4\nPoison turns: 1\n",
+    "output": "Skill Spark dispatches to spark effect.\nSpark hits enemy slot 2.\nLio spends 2 MP; the warden is poisoned.\nMine Warden strikes Lio for 3 damage.\nPoison ticks on the warden for 2.\nTurn 2\nParty: Lio HP 17/20 MP 4, Ren HP 24/24 MP 2\nEnemies: Cave Imp 6, Mine Warden 4\nPoison turns: 1\n",
     "choices": ["Hero Spark", "Use Potion", "Ren Guard", "Hero Strike"],
     "choose": 1
   },
   {
-    "output": "Lio drinks a potion.\nMine Warden strikes Lio for 3 damage.\nPoison ticks on the warden for 2.\nTurn 3\nParty: Lio HP 17/20 MP 4, Ren HP 24/24 MP 2\nEnemies: imp 6, warden 2\nPoison turns: 0\n",
+    "output": "Lio drinks a potion.\nMine Warden strikes Lio for 3 damage.\nPoison ticks on the warden for 2.\nTurn 3\nParty: Lio HP 17/20 MP 4, Ren HP 24/24 MP 2\nEnemies: Cave Imp 6, Mine Warden 2\nPoison turns: 0\n",
     "choices": ["Hero Spark", "Use Potion", "Ren Guard", "Hero Strike"],
     "choose": 2
   },
   {
-    "output": "Skill Guard dispatches to guard effect.\nGuard raises actor 2's shield.\nRen guards the line.\nMine Warden attacks into Ren's guard for 1 damage.\nNo status tick.\nTurn 4\nParty: Lio HP 16/20 MP 4, Ren HP 24/24 MP 2\nEnemies: imp 6, warden 2\nPoison turns: 0\n",
+    "output": "Skill Guard dispatches to guard effect.\nGuard raises actor 2's shield.\nRen guards the line.\nMine Warden attacks into Ren's guard for 1 damage.\nNo status tick.\nTurn 4\nParty: Lio HP 16/20 MP 4, Ren HP 24/24 MP 2\nEnemies: Cave Imp 6, Mine Warden 2\nPoison turns: 0\n",
     "choices": ["Hero Spark", "Use Potion", "Ren Guard", "Hero Strike"],
     "choose": 3
   },
@@ -120,7 +130,7 @@
     "choose": 0
   },
   {
-    "output": "Elder Mara marks the caravan rescued and closes the village ledger.\nApothecary Senn trades the moonleaf for the promised cure.\nQuest log: Missing Caravan=complete, Moonleaf Remedy=complete.\nFlags: main accepted, side accepted, Ren joined, Ren scouting, Ren rejoined, moonleaf, saved, forest clear, gate open, mine won, mine loot, caravan, main complete, side complete.\nCheckpoint: Brindle Village; gold 4; potions 2; moonleaf 0.\nSaved quests: Missing Caravan=active, Moonleaf Remedy=active.\nSaved flags: main accepted, side accepted.\nJRPG slice complete.\n",
+    "output": "Elder Mara marks the caravan rescued and closes the village ledger.\nApothecary Senn trades the moonleaf for the promised cure.\nQuest log: Missing Caravan=complete, Moonleaf Remedy=complete.\nFlags: main accepted, side accepted, Ren joined, Ren scouting, Ren rejoined, moonleaf, saved, forest clear, gate open, mine won, mine loot, caravan, main complete, side complete.\nCheckpoint: Brindle Village; gold 4; potions 2; moonleaf 0.\nSaved party: Lio HP 20 MP 6.\nSaved quests: main active, side active.\nSaved flags: main accepted, side accepted, saved.\nJRPG slice complete.\n",
     "choices": []
   }
 ]

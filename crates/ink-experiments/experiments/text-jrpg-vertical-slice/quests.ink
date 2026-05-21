@@ -25,6 +25,19 @@ VAR objective_progress: Dict<int, int> = %{}
 == function set_objective(objective_id: int, progress: int) => void ==
 ~ objective_progress[objective_id] = progress
 
+== function quest_state_value(quest_id: int) => QuestState ==
+~ return quest_state[quest_id]
+
+== function objective_value(objective_id: int) => int ==
+{ if DICT_HAS(objective_progress, objective_id):
+    ~ return objective_progress[objective_id]
+- else:
+    ~ return 0
+}
+
+== function restore_quest(quest_id: int, state: QuestState) => void ==
+~ quest_state[quest_id] = state
+
 == function complete_main() => void ==
 ~ quest_state[QUEST_MAIN] = QuestState.Complete
 
@@ -72,11 +85,11 @@ VAR objective_progress: Dict<int, int> = %{}
 
 == function objective_label(objective_id: int) => string ==
 { switch objective_id:
-- 101:
+- OBJ_MAIN_REN:
     ~ return "recruit Ren"
-- 102:
+- OBJ_MAIN_GATE:
     ~ return "open gate"
-- 103:
+- OBJ_MAIN_BATTLE:
     ~ return "win mine battle"
 - else:
     ~ return "gather moonleaf"

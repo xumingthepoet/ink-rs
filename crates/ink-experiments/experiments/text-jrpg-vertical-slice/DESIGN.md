@@ -366,6 +366,26 @@ Menus that should be data-driven:
 If current syntax cannot express one of these naturally, leave the direct source
 shape that exposes the limitation and note it in the experiment recap.
 
+## Implemented Follow-Up Improvements
+
+The current implementation goes beyond the first vertical slice in a few places:
+
+- `enemies.ink` defines static enemy data and an `IEnemyAi` interface. Enemy AI
+  handlers are stored in a `Dict<int, interface<IEnemyAi>>`, so the JRPG slice
+  now uses module values outside the skill system.
+- `encounters.ink` exposes encounter name, enemy ids, and loot table helpers.
+  `battle.ink` initializes enemy slots and HP from the mine encounter instead
+  of hardcoding the battle roster.
+- `shop.ink` now honors `ShopStock.unlock_flag`. The playthrough covers both an
+  unaffordable purchase and a locked stock attempt.
+- `save.ink` stores raw checkpoint state for location, inventory counts, party
+  stats, quest state, objective progress, and event flags, then restores that
+  state during the playthrough.
+- Numeric ids are named at use sites with constants where current syntax allows
+  it. Dict literal keys remain numeric because the current Dict literal grammar
+  accepts literal string/int keys, while imported constants must be referenced
+  through qualified names in value expressions.
+
 ## Validation Target
 
 The first implementation should add a deterministic `story.ink.playthrough.json`

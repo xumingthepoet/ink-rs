@@ -41,6 +41,30 @@ VAR level: Dict<int, int> = %{1: 1, 2: 1}
 == function is_active(actor_id: int) => bool ==
 ~ return party_index(actor_id) >= 0
 
+== function actor_hp(actor_id: int) => int ==
+~ return hp[actor_id]
+
+== function actor_mp(actor_id: int) => int ==
+~ return mp[actor_id]
+
+== function actor_exp(actor_id: int) => int ==
+~ return exp[actor_id]
+
+== function actor_level(actor_id: int) => int ==
+~ return level[actor_id]
+
+== function restore_roster(ren_active: bool) => void ==
+~ active_party = [ACTOR_HERO]
+{ if ren_active:
+    ~ ARRAY_PUSH(active_party, ACTOR_REN)
+}
+
+== function set_actor_state(actor_id: int, hp_value: int, mp_value: int, exp_value: int, level_value: int) => void ==
+~ hp[actor_id] = hp_value
+~ mp[actor_id] = mp_value
+~ exp[actor_id] = exp_value
+~ level[actor_id] = level_value
+
 == function party_index(actor_id: int) => int ==
 ~ temp found: int = -1
 { for index, active_id in active_party:

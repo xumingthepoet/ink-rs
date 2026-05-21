@@ -1,5 +1,5 @@
 === module loot ===
-FROM items IMPORT add_item, add_gold, item_name, count_label
+FROM items IMPORT add_item, add_gold, item_name, count_label, ITEM_MOONLEAF, ITEM_MINE_CHARM
 
 STRUCT LootEntry {
     item_id: int
@@ -11,10 +11,10 @@ CONST LOOT_FOREST: int = 1
 CONST LOOT_MINE: int = 2
 CONST loot_tables: Dict<int, LootEntry[]> = %{
     1: [
-        %LootEntry{ item_id: 3, quantity: 1, gold: 0 }
+        %LootEntry{ item_id: items::ITEM_MOONLEAF, quantity: 1, gold: 0 }
     ],
     2: [
-        %LootEntry{ item_id: 4, quantity: 1, gold: 5 }
+        %LootEntry{ item_id: items::ITEM_MINE_CHARM, quantity: 1, gold: 5 }
     ]
 }
 

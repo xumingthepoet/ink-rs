@@ -28,6 +28,9 @@ VAR current_location: int = LOC_VILLAGE
 == function current_location_name() => string ==
 ~ return location_name(current_location)
 
+== function current_location_id() => int ==
+~ return current_location
+
 == function travel_summary() => string ==
 ~ temp text: string = ""
 { for location_id, location in locations:

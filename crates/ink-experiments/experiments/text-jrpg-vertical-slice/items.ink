@@ -59,6 +59,12 @@ VAR inventory: Dict<int, int> = %{1: 1}
 == function add_gold(amount: int) => void ==
 ~ gold += amount
 
+== function set_gold(amount: int) => void ==
+~ gold = amount
+
+== function set_item_count(item_id: int, quantity: int) => void ==
+~ inventory[item_id] = quantity
+
 == function inventory_summary() => string ==
 ~ temp text: string = ""
 { for item_id, count in inventory:

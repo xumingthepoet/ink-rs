@@ -2,11 +2,11 @@
 FROM dialogue IMPORT elder_start, apothecary_start, ren_join, ren_scouts, ren_returns, caravan_rescue, ending
 FROM events IMPORT set_flag, flag_summary, FLAG_MAIN_ACCEPTED, FLAG_SIDE_ACCEPTED, FLAG_REN_JOINED, FLAG_REN_SCOUTING, FLAG_REN_REJOINED, FLAG_MOONLEAF_GATHERED, FLAG_VILLAGE_SAVE_WRITTEN, FLAG_GATE_OPENED, FLAG_CARAVAN_RESCUED, FLAG_MAIN_COMPLETE, FLAG_SIDE_COMPLETE
 FROM quests IMPORT accept_main, accept_side, set_objective, complete_main, complete_side, quest_log, objective_summary, OBJ_MAIN_REN, OBJ_MAIN_GATE, OBJ_MAIN_BATTLE, OBJ_SIDE_MOONLEAF
-FROM party IMPORT join_ren, leave_ren, rejoin_ren, party_summary
-FROM items IMPORT add_item, inventory_summary, ITEM_POTION, ITEM_ANTIDOTE
+FROM party IMPORT join_ren, leave_ren, rejoin_ren, party_summary, damage_actor, ACTOR_HERO, ACTOR_REN
+FROM items IMPORT add_item, add_gold, inventory_summary, count_label, gold, ITEM_POTION, ITEM_ANTIDOTE, ITEM_MINE_CHARM
 FROM equipment IMPORT equip, equipment_summary, EQUIP_GUARD_BADGE
 FROM shop IMPORT show_village_shop, buy
-FROM save IMPORT write_checkpoint, show_checkpoint
+FROM save IMPORT write_checkpoint, load_checkpoint, show_checkpoint
 FROM world IMPORT travel_to, current_location_name, travel_summary, LOC_FOREST, LOC_GATE, LOC_MINE, LOC_VILLAGE
 FROM encounters IMPORT forest_encounter
 FROM puzzle IMPORT gate
@@ -45,25 +45,39 @@ Objectives: {quests::objective_summary()}.
 == buy_potion ==
 -> shop::buy(items::ITEM_POTION) ->
 Inventory: {items::inventory_summary()}.
+* Try Antidote
+    -> fail_antidote
+
+== fail_antidote ==
+-> shop::buy(items::ITEM_ANTIDOTE) ->
 * Try Mine Charm
     -> fail_charm
 
 == fail_charm ==
--> shop::buy(4) ->
+-> shop::buy(items::ITEM_MINE_CHARM) ->
 * Use save shrine
     -> save_scene
 
 == save_scene ==
--> save::write_checkpoint ->
 ~ events::set_flag(events::FLAG_VILLAGE_SAVE_WRITTEN)
+-> save::write_checkpoint ->
 Flags: {events::flag_summary()}.
+* Stress load checkpoint
+    -> load_test_scene
+
+== load_test_scene ==
+~ items::add_gold(3)
+~ party::damage_actor(party::ACTOR_HERO, 4)
+Temporary state before load: gold {items::count_label(items::gold)}, party {party::party_summary()}.
+-> save::load_checkpoint ->
+State after load: gold {items::count_label(items::gold)}, party {party::party_summary()}.
 * Recruit Ren
     -> recruit_scene
 
 == recruit_scene ==
 -> dialogue::ren_join ->
 ~ party::join_ren()
-~ equipment::equip(2, equipment::EQUIP_GUARD_BADGE)
+~ equipment::equip(party::ACTOR_REN, equipment::EQUIP_GUARD_BADGE)
 ~ quests::set_objective(quests::OBJ_MAIN_REN, 1)
 ~ events::set_flag(events::FLAG_REN_JOINED)
 Party: {party::party_summary()}

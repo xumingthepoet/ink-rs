@@ -1,28 +1,48 @@
 === module battle ===
+FROM encounters IMPORT encounter_name, encounter_enemy_ids, encounter_loot_table, ENCOUNTER_MINE
+FROM enemies IMPORT enemy_name, enemy_max_hp, enemy_action_text, enemy_damage
 FROM party IMPORT party_summary, damage_actor, heal_actor, spend_mp, add_exp, ACTOR_HERO, ACTOR_REN
-FROM items IMPORT remove_item
+FROM items IMPORT remove_item, count_label, ITEM_POTION
 FROM skills IMPORT use_skill, SKILL_SPARK, SKILL_GUARD, SKILL_STRIKE
-FROM loot IMPORT resolve, LOOT_MINE
+FROM loot IMPORT resolve
 FROM events IMPORT set_flag, FLAG_MINE_BATTLE_WON, FLAG_MINE_LOOT_RESOLVED
 
+CONST ENEMY_IMP_SLOT: int = 1
+CONST ENEMY_WARDEN_SLOT: int = 2
+
+VAR active_enemy_slots: int[] = []
+VAR enemy_ids_by_slot: Dict<int, int> = %{}
 VAR enemy_hp: Dict<int, int> = %{}
 VAR poison_turns: int = 0
 VAR guarded: bool = false
 VAR turn: int = 1
 
 == mine_battle ==
-~ enemy_hp = %{1: 6, 2: 10}
+-> start_encounter(encounters::ENCOUNTER_MINE) ->
 ~ poison_turns = 0
 ~ guarded = false
 ~ turn = 1
-Mine battle begins: Cave Imp and Mine Warden.
 -> battle_prompt
 
+== start_encounter(encounter_id: int) ==
+~ active_enemy_slots = []
+~ enemy_ids_by_slot = %{}
+~ enemy_hp = %{}
+~ temp enemy_ids: int[] = encounters::encounter_enemy_ids(encounter_id)
+{ for index, enemy_id in enemy_ids:
+    ~ temp slot: int = index + 1
+    ~ ARRAY_PUSH(active_enemy_slots, slot)
+    ~ enemy_ids_by_slot[slot] = enemy_id
+    ~ enemy_hp[slot] = enemies::enemy_max_hp(enemy_id)
+}
+Mine battle begins: {encounters::encounter_name(encounter_id)}.
+->->
+
 == battle_prompt ==
-Turn {count_label(turn)}
+Turn {items::count_label(turn)}
 Party: {party::party_summary()}
-Enemies: imp {count_label(enemy_hp[1])}, warden {count_label(enemy_hp[2])}
-Poison turns: {count_label(poison_turns)}
+Enemies: {enemy_summary()}
+Poison turns: {items::count_label(poison_turns)}
 * Hero Spark
     -> hero_spark
 * Use Potion
@@ -33,9 +53,9 @@ Poison turns: {count_label(poison_turns)}
     -> hero_strike
 
 == hero_spark ==
--> skills::use_skill(skills::SKILL_SPARK, party::ACTOR_HERO, 2) ->
+-> skills::use_skill(skills::SKILL_SPARK, party::ACTOR_HERO, ENEMY_WARDEN_SLOT) ->
 { if party::spend_mp(party::ACTOR_HERO, 2):
-    ~ enemy_hp[2] = enemy_hp[2] - 4
+    ~ enemy_hp[ENEMY_WARDEN_SLOT] = enemy_hp[ENEMY_WARDEN_SLOT] - 4
     ~ poison_turns = 2
     Lio spends 2 MP; the warden is poisoned.
 - else:
@@ -47,7 +67,7 @@ Poison turns: {count_label(poison_turns)}
 -> battle_prompt
 
 == use_potion ==
-{ if items::remove_item(1, 1):
+{ if items::remove_item(items::ITEM_POTION, 1):
     ~ party::heal_actor(party::ACTOR_HERO, 5)
     Lio drinks a potion.
 - else:
@@ -68,32 +88,31 @@ Ren guards the line.
 -> battle_prompt
 
 == hero_strike ==
--> skills::use_skill(skills::SKILL_STRIKE, party::ACTOR_HERO, 1) ->
-~ enemy_hp[1] = 0
-~ enemy_hp[2] = 0
+-> skills::use_skill(skills::SKILL_STRIKE, party::ACTOR_HERO, ENEMY_IMP_SLOT) ->
+{ for slot in active_enemy_slots:
+    ~ enemy_hp[slot] = 0
+}
 Lio and Ren finish the patrol.
 ~ events::set_flag(events::FLAG_MINE_BATTLE_WON)
 Victory: mine patrol defeated.
 ~ temp level_text: string = party::add_exp(5)
 EXP result: {level_text}.
--> loot::resolve(loot::LOOT_MINE) ->
+-> loot::resolve(encounters::encounter_loot_table(encounters::ENCOUNTER_MINE)) ->
 ~ events::set_flag(events::FLAG_MINE_LOOT_RESOLVED)
 ->->
 
 == enemy_turn ==
+~ temp attacker_id: int = enemy_ids_by_slot[ENEMY_WARDEN_SLOT]
+{enemies::enemy_action_text(attacker_id, guarded)} for {items::count_label(enemies::enemy_damage(attacker_id, guarded))} damage.
+~ party::damage_actor(party::ACTOR_HERO, enemies::enemy_damage(attacker_id, guarded))
 { if guarded:
-    ~ party::damage_actor(party::ACTOR_HERO, 1)
-    Mine Warden attacks into Ren's guard for 1 damage.
     ~ guarded = false
-- else:
-    ~ party::damage_actor(party::ACTOR_HERO, 3)
-    Mine Warden strikes Lio for 3 damage.
 }
 ->->
 
 == status_tick ==
 { if poison_turns > 0:
-    ~ enemy_hp[2] = enemy_hp[2] - 2
+    ~ enemy_hp[ENEMY_WARDEN_SLOT] = enemy_hp[ENEMY_WARDEN_SLOT] - 2
     ~ poison_turns -= 1
     Poison ticks on the warden for 2.
 - else:
@@ -101,28 +120,15 @@ EXP result: {level_text}.
 }
 ->->
 
-== function count_label(value: int) => string ==
-{ switch value:
-- 0:
-    ~ return "0"
-- 1:
-    ~ return "1"
-- 2:
-    ~ return "2"
-- 3:
-    ~ return "3"
-- 4:
-    ~ return "4"
-- 5:
-    ~ return "5"
-- 6:
-    ~ return "6"
-- 7:
-    ~ return "7"
-- 8:
-    ~ return "8"
-- 9:
-    ~ return "9"
-- else:
-    ~ return "10"
+== function enemy_summary() => string ==
+~ temp text: string = ""
+{ for slot in active_enemy_slots:
+    ~ temp enemy_id: int = enemy_ids_by_slot[slot]
+    ~ temp slot_text: string = enemies::enemy_name(enemy_id) + " " + items::count_label(enemy_hp[slot])
+    { if text == "":
+        ~ text = slot_text
+    - else:
+        ~ text = text + ", " + slot_text
+    }
 }
+~ return text

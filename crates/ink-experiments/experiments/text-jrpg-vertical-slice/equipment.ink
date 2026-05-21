@@ -1,4 +1,5 @@
 === module equipment ===
+FROM party IMPORT ACTOR_HERO
 
 STRUCT EquipmentDef {
     name: string
@@ -14,11 +15,11 @@ CONST EQUIP_WORN_SABER: int = 1
 CONST EQUIP_GUARD_BADGE: int = 2
 
 CONST equipment_defs: Dict<int, EquipmentDef> = %{
-    1: %EquipmentDef{ name: "Worn Saber", slot: 1, attack: 2, defense: 0 },
-    2: %EquipmentDef{ name: "Guard Badge", slot: 3, attack: 0, defense: 1 }
+    1: %EquipmentDef{ name: "Worn Saber", slot: SLOT_WEAPON, attack: 2, defense: 0 },
+    2: %EquipmentDef{ name: "Guard Badge", slot: SLOT_CHARM, attack: 0, defense: 1 }
 }
 
-VAR equipped: Dict<int, int> = %{1: 1}
+VAR equipped: Dict<int, int> = %{1: EQUIP_WORN_SABER}
 
 == function equip(actor_id: int, equipment_id: int) => void ==
 ~ equipped[actor_id] = equipment_id
@@ -49,7 +50,7 @@ VAR equipped: Dict<int, int> = %{1: 1}
 ~ return text
 
 == function actor_label(actor_id: int) => string ==
-{ if actor_id == 1:
+{ if actor_id == party::ACTOR_HERO:
     ~ return "Lio"
 - else:
     ~ return "Ren"

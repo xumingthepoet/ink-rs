@@ -20,6 +20,9 @@ VAR flags: Dict<int, bool> = %{}
 == function set_flag(flag_id: int) => void ==
 ~ flags[flag_id] = true
 
+== function set_flag_to(flag_id: int, enabled: bool) => void ==
+~ flags[flag_id] = enabled
+
 == function clear_flag(flag_id: int) => void ==
 ~ flags[flag_id] = false
 
