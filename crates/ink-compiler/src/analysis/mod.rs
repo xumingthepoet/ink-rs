@@ -214,6 +214,7 @@ mod tests {
         ("expression_types.rs", include_str!("expression_types.rs")),
         ("field_access.rs", include_str!("field_access.rs")),
         ("flow.rs", include_str!("flow.rs")),
+        ("for_loops.rs", include_str!("for_loops.rs")),
         ("index_access.rs", include_str!("index_access.rs")),
         ("indexes.rs", include_str!("indexes.rs")),
         ("initializers.rs", include_str!("initializers.rs")),
