@@ -1,4 +1,7 @@
-use crate::support::compiler::{assert_story_output, compile_fixture, compile_fixture_to_story};
+use crate::support::compiler::{
+    assert_json_sequence, assert_story_output, compile_fixture, compile_fixture_to_story,
+};
+use serde_json::json;
 
 #[test]
 fn arithmetic_fixture_runs() {
@@ -42,4 +45,18 @@ fn conditions_may_use_expressions_on_left_or_right_hand_side() {
     );
 
     assert_story_output(&compiled, "True\nTrue\nFalse\nTrue\n");
+}
+
+#[test]
+fn expression_string_inline_tokens_are_literals() {
+    let compiled = compile_fixture("expressions/expression-string-inline-tokens-are-literals.ink");
+    let json: serde_json::Value =
+        serde_json::from_str(&compiled.json).expect("compiled JSON should parse");
+
+    assert_story_output(&compiled, "#####\n# <> -> <-\nvalue ok # <> -> <-\n");
+    assert_json_sequence(&json, vec![json!("str"), json!("^#"), json!("/str")]);
+    assert_json_sequence(
+        &json,
+        vec![json!("str"), json!("^# <> -> <-"), json!("/str")],
+    );
 }
