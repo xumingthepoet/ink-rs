@@ -288,6 +288,9 @@ impl ParsedVisitor for CallTargetChecker<'_> {
                     }
                 }
             }
+            Object::ForLoop(for_loop) => {
+                self.check_expression(for_loop.iterable(), for_loop.span(), context);
+            }
             Object::Choice(choice) => {
                 if let Some(condition) = choice.condition() {
                     self.check_expression(condition, choice.span(), context);

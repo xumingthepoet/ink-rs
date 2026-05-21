@@ -27,6 +27,7 @@ use self::dynamic_interface::{
 };
 use self::name_resolution::{resolve_constant_name, resolve_runtime_variable_name};
 use self::operators::{native_function_for_binary_operator, native_function_for_unary_operator};
+pub(super) use self::types::infer_lowered_expression_type;
 
 pub(super) fn lower_output_expression_into(
     content: &mut Vec<RuntimeObject>,

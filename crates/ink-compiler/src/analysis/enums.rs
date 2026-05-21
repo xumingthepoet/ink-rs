@@ -234,6 +234,9 @@ fn collect_enum_declarations_in_object<'a>(
                 collect_enum_declarations_in_weave(module, branch.content(), declarations);
             }
         }
+        Object::ForLoop(for_loop) => {
+            collect_enum_declarations_in_weave(module, for_loop.body(), declarations);
+        }
         Object::Weave(weave) => collect_enum_declarations_in_weave(module, weave, declarations),
         Object::AuthorWarning(_)
         | Object::Choice(_)

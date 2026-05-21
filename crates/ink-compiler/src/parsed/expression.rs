@@ -394,6 +394,7 @@ fn object_display(object: &Object) -> String {
         Object::Tag(_) => "#".to_string(),
         Object::Return(_) => "Return".to_string(),
         Object::Conditional(_) => "Conditional".to_string(),
+        Object::ForLoop(_) => "ForLoop".to_string(),
         Object::LogicLine(expression) => expression_display(expression),
         Object::IncDec(_) => "IncDec".to_string(),
         Object::Choice(_) => "Choice".to_string(),

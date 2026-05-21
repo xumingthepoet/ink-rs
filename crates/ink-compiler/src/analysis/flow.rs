@@ -124,6 +124,11 @@ fn check_global_var_declaration_scope_in_object(
                 }
             }
         }
+        Object::ForLoop(for_loop) => {
+            for object in for_loop.body().content() {
+                check_global_var_declaration_scope_in_object(object, false, diagnostics);
+            }
+        }
         Object::Weave(weave) => {
             for object in weave.content() {
                 check_global_var_declaration_scope_in_object(object, false, diagnostics);
@@ -586,6 +591,9 @@ fn check_nested_choice_termination_in_weave(
                     check_nested_choice_termination_in_weave(branch.content(), true, diagnostics);
                 }
             }
+            Object::ForLoop(for_loop) => {
+                check_nested_choice_termination_in_weave(for_loop.body(), true, diagnostics);
+            }
             Object::Weave(weave) => {
                 check_nested_choice_termination_in_weave(weave, inside_sealed_content, diagnostics)
             }
@@ -620,6 +628,9 @@ fn check_nested_choice_termination_in_content_list(
                 for branch in conditional.branches() {
                     check_nested_choice_termination_in_weave(branch.content(), true, diagnostics);
                 }
+            }
+            Object::ForLoop(for_loop) => {
+                check_nested_choice_termination_in_weave(for_loop.body(), true, diagnostics);
             }
             Object::ContentList(content) => check_nested_choice_termination_in_content_list(
                 content,
@@ -824,6 +835,7 @@ fn find_return_in_object(object: &Object) -> Option<&Return> {
             .branches()
             .iter()
             .find_map(|branch| find_return_in_weave(branch.content())),
+        Object::ForLoop(for_loop) => find_return_in_weave(for_loop.body()),
         Object::Weave(weave) => find_return_in_weave(weave),
         Object::Choice(choice) => choice
             .start_content()
@@ -888,6 +900,7 @@ fn object_terminates_flow(object: &Object) -> bool {
                         .is_some_and(object_terminates_flow)
                 })
         }
+        Object::ForLoop(_) => false,
         Object::AuthorWarning(_)
         | Object::ConstantDeclaration(_)
         | Object::EnumDeclaration(_)

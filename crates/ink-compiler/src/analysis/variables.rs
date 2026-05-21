@@ -3,15 +3,45 @@ use crate::parsed::{
     Flow, Object, Story,
 };
 
-use super::context::{VariableScopeIndex, VariableSymbolKind};
+use super::{
+    context::{
+        EnumTypeIndex, StructTypeIndex, TargetSymbolIndex, VariableScopeIndex, VariableSymbolKind,
+    },
+    expression_types::infer_expression_type,
+    for_loops::loop_variable_types,
+    interfaces::InterfaceMemberIndex,
+};
 
 pub(super) fn build_variable_scope_index(story: &Story) -> VariableScopeIndex {
-    #[derive(Default)]
-    struct VariableScopeVisitor {
+    let struct_types = StructTypeIndex::default();
+    let enum_types = EnumTypeIndex::default();
+    let target_symbols = TargetSymbolIndex::default();
+    let interface_members = InterfaceMemberIndex::default();
+    build_variable_scope_index_with_type_indexes(
+        story,
+        &struct_types,
+        &enum_types,
+        &target_symbols,
+        &interface_members,
+    )
+}
+
+pub(super) fn build_variable_scope_index_with_type_indexes(
+    story: &Story,
+    struct_types: &StructTypeIndex,
+    enum_types: &EnumTypeIndex,
+    target_symbols: &TargetSymbolIndex,
+    interface_members: &InterfaceMemberIndex,
+) -> VariableScopeIndex {
+    struct VariableScopeVisitor<'a> {
         index: VariableScopeIndex,
+        struct_types: &'a StructTypeIndex,
+        enum_types: &'a EnumTypeIndex,
+        target_symbols: &'a TargetSymbolIndex,
+        interface_members: &'a InterfaceMemberIndex,
     }
 
-    impl ParsedVisitor for VariableScopeVisitor {
+    impl ParsedVisitor for VariableScopeVisitor<'_> {
         fn visit_flow(&mut self, flow: &Flow, context: &VisitContext) {
             let Some(flow_path) = &context.current_flow_path else {
                 return;
@@ -64,12 +94,91 @@ pub(super) fn build_variable_scope_index(story: &Story) -> VariableScopeIndex {
                         );
                     }
                 }
+                Object::ForLoop(for_loop) => {
+                    self.index_loop_variables(for_loop, context);
+                }
                 _ => {}
             }
         }
     }
 
-    let mut visitor = VariableScopeVisitor::default();
+    impl VariableScopeVisitor<'_> {
+        fn index_loop_variables(
+            &mut self,
+            for_loop: &crate::parsed::ForLoop,
+            context: &VisitContext,
+        ) {
+            let Ok(iterable_type) = infer_expression_type(
+                for_loop.iterable(),
+                &self.index,
+                self.struct_types,
+                self.enum_types,
+                self.target_symbols,
+                self.interface_members,
+                context.current_module.as_deref(),
+                context.current_flow_path.as_deref(),
+            ) else {
+                return;
+            };
+            let Some(variable_types) =
+                loop_variable_types(&iterable_type, for_loop.variables().len())
+            else {
+                return;
+            };
+
+            if let Some(flow_path) = &context.current_flow_path {
+                self.index.insert_local(
+                    context.current_module.as_deref(),
+                    flow_path.clone(),
+                    for_loop.index_name(),
+                    Some(crate::parsed::TypeName::int()),
+                );
+                self.index.insert_local(
+                    context.current_module.as_deref(),
+                    flow_path.clone(),
+                    for_loop.limit_name(),
+                    Some(crate::parsed::TypeName::int()),
+                );
+                for (variable, variable_type) in for_loop.variables().iter().zip(variable_types) {
+                    self.index.insert_local(
+                        context.current_module.as_deref(),
+                        flow_path.clone(),
+                        variable.runtime_name().to_string(),
+                        Some(variable_type),
+                    );
+                }
+            } else {
+                self.index.insert_global(
+                    context.current_module.as_deref(),
+                    for_loop.index_name(),
+                    Some(crate::parsed::TypeName::int()),
+                    VariableSymbolKind::GlobalVariable,
+                );
+                self.index.insert_global(
+                    context.current_module.as_deref(),
+                    for_loop.limit_name(),
+                    Some(crate::parsed::TypeName::int()),
+                    VariableSymbolKind::GlobalVariable,
+                );
+                for (variable, variable_type) in for_loop.variables().iter().zip(variable_types) {
+                    self.index.insert_global(
+                        context.current_module.as_deref(),
+                        variable.runtime_name().to_string(),
+                        Some(variable_type),
+                        VariableSymbolKind::GlobalVariable,
+                    );
+                }
+            }
+        }
+    }
+
+    let mut visitor = VariableScopeVisitor {
+        index: VariableScopeIndex::default(),
+        struct_types,
+        enum_types,
+        target_symbols,
+        interface_members,
+    };
     walk_story(story, &mut visitor);
     visitor.index
 }

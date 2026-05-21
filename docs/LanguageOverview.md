@@ -125,6 +125,11 @@ Explicit `and` / `&&` and `or` / `||` short-circuit inside a single expression,
 so guard checks can protect later array or Dict reads. Adjacent choice condition
 blocks remain separate tests and are all evaluated.
 
+Typed arrays and Dicts can use multiline source-level `for` blocks:
+`{ for item in items: ... }`, `{ for index, item in items: ... }`, and
+`{ for key, value in scores: ... }`. Nested `for` blocks are supported, but
+choices and diverts stay outside `for` bodies.
+
 ```ink
 == main ==
 ~ temp visits: int = 0

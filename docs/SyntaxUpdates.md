@@ -26,6 +26,37 @@ Each entry should include:
 - migration guidance
 - tests
 
+## 2026-05-21: Array And Dict For Control Blocks
+
+- status: supported
+- upstream behavior: upstream Ink does not have typed array or `Dict<K, V>`
+  source-level `for` control blocks.
+- ink-rs behavior: multiline `{ for ... in ...: }` blocks now iterate typed
+  arrays and Dicts. Arrays support `for item in array` and
+  `for index, item in array`; Dicts support `for key, value in dict`.
+  Nested `for` blocks are supported. Loop variables are body-scoped compiler
+  temps and may shadow outer source names. Array loops fix `LEN(array)` at loop
+  entry and read `array[index]` each iteration. Dict loops fix
+  `DICT_KEYS(dict)` at loop entry and read `dict[key]` each iteration. Mutating
+  the iterated collection can therefore still produce the normal later runtime
+  index or missing-key error.
+- documentation effect: `SyntaxReference.md` documents supported headers,
+  body contents, nested `for`, unsupported flow-control forms, and fixed
+  length/key-list behavior. `LanguageOverview.md` mentions `for` alongside
+  current flow and logic syntax.
+- rationale: typed arrays and Dicts need a concise source-level iteration form
+  for text and logic generation without adding runtime object-model or compiled
+  JSON format changes.
+- migration guidance: replace hand-written counter loops and recursive helper
+  functions with `{ for ... }` when the body only needs text, logic, nested
+  `if`/`switch`/`for`, and no choices or diverts. Keep recursive helpers when
+  generating choices or performing arbitrary flow control.
+- tests: parser and analysis unit tests cover header parsing, nested
+  conditionals, nested `for`, iterable typing, variable counts, and unsupported
+  body objects. Typed integration fixtures cover runtime array output,
+  index/item variables, nested arrays, Dict key order, and normal runtime
+  errors after mutating an iterated collection.
+
 ## 2026-05-21: Explicit Logical Operators Short-Circuit
 
 - status: supported

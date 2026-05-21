@@ -1,6 +1,6 @@
 use super::{
-    Choice, Conditional, ContentList, Expression, Flow, ImportDeclaration, InterfaceDeclaration,
-    Module, Object, Story, Weave,
+    Choice, Conditional, ContentList, Expression, Flow, ForLoop, ImportDeclaration,
+    InterfaceDeclaration, Module, Object, Story, Weave,
 };
 use crate::source::SourceSpan;
 
@@ -157,6 +157,7 @@ where
             walk_expression(expression, visitor, &object_context)
         }
         Object::Conditional(conditional) => walk_conditional(conditional, visitor, &object_context),
+        Object::ForLoop(for_loop) => walk_for_loop(for_loop, visitor, &object_context),
         Object::ConstantDeclaration(declaration) => {
             walk_expression(declaration.expression(), visitor, &object_context)
         }
@@ -211,12 +212,21 @@ fn object_own_span(object: &Object) -> Option<SourceSpan> {
         Object::VariableAssignment(assignment) => Some(assignment.span().clone()),
         Object::ContentList(_)
         | Object::Conditional(_)
+        | Object::ForLoop(_)
         | Object::Expression(_)
         | Object::Glue(_)
         | Object::LogicLine(_)
         | Object::Tag(_)
         | Object::Weave(_) => None,
     }
+}
+
+fn walk_for_loop<V>(for_loop: &ForLoop, visitor: &mut V, context: &VisitContext)
+where
+    V: ParsedVisitor + ?Sized,
+{
+    walk_expression(for_loop.iterable(), visitor, context);
+    walk_weave(for_loop.body(), visitor, context);
 }
 
 fn walk_choice<V>(choice: &Choice, visitor: &mut V, context: &VisitContext)

@@ -89,6 +89,14 @@ fn object_contains_function_call(object: &Object) -> bool {
                             .any(object_contains_function_call)
                 })
         }
+        Object::ForLoop(for_loop) => {
+            expression_contains_function_call(for_loop.iterable())
+                || for_loop
+                    .body()
+                    .content()
+                    .iter()
+                    .any(object_contains_function_call)
+        }
         Object::Choice(choice) => {
             choice
                 .condition()

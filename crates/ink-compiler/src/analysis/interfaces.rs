@@ -533,6 +533,9 @@ fn collect_interface_type_references_in_object(
                 collect_interface_type_references_in_weave(branch.content(), references);
             }
         }
+        Object::ForLoop(for_loop) => {
+            collect_interface_type_references_in_weave(for_loop.body(), references);
+        }
         Object::ContentList(content) => {
             collect_interface_type_references_in_content_list(content, references)
         }
@@ -676,6 +679,9 @@ fn collect_named_declarations_in_object(object: &Object, declarations: &mut Vec<
             for branch in conditional.branches() {
                 collect_named_declarations_in_weave(branch.content(), declarations);
             }
+        }
+        Object::ForLoop(for_loop) => {
+            collect_named_declarations_in_weave(for_loop.body(), declarations);
         }
         Object::ContentList(content) => {
             collect_named_declarations_in_content_list(content, declarations)
