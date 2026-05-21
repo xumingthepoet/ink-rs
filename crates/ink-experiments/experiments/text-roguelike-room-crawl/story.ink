@@ -114,14 +114,14 @@ Key: {key_label()}
     - RoomKind.Chest:
         { if first_visit:
             ~ gold += room.amount
-            ~ last_message = "Move " + label + " opens a chest for " + amount_label(room.amount) + " gold."
+            ~ last_message = "Move " + label + " opens a chest for " + to_str(room.amount) + " gold."
         - else:
             ~ last_message = "Move " + label + " finds an empty chest."
         }
     - RoomKind.Trap:
         { if first_visit:
             ~ hp -= room.amount
-            ~ last_message = "Move " + label + " triggers a trap for " + amount_label(room.amount) + " damage."
+            ~ last_message = "Move " + label + " triggers a trap for " + to_str(room.amount) + " damage."
         - else:
             ~ last_message = "Move " + label + " steps over a spent trap."
         }
@@ -225,18 +225,6 @@ Key: {key_label()}
     ~ return "yes"
 - else:
     ~ return "no"
-}
-
-== function amount_label(value: int) => string ==
-{ switch value:
-- 0:
-    ~ return "0"
-- 1:
-    ~ return "1"
-- 2:
-    ~ return "2"
-- else:
-    ~ return "3"
 }
 
 == function col_label(col: int) => string ==

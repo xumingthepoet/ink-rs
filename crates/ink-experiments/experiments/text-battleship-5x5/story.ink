@@ -142,7 +142,7 @@ Choose column for row {row_label(row)}.
 { if is_ship_sunk(ship_id):
     ~ return "sunk"
 - else:
-    ~ return "afloat " + count_label(hit_count(ship_id)) + "/" + count_label(size)
+    ~ return "afloat " + to_str(hit_count(ship_id)) + "/" + to_str(size)
 }
 
 == function ship_id_at(x: int, y: int) => int ==
@@ -204,22 +204,6 @@ Choose column for row {row_label(row)}.
 - 2:
     ~ return "3"
 - 3:
-    ~ return "4"
-- else:
-    ~ return "5"
-}
-
-== function count_label(value: int) => string ==
-{ switch value:
-- 0:
-    ~ return "0"
-- 1:
-    ~ return "1"
-- 2:
-    ~ return "2"
-- 3:
-    ~ return "3"
-- 4:
     ~ return "4"
 - else:
     ~ return "5"

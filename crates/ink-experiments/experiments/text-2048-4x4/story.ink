@@ -264,29 +264,8 @@ Score: {score}
 ~ return found
 
 == function tile_label(value: int) => string ==
-{ switch value:
-- 0:
+{ if value == 0:
     ~ return "."
-- 2:
-    ~ return "2"
-- 4:
-    ~ return "4"
-- 8:
-    ~ return "8"
-- 16:
-    ~ return "16"
-- 32:
-    ~ return "32"
-- 64:
-    ~ return "64"
-- 128:
-    ~ return "128"
-- 256:
-    ~ return "256"
-- 512:
-    ~ return "512"
-- 1024:
-    ~ return "1024"
 - else:
-    ~ return "2048"
+    ~ return to_str(value)
 }

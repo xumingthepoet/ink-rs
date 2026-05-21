@@ -34,12 +34,12 @@ Text memory match 3x2.
 
 == board_prompt ==
 Move {moves}
-Streak: {count_label(streak)}
-Mistakes: {count_label(mistakes)}
+Streak: {to_str(streak)}
+Mistakes: {to_str(mistakes)}
 { for row in rows:
 {row_cells(row)}
 }
-Matched: {count_label(matched_count())}/{count_label(LEN(cards))}
+Matched: {to_str(matched_count())}/{to_str(LEN(cards))}
 Pairs: {pair_progress()}
 {last_message}
 { if phase == TurnPhase.Won:
@@ -136,9 +136,9 @@ Pairs: {pair_progress()}
 ~ temp text: string = ""
 { for card_id, goal in pair_goals:
     { if text == "":
-        ~ text = card_label(card_id) + " " + count_label(matched_count_for(card_id)) + "/" + count_label(goal)
+        ~ text = card_label(card_id) + " " + to_str(matched_count_for(card_id)) + "/" + to_str(goal)
     - else:
-        ~ text = text + ", " + card_label(card_id) + " " + count_label(matched_count_for(card_id)) + "/" + count_label(goal)
+        ~ text = text + ", " + card_label(card_id) + " " + to_str(matched_count_for(card_id)) + "/" + to_str(goal)
     }
 }
 ~ return text
@@ -175,24 +175,6 @@ Pairs: {pair_progress()}
 - 3:
     ~ return "4"
 - 4:
-    ~ return "5"
-- else:
-    ~ return "6"
-}
-
-== function count_label(value: int) => string ==
-{ switch value:
-- 0:
-    ~ return "0"
-- 1:
-    ~ return "1"
-- 2:
-    ~ return "2"
-- 3:
-    ~ return "3"
-- 4:
-    ~ return "4"
-- 5:
     ~ return "5"
 - else:
     ~ return "6"

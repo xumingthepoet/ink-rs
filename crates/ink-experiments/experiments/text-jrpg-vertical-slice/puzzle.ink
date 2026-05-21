@@ -27,7 +27,7 @@ Input: {sequence_label()}.
     - else:
         ~ failed_attempts += 1
         ~ input = []
-        The gate rejects the sequence. Attempts: {attempt_label(failed_attempts)}.
+        The gate rejects the sequence. Attempts: {to_str(failed_attempts)}.
         -> gate
     }
 }
@@ -55,11 +55,4 @@ Input: {sequence_label()}.
     ~ return "moon"
 - else:
     ~ return "star"
-}
-
-== function attempt_label(value: int) => string ==
-{ if value == 1:
-    ~ return "1"
-- else:
-    ~ return "2"
 }

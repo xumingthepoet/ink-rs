@@ -232,25 +232,10 @@ Moves: {moves}
 }
 
 == function adjacent_label(count: int) => string ==
-{ switch count:
-- 0:
+{ if count == 0:
     ~ return "."
-- 1:
-    ~ return "1"
-- 2:
-    ~ return "2"
-- 3:
-    ~ return "3"
-- 4:
-    ~ return "4"
-- 5:
-    ~ return "5"
-- 6:
-    ~ return "6"
-- 7:
-    ~ return "7"
 - else:
-    ~ return "8"
+    ~ return to_str(count)
 }
 
 == function adjacent_mines(row: int, col: int) => int ==
