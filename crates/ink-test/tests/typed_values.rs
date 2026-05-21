@@ -39,6 +39,12 @@ fn for_loops_run_over_arrays_dicts_and_nested_arrays() {
 }
 
 #[test]
+fn const_dicts_with_struct_values_run() {
+    let compiled = compile_fixture("typed/const-dict-structs.ink");
+    assert_story_output(&compiled, "game::RoomKind.Key|7\nmissing-nine\n");
+}
+
+#[test]
 fn array_for_loops_keep_entry_length_and_use_normal_later_read_errors() {
     let compiled = compile_fixture("typed/for-loop-array-mutation-error.ink");
     let mut story = ink_runtime::story::Story::new(&compiled.json).expect("story should load");

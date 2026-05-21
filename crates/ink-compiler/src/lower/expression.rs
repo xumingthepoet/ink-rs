@@ -344,22 +344,12 @@ fn lower_constant_expression_into(
         has_start_content: lowering.has_start_content,
         visiting_constants: &mut *lowering.visiting_constants,
     };
-    if let Some(value) = lower_value_literal(
+    lower_expression_with_expected_type_into_with_constants(
+        content,
         constant.expression(),
         Some(constant.declared_type()),
-        context.struct_definitions(),
-        context.enum_definitions(),
-        context.constants(),
-        context.global_variables(),
-        context.choice_labels(),
-        context.global_labels(),
-        context.path_mode(),
-    ) {
-        content.push(value);
-        return;
-    }
-
-    lower_expression_into_with_constants(content, constant.expression(), &mut constant_lowering);
+        &mut constant_lowering,
+    );
 }
 
 pub(super) fn lower_expression_with_expected_type_into_with_constants(
