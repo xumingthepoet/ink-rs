@@ -1,5 +1,7 @@
 use crate::parsed::{Object, Weave};
 
+use super::for_loop::{dynamic_choice_aliases, rewrite_choice_own_dynamic_aliases, rewrite_object};
+
 pub(super) fn group_weave_content(objects: Vec<Object>) -> Vec<Object> {
     let base_depth = determine_base_depth(&objects);
     group_nested_weaves(objects, base_depth)
@@ -38,7 +40,7 @@ fn group_nested_weaves(objects: Vec<Object>, base_depth: usize) -> Vec<Object> {
         }
     }
 
-    grouped
+    rewrite_dynamic_choice_scopes(grouped)
 }
 
 fn determine_base_depth(objects: &[Object]) -> usize {
@@ -51,6 +53,58 @@ fn object_depth(object: &Object) -> Option<usize> {
         Object::Gather(gather) => Some(gather.indentation_depth()),
         _ => None,
     }
+}
+
+fn rewrite_dynamic_choice_scopes(objects: Vec<Object>) -> Vec<Object> {
+    let mut objects = objects
+        .into_iter()
+        .map(rewrite_nested_dynamic_choice_scopes)
+        .collect::<Vec<_>>();
+
+    let mut index = 0;
+    while index < objects.len() {
+        let Some(aliases) = dynamic_choice_scope_aliases(&objects[index]) else {
+            index += 1;
+            continue;
+        };
+
+        let Object::Choice(choice) = objects[index].clone() else {
+            unreachable!();
+        };
+        objects[index] = Object::Choice(rewrite_choice_own_dynamic_aliases(choice));
+
+        let mut body_index = index + 1;
+        while body_index < objects.len()
+            && !matches!(objects[body_index], Object::Choice(_) | Object::Gather(_))
+        {
+            objects[body_index] = rewrite_nested_dynamic_choice_scopes(rewrite_object(
+                objects[body_index].clone(),
+                &aliases,
+            ));
+            body_index += 1;
+        }
+
+        index += 1;
+    }
+
+    objects
+}
+
+fn rewrite_nested_dynamic_choice_scopes(object: Object) -> Object {
+    match object {
+        Object::Weave(weave) => Object::Weave(Weave::new(
+            rewrite_dynamic_choice_scopes(weave.content().to_vec()),
+            weave.base_indent(),
+        )),
+        other => other,
+    }
+}
+
+fn dynamic_choice_scope_aliases(object: &Object) -> Option<Vec<super::for_loop::LoopAlias>> {
+    let Object::Choice(choice) = object else {
+        return None;
+    };
+    choice.dynamic_binding().map(dynamic_choice_aliases)
 }
 
 #[cfg(test)]

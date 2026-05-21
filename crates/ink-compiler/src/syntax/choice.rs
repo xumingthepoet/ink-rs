@@ -1,6 +1,9 @@
+use std::collections::HashSet;
+
 use crate::{
     diagnostic::Diagnostic,
-    parsed::{Choice, ContentList, Expression},
+    parsed::{Choice, ContentList, DynamicChoiceBinding, DynamicChoiceVariable, Expression},
+    source::SourceSpan,
 };
 
 use super::{is_identifier, rule::RuleParser, scan, text};
@@ -35,7 +38,21 @@ pub(super) fn parse_choice(parser: &mut RuleParser<'_>) -> Option<Choice> {
     let choice_body = parser.line_remainder().to_string();
     parser.skip_to_end();
 
+    let (dynamic_binding, choice_body) = match parse_dynamic_choice_binding(&choice_body, &span) {
+        Ok(parsed) => parsed,
+        Err(message) => {
+            parser.diagnostic(Diagnostic::error(span, message));
+            return None;
+        }
+    };
     let (identifier, choice_body) = parse_choice_identifier(&choice_body);
+    if dynamic_binding.is_some() && identifier.is_some() {
+        parser.diagnostic(Diagnostic::error(
+            span,
+            "Dynamic choices do not support labels; use item data, explicit state, or gather labels instead",
+        ));
+        return None;
+    }
     let (condition, choice_body) = parse_choice_conditions(&choice_body)?;
 
     // Handle fallback choices like "* -> " which have no text content
@@ -52,6 +69,7 @@ pub(super) fn parse_choice(parser: &mut RuleParser<'_>) -> Option<Choice> {
         let inner = append_newline(ContentList::new(vec![]), span.clone());
         let mut choice = Choice::new(None, inner, span);
         choice.set_identifier(identifier);
+        choice.set_dynamic_binding(dynamic_binding);
         choice.set_is_invisible_default(true);
         choice.set_condition(condition);
         choice.set_indentation_depth(indentation_depth);
@@ -80,6 +98,7 @@ pub(super) fn parse_choice(parser: &mut RuleParser<'_>) -> Option<Choice> {
         span,
     );
     choice.set_identifier(identifier);
+    choice.set_dynamic_binding(dynamic_binding);
     choice.set_condition(condition);
     choice.set_indentation_depth(indentation_depth);
 
@@ -89,6 +108,79 @@ pub(super) fn parse_choice(parser: &mut RuleParser<'_>) -> Option<Choice> {
     choice.set_is_invisible_default(is_invisible_default);
 
     Some(choice)
+}
+
+fn parse_dynamic_choice_binding(
+    choice_body: &str,
+    span: &SourceSpan,
+) -> Result<(Option<DynamicChoiceBinding>, String), String> {
+    let remaining = choice_body.trim_start();
+    let Some(after_open) = remaining.strip_prefix('[') else {
+        return Ok((None, choice_body.to_string()));
+    };
+    let Some(close_index) = scan::find_matching_delimiter(after_open, '[', ']') else {
+        return Ok((None, choice_body.to_string()));
+    };
+
+    let header = &after_open[..close_index];
+    let Some((variables_source, iterable_source)) = split_dynamic_choice_header(header) else {
+        return Ok((None, choice_body.to_string()));
+    };
+
+    let variable_names =
+        scan::split_top_level_with_options(variables_source, ',', scan::ScanOptions::expression());
+    if !(1..=2).contains(&variable_names.len()) {
+        return Err(format!(
+            "Dynamic choice binding expects one item variable or `index, item` variables but got {}",
+            variable_names.len()
+        ));
+    }
+    if !variable_names.iter().all(|name| is_identifier(name.trim())) {
+        return Err("Dynamic choice binding variables must be identifiers".to_string());
+    }
+    if has_duplicate_variable_names(&variable_names) {
+        return Err("Dynamic choice binding variables must be unique".to_string());
+    }
+
+    let iterable = super::parse_initial_expression(iterable_source.trim()).ok_or_else(|| {
+        "Dynamic choice binding expects an array expression after `in`".to_string()
+    })?;
+    let prefix = format!("$choice{}_{}", span.line, span.column);
+    let variables = variable_names
+        .into_iter()
+        .enumerate()
+        .map(|(index, name)| DynamicChoiceVariable::new(name.trim(), format!("{prefix}_v{index}")))
+        .collect();
+    let binding = DynamicChoiceBinding::new(
+        variables,
+        iterable,
+        format!("{prefix}_arr"),
+        format!("{prefix}_i"),
+        format!("{prefix}_n"),
+    );
+    let after_binding = after_open[close_index + ']'.len_utf8()..]
+        .trim_start()
+        .to_string();
+
+    Ok((Some(binding), after_binding))
+}
+
+fn split_dynamic_choice_header(source: &str) -> Option<(&str, &str)> {
+    for (index, token) in scan::top_level_token_matches_with_options(
+        source,
+        &[" in "],
+        scan::ScanOptions::expression(),
+    ) {
+        if token == " in " {
+            return Some((&source[..index], &source[index + token.len()..]));
+        }
+    }
+    None
+}
+
+fn has_duplicate_variable_names(variable_names: &[&str]) -> bool {
+    let mut seen = HashSet::new();
+    variable_names.iter().any(|name| !seen.insert(name.trim()))
 }
 
 fn parse_choice_identifier(choice_body: &str) -> (Option<String>, String) {

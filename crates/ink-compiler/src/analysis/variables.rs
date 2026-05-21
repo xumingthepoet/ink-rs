@@ -97,6 +97,9 @@ pub(super) fn build_variable_scope_index_with_type_indexes(
                 Object::ForLoop(for_loop) => {
                     self.index_loop_variables(for_loop, context);
                 }
+                Object::Choice(choice) => {
+                    self.index_dynamic_choice_variables(choice, context);
+                }
                 _ => {}
             }
         }
@@ -170,6 +173,85 @@ pub(super) fn build_variable_scope_index_with_type_indexes(
                 }
             }
         }
+
+        fn index_dynamic_choice_variables(
+            &mut self,
+            choice: &crate::parsed::Choice,
+            context: &VisitContext,
+        ) {
+            let Some(binding) = choice.dynamic_binding() else {
+                return;
+            };
+            let Ok(iterable_type) = infer_expression_type(
+                binding.iterable(),
+                &self.index,
+                self.struct_types,
+                self.enum_types,
+                self.target_symbols,
+                self.interface_members,
+                context.current_module.as_deref(),
+                context.current_flow_path.as_deref(),
+            ) else {
+                return;
+            };
+            let Some(element_type) = iterable_type.array_element_type().cloned() else {
+                return;
+            };
+
+            if let Some(flow_path) = &context.current_flow_path {
+                self.index.insert_local(
+                    context.current_module.as_deref(),
+                    flow_path.clone(),
+                    binding.array_name().to_string(),
+                    Some(iterable_type.clone()),
+                );
+                self.index.insert_local(
+                    context.current_module.as_deref(),
+                    flow_path.clone(),
+                    binding.index_name().to_string(),
+                    Some(crate::parsed::TypeName::int()),
+                );
+                self.index.insert_local(
+                    context.current_module.as_deref(),
+                    flow_path.clone(),
+                    binding.limit_name().to_string(),
+                    Some(crate::parsed::TypeName::int()),
+                );
+                insert_dynamic_choice_binding_variables(
+                    &mut self.index,
+                    context.current_module.as_deref(),
+                    Some(flow_path.as_str()),
+                    binding,
+                    element_type,
+                );
+            } else {
+                self.index.insert_global(
+                    context.current_module.as_deref(),
+                    binding.array_name().to_string(),
+                    Some(iterable_type.clone()),
+                    VariableSymbolKind::GlobalVariable,
+                );
+                self.index.insert_global(
+                    context.current_module.as_deref(),
+                    binding.index_name().to_string(),
+                    Some(crate::parsed::TypeName::int()),
+                    VariableSymbolKind::GlobalVariable,
+                );
+                self.index.insert_global(
+                    context.current_module.as_deref(),
+                    binding.limit_name().to_string(),
+                    Some(crate::parsed::TypeName::int()),
+                    VariableSymbolKind::GlobalVariable,
+                );
+                insert_dynamic_choice_binding_variables(
+                    &mut self.index,
+                    context.current_module.as_deref(),
+                    None,
+                    binding,
+                    element_type,
+                );
+            }
+        }
     }
 
     let mut visitor = VariableScopeVisitor {
@@ -181,6 +263,65 @@ pub(super) fn build_variable_scope_index_with_type_indexes(
     };
     walk_story(story, &mut visitor);
     visitor.index
+}
+
+fn insert_dynamic_choice_binding_variables(
+    index: &mut VariableScopeIndex,
+    current_module: Option<&str>,
+    flow_path: Option<&str>,
+    binding: &crate::parsed::DynamicChoiceBinding,
+    element_type: crate::parsed::TypeName,
+) {
+    match binding.variables() {
+        [item] => insert_dynamic_choice_variable(
+            index,
+            current_module,
+            flow_path,
+            item.runtime_name().to_string(),
+            element_type,
+        ),
+        [index_variable, item] => {
+            insert_dynamic_choice_variable(
+                index,
+                current_module,
+                flow_path,
+                index_variable.runtime_name().to_string(),
+                crate::parsed::TypeName::int(),
+            );
+            insert_dynamic_choice_variable(
+                index,
+                current_module,
+                flow_path,
+                item.runtime_name().to_string(),
+                element_type,
+            );
+        }
+        _ => {}
+    }
+}
+
+fn insert_dynamic_choice_variable(
+    index: &mut VariableScopeIndex,
+    current_module: Option<&str>,
+    flow_path: Option<&str>,
+    name: String,
+    variable_type: crate::parsed::TypeName,
+) {
+    if let Some(flow_path) = flow_path {
+        index.insert_local(
+            current_module,
+            flow_path.to_string(),
+            name,
+            Some(variable_type),
+        );
+    } else {
+        index.insert_global(
+            current_module,
+            name,
+            Some(variable_type),
+            VariableSymbolKind::GlobalVariable,
+        );
+    }
 }
 
 #[cfg(test)]

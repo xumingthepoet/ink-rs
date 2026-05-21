@@ -233,6 +233,9 @@ fn walk_choice<V>(choice: &Choice, visitor: &mut V, context: &VisitContext)
 where
     V: ParsedVisitor + ?Sized,
 {
+    if let Some(binding) = choice.dynamic_binding() {
+        walk_expression(binding.iterable(), visitor, context);
+    }
     if let Some(condition) = choice.condition() {
         walk_expression(condition, visitor, context);
     }

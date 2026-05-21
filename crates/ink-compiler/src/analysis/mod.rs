@@ -4,6 +4,7 @@ mod assignments;
 mod constants;
 mod context;
 mod dict_literals;
+mod dynamic_choices;
 mod enums;
 mod expected_expressions;
 mod expression_types;
@@ -34,6 +35,7 @@ use array_literals::array_literal_diagnostics_with_indexes;
 use assignments::variable_assignment_diagnostics_with_indexes;
 use constants::constant_redefinition_diagnostics;
 use dict_literals::dict_literal_diagnostics_with_indexes;
+use dynamic_choices::dynamic_choice_diagnostics_with_indexes;
 use enums::enum_type_diagnostics;
 use field_access::field_access_diagnostics_with_indexes;
 use flow::flow_diagnostics_with_indexes;
@@ -156,6 +158,10 @@ fn run_analysis_passes_with_modules(
     // control-flow shape rather than target availability.
     diagnostics.extend(flow_diagnostics_with_indexes(story, &analysis_indexes));
     diagnostics.extend(for_loop_diagnostics_with_indexes(story, &analysis_indexes));
+    diagnostics.extend(dynamic_choice_diagnostics_with_indexes(
+        story,
+        &analysis_indexes,
+    ));
 
     // Target checks build symbol and variable-scope indexes.
     // Keep this after naming/flow diagnostics so resolution errors do not hide
@@ -210,6 +216,7 @@ mod tests {
         ("constants.rs", include_str!("constants.rs")),
         ("context.rs", include_str!("context.rs")),
         ("dict_literals.rs", include_str!("dict_literals.rs")),
+        ("dynamic_choices.rs", include_str!("dynamic_choices.rs")),
         ("enums.rs", include_str!("enums.rs")),
         ("expression_types.rs", include_str!("expression_types.rs")),
         ("field_access.rs", include_str!("field_access.rs")),

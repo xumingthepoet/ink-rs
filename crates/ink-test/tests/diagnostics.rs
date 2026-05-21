@@ -173,6 +173,28 @@ fn dict_builtin_diagnostics_report_invalid_collection_builtin_arguments() {
 }
 
 #[test]
+fn dynamic_choice_diagnostics_reject_labels() {
+    let diagnostics = diagnostics_for_fixture("diagnostics/dynamic-choice-label.ink");
+
+    assert_diagnostic(
+        &diagnostics,
+        DiagnosticSeverity::Error,
+        "Dynamic choices do not support labels",
+    );
+}
+
+#[test]
+fn dynamic_choice_diagnostics_require_array_iterables() {
+    let diagnostics = diagnostics_for_fixture("diagnostics/dynamic-choice-non-array.ink");
+
+    assert_diagnostic(
+        &diagnostics,
+        DiagnosticSeverity::Error,
+        "Dynamic choice iterable has type int but expected array",
+    );
+}
+
+#[test]
 fn dict_literal_diagnostics_report_duplicate_keys() {
     let diagnostics = diagnostics_for_fixture("diagnostics/dicts/duplicate-keys.ink");
 
