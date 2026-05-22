@@ -1,6 +1,6 @@
 use crate::{
     app::{InkApp, InkAppInteraction, InkAppOptions, InkChoicePrompt, InkToast},
-    runtime::{InkRuntime, InkSource},
+    runtime::{InkGameSource, InkRuntime, InkSource},
     styled_text::{
         parse_style_markup, parse_style_markup_with_tags, style_from_tags, StyledSegment, TextStyle,
     },
@@ -23,6 +23,8 @@ static WEB_CONFIG: OnceLock<WebLaunchConfig> = OnceLock::new();
 #[derive(Debug, Clone)]
 pub struct WebLaunchConfig {
     pub sources: &'static [InkSource],
+    pub games: &'static [InkGameSource],
+    pub catalog_mode: bool,
     pub app_label: &'static str,
     pub storage_key: &'static str,
     pub save_schema_version: u32,
@@ -40,6 +42,27 @@ impl WebLaunchConfig {
     pub const fn new(sources: &'static [InkSource]) -> Self {
         Self {
             sources,
+            games: &[],
+            catalog_mode: false,
+            app_label: "ink-rs",
+            storage_key: DEFAULT_WEB_SAVE_STORAGE_KEY,
+            save_schema_version: DEFAULT_WEB_SAVE_SCHEMA_VERSION,
+            default_story_title: "ink-rs Story",
+            default_prompt_title: "Choices",
+            default_prompt_title_function: None,
+            text_reveal_chars_per_second: DEFAULT_TEXT_REVEAL_CHARS_PER_SECOND,
+            text_reveal_tick_ms: DEFAULT_TEXT_REVEAL_TICK_MS,
+            toast_duration_ticks: DEFAULT_TOAST_DURATION_TICKS,
+            css: DEFAULT_WEB_CSS,
+            messages: WebMessages::DEFAULT,
+        }
+    }
+
+    pub const fn new_catalog(games: &'static [InkGameSource]) -> Self {
+        Self {
+            sources: &[],
+            games,
+            catalog_mode: true,
             app_label: "ink-rs",
             storage_key: DEFAULT_WEB_SAVE_STORAGE_KEY,
             save_schema_version: DEFAULT_WEB_SAVE_SCHEMA_VERSION,
@@ -116,10 +139,30 @@ impl WebLaunchConfig {
 
         options
     }
+
+    fn app_options_for_game(&self, game: &InkGameSource) -> InkAppOptions {
+        let mut options = InkAppOptions::new()
+            .with_default_story_title(game.title)
+            .with_default_prompt_title(self.default_prompt_title);
+
+        if let Some(function_path) = self.default_prompt_title_function {
+            options = options.with_default_prompt_title_function(function_path);
+        }
+
+        options
+    }
+
+    fn has_catalog(&self) -> bool {
+        self.catalog_mode
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct WebMessages {
+    pub catalog_kicker: &'static str,
+    pub catalog_title: &'static str,
+    pub catalog_empty_text: &'static str,
+    pub back_to_catalog_title: &'static str,
     pub choices_kicker: &'static str,
     pub error_title: &'static str,
     pub error_hint: &'static str,
@@ -134,6 +177,10 @@ pub struct WebMessages {
 
 impl WebMessages {
     pub const DEFAULT: Self = Self {
+        catalog_kicker: "GAMES",
+        catalog_title: "Text games",
+        catalog_empty_text: "No embedded ink-rs games.",
+        back_to_catalog_title: "Games",
         choices_kicker: "CHOICES",
         error_title: "Could not start",
         error_hint: "Check ink compiler diagnostics and rebuild.",
@@ -164,8 +211,10 @@ fn config() -> &'static WebLaunchConfig {
 fn web_app() -> Element {
     let mut game = use_signal(WebGameState::new);
     use_future(move || async move {
-        let saved_state = read_web_save().await;
-        game.write().finish_storage_restore(saved_state);
+        if !config().has_catalog() {
+            let saved_state = read_web_save(config().storage_key.to_string()).await;
+            game.write().finish_storage_restore(saved_state);
+        }
     });
     use_future(move || async move {
         loop {
@@ -194,67 +243,66 @@ fn web_app() -> Element {
     let app_label = config().app_label;
     let choices_kicker = config().messages.choices_kicker;
     let speed_up_title = config().messages.speed_up_title;
+    let back_to_catalog_title = config().messages.back_to_catalog_title;
 
     rsx! {
         style { "{css}" }
-        main {
-            class: "web-shell",
-            section { class: "story-panel",
-                header { class: "story-header",
-                    div { class: "brand-block",
-                        span { class: "kicker", "{app_label}" }
-                        h1 { "{view.story_title}" }
+        if view.is_catalog {
+            main {
+                class: "catalog-shell",
+                section { class: "catalog-panel",
+                    header { class: "catalog-header",
+                        span { class: "kicker", "{view.catalog_kicker}" }
+                        h1 { "{view.catalog_title}" }
                     }
-                }
-                div { class: "transcript-frame",
-                    div { class: "transcript-scroll",
-                        for paragraph in view.paragraphs {
-                            p { class: "story-line",
-                                for segment in paragraph.segments {
-                                    span { style: "{segment.style_attr}", "{segment.text}" }
+                    if view.catalog_games.is_empty() {
+                        div { class: "catalog-empty", "{view.catalog_empty_text}" }
+                    } else {
+                        div { class: "catalog-grid",
+                            for catalog_game in view.catalog_games {
+                                button {
+                                    key: "{catalog_game.id}",
+                                    class: "catalog-card",
+                                    onclick: move |_| {
+                                        let game_index = catalog_game.index;
+                                        spawn(async move {
+                                            let saved_state = read_web_save(
+                                                storage_key_for_game_index(game_index),
+                                            ).await;
+                                            game.write().select_game(game_index, saved_state);
+                                        });
+                                    },
+                                    span { class: "kicker", "{app_label}" }
+                                    h2 { "{catalog_game.title}" }
+                                    p { "{catalog_game.description}" }
                                 }
                             }
                         }
                     }
                 }
             }
-
-            aside { class: "choice-panel",
-                div { class: "choice-panel-header",
-                    if !view.choice_title.is_empty() {
-                        span { class: "kicker", "{choices_kicker}" }
-                        h2 { "{view.choice_title}" }
-                    }
-                }
-
-                if view.is_revealing {
-                    div {
-                        class: "choice-read-surface",
-                        title: "{speed_up_title}",
-                        onclick: move |_| game.write().accelerate_transcript_reveal(),
-                    }
-                } else if view.choices.is_empty() {
-                    div { class: "empty-choices", "{view.empty_choice_text}" }
-                } else {
-                    div { class: "choice-list",
-                        for choice in view.choices {
+        } else {
+            main {
+                class: "web-shell",
+                section { class: "story-panel",
+                    header { class: "story-header",
+                        div { class: "brand-block",
+                            span { class: "kicker", "{app_label}" }
+                            h1 { "{view.story_title}" }
+                        }
+                        if view.can_return_to_catalog {
                             button {
-                                key: "{choice.index}",
-                                class: "{choice.class_name}",
-                                disabled: !choice.enabled,
-                                onpointerdown: move |_| game.write().press_choice(choice.index),
-                                onpointerup: move |_| game.write().release_choice(),
-                                onpointercancel: move |_| game.write().release_choice(),
-                                onpointerleave: move |_| game.write().release_choice(),
-                                onblur: move |_| game.write().release_choice(),
-                                onclick: move |_| game.write().submit_choice(choice.index),
-                                span {
-                                    class: "choice-number",
-                                    style: "{choice.base_style_attr}",
-                                    "{choice.display_number}"
-                                }
-                                span { class: "choice-label",
-                                    for segment in choice.segments {
+                                class: "catalog-back-button",
+                                onclick: move |_| game.write().return_to_catalog(),
+                                "{back_to_catalog_title}"
+                            }
+                        }
+                    }
+                    div { class: "transcript-frame",
+                        div { class: "transcript-scroll",
+                            for paragraph in view.paragraphs {
+                                p { class: "story-line",
+                                    for segment in paragraph.segments {
                                         span { style: "{segment.style_attr}", "{segment.text}" }
                                     }
                                 }
@@ -262,13 +310,58 @@ fn web_app() -> Element {
                         }
                     }
                 }
-            }
 
-            if let Some(toast) = toast {
-                div { class: "toast-layer",
-                    div { class: "toast-card", role: "status", aria_live: "polite",
-                        for segment in toast.segments {
-                            span { style: "{segment.style_attr}", "{segment.text}" }
+                aside { class: "choice-panel",
+                    div { class: "choice-panel-header",
+                        if !view.choice_title.is_empty() {
+                            span { class: "kicker", "{choices_kicker}" }
+                            h2 { "{view.choice_title}" }
+                        }
+                    }
+
+                    if view.is_revealing {
+                        div {
+                            class: "choice-read-surface",
+                            title: "{speed_up_title}",
+                            onclick: move |_| game.write().accelerate_transcript_reveal(),
+                        }
+                    } else if view.choices.is_empty() {
+                        div { class: "empty-choices", "{view.empty_choice_text}" }
+                    } else {
+                        div { class: "choice-list",
+                            for choice in view.choices {
+                                button {
+                                    key: "{choice.index}",
+                                    class: "{choice.class_name}",
+                                    disabled: !choice.enabled,
+                                    onpointerdown: move |_| game.write().press_choice(choice.index),
+                                    onpointerup: move |_| game.write().release_choice(),
+                                    onpointercancel: move |_| game.write().release_choice(),
+                                    onpointerleave: move |_| game.write().release_choice(),
+                                    onblur: move |_| game.write().release_choice(),
+                                    onclick: move |_| game.write().submit_choice(choice.index),
+                                    span {
+                                        class: "choice-number",
+                                        style: "{choice.base_style_attr}",
+                                        "{choice.display_number}"
+                                    }
+                                    span { class: "choice-label",
+                                        for segment in choice.segments {
+                                            span { style: "{segment.style_attr}", "{segment.text}" }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if let Some(toast) = toast {
+                    div { class: "toast-layer",
+                        div { class: "toast-card", role: "status", aria_live: "polite",
+                            for segment in toast.segments {
+                                span { style: "{segment.style_attr}", "{segment.text}" }
+                            }
                         }
                     }
                 }
@@ -278,6 +371,7 @@ fn web_app() -> Element {
 }
 
 struct WebGameState {
+    active_game_index: Option<usize>,
     app: Option<InkApp>,
     transcript: TranscriptBuffer,
     target_transcript_text: String,
@@ -311,6 +405,12 @@ struct ScrollSync {
 
 #[derive(Debug)]
 struct WebView {
+    is_catalog: bool,
+    catalog_kicker: String,
+    catalog_title: String,
+    catalog_empty_text: String,
+    catalog_games: Vec<WebCatalogGameView>,
+    can_return_to_catalog: bool,
     story_title: String,
     paragraphs: Vec<WebParagraphView>,
     choice_title: String,
@@ -318,6 +418,14 @@ struct WebView {
     empty_choice_text: String,
     is_revealing: bool,
     toast: Option<WebToastView>,
+}
+
+#[derive(Debug)]
+struct WebCatalogGameView {
+    index: usize,
+    id: String,
+    title: String,
+    description: String,
 }
 
 #[derive(Debug, Clone)]
@@ -355,7 +463,19 @@ struct WebTextSegment {
 
 impl WebGameState {
     fn new() -> Self {
-        let mut state = Self {
+        let mut state = Self::blank(None);
+        if config().has_catalog() {
+            state.storage_ready = true;
+            return state;
+        }
+
+        state.load_current_game();
+        state
+    }
+
+    fn blank(active_game_index: Option<usize>) -> Self {
+        Self {
+            active_game_index,
             app: None,
             transcript: TranscriptBuffer::default(),
             target_transcript_text: String::new(),
@@ -370,37 +490,61 @@ impl WebGameState {
             toast_queue: VecDeque::new(),
             storage_ready: false,
             error: None,
-        };
+        }
+    }
 
-        let runtime = match InkRuntime::load_from_ink_sources(config().sources) {
+    fn load_current_game(&mut self) {
+        let runtime = match InkRuntime::load_from_ink_sources(self.active_sources()) {
             Ok(Some(runtime)) => runtime,
             Ok(None) => {
-                state.error = Some(config().messages.no_sources_text.to_string());
-                return state;
+                self.error = Some(config().messages.no_sources_text.to_string());
+                return;
             }
             Err(error) => {
-                state.error = Some(error.to_string());
-                return state;
+                self.error = Some(error.to_string());
+                return;
             }
         };
 
-        match InkApp::with_options(runtime, config().app_options()) {
-            Ok(app) => state.app = Some(app),
+        match InkApp::with_options(runtime, self.active_app_options()) {
+            Ok(app) => self.app = Some(app),
             Err(error) => {
-                state.error = Some(error.to_string());
-                return state;
+                self.error = Some(error.to_string());
+                return;
             }
         }
 
-        state.consume_output();
-        state
+        self.consume_output();
+    }
+
+    fn select_game(&mut self, game_index: usize, saved_state: Option<String>) {
+        if config().games.get(game_index).is_none() {
+            *self = Self::blank(None);
+            self.error = Some("selected game is not available".to_string());
+            self.storage_ready = true;
+            return;
+        }
+
+        *self = Self::blank(Some(game_index));
+        self.load_current_game();
+        self.finish_storage_restore(saved_state);
+    }
+
+    fn return_to_catalog(&mut self) {
+        if !config().has_catalog() {
+            return;
+        }
+
+        *self = Self::blank(None);
+        self.storage_ready = true;
     }
 
     fn finish_storage_restore(&mut self, saved_state: Option<String>) {
         if self.error.is_none() {
             if let Some(saved_state) = saved_state {
                 if self.restore_from_web_save(&saved_state).is_err() {
-                    clear_web_save();
+                    let storage_key = self.active_storage_key();
+                    clear_web_save(&storage_key);
                 }
             }
         }
@@ -417,19 +561,16 @@ impl WebGameState {
             return Err("save version is stale".to_string());
         }
 
-        if save.content_fingerprint != embedded_ink_fingerprint() {
+        if save.content_fingerprint != embedded_ink_fingerprint(self.active_sources()) {
             return Err("save content version does not match current story".to_string());
         }
 
-        let runtime = InkRuntime::load_from_ink_sources(config().sources)
+        let runtime = InkRuntime::load_from_ink_sources(self.active_sources())
             .map_err(|error| error.to_string())?
             .ok_or_else(|| config().messages.no_sources_text.to_string())?;
-        let mut app = InkApp::from_saved_state_with_options(
-            runtime,
-            &save.story_state,
-            config().app_options(),
-        )
-        .map_err(|error| error.to_string())?;
+        let options = self.active_app_options();
+        let mut app = InkApp::from_saved_state_with_options(runtime, &save.story_state, options)
+            .map_err(|error| error.to_string())?;
         app.restore_ui_titles(save.story_title, save.prompt_title);
 
         self.app = Some(app);
@@ -446,10 +587,56 @@ impl WebGameState {
         Ok(())
     }
 
+    fn active_game(&self) -> Option<&'static InkGameSource> {
+        config().games.get(self.active_game_index?)
+    }
+
+    fn active_sources(&self) -> &'static [InkSource] {
+        self.active_game()
+            .map(|game| game.sources)
+            .unwrap_or(config().sources)
+    }
+
+    fn active_app_options(&self) -> InkAppOptions {
+        self.active_game()
+            .map(|game| config().app_options_for_game(game))
+            .unwrap_or_else(|| config().app_options())
+    }
+
+    fn active_storage_key(&self) -> String {
+        self.active_game_index
+            .map(storage_key_for_game_index)
+            .unwrap_or_else(|| config().storage_key.to_string())
+    }
+
     fn view(&self) -> WebView {
         let messages = config().messages;
+        if config().has_catalog() && self.active_game_index.is_none() && self.error.is_none() {
+            return WebView {
+                is_catalog: true,
+                catalog_kicker: messages.catalog_kicker.to_string(),
+                catalog_title: messages.catalog_title.to_string(),
+                catalog_empty_text: messages.catalog_empty_text.to_string(),
+                catalog_games: catalog_game_views(),
+                can_return_to_catalog: false,
+                story_title: String::new(),
+                paragraphs: Vec::new(),
+                choice_title: String::new(),
+                choices: Vec::new(),
+                empty_choice_text: String::new(),
+                is_revealing: false,
+                toast: None,
+            };
+        }
+
         if let Some(error) = &self.error {
             return WebView {
+                is_catalog: false,
+                catalog_kicker: String::new(),
+                catalog_title: String::new(),
+                catalog_empty_text: String::new(),
+                catalog_games: Vec::new(),
+                can_return_to_catalog: config().has_catalog(),
                 story_title: messages.error_title.to_string(),
                 paragraphs: vec![plain_paragraph(error)],
                 choice_title: messages.error_title.to_string(),
@@ -462,6 +649,12 @@ impl WebGameState {
 
         if !self.storage_ready {
             return WebView {
+                is_catalog: false,
+                catalog_kicker: String::new(),
+                catalog_title: String::new(),
+                catalog_empty_text: String::new(),
+                catalog_games: Vec::new(),
+                can_return_to_catalog: config().has_catalog(),
                 story_title: self.story_title().to_string(),
                 paragraphs: vec![plain_paragraph(messages.storage_loading_text)],
                 choice_title: messages.ended_title.to_string(),
@@ -482,6 +675,12 @@ impl WebGameState {
 
         if is_revealing {
             return WebView {
+                is_catalog: false,
+                catalog_kicker: String::new(),
+                catalog_title: String::new(),
+                catalog_empty_text: String::new(),
+                catalog_games: Vec::new(),
+                can_return_to_catalog: config().has_catalog(),
                 story_title: self.story_title().to_string(),
                 paragraphs,
                 choice_title: self.default_prompt_title().to_string(),
@@ -494,6 +693,12 @@ impl WebGameState {
 
         match interaction {
             InkAppInteraction::Choice(prompt) => WebView {
+                is_catalog: false,
+                catalog_kicker: String::new(),
+                catalog_title: String::new(),
+                catalog_empty_text: String::new(),
+                catalog_games: Vec::new(),
+                can_return_to_catalog: config().has_catalog(),
                 story_title: self.story_title().to_string(),
                 paragraphs,
                 choice_title: choice_title(&prompt),
@@ -503,6 +708,12 @@ impl WebGameState {
                 toast: self.toast_view(),
             },
             InkAppInteraction::Ended => WebView {
+                is_catalog: false,
+                catalog_kicker: String::new(),
+                catalog_title: String::new(),
+                catalog_empty_text: String::new(),
+                catalog_games: Vec::new(),
+                can_return_to_catalog: config().has_catalog(),
                 story_title: self.story_title().to_string(),
                 paragraphs,
                 choice_title: messages.ended_title.to_string(),
@@ -696,7 +907,7 @@ impl WebGameState {
 
         let save_state = WebSaveState {
             schema_version: config().save_schema_version,
-            content_fingerprint: embedded_ink_fingerprint(),
+            content_fingerprint: embedded_ink_fingerprint(self.active_sources()),
             story_state,
             transcript_text: self.target_transcript_text.clone(),
             story_title: app.story_title().to_string(),
@@ -704,7 +915,8 @@ impl WebGameState {
         };
 
         if let Ok(serialized) = serde_json::to_string(&save_state) {
-            write_web_save(&serialized);
+            let storage_key = self.active_storage_key();
+            write_web_save(&storage_key, &serialized);
             self.last_saved_prompt_revision = prompt.revision;
         }
     }
@@ -727,6 +939,7 @@ impl WebGameState {
         self.app
             .as_ref()
             .map(InkApp::story_title)
+            .or_else(|| self.active_game().map(|game| game.title))
             .unwrap_or(config().default_story_title)
     }
 
@@ -763,8 +976,8 @@ impl WebGameState {
     }
 }
 
-async fn read_web_save() -> Option<String> {
-    let storage_key = js_string_literal(config().storage_key);
+async fn read_web_save(storage_key: String) -> Option<String> {
+    let storage_key = js_string_literal(&storage_key);
     let script = format!(
         r#"
 try {{
@@ -782,8 +995,8 @@ try {{
         .flatten()
 }
 
-fn write_web_save(serialized_save: &str) {
-    let storage_key = js_string_literal(config().storage_key);
+fn write_web_save(storage_key: &str, serialized_save: &str) {
+    let storage_key = js_string_literal(storage_key);
     let serialized_save = js_string_literal(serialized_save);
     let script = format!(
         r#"
@@ -796,8 +1009,8 @@ try {{
     let _ = document::eval(&script);
 }
 
-fn clear_web_save() {
-    let storage_key = js_string_literal(config().storage_key);
+fn clear_web_save(storage_key: &str) {
+    let storage_key = js_string_literal(storage_key);
     let script = format!(
         r#"
 try {{
@@ -813,9 +1026,9 @@ fn js_string_literal(value: &str) -> String {
     serde_json::to_string(value).expect("string should serialize to a JavaScript literal")
 }
 
-fn embedded_ink_fingerprint() -> String {
+fn embedded_ink_fingerprint(sources: &[InkSource]) -> String {
     let mut hash = 0xcbf2_9ce4_8422_2325;
-    for source in config().sources {
+    for source in sources {
         update_fnv1a(&mut hash, source.filename.as_bytes());
         update_fnv1a(&mut hash, &[0]);
         update_fnv1a(&mut hash, source.source.as_bytes());
@@ -831,6 +1044,28 @@ fn update_fnv1a(hash: &mut u64, bytes: &[u8]) {
         *hash ^= u64::from(*byte);
         *hash = hash.wrapping_mul(FNV_PRIME);
     }
+}
+
+fn catalog_game_views() -> Vec<WebCatalogGameView> {
+    config()
+        .games
+        .iter()
+        .enumerate()
+        .map(|(index, game)| WebCatalogGameView {
+            index,
+            id: game.id.to_string(),
+            title: game.title.to_string(),
+            description: game.description.to_string(),
+        })
+        .collect()
+}
+
+fn storage_key_for_game_index(game_index: usize) -> String {
+    config()
+        .games
+        .get(game_index)
+        .map(|game| format!("{}.{}", config().storage_key, game.id))
+        .unwrap_or_else(|| config().storage_key.to_string())
 }
 
 fn choice_title(prompt: &InkChoicePrompt) -> String {

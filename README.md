@@ -15,6 +15,7 @@ available when a project wants tighter dependency control.
 - `ink-compiler`: compiler from ink-rs source to compiled story JSON.
 - `ink-story-json-format`: typed compiled story JSON wire model and codec.
 - `ink-dioxus`: reusable Dioxus UI adapter for ink-rs game crates.
+- `text-games-app`: playable web hub for bundled ink-rs text games.
 
 `ink-test` and `ink-tools` are repository-internal crates and are not published.
 
@@ -41,11 +42,15 @@ Use `full` to enable both runtime and compiler APIs explicitly.
 
 Game crates that want the shared Dioxus UI shell can depend on `ink-dioxus` with
 the `web` feature. The game crate owns its `.ink` files and passes embedded
-`InkSource` values to `ink_dioxus::web::launch`.
+`InkSource` values to `ink_dioxus::web::launch`, or embedded `InkGameSource`
+values to `ink_dioxus::web::WebLaunchConfig::new_catalog` for a multi-game hub.
 
 `ink-dioxus` also exposes a build-script helper that generates that embedded
 source list from `assets/ink/src`, so adding or renaming `.ink` files does not
 require manually editing an `include_str!` array.
+
+The repository app crate `text-games-app` uses the catalog path to serve all
+bundled text games from one web entry point.
 
 ## Runtime Use
 

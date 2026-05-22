@@ -14,6 +14,30 @@ impl InkSource {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct InkGameSource {
+    pub id: &'static str,
+    pub title: &'static str,
+    pub description: &'static str,
+    pub sources: &'static [InkSource],
+}
+
+impl InkGameSource {
+    pub const fn new(
+        id: &'static str,
+        title: &'static str,
+        description: &'static str,
+        sources: &'static [InkSource],
+    ) -> Self {
+        Self {
+            id,
+            title,
+            description,
+            sources,
+        }
+    }
+}
+
 fn strip_bom(content: &str) -> &str {
     content.strip_prefix('\u{FEFF}').unwrap_or(content)
 }

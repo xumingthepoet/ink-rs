@@ -1513,15 +1513,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ink-experiments"
-version = "0.1.0"
-dependencies = [
- "ink-compiler",
- "ink-runtime",
- "serde_json",
-]
-
-[[package]]
 name = "ink-rs"
 version = "0.1.0"
 dependencies = [
@@ -2662,6 +2653,13 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "text-games-app"
+version = "0.1.0"
+dependencies = [
+ "ink-dioxus",
 ]
 
 [[package]]

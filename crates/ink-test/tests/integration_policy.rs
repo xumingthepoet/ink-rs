@@ -11,8 +11,8 @@ const ALLOWED_SOURCE_CONSTRUCTION_TESTS: &[&str] = &[];
 const DISABLED_TEST_HARNESS_SOURCE_ROOTS: &[(&str, &str)] = &[
     ("Cargo.toml", "src"),
     (
-        "crates/ink-experiments/Cargo.toml",
-        "crates/ink-experiments/src",
+        "crates/text-games-app/Cargo.toml",
+        "crates/text-games-app/src",
     ),
     ("crates/ink-test/Cargo.toml", "crates/ink-test/src"),
     ("crates/ink-tools/Cargo.toml", "crates/ink-tools/src"),

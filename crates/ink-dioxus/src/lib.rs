@@ -18,6 +18,7 @@ pub use app::{
     InkApp, InkAppInteraction, InkAppOptions, InkChoiceOption, InkChoicePrompt, InkToast,
 };
 pub use runtime::{
-    InkError, InkRuntime, InkSource, RuntimeChoice, RuntimePause, RuntimeStep, TextItem,
+    InkError, InkGameSource, InkRuntime, InkSource, RuntimeChoice, RuntimePause, RuntimeStep,
+    TextItem,
 };
 pub use transcript::TranscriptBuffer;

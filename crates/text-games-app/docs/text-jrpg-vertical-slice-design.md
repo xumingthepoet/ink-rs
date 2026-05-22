@@ -423,7 +423,7 @@ that verifies:
 Run:
 
 ```text
-cargo test -p ink-experiments
+cargo check -p text-games-app
 git diff --check
 ```
 

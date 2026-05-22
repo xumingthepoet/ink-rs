@@ -49,7 +49,8 @@ defined by this repository.
 - `crates/ink-compiler`: parser, parsed model, analysis, lowering, and JSON
   export pipeline
 - `crates/ink-story-json-format`: shared compiled-story JSON format crate
-- `crates/ink-experiments`: executable language-surface experiments
+- `crates/ink-dioxus`: Dioxus-facing game engine and web shell
+- `crates/text-games-app`: playable text game hub built on `ink-dioxus`
 - `crates/ink-test`: conformance and integration tests
 - `docs/LanguageOverview.md`: short current-language entry point
 - `docs/SyntaxReference.md`: current syntax reference for the latest language
@@ -99,8 +100,8 @@ defined by this repository.
 - Keep `docs/SyntaxReference.md` focused only on the latest supported ink-rs
   syntax. Put historical language changes in `docs/SyntaxUpdates.md`, issue
   records, diagnostics tests, or architecture notes instead.
-- When working under `crates/ink-experiments/`, read and follow
-  `crates/ink-experiments/README.md`.
+- When working under `crates/text-games-app/`, read and follow
+  `crates/text-games-app/README.md`.
 
 ## Workflows
 

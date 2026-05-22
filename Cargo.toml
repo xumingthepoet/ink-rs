@@ -38,7 +38,7 @@ members = [
     "crates/ink-dioxus",
     "crates/ink-story-json-format",
     "crates/ink-runtime",
-    "crates/ink-experiments",
+    "crates/text-games-app",
     "crates/ink-test",
     "crates/ink-tools",
 ]
@@ -48,7 +48,7 @@ default-members = [
     "crates/ink-dioxus",
     "crates/ink-story-json-format",
     "crates/ink-runtime",
-    "crates/ink-experiments",
+    "crates/text-games-app",
     "crates/ink-test",
     "crates/ink-tools",
 ]

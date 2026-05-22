@@ -1,8 +1,8 @@
 # ink-dioxus
 
-`ink-dioxus` is the reusable Dioxus adapter for ink-rs games. It keeps the game
-state, rules, and content in ink-rs source while providing a shared Rust UI
-shell for choice-based games.
+`ink-dioxus` is the reusable Dioxus game engine layer for ink-rs games. It keeps
+game state, rules, and content in ink-rs source while providing shared Rust UI
+shells for choice-based games.
 
 The adapter understands these ink-rs tags:
 
@@ -57,3 +57,30 @@ fn main() {
 ```
 
 After that, ordinary game content changes can live in `.ink` files.
+
+## Web Game Catalog
+
+Game hubs can generate a catalog from one directory per game:
+
+```rust
+// build.rs
+fn main() {
+    ink_dioxus::build::generate_ink_game_catalog("assets/ink")
+        .expect("ink-rs game catalog should generate");
+}
+```
+
+Then launch the generated catalog from the web binary:
+
+```rust
+// src/main.rs
+include!(concat!(env!("OUT_DIR"), "/ink_games.rs"));
+
+fn main() {
+    ink_dioxus::web::launch(
+        ink_dioxus::web::WebLaunchConfig::new_catalog(INK_GAMES)
+            .with_app_label("TEXT GAMES")
+            .with_storage_key("text_games.web_save.v1"),
+    );
+}
+```

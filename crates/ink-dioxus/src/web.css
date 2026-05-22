@@ -43,6 +43,123 @@ button {
   font: inherit;
 }
 
+.catalog-shell {
+  width: 100%;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+  padding: 16px;
+}
+
+.catalog-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid rgba(236, 216, 174, 0.22);
+  border-radius: 8px;
+  background: rgba(22, 24, 22, 0.84);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+  overflow: hidden;
+}
+
+.catalog-header {
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(236, 216, 174, 0.16);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.catalog-grid {
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  align-content: start;
+  gap: 12px;
+  padding: 16px;
+  scrollbar-color: rgba(236, 216, 174, 0.35) transparent;
+  scrollbar-gutter: stable;
+}
+
+.catalog-card {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-height: 142px;
+  border: 1px solid rgba(236, 216, 174, 0.18);
+  border-radius: 8px;
+  padding: 14px;
+  color: #f6eddc;
+  background: rgba(255, 255, 255, 0.045);
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition:
+    transform 80ms ease,
+    border-color 80ms ease,
+    background-color 80ms ease,
+    box-shadow 80ms ease;
+}
+
+.catalog-card h2,
+.catalog-card p {
+  margin: 0;
+}
+
+.catalog-card p {
+  color: #c8bdab;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .catalog-card:hover {
+    border-color: rgba(150, 199, 183, 0.5);
+    background: rgba(255, 255, 255, 0.075);
+  }
+}
+
+.catalog-card:active {
+  transform: scale(0.985);
+  border-color: rgba(150, 199, 183, 0.78);
+  background: rgba(86, 135, 118, 0.28);
+}
+
+.catalog-card:focus-visible,
+.catalog-back-button:focus-visible {
+  outline: 2px solid rgba(150, 199, 183, 0.72);
+  outline-offset: 2px;
+}
+
+.catalog-empty {
+  margin: 16px;
+  border: 1px solid rgba(236, 216, 174, 0.16);
+  border-radius: 8px;
+  padding: 16px;
+  color: #c8bdab;
+  background: rgba(255, 255, 255, 0.035);
+  line-height: 1.5;
+}
+
+.catalog-back-button {
+  flex: 0 0 auto;
+  border: 1px solid rgba(236, 216, 174, 0.22);
+  border-radius: 8px;
+  padding: 7px 11px;
+  color: #f6eddc;
+  background: rgba(255, 255, 255, 0.055);
+  cursor: pointer;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .catalog-back-button:hover {
+    border-color: rgba(150, 199, 183, 0.5);
+    background: rgba(255, 255, 255, 0.085);
+  }
+}
+
 .web-shell {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
@@ -293,6 +410,24 @@ h2 {
     height: 100dvh;
     min-height: 0;
     padding: 10px;
+  }
+
+  .catalog-shell {
+    padding: 10px;
+  }
+
+  .catalog-header {
+    padding: 10px 12px;
+  }
+
+  .catalog-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding: 10px;
+  }
+
+  .catalog-card {
+    min-height: 112px;
   }
 
   .story-panel {

@@ -38,6 +38,7 @@ ink-compiler ----------+
 ink-runtime -----------+
 
 ink-dioxus -> ink-compiler + ink-runtime + ink-story-json-format
+text-games-app -> ink-dioxus
 ink-test  -> ink-compiler + ink-runtime
 ink-tools -> ink-compiler
 ```
@@ -57,8 +58,11 @@ Ownership rules:
 - Runtime save-state JSON is separate from compiled-story JSON and remains
   runtime-owned.
 - `crates/ink-dioxus` owns reusable Dioxus-facing game UI glue: embedded source
-  list helpers, ink-rs runtime/app wrappers, shared UI tag interpretation, text
-  reveal, toast handling, and the optional web shell.
+  list helpers, ink-rs runtime/app wrappers, shared UI tag interpretation,
+  multi-game catalogs, text reveal, toast handling, and the optional web shell.
+- `crates/text-games-app` owns the bundled playable text-game hub. It depends on
+  `ink-dioxus` instead of depending directly on compiler, runtime, or format
+  crates.
 
 ## Repository Tree
 
@@ -175,6 +179,17 @@ work. It intentionally omits build output and historical plan internals.
 |   |       |   Optional Dioxus web UI shell behind the `web` feature.
 |   |       `-- web.css
 |   |           Default web shell CSS embedded by `web.rs`.
+|   |-- text-games-app/
+|   |   |-- Cargo.toml
+|   |   |-- Dioxus.toml
+|   |   |-- build.rs
+|   |   |   Generates the embedded multi-game catalog.
+|   |   |-- src/main.rs
+|   |   |   Launches the catalog web app through `ink-dioxus`.
+|   |   |-- assets/ink/
+|   |   |   Bundled playable game source directories.
+|   |   `-- docs/
+|   |       Supporting game design notes.
 |   |-- ink-test/
 |   |   |-- Cargo.toml
 |   |   |-- src/lib.rs
@@ -634,7 +649,8 @@ Use this table to decide where to start.
 | Native operation or typed runtime value wrong | `native_function_call/`, `value_type.rs`, `value.rs` | typed value tests |
 | Variable get/set wrong | `variables_state.rs`, `story/state.rs` | runtime API and variables tests |
 | Save/load bug | `story_state.rs`, `json/json_write.rs`, `flow.rs`, `callstack.rs` | choices/runtime save-load tests |
-| Dioxus game UI, shared UI tags, embedded ink-rs source lists | `crates/ink-dioxus/src/` | `cargo test -p ink-dioxus`, `cargo check -p ink-dioxus --features web` |
+| Dioxus game UI, shared UI tags, embedded ink-rs source lists and catalogs | `crates/ink-dioxus/src/` | `cargo test -p ink-dioxus`, `cargo check -p ink-dioxus --features web` |
+| Playable text game hub or bundled game sources | `crates/text-games-app/` | `cargo check -p text-games-app` |
 | CLI compile behavior | `crates/ink-tools/src/main.rs` | compiler API tests |
 | Test harness or fixture policy | `crates/ink-test/tests/support/`, `integration_policy.rs` | `cargo test -p ink-test --test integration integration_policy` |
 

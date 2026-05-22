@@ -1,7 +1,0 @@
-Battle begins with 3 enemies.
-Spawn id 101 Slime: splits out of the grass.
-Spawn id 204 Ash Bat: drops from the rafters.
-Spawn id 305 Iron Warden: locks the gate.
-Ready id 101: Slime hp=12 threat=1
-Ready id 204: Ash Bat hp=9 threat=2
-Ready id 305: Iron Warden hp=30 threat=5
