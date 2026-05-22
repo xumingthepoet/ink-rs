@@ -27,8 +27,8 @@ pub enum InkError {
 impl fmt::Display for InkError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Compile(reason) => write!(f, "ink compile failed: {reason}"),
-            Self::Runtime(reason) => write!(f, "ink runtime failed: {reason}"),
+            Self::Compile(reason) => write!(f, "ink-rs compile failed: {reason}"),
+            Self::Runtime(reason) => write!(f, "ink-rs runtime failed: {reason}"),
         }
     }
 }

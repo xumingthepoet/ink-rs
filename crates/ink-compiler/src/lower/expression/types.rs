@@ -107,7 +107,7 @@ fn callable_return_type(name: &str, context: &LoweringContext<'_>) -> Option<Typ
         .get(resolved_name.as_str())
         .map(|signature| match signature {
             CallSignature::External { return_type, .. }
-            | CallSignature::Ink { return_type, .. } => name
+            | CallSignature::Internal { return_type, .. } => name
                 .split_once("::")
                 .map(|(module, _)| qualify_type_name_for_module(return_type, module))
                 .unwrap_or_else(|| return_type.clone()),

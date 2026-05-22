@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-const ALLOWED_LEGACY_INK_FIXTURES: &[&str] = &[];
+const ALLOWED_NON_MODULE_INK_FIXTURES: &[&str] = &[];
 
 const ALLOWED_SOURCE_CONSTRUCTION_TESTS: &[&str] = &[];
 
@@ -22,8 +22,6 @@ const BANNED_ORIGIN_LABELS: &[&str] = &[
     "language",
     "conformance",
     "compiler_conformance",
-    "csharp",
-    "csharp_compatibility",
     "inkling",
     "inkfiles",
 ];
@@ -44,33 +42,33 @@ const SOURCE_CONSTRUCTION_PATTERNS: &[&str] = &[
 ];
 
 #[test]
-fn module_fixture_policy_tracks_legacy_ink_files() {
+fn module_fixture_policy_tracks_non_module_ink_files() {
     let fixture_root = ink_test::fixture_root();
-    let legacy_fixtures = ink_files_under(&fixture_root)
+    let non_module_fixtures = ink_files_under(&fixture_root)
         .into_iter()
-        .filter_map(|path| legacy_fixture_path(&fixture_root, &path))
+        .filter_map(|path| non_module_fixture_path(&fixture_root, &path))
         .collect::<BTreeSet<_>>();
-    let allowed = ALLOWED_LEGACY_INK_FIXTURES
+    let allowed = ALLOWED_NON_MODULE_INK_FIXTURES
         .iter()
         .map(|path| path.to_string())
         .collect::<BTreeSet<_>>();
 
-    let unexpected = legacy_fixtures
+    let unexpected = non_module_fixtures
         .difference(&allowed)
         .cloned()
         .collect::<Vec<_>>();
     let stale_allowlist = allowed
-        .difference(&legacy_fixtures)
+        .difference(&non_module_fixtures)
         .cloned()
         .collect::<Vec<_>>();
 
     assert!(
         unexpected.is_empty(),
-        "unexpected legacy .ink fixtures; convert them to explicit module syntax or add a task-specific allowlist entry: {unexpected:#?}"
+        "unexpected non-module .ink fixtures; convert them to explicit module syntax or add a task-specific allowlist entry: {unexpected:#?}"
     );
     assert!(
         stale_allowlist.is_empty(),
-        "legacy .ink allowlist entries are stale; remove migrated fixtures from ALLOWED_LEGACY_INK_FIXTURES: {stale_allowlist:#?}"
+        "non-module .ink allowlist entries are stale; remove stale entries from ALLOWED_NON_MODULE_INK_FIXTURES: {stale_allowlist:#?}"
     );
 }
 
@@ -91,11 +89,11 @@ fn source_construction_policy_tracks_inline_ink_helpers() {
 
     assert!(
         unexpected.is_empty(),
-        "unexpected integration tests construct Ink source directly; move the source to .ink fixtures: {unexpected:#?}"
+        "unexpected integration tests construct ink-rs source directly; move the source to .ink fixtures: {unexpected:#?}"
     );
     assert!(
         stale_allowlist.is_empty(),
-        "inline Ink/source-construction allowlist entries are stale; remove migrated files from ALLOWED_SOURCE_CONSTRUCTION_TESTS: {stale_allowlist:#?}"
+        "inline source-construction allowlist entries are stale; remove stale entries from ALLOWED_SOURCE_CONSTRUCTION_TESTS: {stale_allowlist:#?}"
     );
 }
 
@@ -176,7 +174,7 @@ fn disabled_test_harness_targets_stay_test_free() {
     );
 }
 
-fn legacy_fixture_path(root: &Path, path: &Path) -> Option<String> {
+fn non_module_fixture_path(root: &Path, path: &Path) -> Option<String> {
     let text = fs::read_to_string(path)
         .unwrap_or_else(|error| panic!("failed to read fixture {}: {error}", path.display()));
     let first_content = text

@@ -20,7 +20,7 @@ pub(crate) struct ExternalFunctionDef {
 /// Methods dealing with external function call handlers that will be called
 /// while [`Story`] is processing.
 impl Story {
-    /// An ink file can provide a fallback function for when when an `EXTERNAL`
+    /// An ink-rs source file can provide a fallback function for when an `EXTERNAL`
     /// has been left unbound by the client, in which case the fallback will
     /// be called instead. Useful when testing a story in play-mode, when
     /// it's not possible to write a client-side external function, but when
@@ -33,9 +33,9 @@ impl Story {
     ///
     /// Arguments:
     /// * `func_name` - The name of the function you're binding the handler to.
-    /// * `function` - The handler that will be called whenever Ink runs that
+    /// * `function` - The handler that will be called whenever ink-rs runs that
     ///   `EXTERNAL` function.
-    /// * `lookahead_safe` - The ink engine often evaluates further
+    /// * `lookahead_safe` - The ink-rs runtime often evaluates further
     ///   than you might expect beyond the current line just in case it sees
     ///   glue that will the current line with the next. It's
     ///   possible that a function can appear to be called twice,
@@ -183,7 +183,7 @@ impl Story {
             .borrow_mut()
             .call(func_name, arguments);
 
-        // Convert return value (if any) to a type that the ink engine can use
+        // Convert return value (if any) to a type that the ink-rs runtime can use
         let return_obj: Rc<dyn RTObject> = match func_result {
             Some(func_result) => Rc::new(Value::new_value_type(func_result)),
             None => Rc::new(Void::new()),

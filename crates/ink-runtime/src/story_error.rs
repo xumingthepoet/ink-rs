@@ -3,7 +3,7 @@ use core::fmt;
 
 /// Error that represents an error when running a [`Story`](crate::story::Story) at runtime.
 /// An error of this type typically means there's
-/// a bug in your ink, rather than in the ink engine itself!
+/// a bug in your ink-rs source, rather than in the runtime itself.
 #[derive(Debug)]
 pub enum StoryError {
     /// Story is in an invalid state.

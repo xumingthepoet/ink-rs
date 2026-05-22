@@ -65,11 +65,11 @@ impl fmt::Display for Pointer {
         match &self.container {
             Some(container) => write!(
                 f,
-                "Ink Pointer -> {} -- index {}",
+                "ink-rs Pointer -> {} -- index {}",
                 container.get_path(),
                 self.index
             ),
-            None => write!(f, "Ink Pointer (null)"),
+            None => write!(f, "ink-rs Pointer (null)"),
         }
     }
 }

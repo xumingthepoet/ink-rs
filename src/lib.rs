@@ -1,10 +1,11 @@
-//! Unified library entry point for game projects using ink-rs.
+//! Unified library entry point for game projects using ink-rs, a
+//! domain-specific language for narrative games.
 //!
 //! The lower-level crates remain available for projects that want tighter
 //! dependency control. This facade keeps the common game integration path short:
 //! use the default `runtime` feature to load compiled story JSON, and enable the
 //! `compiler` feature when a tool, editor, build script, or mod pipeline needs
-//! to compile Ink source.
+//! to compile ink-rs source.
 //!
 //! For current language syntax, see the repository
 //! [`SyntaxReference.md`](https://github.com/xumingthepoet/ink-rs/blob/main/docs/SyntaxReference.md).

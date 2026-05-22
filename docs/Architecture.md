@@ -7,12 +7,14 @@ layout, fixture categories, or the compile/runtime data flow change.
 
 ## Fast Orientation
 
-`ink-rs` is a Rust implementation and language fork of Ink. The implementation
-is split into a compiler, a shared compiled-story JSON format crate, a runtime,
-an optional Dioxus game adapter, integration tests, and a small CLI.
+`ink-rs` is a new domain-specific language for narrative games, implemented in
+Rust and inspired by ink by inkle. It does not aim to be compatible with the Ink
+language. The implementation is split into a compiler, a shared compiled-story
+JSON format crate, a runtime, an optional Dioxus game adapter, integration
+tests, and a small CLI.
 
 ```text
-Ink source
+ink-rs source
   -> ink-compiler
      -> ParsedStory
      -> CheckedStory
@@ -55,13 +57,13 @@ Ownership rules:
 - Runtime save-state JSON is separate from compiled-story JSON and remains
   runtime-owned.
 - `crates/ink-dioxus` owns reusable Dioxus-facing game UI glue: embedded source
-  list helpers, Ink runtime/app wrappers, shared UI tag interpretation, text
+  list helpers, ink-rs runtime/app wrappers, shared UI tag interpretation, text
   reveal, toast handling, and the optional web shell.
 
 ## Repository Tree
 
 The tree below lists the directories and files that usually matter when routing
-work. It intentionally omits build output and most upstream reference internals.
+work. It intentionally omits build output and historical plan internals.
 
 ```text
 .
@@ -85,11 +87,11 @@ work. It intentionally omits build output and most upstream reference internals.
 |   |       |   Diagnostic severity, codes, messages, and spans.
 |   |       |-- source.rs
 |   |       |   `SourceInput`, `SourceFile`, line spans, comment elimination,
-|   |       |   removed `INCLUDE` diagnostics.
+|   |       |   unsupported `INCLUDE` diagnostics.
 |   |       |-- syntax/
 |   |       |   Source-line parser and syntax diagnostics.
 |   |       |-- parsed/
-|   |       |   Typed parsed model for Ink language constructs.
+|   |       |   Typed parsed model for ink-rs language constructs.
 |   |       |-- analysis/
 |   |       |   Semantic checks and indexes over the parsed model.
 |   |       |-- lower.rs
@@ -162,13 +164,13 @@ work. It intentionally omits build output and most upstream reference internals.
 |   |       |-- app.rs
 |   |       |   Choice prompts, title/prompt/toast control tags, and app state.
 |   |       |-- tags.rs
-|   |       |   Shared key/value, marker, and boolean Ink tag parsing.
+|   |       |   Shared key/value, marker, and boolean ink-rs tag parsing.
 |   |       |-- styled_text.rs
 |   |       |   `[style ...]` markup and tag-derived style segments.
 |   |       |-- transcript.rs
 |   |       |   Transcript paragraph buffering.
 |   |       |-- build.rs
-|   |       |   Build-script helper for generated embedded Ink source lists.
+|   |       |   Build-script helper for generated embedded ink-rs source lists.
 |   |       |-- web.rs
 |   |       |   Optional Dioxus web UI shell behind the `web` feature.
 |   |       `-- web.css
@@ -196,8 +198,6 @@ work. It intentionally omits build output and most upstream reference internals.
 |   |   Historical language and semantic change log.
 |   |-- SyntaxReference.md
 |   |   Full current supported syntax reference.
-|   |-- WritingWithInk.md
-|   |   Upstream C# guide snapshot. Do not edit.
 |   |-- ink_JSON_runtime_format.md
 |   |   Compiled story JSON notes.
 |   |-- workflows/
@@ -251,7 +251,7 @@ Use this area for file-level input concerns:
 - comment elimination
 - first-line byte-order-mark trimming
 - normalized line endings and trailing whitespace
-- removed `INCLUDE` diagnostics
+- unsupported `INCLUDE` diagnostics
 
 Do not put language parsing here. If logic needs to know about declarations,
 expressions, modules, or flow structure, it belongs in syntax or later.
@@ -297,7 +297,7 @@ story content is a syntax error.
 
 Owner: `crates/ink-compiler/src/parsed/`
 
-Parsed nodes are the Rust-native representation of Ink concepts. Add or extend
+Parsed nodes are the Rust-native representation of ink-rs concepts. Add or extend
 these types before analysis or lowering needs the data.
 
 Key files:
@@ -390,7 +390,7 @@ Owner: `crates/ink-compiler/src/emit.rs`
 
 Emit serializes the lowered format `Program` using
 `ink-story-json-format`. It should stay a narrow writer. If emit needs to know
-about Ink syntax or semantic rules, the ownership boundary is probably wrong.
+about ink-rs syntax or semantic rules, the ownership boundary is probably wrong.
 
 ## Format Crate
 
@@ -474,9 +474,9 @@ The v2 save format stores only stable pause-point state:
 - deterministic random state (`storySeed`, `previousRandom`)
 - `inkSaveVersion` and compiled-story `inkFormatVersion`
 
-It does not store old upstream multi-flow maps, mid-expression internals,
-current divert target internals, visit counts, turn indices, or old version 1
-state. Saving should fail clearly at unstable runtime points rather than
+It does not store multi-flow maps, mid-expression internals, current divert
+target internals, visit counts, turn indices, or version 1 state. Saving should
+fail clearly at unstable runtime points rather than
 serializing incomplete execution internals.
 
 ## Tests And Fixtures
@@ -554,7 +554,7 @@ crates/ink-test/
 Test policy:
 
 - Every `.ink` integration fixture should use explicit module syntax.
-- Tests should load repository fixtures instead of constructing Ink source
+- Tests should load repository fixtures instead of constructing ink-rs source
   inline.
 - `.ink.json` fixtures are allowed only as expected compiler-output snapshots
   beside the matching `.ink` source fixture; runtime integration tests compile
@@ -563,7 +563,7 @@ Test policy:
   origin.
 - Shared helpers belong under `tests/support/` only when they are harness code,
   not behavior categories.
-- `tests/integration_policy.rs` enforces fixture module syntax, no inline Ink
+- `tests/integration_policy.rs` enforces fixture module syntax, no inline ink-rs
   source construction, and no banned origin/example-suite labels under
   `tests/` or `fixtures/`.
 
@@ -593,10 +593,9 @@ language syntax change should affect highlighting or editor examples.
 `docs/LanguageOverview.md` is the short current-language entry point.
 `docs/SyntaxReference.md` is the full maintained syntax reference.
 `docs/SyntaxUpdates.md` is the historical language and semantic change log.
-Keep `SyntaxReference.md` focused on current supported syntax; removed syntax,
-migration notes, and compatibility explanations belong in `SyntaxUpdates.md`,
-issue records, diagnostics tests, or architecture notes. Do not edit
-`docs/WritingWithInk.md`.
+Keep `SyntaxReference.md` focused on current supported syntax. Historical
+language changes belong in `SyntaxUpdates.md`, issue records, diagnostics
+tests, or architecture notes.
 
 Standing workflows live under `docs/workflows/`:
 
@@ -605,10 +604,9 @@ Standing workflows live under `docs/workflows/`:
 - `issues.md`: deferred issue capture and solved-issue movement
 - `notes.md`: `Notes.md` ranking and maintenance rules
 
-The upstream C# implementation remains an external reference for
-legacy-compatible behavior questions, especially parser trial order, weave
-grouping, path compaction, and upstream JSON shape. Do not copy C# class
-structure into Rust when the Rust module boundary already has a clearer owner.
+The current Rust implementation, maintained docs, and tests are the source of
+truth for language behavior. External implementations are background context
+only and should not override ink-rs design decisions.
 
 ## Change Routing
 
@@ -636,7 +634,7 @@ Use this table to decide where to start.
 | Native operation or typed runtime value wrong | `native_function_call/`, `value_type.rs`, `value.rs` | typed value tests |
 | Variable get/set wrong | `variables_state.rs`, `story/state.rs` | runtime API and variables tests |
 | Save/load bug | `story_state.rs`, `json/json_write.rs`, `flow.rs`, `callstack.rs` | choices/runtime save-load tests |
-| Dioxus game UI, shared UI tags, embedded Ink source lists | `crates/ink-dioxus/src/` | `cargo test -p ink-dioxus`, `cargo check -p ink-dioxus --features web` |
+| Dioxus game UI, shared UI tags, embedded ink-rs source lists | `crates/ink-dioxus/src/` | `cargo test -p ink-dioxus`, `cargo check -p ink-dioxus --features web` |
 | CLI compile behavior | `crates/ink-tools/src/main.rs` | compiler API tests |
 | Test harness or fixture policy | `crates/ink-test/tests/support/`, `integration_policy.rs` | `cargo test -p ink-test --test integration integration_policy` |
 
@@ -670,8 +668,8 @@ Forbidden shortcuts:
 - Do not duplicate compiled-story JSON schema knowledge outside
   `ink-story-json-format`.
 - Do not hide unsupported behavior with ignored tests or weakened assertions.
-- Do not preserve obsolete compatibility shims after a feature is explicitly
-  removed.
+- Do not preserve inactive compatibility shims after a feature is intentionally
+  replaced.
 
 ## Validation
 
@@ -687,7 +685,6 @@ cargo test --workspace --quiet
 See `docs/workflows/validation.md` for focused command examples, Cargo filter
 pitfalls, timeout behavior, and doctest policy.
 
-If a change intentionally diverges from upstream Ink, update tests and
-maintained documentation in the same change. If the change is only a code
-layout refactor, this architecture map should still be updated when navigation
-would otherwise become stale.
+If a language behavior changes, update tests and maintained documentation in the
+same change. If the change is only a code layout refactor, this architecture map
+should still be updated when navigation would otherwise become stale.

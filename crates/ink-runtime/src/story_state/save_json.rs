@@ -90,7 +90,7 @@ impl StoryState {
 
         if save_version != INK_SAVE_STATE_VERSION as u64 {
             return Err(StoryError::BadJson(format!(
-                "Ink save format version mismatch: expected {}, got {}.",
+                "ink-rs save format version mismatch: expected {}, got {}.",
                 INK_SAVE_STATE_VERSION, save_version
             )));
         }

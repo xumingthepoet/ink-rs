@@ -1,4 +1,4 @@
-//! [`Story`] is the entry point to load and run an Ink story.
+//! [`Story`] is the entry point to load and run an ink-rs story.
 use crate::{
     container::Container,
     dynamic_interface::DynamicInterfaceRegistry,
@@ -10,7 +10,7 @@ use crate::{
 };
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-/// The current version of the Ink story file format.
+/// The current version of the ink-rs compiled story file format.
 pub const INK_VERSION_CURRENT: i32 = ink_story_json_format::INK_VERSION_CURRENT;
 
 #[derive(PartialEq)]
@@ -20,7 +20,7 @@ pub(crate) enum OutputStateChange {
     NewlineRemoved,
 }
 
-/// A `Story` is the core struct representing a complete Ink narrative,
+/// A `Story` is the core struct representing a complete ink-rs narrative,
 /// managing evaluation and state.
 pub struct Story {
     main_content_container: Rc<Container>,
@@ -40,18 +40,18 @@ pub struct Story {
     pub(crate) dynamic_interfaces: DynamicInterfaceRegistry,
 }
 
-struct CSharpRandom {
+struct CompiledStoryRandom {
     seed_array: [i32; 56],
     inext: usize,
     inextp: usize,
 }
 
-impl CSharpRandom {
+impl CompiledStoryRandom {
     const MBIG: i32 = i32::MAX;
     const MSEED: i32 = 161_803_398;
 
     fn new(seed: i32) -> Self {
-        // Matches legacy System.Random(seed), which ink JSON relies on for deterministic output.
+        // Matches the historical System.Random(seed) sequence used by compiled story JSON.
         let subtraction = if seed == i32::MIN {
             i32::MAX
         } else {
@@ -111,8 +111,8 @@ impl CSharpRandom {
     }
 }
 
-pub(crate) fn csharp_random_next(seed: i32) -> i32 {
-    CSharpRandom::new(seed).next()
+pub(crate) fn compiled_story_random_next(seed: i32) -> i32 {
+    CompiledStoryRandom::new(seed).next()
 }
 
 mod misc {
@@ -226,7 +226,7 @@ mod misc {
                 .wrapping_add(loop_index)
                 .wrapping_add(self.get_state().story_seed);
 
-            let mut random = super::CSharpRandom::new(random_seed);
+            let mut random = super::CompiledStoryRandom::new(random_seed);
             let mut unpicked_indices: Vec<i32> = (0..num_elements).collect();
 
             for i in 0..=iteration_index {

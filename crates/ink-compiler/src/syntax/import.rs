@@ -22,7 +22,7 @@ pub(super) fn parse_import_declaration(parser: &mut RuleParser<'_>) -> Option<Im
     let keyword = parser.take_while(is_identifier_continue)?;
 
     if keyword.eq_ignore_ascii_case("IMPORT") {
-        parser.diagnostic(obsolete_import_syntax_diagnostic(
+        parser.diagnostic(unsupported_import_syntax_diagnostic(
             keyword_span,
             parser.line_remainder(),
         ));
@@ -167,13 +167,13 @@ pub(super) fn parse_import_declaration_lines(
     index: usize,
 ) -> (Option<ImportDeclaration>, Vec<Diagnostic>, usize) {
     let line = &lines[index];
-    let obsolete_multiline_import = is_obsolete_multiline_import_start(line);
+    let unsupported_multiline_import = is_unsupported_multiline_import_start(line);
     let mut line_parser = RuleParser::new(line);
     let declaration = line_parser.parse_rule(parse_import_declaration);
     let had_error = line_parser.had_error();
     let diagnostics = line_parser.finish();
-    let next_index = if obsolete_multiline_import {
-        consume_obsolete_multiline_import(lines, index)
+    let next_index = if unsupported_multiline_import {
+        consume_unsupported_multiline_import(lines, index)
     } else {
         index + 1
     };
@@ -181,7 +181,7 @@ pub(super) fn parse_import_declaration_lines(
     (declaration.filter(|_| !had_error), diagnostics, next_index)
 }
 
-fn is_obsolete_multiline_import_start(line: &SourceLine) -> bool {
+fn is_unsupported_multiline_import_start(line: &SourceLine) -> bool {
     let trimmed = line.text.trim_start();
     let keyword = trimmed
         .chars()
@@ -194,7 +194,7 @@ fn is_obsolete_multiline_import_start(line: &SourceLine) -> bool {
     rest.starts_with([' ', '\t']) && rest.trim_start_matches([' ', '\t']).starts_with('{')
 }
 
-fn consume_obsolete_multiline_import(lines: &[SourceLine], start_index: usize) -> usize {
+fn consume_unsupported_multiline_import(lines: &[SourceLine], start_index: usize) -> usize {
     let mut index = start_index + 1;
     while index < lines.len() {
         if lines[index].text.trim_start().starts_with('}') {
@@ -330,13 +330,13 @@ fn parse_imported_names(
     Some(imported_names)
 }
 
-fn obsolete_import_syntax_diagnostic(span: SourceSpan, remainder: &str) -> Diagnostic {
-    if let Some((names, source_module)) = obsolete_import_parts(remainder) {
+fn unsupported_import_syntax_diagnostic(span: SourceSpan, remainder: &str) -> Diagnostic {
+    if let Some((names, source_module)) = unsupported_import_parts(remainder) {
         if names == source_module && is_identifier(names) {
             return Diagnostic::error(
                 span,
                 format!(
-                    "Module literals must be imported with `FROM {source_module}`; `IMPORT {names} FROM {source_module}` is obsolete"
+                    "Module literals must be imported with `FROM {source_module}`; `IMPORT {names} FROM {source_module}` is not supported"
                 ),
             );
         }
@@ -344,18 +344,18 @@ fn obsolete_import_syntax_diagnostic(span: SourceSpan, remainder: &str) -> Diagn
         return Diagnostic::error(
             span,
             format!(
-                "Old import syntax `IMPORT {names} FROM {source_module}` has been replaced by `FROM {source_module} IMPORT {names}`"
+                "Unsupported import syntax `IMPORT {names} FROM {source_module}`; use `FROM {source_module} IMPORT {names}`"
             ),
         );
     }
 
     Diagnostic::error(
         span,
-        "Old import syntax `IMPORT symbol FROM module` has been replaced by `FROM module IMPORT symbol`",
+        "Unsupported import syntax `IMPORT symbol FROM module`; use `FROM module IMPORT symbol`",
     )
 }
 
-fn obsolete_import_parts(remainder: &str) -> Option<(&str, &str)> {
+fn unsupported_import_parts(remainder: &str) -> Option<(&str, &str)> {
     let trimmed = remainder.trim();
     let (names, source_module) = trimmed.split_once(" FROM ")?;
     let source_module = source_module.split_whitespace().next()?;
@@ -497,11 +497,11 @@ mod tests {
             ),
             (
                 "IMPORT sword FROM items",
-                "Old import syntax `IMPORT sword FROM items` has been replaced by `FROM items IMPORT sword`",
+                "Unsupported import syntax `IMPORT sword FROM items`; use `FROM items IMPORT sword`",
             ),
             (
                 "IMPORT items FROM items",
-                "Module literals must be imported with `FROM items`; `IMPORT items FROM items` is obsolete",
+                "Module literals must be imported with `FROM items`; `IMPORT items FROM items` is not supported",
             ),
         ];
 

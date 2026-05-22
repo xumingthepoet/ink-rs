@@ -35,26 +35,26 @@ impl<'a> TokenExpressionParser<'a> {
     pub(super) fn parse_braced_literal(&mut self) -> Result<Expression, ExpressionParseError> {
         if self.match_kind(|kind| matches!(kind, ExpressionTokenKind::CloseBrace)) {
             return Err(ExpressionParseError::new(
-                ExpressionParseErrorKind::LegacyEmptyCompositeLiteral,
+                ExpressionParseErrorKind::UnsupportedEmptyCompositeLiteral,
                 self.previous_span(),
             ));
         }
 
         match self.peek().map(|token| &token.kind) {
             Some(ExpressionTokenKind::Identifier(_)) => Err(ExpressionParseError::new(
-                ExpressionParseErrorKind::LegacyStructLiteral,
+                ExpressionParseErrorKind::UnsupportedStructLiteral,
                 self.peek().expect("kind came from peek").span.clone(),
             )),
             Some(ExpressionTokenKind::StringLiteral(_))
             | Some(ExpressionTokenKind::IntLiteral(_)) => Err(ExpressionParseError::new(
-                ExpressionParseErrorKind::LegacyDictLiteral,
+                ExpressionParseErrorKind::UnsupportedDictLiteral,
                 self.peek().expect("kind came from peek").span.clone(),
             )),
             Some(ExpressionTokenKind::Operator(operator))
                 if operator == "-" && self.next_token_is_int_literal() =>
             {
                 Err(ExpressionParseError::new(
-                    ExpressionParseErrorKind::LegacyDictLiteral,
+                    ExpressionParseErrorKind::UnsupportedDictLiteral,
                     self.peek().expect("kind came from peek").span.clone(),
                 ))
             }

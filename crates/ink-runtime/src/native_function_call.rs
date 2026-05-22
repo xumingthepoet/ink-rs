@@ -373,7 +373,7 @@ mod tests {
     }
 
     #[test]
-    fn primitive_equality_regressions_keep_legacy_semantics() {
+    fn primitive_equality_regressions_keep_current_semantics() {
         assert!(native_bool_result(
             Op::Equal,
             bool_value(true),

@@ -30,9 +30,9 @@ pub(super) enum ExpressionParseErrorKind {
     ExpectedCommaOrArrayCloseBracket {
         found: Option<String>,
     },
-    LegacyEmptyCompositeLiteral,
-    LegacyStructLiteral,
-    LegacyDictLiteral,
+    UnsupportedEmptyCompositeLiteral,
+    UnsupportedStructLiteral,
+    UnsupportedDictLiteral,
     ExpectedPercentLiteralTarget {
         found: Option<String>,
     },
@@ -125,14 +125,14 @@ impl ExpressionParseError {
                     found_clause(found)
                 )
             }
-            ExpressionParseErrorKind::LegacyEmptyCompositeLiteral => {
+            ExpressionParseErrorKind::UnsupportedEmptyCompositeLiteral => {
                 "Use `%Type{}` for structs or `%{}` for Dicts".to_string()
             }
-            ExpressionParseErrorKind::LegacyStructLiteral => {
-                "Struct literals now use `%Type{...}`".to_string()
+            ExpressionParseErrorKind::UnsupportedStructLiteral => {
+                "Struct literals use `%Type{...}` in ink-rs".to_string()
             }
-            ExpressionParseErrorKind::LegacyDictLiteral => {
-                "Dict literals now use `%{...}`".to_string()
+            ExpressionParseErrorKind::UnsupportedDictLiteral => {
+                "Dict literals use `%{...}` in ink-rs".to_string()
             }
             ExpressionParseErrorKind::ExpectedPercentLiteralTarget { found } => {
                 format!(

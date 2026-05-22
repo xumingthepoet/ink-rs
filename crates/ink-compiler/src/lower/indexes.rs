@@ -146,7 +146,7 @@ pub(super) enum CallSignature {
         args: usize,
         return_type: TypeName,
     },
-    Ink {
+    Internal {
         args: Vec<FlowArgument>,
         return_type: TypeName,
     },
@@ -617,7 +617,7 @@ fn build_external_signatures(story: &Story) -> ExternalSignatures {
     collect_external_signatures_in_objects(story.root_weave().content(), None, &mut signatures);
     for flow in story.flows() {
         collect_external_signatures_in_flow(flow, None, &mut signatures);
-        collect_ink_call_signatures_in_flow(flow, None, None, &mut signatures);
+        collect_internal_call_signatures_in_flow(flow, None, None, &mut signatures);
     }
     for module in story.modules() {
         collect_external_signatures_in_objects(
@@ -627,7 +627,12 @@ fn build_external_signatures(story: &Story) -> ExternalSignatures {
         );
         for flow in module.flows() {
             collect_external_signatures_in_flow(flow, Some(module.name()), &mut signatures);
-            collect_ink_call_signatures_in_flow(flow, Some(module.name()), None, &mut signatures);
+            collect_internal_call_signatures_in_flow(
+                flow,
+                Some(module.name()),
+                None,
+                &mut signatures,
+            );
         }
     }
     signatures
@@ -644,7 +649,7 @@ fn collect_external_signatures_in_flow(
     }
 }
 
-fn collect_ink_call_signatures_in_flow(
+fn collect_internal_call_signatures_in_flow(
     flow: &Flow,
     module_name: Option<&str>,
     parent_flow_path: Option<&str>,
@@ -657,7 +662,7 @@ fn collect_ink_call_signatures_in_flow(
         let signature_name = module_name
             .map(|module| format!("{module}::{flow_path}"))
             .unwrap_or_else(|| flow_path.clone());
-        let signature = CallSignature::Ink {
+        let signature = CallSignature::Internal {
             args: flow.arguments().to_vec(),
             return_type: flow.return_type().clone(),
         };
@@ -672,7 +677,7 @@ fn collect_ink_call_signatures_in_flow(
         }
     }
     for child in flow.child_flows() {
-        collect_ink_call_signatures_in_flow(child, module_name, Some(&flow_path), signatures);
+        collect_internal_call_signatures_in_flow(child, module_name, Some(&flow_path), signatures);
     }
 }
 

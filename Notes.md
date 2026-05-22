@@ -8,10 +8,10 @@ in `docs/workflows/notes.md`.
 
 - [N001] [created:2026-04-25] [helps:27] [hurts:0]
   [last_helped:unknown] [last_hurt:never] [scope:validation/compatibility]
-  Upstream-derived legacy scenarios that still match the current language are
-  migrated into ink-rs fixtures covered by `make gate`. Keep those fixtures
-  passing for unchanged behavior, but when the language intentionally changes,
-  update or replace obsolete scenarios instead of preserving upstream parity.
+  Current-language scenarios are pinned by ink-rs fixtures covered by
+  `make gate`. Keep those fixtures passing for unchanged behavior, but when the
+  language intentionally changes, update or replace stale scenarios instead
+  of preserving stale behavior.
 
 - [N002] [created:2026-04-24] [helps:14] [hurts:0]
   [last_helped:unknown] [last_hurt:never] [scope:parsed-model/lowering]
@@ -35,10 +35,11 @@ in `docs/workflows/notes.md`.
 
 - [N005] [created:2026-04-24] [helps:7] [hurts:1]
   [last_helped:unknown] [last_hurt:2026-04-29] [scope:braced-content/parser]
-  Source sequences are removed. Braced inline or multiline content should parse
-  conditionals and expressions, but top-level source alternatives such as
-  `{one|two}`, `{~one|two}`, or `{ cycle: ... }` must emit the removed-feature
-  diagnostic instead of creating parsed sequence nodes.
+  Source sequences are not part of current ink-rs syntax. Braced inline or
+  multiline content should parse conditionals and expressions, but top-level
+  source alternatives such as `{one|two}`, `{~one|two}`, or `{ cycle: ... }`
+  must emit an unsupported syntax diagnostic instead of creating parsed
+  sequence nodes.
 
 - [N006] [created:2026-04-25] [helps:15] [hurts:0]
   [last_helped:unknown] [last_hurt:never] [scope:diagnostics/constants/diverts]
@@ -69,9 +70,9 @@ in `docs/workflows/notes.md`.
 
 - [N010] [created:2026-04-26] [helps:8] [hurts:0]
   [last_helped:unknown] [last_hurt:never] [scope:variables/scoping]
-  `VAR` declarations are story-top-level only. Nested `VAR` is removed and must
-  move to root or become typed `temp` state. Variable refs resolve by current
-  visibility order: closest flow args/temps, then globals.
+  `VAR` declarations are story-top-level only. Nested `VAR` is not supported
+  and must move to root or become typed `temp` state. Variable refs resolve by
+  current visibility order: closest flow args/temps, then globals.
 
 ## Candidate Notes
 

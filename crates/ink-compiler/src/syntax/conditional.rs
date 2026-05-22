@@ -469,7 +469,7 @@ mod tests {
     }
 
     #[test]
-    fn legacy_multiline_conditional_without_keyword_is_not_control_syntax() {
+    fn keywordless_multiline_conditional_without_keyword_is_not_control_syntax() {
         let output = parse(SourceInput::new("{ score > 0:\nyes\n}"));
 
         assert!(output.diagnostics.iter().any(|diagnostic| diagnostic

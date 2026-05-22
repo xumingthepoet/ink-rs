@@ -1,8 +1,12 @@
 # ink-rs
 
-`ink-rs` is a Rust implementation and language fork of Ink for interactive
-narrative games. The root crate is a small facade for game projects; lower-level
-crates remain available when a project wants tighter dependency control.
+`ink-rs` is a new domain-specific language for narrative games, implemented in
+Rust. It is inspired by ink by inkle, but Ink compatibility is not a language
+goal: ink-rs syntax, compiler behavior, runtime behavior, and save contracts are
+defined by this repository.
+
+The root crate is a small facade for game projects; lower-level crates remain
+available when a project wants tighter dependency control.
 
 ## Crates
 

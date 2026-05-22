@@ -203,7 +203,7 @@ impl Story {
                 // Throw an exception since there's no error handler
                 None => {
                     let mut sb = String::new();
-                    sb.push_str("Ink had ");
+                    sb.push_str("ink-rs had ");
 
                     if self.get_state().has_error() {
                         sb.push_str(&self.get_state().get_current_errors().len().to_string());
@@ -631,7 +631,7 @@ impl Story {
             return OutputStateChange::NoChange;
         }
 
-        // Old newline has been removed, it wasn't the end of the line after all
+        // Previous newline has been removed; it was not the end of the line.
         if !newline_still_exists {
             return OutputStateChange::NewlineRemoved;
         }

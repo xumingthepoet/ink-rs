@@ -6,7 +6,7 @@ use std::{
 
 const PARENT_ID: &str = "^";
 
-/// The componentsString field from the C# impl. has been removed and it is always generated dinamically from the components field.
+/// Path text is generated dynamically from the components field.
 #[derive(Eq, Clone, Default)]
 pub struct Path {
     components: Vec<Component>,

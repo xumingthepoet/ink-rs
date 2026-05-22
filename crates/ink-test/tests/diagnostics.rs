@@ -26,13 +26,13 @@ fn module_level_content_is_rejected() {
 }
 
 #[test]
-fn removed_list_declaration_reports_removed_feature_diagnostic() {
-    let diagnostics = diagnostics_for_fixture("diagnostics/removed-list-module.ink");
+fn unsupported_list_declaration_reports_unsupported_syntax_diagnostic() {
+    let diagnostics = diagnostics_for_fixture("diagnostics/unsupported-list-module.ink");
 
     assert_diagnostic(
         &diagnostics,
         DiagnosticSeverity::Error,
-        "LIST declarations are no longer supported",
+        "LIST declarations are not supported in ink-rs",
     );
     assert!(
         diagnostics.iter().all(|diagnostic| !diagnostic
@@ -43,13 +43,13 @@ fn removed_list_declaration_reports_removed_feature_diagnostic() {
 }
 
 #[test]
-fn removed_source_sequences_report_removed_feature_diagnostic() {
-    let diagnostics = diagnostics_for_fixture("diagnostics/removed-sequence.ink");
+fn unsupported_source_sequences_report_unsupported_syntax_diagnostic() {
+    let diagnostics = diagnostics_for_fixture("diagnostics/unsupported-sequence.ink");
 
     assert_diagnostic(
         &diagnostics,
         DiagnosticSeverity::Error,
-        "Source sequences, cycles, shuffles, and once-only alternatives are no longer supported",
+        "Source sequences, cycles, shuffles, and once-only alternatives are not supported in ink-rs",
     );
 }
 
@@ -105,12 +105,12 @@ fn dict_literal_diagnostics_report_invalid_literals() {
 }
 
 #[test]
-fn old_composite_literal_syntax_reports_migration_diagnostics() {
+fn unsupported_composite_literal_syntax_reports_current_syntax_diagnostics() {
     let diagnostics = diagnostics_for_fixture("diagnostics/composite-literal-syntax.ink");
 
     for message in [
-        "Struct literals now use `%Type{...}`",
-        "Dict literals now use `%{...}`",
+        "Struct literals use `%Type{...}` in ink-rs",
+        "Dict literals use `%{...}` in ink-rs",
         "Use `%Type{}` for structs or `%{}` for Dicts",
     ] {
         assert_diagnostic(&diagnostics, DiagnosticSeverity::Error, message);
@@ -318,13 +318,13 @@ fn interface_dynamic_function_lowering_is_implemented() {
 }
 
 #[test]
-fn imports_diagnostics_report_obsolete_import_syntax() {
-    let diagnostics = diagnostics_for_fixture("diagnostics/imports-obsolete.ink");
+fn imports_diagnostics_report_unsupported_import_syntax() {
+    let diagnostics = diagnostics_for_fixture("diagnostics/imports-unsupported.ink");
 
     assert_diagnostic(
         &diagnostics,
         DiagnosticSeverity::Error,
-        "Old import syntax `IMPORT sword FROM items` has been replaced by `FROM items IMPORT sword`",
+        "Unsupported import syntax `IMPORT sword FROM items`; use `FROM items IMPORT sword`",
     );
 }
 
@@ -461,10 +461,10 @@ fn missing_external_return_type_reports_missing_type() {
 #[test]
 fn static_diverts_to_variables_report_current_syntax_error() {
     let cases = [
-        "diagnostics/static-diverts/old-global-divert.ink",
-        "diagnostics/static-diverts/old-const-divert.ink",
-        "diagnostics/static-diverts/old-param-divert.ink",
-        "diagnostics/static-diverts/old-temp-divert.ink",
+        "diagnostics/static-diverts/global-variable-divert.ink",
+        "diagnostics/static-diverts/constant-divert.ink",
+        "diagnostics/static-diverts/parameter-divert.ink",
+        "diagnostics/static-diverts/temp-divert.ink",
     ];
 
     for fixture in cases {

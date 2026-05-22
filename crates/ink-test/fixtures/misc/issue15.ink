@@ -2,7 +2,7 @@
 VAR x: string = ""
 
 == main ==
-// Issue reported here: original upstream issue 15
+// Historical issue fixture.
 // The correct output has to be:
 // This is a test
 // X is set

@@ -1,10 +1,10 @@
 # ink-dioxus
 
 `ink-dioxus` is the reusable Dioxus adapter for ink-rs games. It keeps the game
-state, rules, and content in Ink while providing a shared Rust UI shell for
-choice-based games.
+state, rules, and content in ink-rs source while providing a shared Rust UI
+shell for choice-based games.
 
-The adapter understands these Ink tags:
+The adapter understands these ink-rs tags:
 
 - `# title` or `# title:...` consumes output and updates the story title.
 - `# prompt` or `# prompt:...` consumes output and updates the choice prompt.
@@ -35,7 +35,7 @@ from `assets/ink/src`:
 // build.rs
 fn main() {
     ink_dioxus::build::generate_ink_source_list("assets/ink/src")
-        .expect("ink source list should generate");
+        .expect("ink-rs source list should generate");
 }
 ```
 
@@ -50,7 +50,7 @@ fn main() {
         ink_dioxus::web::WebLaunchConfig::new(INK_SOURCES)
             .with_app_label("TEXT RPG")
             .with_storage_key("text_rpg.web_save.v1")
-            .with_default_story_title("Ink Story")
+            .with_default_story_title("ink-rs Story")
             .with_default_prompt_title("Choices"),
     );
 }

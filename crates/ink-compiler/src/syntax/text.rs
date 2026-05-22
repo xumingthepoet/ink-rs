@@ -6,8 +6,8 @@ use crate::{
 
 use super::{rule::RuleParser, scan};
 
-pub(super) const REMOVED_SEQUENCE_MESSAGE: &str =
-    "Source sequences, cycles, shuffles, and once-only alternatives are no longer supported; use explicit variables and conditionals instead.";
+pub(super) const UNSUPPORTED_SEQUENCE_MESSAGE: &str =
+    "Source sequences, cycles, shuffles, and once-only alternatives are not supported in ink-rs; use explicit variables and conditionals instead.";
 
 pub(super) fn parse_text_line(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
     let span = parser.current_span();
@@ -47,7 +47,7 @@ pub(super) fn parse_text_line(parser: &mut RuleParser<'_>) -> Option<Vec<Object>
         return None;
     }
 
-    if let Some(diagnostic) = removed_sequence_diagnostic_for_inline_text(&text, &text_span) {
+    if let Some(diagnostic) = unsupported_sequence_diagnostic_for_inline_text(&text, &text_span) {
         parser.diagnostic(diagnostic);
         return None;
     }
@@ -101,11 +101,11 @@ fn find_unmatched_open_brace_char_offset(text: &str) -> Option<usize> {
     None
 }
 
-pub(super) fn removed_sequence_diagnostic_for_inline_text(
+pub(super) fn unsupported_sequence_diagnostic_for_inline_text(
     text: &str,
     span: &SourceSpan,
 ) -> Option<Diagnostic> {
-    let char_offset = find_removed_inline_sequence_char_offset(text)?;
+    let char_offset = find_unsupported_inline_sequence_char_offset(text)?;
     Some(
         Diagnostic::error(
             SourceSpan::new(
@@ -113,13 +113,13 @@ pub(super) fn removed_sequence_diagnostic_for_inline_text(
                 span.line,
                 span.column + char_offset,
             ),
-            REMOVED_SEQUENCE_MESSAGE,
+            UNSUPPORTED_SEQUENCE_MESSAGE,
         )
         .with_code(DiagnosticCode::InvalidInlineSyntax),
     )
 }
 
-fn find_removed_inline_sequence_char_offset(text: &str) -> Option<usize> {
+fn find_unsupported_inline_sequence_char_offset(text: &str) -> Option<usize> {
     let mut byte_offset = 0;
     while let Some(relative_open) = text[byte_offset..].find('{') {
         let open_index = byte_offset + relative_open;
@@ -133,7 +133,7 @@ fn find_removed_inline_sequence_char_offset(text: &str) -> Option<usize> {
             return None;
         };
         let inner = &rest[..close_index];
-        if is_removed_inline_sequence(inner) {
+        if is_unsupported_inline_sequence(inner) {
             return Some(text[..open_index].chars().count());
         }
         byte_offset = open_index + '{'.len_utf8() + close_index + '}'.len_utf8();
@@ -142,9 +142,9 @@ fn find_removed_inline_sequence_char_offset(text: &str) -> Option<usize> {
     None
 }
 
-fn is_removed_inline_sequence(source: &str) -> bool {
+fn is_unsupported_inline_sequence(source: &str) -> bool {
     let trimmed = source.trim();
-    if removed_sequence_type_annotation_rest(trimmed).is_some() {
+    if unsupported_sequence_type_annotation_rest(trimmed).is_some() {
         return true;
     }
 
@@ -395,7 +395,7 @@ fn split_inline_conditional(source: &str) -> Option<(&str, &str)> {
     Some((&source[..index], &source[index + ':'.len_utf8()..]))
 }
 
-pub(super) fn removed_sequence_type_annotation_rest(source: &str) -> Option<&str> {
+pub(super) fn unsupported_sequence_type_annotation_rest(source: &str) -> Option<&str> {
     let source = source.trim_start();
     let first = source.chars().next()?;
 
@@ -483,16 +483,16 @@ mod tests {
     }
 
     #[test]
-    fn removed_inline_sequence_reports_specific_error_span() {
-        let diagnostic = removed_sequence_diagnostic_for_inline_text(
+    fn unsupported_inline_sequence_reports_specific_error_span() {
+        let diagnostic = unsupported_sequence_diagnostic_for_inline_text(
             "Line {one|two}",
             &SourceSpan::new(Some("sequence.ink".to_string()), 4, 3),
         )
-        .expect("expected removed sequence diagnostic");
+        .expect("expected unsupported sequence diagnostic");
 
         assert_eq!(diagnostic.code, Some(DiagnosticCode::InvalidInlineSyntax));
         assert_eq!(diagnostic.line, 4);
         assert_eq!(diagnostic.column, 8);
-        assert_eq!(diagnostic.message, REMOVED_SEQUENCE_MESSAGE);
+        assert_eq!(diagnostic.message, UNSUPPORTED_SEQUENCE_MESSAGE);
     }
 }

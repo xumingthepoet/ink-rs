@@ -1,6 +1,8 @@
 # Language Overview
 
-This is the short entry point for current ink-rs syntax. Use
+This is the short entry point for current ink-rs syntax. ink-rs is a new
+domain-specific language for narrative games, implemented in Rust and inspired
+by ink by inkle. Ink compatibility is not a language goal. Use
 `SyntaxReference.md` for the full reference and `SyntaxUpdates.md` for the
 historical change log.
 

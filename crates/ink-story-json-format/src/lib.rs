@@ -1,4 +1,4 @@
-//! Typed memory model and JSON codec for the compiled Ink story format.
+//! Typed memory model and JSON codec for the ink-rs compiled story format.
 //!
 //! This crate deliberately models the compiled story wire format, not compiler
 //! lowering state and not runtime execution objects.

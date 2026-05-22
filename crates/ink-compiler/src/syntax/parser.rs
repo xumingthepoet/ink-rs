@@ -833,7 +833,7 @@ impl Parser {
         }
 
         if let Some(parsed) = self.parse_multiline_rule(index, |parser, index| {
-            parser.reject_removed_multiline_sequence(lines, index)
+            parser.reject_unsupported_multiline_sequence(lines, index)
         }) {
             return Some(self.apply_loop_aliases(parsed));
         }
@@ -918,7 +918,7 @@ impl Parser {
         Some(vec![Object::Choice(combined_choice)])
     }
 
-    fn reject_removed_multiline_sequence(
+    fn reject_unsupported_multiline_sequence(
         &mut self,
         lines: &[SourceLine],
         index: &mut usize,
@@ -926,13 +926,13 @@ impl Parser {
         let line = &lines[*index];
         let trimmed = line.text.trim();
         let after_open = trimmed.strip_prefix('{')?.trim();
-        let rest = text::removed_sequence_type_annotation_rest(after_open)?;
+        let rest = text::unsupported_sequence_type_annotation_rest(after_open)?;
         if !rest.trim().is_empty() {
             return None;
         }
 
         self.diagnostics.push(
-            Diagnostic::error(line.span.clone(), text::REMOVED_SEQUENCE_MESSAGE)
+            Diagnostic::error(line.span.clone(), text::UNSUPPORTED_SEQUENCE_MESSAGE)
                 .with_code(crate::diagnostic::DiagnosticCode::InvalidInlineSyntax),
         );
 
@@ -1527,15 +1527,15 @@ mod tests {
             ),
             (
                 "=== module game ===\nIMPORT sword FROM items",
-                "Old import syntax `IMPORT sword FROM items` has been replaced by `FROM items IMPORT sword`",
+                "Unsupported import syntax `IMPORT sword FROM items`; use `FROM items IMPORT sword`",
             ),
             (
                 "=== module game ===\nIMPORT items FROM items",
-                "Module literals must be imported with `FROM items`; `IMPORT items FROM items` is obsolete",
+                "Module literals must be imported with `FROM items`; `IMPORT items FROM items` is not supported",
             ),
             (
                 "=== module game ===\nIMPORT {\n  sword\n} FROM items",
-                "Old import syntax `IMPORT symbol FROM module` has been replaced by `FROM module IMPORT symbol`",
+                "Unsupported import syntax `IMPORT symbol FROM module`; use `FROM module IMPORT symbol`",
             ),
         ];
 

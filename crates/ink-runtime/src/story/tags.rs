@@ -67,7 +67,7 @@ impl Story {
         Ok(tags)
     }
 
-    /// Gets a list of tags defined with '#' in the ink source that were
+    /// Gets a list of tags defined with '#' in the ink-rs source that were
     /// seen during the most recent [`cont`](Story::cont) call.
     pub fn get_current_tags(&mut self) -> Result<Vec<String>, StoryError> {
         self.if_async_we_cant("call currentTags since it's a work in progress")?;

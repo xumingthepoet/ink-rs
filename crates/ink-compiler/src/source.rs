@@ -70,8 +70,8 @@ pub(crate) fn prepare_source_input(
         })
         .collect();
     let source = SourceFile::from_lines(lines);
-    let mut diagnostics = diagnose_removed_includes(&source);
-    diagnostics.extend(diagnose_removed_list_declarations(&source));
+    let mut diagnostics = diagnose_unsupported_includes(&source);
+    diagnostics.extend(diagnose_unsupported_list_declarations(&source));
     let source = diagnostics.is_empty().then_some(source);
 
     SourceLoadOutput {
@@ -85,7 +85,7 @@ impl SourceFile {
     pub fn from_input(input: SourceInput) -> Self {
         prepare_source_input(input, None)
             .source
-            .expect("test source should not contain removed source syntax")
+            .expect("test source should not contain unsupported source syntax")
     }
 
     pub(crate) fn from_lines(lines: Vec<SourceLine>) -> Self {
@@ -102,37 +102,37 @@ impl SourceFile {
     }
 }
 
-fn diagnose_removed_includes(source: &SourceFile) -> Vec<Diagnostic> {
+fn diagnose_unsupported_includes(source: &SourceFile) -> Vec<Diagnostic> {
     source
         .lines
         .iter()
         .filter_map(|line| {
-            removed_include_column(&line.text).map(|column| {
+            unsupported_include_column(&line.text).map(|column| {
                 Diagnostic::error(
                     SourceSpan::new(line.span.source_name.clone(), line.span.line, column),
-                    "INCLUDE is no longer supported; use modules and IMPORT instead",
+                    "INCLUDE is not supported in ink-rs; pass sources explicitly to the compiler",
                 )
             })
         })
         .collect()
 }
 
-fn diagnose_removed_list_declarations(source: &SourceFile) -> Vec<Diagnostic> {
+fn diagnose_unsupported_list_declarations(source: &SourceFile) -> Vec<Diagnostic> {
     source
         .lines
         .iter()
         .filter_map(|line| {
-            removed_list_declaration_column(&line.text).map(|column| {
+            unsupported_list_declaration_column(&line.text).map(|column| {
                 Diagnostic::error(
                     SourceSpan::new(line.span.source_name.clone(), line.span.line, column),
-                    "LIST declarations are no longer supported; use variables, functions, or host-side data instead",
+                    "LIST declarations are not supported in ink-rs; use variables, functions, or host-side data instead",
                 )
             })
         })
         .collect()
 }
 
-fn removed_list_declaration_column(text: &str) -> Option<usize> {
+fn unsupported_list_declaration_column(text: &str) -> Option<usize> {
     let leading_whitespace = text
         .chars()
         .take_while(|ch| matches!(ch, ' ' | '\t'))
@@ -146,7 +146,7 @@ fn removed_list_declaration_column(text: &str) -> Option<usize> {
     }
 }
 
-fn removed_include_column(text: &str) -> Option<usize> {
+fn unsupported_include_column(text: &str) -> Option<usize> {
     let leading_whitespace = text
         .chars()
         .take_while(|ch| matches!(ch, ' ' | '\t'))

@@ -18,7 +18,7 @@ pub struct Choice {
     pub(crate) source_path: String,
     pub(crate) target_path: Path,
     pub(crate) is_invisible_default: bool,
-    /// Ink tags attached to this `Choice`.
+    /// ink-rs tags attached to this `Choice`.
     pub tags: Vec<String>,
     /// The original index into `currentChoices` list on the [`Story`](crate::story::Story) when
     /// this `Choice` was generated, for convenience.

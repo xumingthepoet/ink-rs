@@ -3,7 +3,7 @@ use crate::{
     tags,
 };
 
-const DEFAULT_STORY_TITLE: &str = "Ink Story";
+const DEFAULT_STORY_TITLE: &str = "ink-rs Story";
 const DEFAULT_PROMPT_TITLE: &str = "Choices";
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -78,11 +78,11 @@ pub(super) fn lower_function_call_into(
         }
         _ if matches!(
             context.external_signatures().get(resolved_name.as_str()),
-            Some(CallSignature::Ink { .. })
+            Some(CallSignature::Internal { .. })
         ) =>
         {
             let expected_args = match context.external_signatures().get(resolved_name.as_str()) {
-                Some(CallSignature::Ink { args, .. }) => args.as_slice(),
+                Some(CallSignature::Internal { args, .. }) => args.as_slice(),
                 _ => &[],
             };
             for (index, arg) in args.iter().enumerate() {

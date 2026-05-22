@@ -1,8 +1,8 @@
-//! Incremental Ink compiler rewrite.
+//! Compiler for ink-rs, a domain-specific language for narrative games.
 //!
-//! The compiler is intentionally independent from `ink-runtime`: it parses Ink
-//! source into compiler-owned structures and emits the official runtime JSON
-//! wire format directly.
+//! The compiler is intentionally independent from `ink-runtime`: it parses
+//! ink-rs source into compiler-owned structures and emits compiled story JSON
+//! directly.
 
 mod analysis;
 mod compiler;

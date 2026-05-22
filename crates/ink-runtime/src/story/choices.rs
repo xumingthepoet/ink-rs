@@ -41,7 +41,7 @@ impl Story {
         self.get_state_mut()
             .set_chosen_path(p, incrementing_turn_index)?;
 
-        // Preserve the legacy navigation hook. The current runtime no longer
+        // Preserve the navigation hook. The current runtime no longer
         // records visit or turn counts here.
         self.visit_changed_containers_due_to_divert();
 

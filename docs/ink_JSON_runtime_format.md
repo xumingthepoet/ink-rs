@@ -70,13 +70,13 @@ Although containers primarily behave like arrays, they also have additional attr
 
 Possible flags used by `#f`:
 
- * **0x1** - Visits: legacy compiled-story metadata for visit counts.
- * **0x2** - Turns: legacy compiled-story metadata for turn counts.
- * **0x4** - CountStartOnly: legacy metadata for count-at-start behavior.
+ * **0x1** - Visits: historical compiled-story metadata for visit counts.
+ * **0x2** - Turns: historical compiled-story metadata for turn counts.
+ * **0x4** - CountStartOnly: historical metadata for count-at-start behavior.
 
 ink-rs no longer exposes visit or turn counts in the source language or save
 state. These flags remain documented because the compiled-story JSON model can
-still represent them for legacy compiled-story compatibility.
+still represent them for historical compiled-story compatibility.
 
 Examples:
 
@@ -111,7 +111,7 @@ Supported types:
     }
     ```
 
-    This represents an object value with `flags`, `hp`, and `name` fields. Static Ink source type names and field declarations are not serialized in story JSON or save JSON in this phase; only the runtime values are serialized.
+    This represents an object value with `flags`, `hp`, and `name` fields. Static ink-rs source type names and field declarations are not serialized in story JSON or save JSON in this phase; only the runtime values are serialized.
 * **dynamic Dict value**: represented as an array marker that stores the key
   type and an array of key/value entries:
 
@@ -172,12 +172,12 @@ Control commands are special instructions to the text engine to perform various 
 * `"str"` - Begin string evaluation mode. Adds a marker to the output stream, and goes into content mode (from evaluation mode). Must have already been in evaluation mode when this is encountered. See below for explanation.
 * `"/str"` - End string evaluation mode. All content after the previous Begin marker is concatenated together, removed from the output stream, and appended as a string value to the evaluation stack. Re-enters evaluation mode immediately afterwards.
 * `"nop"` - No-operation. Does nothing, but is useful as an addressable piece of content to divert to.
-* `"choiceCnt"` - Legacy compiled-story command that pushes the current generated choice count. ink-rs source no longer emits `CHOICE_COUNT`.
-* `"turn"` - Legacy compiled-story command. The current runtime keeps no turn counter and pushes `0`.
-* `"turns"` - Legacy compiled-story command. The current runtime keeps no turn index state and pushes `-1` for known divert targets.
-* `"visit"` - Legacy compiled-story command. The current runtime keeps no visit-count state and pushes `-1` as a sequence index fallback. ink-rs source no longer emits source sequence JSON.
-* `"seq"` - Legacy compiled-story command for old shuffle sequence JSON. Pops an integer, expected to be the number of elements in a sequence that's being entered. In return, it pushes an integer with the next sequence shuffle index to the evaluation stack. This shuffle index is derived from the element count, the sequence path, and the story's random seed from when it was first begun.
-* `"thread"` - Clones/starts a new thread, as used with the `<- knot` syntax in ink. This essentially clones the entire callstack, branching it.
+* `"choiceCnt"` - Historical compiled-story command that pushes the current generated choice count. ink-rs source no longer emits `CHOICE_COUNT`.
+* `"turn"` - Historical compiled-story command. The current runtime keeps no turn counter and pushes `0`.
+* `"turns"` - Historical compiled-story command. The current runtime keeps no turn index state and pushes `-1` for known divert targets.
+* `"visit"` - Historical compiled-story command. The current runtime keeps no visit-count state and pushes `-1` as a sequence index fallback. ink-rs source no longer emits source sequence JSON.
+* `"seq"` - Historical compiled-story command for shuffle sequence JSON. Pops an integer, expected to be the number of elements in a sequence that's being entered. In return, it pushes an integer with the next sequence shuffle index to the evaluation stack. This shuffle index is derived from the element count, the sequence path, and the story's random seed from when it was first begun.
+* `"thread"` - Clones/starts a new thread, as used by thread-style source branching. This essentially clones the entire callstack, branching it.
 * `"done"` - Tries to close/pop the active thread, otherwise marks the story flow safe to exit without a loose end warning.
 * `"end"` - Ends the story flow immediately, closes all active threads, unwinds the callstack, and removes any choices that were previously created.
 
@@ -247,16 +247,16 @@ Example:
 * `{"VAR?": "state::danger"}` - Get a module global by its source-qualified
   runtime variable name.
 
-## Legacy read count
+## Historical Read Count
 
-Compiled-story JSON can still represent the C# read-count lookup shape. ink-rs
+Compiled-story JSON can still represent the historical read-count lookup shape. ink-rs
 source no longer emits this for `READ_COUNT` or `{knot}` shorthand, and runtime
 save JSON no longer stores visit counts. Runtime lookups therefore return the
-legacy fallback count rather than maintained authored state.
+compatibility fallback count rather than maintained authored state.
 
 Example:
 
-* `{"CNT?": "the_hall.light_switch"}` - legacy compiled-story read-count lookup for the container at the given path.
+* `{"CNT?": "the_hall.light_switch"}` - Historical compiled-story read-count lookup for the container at the given path.
 
 
 ## ChoicePoint
@@ -278,11 +278,11 @@ The `flg` field is a bitfield of flags:
 
  * **0x1 - Has condition?**: Set if the story should pop a value from the evaluation stack in order to determine whether a choice instance should be created at all.
  * **0x2 - Has start content?** - Choice display text should be popped from the evaluation stack.
- * **0x4 - Has choice-only content?** - Legacy square-bracket choice text should be popped from the evaluation stack if present in compiled-story JSON. ink-rs source no longer accepts this syntax.
+ * **0x4 - Has choice-only content?** - Historical square-bracket choice text should be popped from the evaluation stack if present in compiled-story JSON. ink-rs source no longer accepts this syntax.
  * **0x8 - Is invisible default?** - When this is enabled, the choice isn't provided to the game (isn't presented to the player), and instead is automatically followed if there are no other choices generated.
- * **0x10 - Once only?** - Legacy flag retained in the compiled-story shape. Current ink-rs source accepts only `*` choice markers, and the runtime ignores once-only flags when loading compiled stories.
+ * **0x10 - Once only?** - Historical flag retained in the compiled-story shape. Current ink-rs source accepts only `*` choice markers, and the runtime ignores once-only flags when loading compiled stories.
 
-Example of the legacy full JSON output, including the ChoicePoint object, when generating an upstream-style ink choice from `* Hello[.], world.`. Current ink-rs source does not accept choice square brackets, but the runtime data shape can still describe older compiled content.
+Example of the historical full JSON output, including the ChoicePoint object, when generating split choice text from `* Hello[.], world.`. Current ink-rs source does not accept choice square brackets, but the runtime data shape can still describe existing compiled content.
 
 ```jsonc
 // Outer container
@@ -291,7 +291,7 @@ Example of the legacy full JSON output, including the ChoicePoint object, when g
   // Evaluate choice text.
   // Starts by calling a "function" labelled
   // 's', which is the start content for the choice.
-  // Legacy C# output used a small Container so that it could be
+  // Historical compiled output used a small Container so that it could be
   // re-used for visit-count behavior.
   "ev",
   "str",
@@ -300,7 +300,7 @@ Example of the legacy full JSON output, including the ChoicePoint object, when g
   },
   "/str",
 
-  // Evaluate legacy content inside square brackets (simply '.')
+  // Evaluate historical content inside square brackets (simply '.')
   "str",
   "^.",
   "/str",
@@ -312,8 +312,8 @@ Example of the legacy full JSON output, including the ChoicePoint object, when g
   //  - linked to own container named 'c'
   //  - Flags 22 are:
   //     * 0x2  - has start content
-  //     * 0x4  - has legacy choice-only content
-  //     * 0x10 - legacy once-only flag ignored by ink-rs runtime
+  //     * 0x4  - has historical choice-only content
+  //     * 0x10 - historical once-only flag ignored by ink-rs runtime
   {
     "*": ".^.c",
     "flg": 22

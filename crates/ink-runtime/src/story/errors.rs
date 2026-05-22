@@ -8,7 +8,7 @@ pub trait ErrorHandler {
     fn error(&mut self, message: &str, error_type: ErrorType);
 }
 
-/// Types of errors an Ink story might throw.
+/// Types of errors an ink-rs story might throw.
 #[derive(PartialEq, Clone, Copy)]
 pub enum ErrorType {
     /// Problem that is not critical, but should be fixed.
@@ -20,11 +20,11 @@ pub enum ErrorType {
 /// # Errors
 /// Methods to check for errors.
 impl Story {
-    /// Assign the error handler for all runtime errors in ink -- i.e. problems
-    /// with the source ink itself that are only discovered when playing
+    /// Assign the error handler for all runtime errors in ink-rs, meaning
+    /// problems with the source itself that are only discovered when playing
     /// the story.
     /// It's strongly recommended that you assign an error handler to your
-    /// story instance, to avoid getting panics for ink errors.
+    /// story instance, to avoid getting panics for ink-rs errors.
     pub fn set_error_handler(&mut self, err_handler: Rc<RefCell<dyn ErrorHandler>>) {
         self.on_error = Some(err_handler);
     }

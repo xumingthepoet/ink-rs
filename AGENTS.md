@@ -1,16 +1,14 @@
 # AGENTS.md
 
-This repository is a Rust implementation and language fork of Ink, originally
-ported from inkle's official C# implementation. The upstream C# implementation
-is an external compatibility reference, not a tracked repository directory.
+This repository is the Rust implementation of ink-rs, a new domain-specific
+language for narrative games. ink-rs is inspired by ink by inkle, but Ink
+language compatibility is not a project goal; current language behavior is
+defined by this repository.
 
 ## Source Of Truth
 
 - Treat the project owner's requested language behavior as authoritative after
   verifying any claim about current behavior.
-- Use the upstream C# implementation as a compatibility reference for unchanged
-  legacy behavior, not as a veto over intentional ink-rs language changes.
-- Do not edit `docs/WritingWithInk.md`; it is the upstream C# guide snapshot.
 - Keep repository-authored documentation in English.
 - Keep terminology synchronized across `AGENTS.md`, `Notes.md`, `docs/`, tests,
   diagnostics, and code-facing comments.
@@ -75,14 +73,14 @@ is an external compatibility reference, not a tracked repository directory.
   parser, language, or runtime execution changes.
 - If the existing compiler architecture blocks progress, rewrite the affected
   area instead of extending a fragile partial port.
-- For unchanged legacy features, preserve existing behavior unless there is a
+- For existing supported features, preserve current behavior unless there is a
   clear reason to change it.
-- When behavior intentionally diverges from upstream Ink, update tests and
-  maintained documentation in the same change.
-- When a feature change makes old behavior obsolete or explicitly removed,
+- When behavior intentionally changes, update tests and maintained
+  documentation in the same change.
+- When a feature change intentionally replaces previous behavior,
   delete code, tests, fixture hooks, empty macros, and compatibility shims that
-  only served that old behavior. Do not leave unused `obsolete`, `removed
-  behavior`, `dead_code`, ignored-test, or no-op compatibility paths behind.
+  only served that behavior. Do not leave unused `dead_code`, ignored-test, or
+  no-op compatibility paths behind.
 - Avoid broad unrelated edits when working on compiler or language behavior.
 - Do not automatically create or switch branches. Stay on the current branch
   unless the project owner explicitly asks for a branch change.
@@ -90,7 +88,7 @@ is an external compatibility reference, not a tracked repository directory.
   commit the successful, validated change by default. Stage only related files,
   preserve unrelated edits, and skip the commit if validation fails or the owner
   explicitly asks not to commit.
-- Use `active plan` terminology consistently. Do not create or reference legacy
+- Use `active plan` terminology consistently. Do not create or reference stale
   aliases for the active-plan directory or concept.
 - Store active implementation plans under `docs/active_plan/`. When a plan is
   complete, move it to `docs/finished_plans/`.
@@ -99,9 +97,8 @@ is an external compatibility reference, not a tracked repository directory.
   `docs/LanguageOverview.md` when the short overview would otherwise become
   stale.
 - Keep `docs/SyntaxReference.md` focused only on the latest supported ink-rs
-  syntax. Put removed syntax, migration notes, and compatibility explanations
-  in `docs/SyntaxUpdates.md`, issue records, diagnostics tests, or architecture
-  notes instead.
+  syntax. Put historical language changes in `docs/SyntaxUpdates.md`, issue
+  records, diagnostics tests, or architecture notes instead.
 - When working under `crates/ink-experiments/`, read and follow
   `crates/ink-experiments/README.md`.
 
@@ -136,23 +133,20 @@ is an external compatibility reference, not a tracked repository directory.
   model nodes, lowering/export behavior, tests, and documentation as needed.
 - Removing a language feature is allowed when requested, but the removal must be
   explicit: update diagnostics, docs, and tests so the new behavior is clear.
-- Do not preserve awkward upstream behavior only for parity if it conflicts
-  with the new language direction.
 - Do not silently break JSON/runtime compatibility. If compatibility must
   change, document the new contract and update runtime tests.
-- Keep migration impact visible. When changing or deleting old syntax, prefer
-  clear diagnostics over ambiguous parse failures.
+- Keep source impact visible. When changing or deleting syntax, prefer clear
+  diagnostics over ambiguous parse failures.
 - Pass tests by implementing the intended language model, not by shaping code
   around individual fixtures.
 - Prefer Rust-native representations: `enum`/`struct`/module boundaries,
-  ownership-friendly APIs, explicit parser state, and typed parsed-model objects
-  instead of C#-style inheritance.
+  ownership-friendly APIs, explicit parser state, and typed parsed-model
+  objects.
 - When parser behavior is added, prefer reusable parser rules, parser state
   transitions, and parsed-model nodes that can naturally support future
   fixtures.
-- When legacy compiler behavior is unclear and still relevant, inspect the
-  corresponding upstream parser or parsed-hierarchy implementation before
-  choosing a Rust-side design.
+- When compiler behavior is unclear, inspect the current Rust parser, parsed
+  model, lowering, diagnostics, and tests before choosing a design.
 
 ## Forbidden Shortcuts
 

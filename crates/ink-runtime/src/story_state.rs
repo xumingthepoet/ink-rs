@@ -168,7 +168,7 @@ mod tests {
 
         assert!(error
             .to_string()
-            .contains("Ink save format version mismatch"));
+            .contains("ink-rs save format version mismatch"));
     }
 
     #[test]
@@ -287,7 +287,7 @@ mod tests {
         assert!(save.get("storySeed").is_some());
         assert!(save.get("previousRandom").is_some());
 
-        for removed_field in [
+        for omitted_field in [
             "flows",
             "currentFlowName",
             "evalStack",
@@ -297,8 +297,8 @@ mod tests {
             "turnIdx",
         ] {
             assert!(
-                save.get(removed_field).is_none(),
-                "save should not contain removed field {removed_field}"
+                save.get(omitted_field).is_none(),
+                "save should not contain omitted field {omitted_field}"
             );
         }
     }

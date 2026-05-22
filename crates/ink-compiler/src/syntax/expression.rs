@@ -573,8 +573,8 @@ mod tests {
                 16,
             ),
             ("{}", "Use `%Type{}` for structs or `%{}` for Dicts", 2),
-            ("{ hp: 1 }", "Struct literals now use `%Type{...}`", 3),
-            (r#"{"hp": 1}"#, "Dict literals now use `%{...}`", 2),
+            ("{ hp: 1 }", "Struct literals use `%Type{...}` in ink-rs", 3),
+            (r#"{"hp": 1}"#, "Dict literals use `%{...}` in ink-rs", 2),
             (
                 "state.",
                 "expected field name after `.` before end of input",

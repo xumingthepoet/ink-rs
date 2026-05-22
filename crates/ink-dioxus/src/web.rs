@@ -40,10 +40,10 @@ impl WebLaunchConfig {
     pub const fn new(sources: &'static [InkSource]) -> Self {
         Self {
             sources,
-            app_label: "INK",
+            app_label: "ink-rs",
             storage_key: DEFAULT_WEB_SAVE_STORAGE_KEY,
             save_schema_version: DEFAULT_WEB_SAVE_SCHEMA_VERSION,
-            default_story_title: "Ink Story",
+            default_story_title: "ink-rs Story",
             default_prompt_title: "Choices",
             default_prompt_title_function: None,
             text_reveal_chars_per_second: DEFAULT_TEXT_REVEAL_CHARS_PER_SECOND,
@@ -137,7 +137,7 @@ impl WebMessages {
         choices_kicker: "CHOICES",
         error_title: "Could not start",
         error_hint: "Check ink compiler diagnostics and rebuild.",
-        no_sources_text: "No embedded ink source files.",
+        no_sources_text: "No embedded ink-rs source files.",
         storage_loading_text: "Loading local save.",
         initializing_text: "Story is initializing.",
         no_choices_text: "No available choices.",

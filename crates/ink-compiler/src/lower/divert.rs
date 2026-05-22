@@ -28,7 +28,7 @@ pub(super) fn lower_tail_recursive_return_into(
     let Some(tail_args) = ret.direct_self_tail_call_args(flow_name) else {
         return false;
     };
-    let Some(CallSignature::Ink {
+    let Some(CallSignature::Internal {
         args: expected_args,
         ..
     }) = external_signatures.get(&signature_name)
@@ -304,7 +304,8 @@ fn static_divert_expected_args<'a>(
 ) -> Option<&'a [FlowArgument]> {
     let target = static_divert_target_name(target)?;
     let signature_name = resolve_static_signature_name(target, context)?;
-    let Some(CallSignature::Ink { args, .. }) = context.external_signatures().get(&signature_name)
+    let Some(CallSignature::Internal { args, .. }) =
+        context.external_signatures().get(&signature_name)
     else {
         return None;
     };

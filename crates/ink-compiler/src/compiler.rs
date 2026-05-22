@@ -366,7 +366,7 @@ mod tests {
     }
 
     #[test]
-    fn include_statement_is_removed_diagnostic() {
+    fn include_statement_is_unsupported_diagnostic() {
         let compiler = Compiler::default();
         let output = compiler.parse(SourceInput::named(
             "Line.\n  INCLUDE inc.ink\nAfter.",
@@ -382,13 +382,13 @@ mod tests {
         assert_eq!(diagnostic.column, 3);
         assert_eq!(
             diagnostic.message,
-            "INCLUDE is no longer supported; use modules and IMPORT instead"
+            "INCLUDE is not supported in ink-rs; pass sources explicitly to the compiler"
         );
         assert!(output.artifact.is_none());
     }
 
     #[test]
-    fn list_declaration_is_removed_diagnostic_before_root_module_fallback() {
+    fn list_declaration_is_unsupported_diagnostic_before_root_module_fallback() {
         let compiler = Compiler::default();
         let output = compiler.compile(SourceInput::named(
             "  LIST colors = red, blue\n",
@@ -404,13 +404,13 @@ mod tests {
         assert_eq!(diagnostic.column, 3);
         assert_eq!(
             diagnostic.message,
-            "LIST declarations are no longer supported; use variables, functions, or host-side data instead"
+            "LIST declarations are not supported in ink-rs; use variables, functions, or host-side data instead"
         );
         assert!(output.artifact.is_none());
     }
 
     #[test]
-    fn list_declaration_is_removed_diagnostic_before_module_content_fallback() {
+    fn list_declaration_is_unsupported_diagnostic_before_module_content_fallback() {
         let compiler = Compiler::default();
         let output = compiler.compile(SourceInput::named(
             "=== module game ===\n  LIST colors = red, blue\n== main ==\n-> END",
@@ -424,7 +424,7 @@ mod tests {
         assert_eq!(diagnostic.column, 3);
         assert_eq!(
             diagnostic.message,
-            "LIST declarations are no longer supported; use variables, functions, or host-side data instead"
+            "LIST declarations are not supported in ink-rs; use variables, functions, or host-side data instead"
         );
         assert!(output.artifact.is_none());
     }

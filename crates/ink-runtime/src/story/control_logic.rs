@@ -393,7 +393,7 @@ impl Story {
                         .get_state()
                         .story_seed
                         .wrapping_add(self.get_state().previous_random);
-                    let next_random = super::csharp_random_next(result_seed);
+                    let next_random = super::compiled_story_random_next(result_seed);
                     let chosen_value = (next_random % random_range) + min_value;
                     self.get_state_mut()
                         .push_evaluation_stack(Rc::new(Value::new::<i32>(chosen_value)));
@@ -419,8 +419,9 @@ impl Story {
                         .push_evaluation_stack(Rc::new(Void::new()));
                 }
                 CommandType::VisitIndex => {
-                    // Legacy compiled-story fallback. Source sequences are
-                    // removed and the runtime no longer tracks visits.
+                    // Compatibility fallback for compiled-story sequence JSON.
+                    // Source sequences are not part of current ink-rs syntax,
+                    // and the runtime no longer tracks visits.
                     let count = -1;
                     self.get_state_mut()
                         .push_evaluation_stack(Rc::new(Value::new::<i32>(count)));

@@ -1,26 +1,26 @@
-//! A combination of an Ink value with its type.
+//! A combination of an ink-rs runtime value with its type.
 use std::{collections::BTreeMap, fmt};
 
 use crate::{path::Path, story_error::StoryError};
 
-/// An Ink value, tagged with its type.
+/// An ink-rs runtime value, tagged with its type.
 #[repr(u8)]
 #[derive(Clone, PartialEq)]
 pub enum ValueType {
     Bool(bool),
     Int(i32),
     Float(f32),
-    /// Ink string, constructed with [`new_string`](ValueType::new::<&str>)
+    /// String value, constructed with [`new_string`](ValueType::new::<&str>)
     String(StringValue),
-    /// Reference to an Ink divert.
+    /// Reference to an ink-rs divert.
     DivertTarget(Path),
-    /// Reference to an Ink variable.
+    /// Reference to an ink-rs variable.
     VariablePointer(VariablePointerValue),
-    /// Dynamic Ink array value.
+    /// Dynamic ink-rs array value.
     Array(Vec<ValueType>),
-    /// Dynamic Ink object/struct value.
+    /// Dynamic ink-rs object/struct value.
     Object(BTreeMap<String, ValueType>),
-    /// Dynamic Ink dictionary value.
+    /// Dynamic ink-rs dictionary value.
     Dict(DictValue),
 }
 
@@ -279,7 +279,7 @@ impl ValueType {
     }
 }
 
-/// Ink runtime representation of a string.
+/// ink-rs runtime representation of a string.
 #[derive(Clone, PartialEq)]
 pub struct StringValue {
     /// The internal string value.
@@ -294,7 +294,7 @@ impl StringValue {
     }
 }
 
-/// Ink runtime representation of a reference to a variable.
+/// ink-rs runtime representation of a reference to a variable.
 #[derive(Clone, PartialEq)]
 pub struct VariablePointerValue {
     pub(crate) variable_name: String,
