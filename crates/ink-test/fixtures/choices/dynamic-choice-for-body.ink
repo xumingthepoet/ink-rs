@@ -6,4 +6,3 @@ VAR groups: string[][] = [["A", "B"], ["C"]]
     { for item in group:
     Item {item}.
     }
-    -> DONE

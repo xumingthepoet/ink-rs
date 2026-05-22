@@ -11,4 +11,3 @@
 == i_stared ==
 I stared at Monsieur Fogg. "But there must be a reason for this trip," I observed.
 He gave no answer.
--> DONE

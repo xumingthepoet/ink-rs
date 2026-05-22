@@ -6,4 +6,3 @@ Every switch is labeled.
 
 == control_room ==
 The panel is already lit.
--> END

@@ -8,4 +8,4 @@
         - else:
             ~ y = x + 1
         }
-        The value is {y}. -> END
+        The value is {y}.

@@ -90,11 +90,9 @@ VAR route: interface<IItem> = left
 
 === module left implements IItem ===
 == target ==
--> END
 
 === module unused implements IItem ===
 == target ==
--> END
 "#;
     let output = Compiler::default().compile(SourceInput::named(source, "inline-interface.ink"));
     let errors = output

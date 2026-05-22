@@ -26,4 +26,3 @@ Victory: {result.encounter}
 { for member in members:
     {member.name}: {member.victory_line}
 }
--> END

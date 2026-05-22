@@ -4,4 +4,3 @@ VAR ready: bool = true
 == main ==
 * {ready} Label
     picked.
-    -> DONE

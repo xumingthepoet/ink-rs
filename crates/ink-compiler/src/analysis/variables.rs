@@ -364,9 +364,9 @@ mod tests {
             "VAR score: int = 0\n\
              == knot(arg) ==\n\
              ~ temp local: int = 0\n\
-             -> DONE\n\
+             \n\
              == other ==\n\
-             -> DONE",
+             ",
         );
 
         let index = build_variable_scope_index(&story);
@@ -385,7 +385,7 @@ mod tests {
             "VAR score: int = 0\n\
              == knot(arg: string) ==\n\
              ~ temp local: bool = true\n\
-             -> DONE",
+             ",
         );
 
         let index = build_variable_scope_index(&story);
@@ -413,7 +413,7 @@ mod tests {
         let story = parse_story(
             "CONST derived: int = other\n\
              == knot(arg) ==\n\
-             -> DONE",
+             ",
         );
 
         let index = build_variable_scope_index(&story);
@@ -433,7 +433,7 @@ mod tests {
         let story = parse_story(
             "VAR value: int = 0\n\
              == knot(value: string) ==\n\
-             -> DONE",
+             ",
         );
 
         let index = build_variable_scope_index(&story);
@@ -453,9 +453,9 @@ mod tests {
         let story = parse_story(
             "== one(arg: int) ==\n\
              ~ temp local: bool = true\n\
-             -> DONE\n\
+             \n\
              == two(arg: string) ==\n\
-             -> DONE",
+             ",
         );
 
         let index = build_variable_scope_index(&story);
@@ -485,11 +485,11 @@ mod tests {
              VAR value: int = 0\n\
              == main(arg: string) ==\n\
              ~ temp local: bool = true\n\
-             -> DONE\n\
+             \n\
              === module items ===\n\
              VAR value: string = \"item\"\n\
              == helper ==\n\
-             -> DONE",
+             ",
         );
 
         let index = build_variable_scope_index(&story);
@@ -523,7 +523,7 @@ mod tests {
              CONST MAX_SCORE: int = 3\n\
              VAR score: int = 0\n\
              == main ==\n\
-             -> DONE",
+             ",
         );
 
         let index = build_variable_scope_index(&story);
@@ -560,7 +560,7 @@ mod tests {
              * [slot_id in save::slot_ids] {slot_id}\n\
                  -> choose(slot_id)\n\
              == choose(slot_id: int) ==\n\
-             -> DONE\n\
+             \n\
              === module save ===\n\
              CONST slot_ids: int[] = [1, 2, 3]\n",
         );

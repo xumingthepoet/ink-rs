@@ -1,4 +1,4 @@
 === module game ===
 
 == main ==
-Line.
+*

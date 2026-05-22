@@ -1,7 +1,5 @@
 Story
   Weave(baseIndent=0)
-    Gather(name=null, depth=1)
-    Divert(target="-> DONE", empty=false, tunnel=false, thread=false)
   Module(name="game")
     Weave(baseIndent=0)
       VariableAssignment(name="x", global=true, temp=false, type=int)
@@ -16,7 +14,6 @@ Story
         Tag(start=false, inChoice=false)
         Text("This is the content")
         Text("\n")
-        Divert(target="-> END", empty=false, tunnel=false, thread=false)
     Flow(level=Knot, name="knot", function=false)
       Weave(baseIndent=0)
         Tag(start=true, inChoice=false)
@@ -27,7 +24,6 @@ Story
         Tag(start=true, inChoice=false)
         Text("end of knot tag")
         Tag(start=false, inChoice=false)
-        Divert(target="-> END", empty=false, tunnel=false, thread=false)
       Flow(level=Stitch, name="stitch", function=false)
         Weave(baseIndent=0)
           Tag(start=true, inChoice=false)
@@ -38,4 +34,3 @@ Story
           Tag(start=true, inChoice=false)
           Text("this tag is below some content so isn't included in the static tags for the stitch")
           Tag(start=false, inChoice=false)
-          Divert(target="-> END", empty=false, tunnel=false, thread=false)

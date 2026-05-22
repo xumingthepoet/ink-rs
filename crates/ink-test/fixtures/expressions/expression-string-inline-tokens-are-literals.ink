@@ -5,7 +5,6 @@ VAR width: int = 3
 {border_row(0, "")}
 {literal_tokens()}
 {interpolated("ok")}
--> END
 
 == function border_row(x: int, text: string) => string ==
 { if x >= width + 2:

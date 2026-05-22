@@ -8,7 +8,6 @@ The detective arrives.
 
 == evidence ==
 The letter is still on the desk.
--> END
 
 == interview ==
 The witness points to the desk.

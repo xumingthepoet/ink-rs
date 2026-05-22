@@ -15,7 +15,6 @@ The carriage waited outside.
     -> hurry_home
 * Wait
     We waited.
-    -> DONE
 
 == hurry_home ==
 We hurried home.
@@ -32,14 +31,11 @@ Fogg answered none of them.
     He finally turned to me.
     The look was enough.
     We rode on in silence.
-    -> DONE
 * Fall silent
     We rode on in silence.
-    -> DONE
 
 == silent ==
 ... but I said nothing and we passed the day in silence.
--> DONE
 
 == quiet ==
 We stayed quiet.
@@ -48,9 +44,7 @@ The wheels rattled.
     He finally turned to me.
     The look was enough.
     We rode on in silence.
-    -> DONE
 * Fall asleep
     He finally turned to me.
     The look was enough.
     We rode on in silence.
-    -> DONE

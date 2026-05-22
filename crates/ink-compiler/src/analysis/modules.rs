@@ -144,7 +144,7 @@ mod tests {
              - (gather_id)\n\
              = intro\n\
              ~ temp local: int = 0\n\
-             -> END",
+             ",
         );
 
         let index = build_module_symbol_index(&story);
@@ -255,13 +255,13 @@ mod tests {
              FROM items IMPORT sword\n\
              FROM audio IMPORT play\n\
              == main ==\n\
-             -> END\n\
+             \n\
              === module items ===\n\
              == sword ==\n\
-             -> END\n\
+             \n\
              === module audio ===\n\
              == play ==\n\
-             -> END",
+             ",
         );
 
         let checked = super::super::analyze(story);
@@ -290,19 +290,19 @@ mod tests {
              FROM items IMPORT sword\n\
              FROM audio IMPORT play\n\
              == main ==\n\
-             -> END",
+             ",
             "game.ink",
         );
         let items = SourceInput::named(
             "=== module items ===\n\
              == sword ==\n\
-             -> END",
+             ",
             "items.ink",
         );
         let audio = SourceInput::named(
             "=== module audio ===\n\
              == play ==\n\
-             -> END",
+             ",
             "audio.ink",
         );
         let compiler = Compiler::default();
@@ -343,11 +343,11 @@ mod tests {
             "=== module game ===\n\
              FROM items IMPORT sword\n\
              == main ==\n\
-             -> END\n\
+             \n\
              === module items ===\n\
              FROM game IMPORT main\n\
              == sword ==\n\
-             -> END",
+             ",
         );
 
         let diagnostics = dependency_diagnostics(&story);
@@ -367,15 +367,15 @@ mod tests {
             "=== module game ===\n\
              FROM items IMPORT sword\n\
              == main ==\n\
-             -> END\n\
+             \n\
              === module items ===\n\
              FROM audio IMPORT play\n\
              == sword ==\n\
-             -> END\n\
+             \n\
              === module audio ===\n\
              FROM game IMPORT main\n\
              == play ==\n\
-             -> END",
+             ",
         );
 
         let diagnostics = dependency_diagnostics(&story);
@@ -396,7 +396,7 @@ mod tests {
              FROM missing IMPORT sword\n\
              FROM absent\n\
              == main ==\n\
-             -> END",
+             ",
         );
 
         let diagnostics = import_diagnostics(&story);
@@ -422,10 +422,10 @@ mod tests {
             "=== module game ===\n\
              FROM items IMPORT sword\n\
              == main ==\n\
-             -> END\n\
+             \n\
              === module items ===\n\
              == shield ==\n\
-             -> END",
+             ",
         );
 
         let diagnostics = import_diagnostics(&story);
@@ -445,11 +445,11 @@ mod tests {
             "=== module game ===\n\
              FROM scenes IMPORT intro\n\
              == main ==\n\
-             -> END\n\
+             \n\
              === module scenes ===\n\
              == opening ==\n\
              = intro\n\
-             -> END",
+             ",
         );
 
         let diagnostics = import_diagnostics(&story);
@@ -468,10 +468,10 @@ mod tests {
             "=== module game ===\n\
              FROM items IMPORT sword\n\
              == main ==\n\
-             -> END\n\
+             \n\
              === module items ===\n\
              == sword ==\n\
-             -> END",
+             ",
         );
 
         let checked = super::super::analyze(story);
@@ -494,10 +494,10 @@ mod tests {
             "=== module game ===\n\
              FROM items\n\
              == main ==\n\
-             -> END\n\
+             \n\
              === module items ===\n\
              == sword ==\n\
-             -> END",
+             ",
         );
 
         let checked = super::super::analyze(story);
@@ -526,10 +526,10 @@ mod tests {
              FROM left\n\
              VAR route: interface<IItem> = left\n\
              == main ==\n\
-             -> END\n\
+             \n\
              === module left implements IItem ===\n\
              == target ==\n\
-             -> END",
+             ",
         );
 
         let diagnostics = import_diagnostics(&story);
@@ -552,10 +552,10 @@ mod tests {
              -> {{route}::target}(left)\n\
              === module router implements IRouter ===\n\
              == target(next: interface<IItem>) ==\n\
-             -> END\n\
+             \n\
              === module left implements IItem ===\n\
              == target ==\n\
-             -> END",
+             ",
         );
 
         let diagnostics = import_diagnostics(&story);
@@ -576,13 +576,13 @@ mod tests {
              VAR route: interface<IScorer> = scorer\n\
              == main ==\n\
              ~ temp value: int = {route}::score(left)\n\
-             -> END\n\
+             \n\
              === module scorer implements IScorer ===\n\
              == function score(item: interface<IItem>) => int ==\n\
              ~ return 1\n\
              === module left implements IItem ===\n\
              == target ==\n\
-             -> END",
+             ",
         );
 
         let diagnostics = import_diagnostics(&story);
@@ -600,14 +600,14 @@ mod tests {
              == main ==\n\
              -> register(left)\n\
              ~ temp route: interface<IItem> = select(left)\n\
-             -> END\n\
+             \n\
              == register(next: interface<IItem>) ==\n\
-             -> DONE\n\
+             \n\
              == function select(next: interface<IItem>) => interface<IItem> ==\n\
              ~ return next\n\
              === module left implements IItem ===\n\
              == target ==\n\
-             -> END",
+             ",
         );
 
         let diagnostics = import_diagnostics(&story);
@@ -622,7 +622,7 @@ mod tests {
              FROM items\n\
              == main ==\n\
              ~ items::helper()\n\
-             -> END\n\
+             \n\
              === module items ===\n\
              == function helper() => void ==\n\
              ~ return",
@@ -651,7 +651,7 @@ mod tests {
              -> items::sword\n\
              === module items ===\n\
              == sword ==\n\
-             -> END",
+             ",
         );
 
         let diagnostics = import_diagnostics(&story);
@@ -666,7 +666,7 @@ mod tests {
              FROM items IMPORT helper\n\
              == main ==\n\
              ~ items::helper()\n\
-             -> END\n\
+             \n\
              === module items ===\n\
              == function helper() => void ==\n\
              ~ return",
@@ -683,7 +683,7 @@ mod tests {
             "=== module game ===\n\
              == main ==\n\
              ~ items::helper()\n\
-             -> END\n\
+             \n\
              === module items ===\n\
              == function helper() => void ==\n\
              ~ return",
@@ -709,7 +709,7 @@ mod tests {
              == main ==\n\
              ~ bridge::relay()\n\
              ~ items::helper()\n\
-             -> END\n\
+             \n\
              === module bridge ===\n\
              FROM items IMPORT helper\n\
              == function relay() => void ==\n\
@@ -760,7 +760,7 @@ mod tests {
              FROM audio IMPORT helper\n\
              == main ==\n\
              ~ audio::helper()\n\
-             -> END\n\
+             \n\
              === module items ===\n\
              == function helper() => void ==\n\
              ~ return\n\
@@ -785,7 +785,7 @@ mod tests {
             "=== module game ===\n\
              == main ==\n\
              ~ game::helper()\n\
-             -> END\n\
+             \n\
              == function helper() => void ==\n\
              ~ return",
         );
@@ -801,7 +801,7 @@ mod tests {
             "=== module game ===\n\
              == main ==\n\
              ~ items::helper()\n\
-             -> END\n\
+             \n\
              === module items ===\n\
              == function helper() => void ==\n\
              ~ return",
@@ -824,13 +824,13 @@ mod tests {
              FROM items IMPORT Item\n\
              VAR item: items::Item\n\
              == main ==\n\
-             -> END\n\
+             \n\
              === module items ===\n\
              STRUCT Item {\n\
              hp: int\n\
              }\n\
              == helper ==\n\
-             -> END",
+             ",
         );
 
         let diagnostics = import_diagnostics(&story);
@@ -844,13 +844,13 @@ mod tests {
             "=== module game ===\n\
              VAR item: items::Item\n\
              == main ==\n\
-             -> END\n\
+             \n\
              === module items ===\n\
              STRUCT Item {\n\
              hp: int\n\
              }\n\
              == helper ==\n\
-             -> END",
+             ",
         );
 
         let diagnostics = import_diagnostics(&story);
@@ -869,11 +869,11 @@ mod tests {
              FROM items IMPORT State\n\
              VAR state: items::State\n\
              == main ==\n\
-             -> END\n\
+             \n\
              === module items ===\n\
              ENUM State { Idle Busy }\n\
              == helper ==\n\
-             -> END",
+             ",
         );
 
         let diagnostics = import_diagnostics(&story);
@@ -886,10 +886,10 @@ mod tests {
         let story = parse_story(
             "=== module game ===\n\
              == main ==\n\
-             -> END\n\
+             \n\
              === module unused ===\n\
              == helper ==\n\
-             -> END",
+             ",
         );
         let graph = build_module_dependency_graph(&story);
         let entry_points = build_module_entry_point_analysis(&story);
@@ -916,7 +916,7 @@ mod tests {
         let story = parse_story(
             "=== module game ===\n\
              == main ==\n\
-             -> END\n\
+             \n\
              === module host_api ===\n\
              FROM config IMPORT value\n\
              == INTERNAL read() => string ==\n\
@@ -926,7 +926,7 @@ mod tests {
              ~ return \"ok\"\n\
              === module unused ===\n\
              == helper ==\n\
-             -> END",
+             ",
         );
         let graph = build_module_dependency_graph(&story);
         let entry_points = build_module_entry_point_analysis(&story);
@@ -955,7 +955,7 @@ mod tests {
         let story = parse_story(
             "=== module game ===\n\
              == main ==\n\
-             -> END\n\
+             \n\
              === module unused ===\n\
              CONST value: int = 1\n\
              VAR value: int = 0",
@@ -1029,7 +1029,7 @@ mod tests {
              == function util() => void ==\n\
              ~ return\n\
              == util ==\n\
-             -> END",
+             ",
         );
 
         let diagnostics = symbol_diagnostics(&story);
@@ -1063,11 +1063,11 @@ mod tests {
             "=== module game ===\n\
              CONST value: int = 1\n\
              == main ==\n\
-             -> END\n\
+             \n\
              === module ui ===\n\
              CONST value: string = \"ready\"\n\
              == helper ==\n\
-             -> END",
+             ",
         );
 
         let diagnostics = symbol_diagnostics(&story);
@@ -1081,10 +1081,10 @@ mod tests {
             "=== module game ===\n\
              == first ==\n\
              = shared\n\
-             -> END\n\
+             \n\
              == second ==\n\
              = shared\n\
-             -> END",
+             ",
         );
 
         let diagnostics = symbol_diagnostics(&story);
@@ -1097,7 +1097,7 @@ mod tests {
         let story = parse_story(
             "=== module library ===\n\
              == helper ==\n\
-             -> END",
+             ",
         );
 
         let diagnostics = entry_point_diagnostics(&story);
@@ -1117,10 +1117,10 @@ mod tests {
         let story = parse_story(
             "=== module helpers ===\n\
              == setup ==\n\
-             -> END\n\
+             \n\
              === module game ===\n\
              == main ==\n\
-             -> END",
+             ",
         );
 
         let checked = super::super::analyze(story);
@@ -1143,11 +1143,11 @@ mod tests {
              FROM audio IMPORT play\n\
              VAR score: int = 0\n\
              == main ==\n\
-             -> END\n\
+             \n\
              === module audio ===\n\
              EXTERNAL play(name: string) => int\n\
              == helper ==\n\
-             -> END",
+             ",
         );
 
         let checked = super::super::analyze(story)
@@ -1177,10 +1177,10 @@ mod tests {
         let story = parse_story(
             "=== module first ===\n\
              == main ==\n\
-             -> END\n\
+             \n\
              === module second ===\n\
              == main ==\n\
-             -> END",
+             ",
         );
 
         let diagnostics = entry_point_diagnostics(&story);

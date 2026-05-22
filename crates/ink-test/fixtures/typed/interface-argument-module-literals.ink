@@ -14,7 +14,6 @@ VAR picked: interface<IEventHandler> = damage_event
 
 == after_register ==
 {chosen}|{picked}
--> END
 
 == register(handler: interface<IEventHandler>) ==
 ~ chosen = handler
@@ -25,8 +24,6 @@ VAR picked: interface<IEventHandler> = damage_event
 
 === module heal_event implements IEventHandler ===
 == target ==
--> END
 
 === module damage_event implements IEventHandler ===
 == target ==
--> END

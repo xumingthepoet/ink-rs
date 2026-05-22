@@ -38,4 +38,3 @@ before{ARRAY_PUSH(items, 1)}after|{LEN(items)}|{items[0]}
 ~ ARRAY_PUSH(bag.items, 8)
 ~ ARRAY_INSERT(bag.items, 0, 7)
 {bag.items[0]}|{bag.items[1]}|{LEN(bag.items)}
--> DONE

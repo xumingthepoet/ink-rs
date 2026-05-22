@@ -1,7 +1,7 @@
 use crate::{story::Story, story_error::StoryError};
 
-/// # Flow
-/// Methods to work with flows and the call-stack.
+/// # Callstack
+/// Methods to work with the story callstack.
 impl Story {
     pub(crate) fn reset_callstack(&mut self) -> Result<(), StoryError> {
         self.if_async_we_cant("ResetCallstack")?;

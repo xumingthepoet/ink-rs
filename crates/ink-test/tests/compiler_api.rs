@@ -48,7 +48,7 @@ fn public_compiler_options_are_constructible() {
 
 #[test]
 fn public_compile_result_reports_warnings_and_policy_failure() {
-    let source = named_fixture("loose-end-warning.ink", "warning.ink");
+    let source = named_fixture("empty-choice-warning.ink", "warning.ink");
 
     let allow_output = Compiler::default().compile(source.clone());
     assert!(

@@ -9,4 +9,3 @@ VAR state: Stats = %Stats{ hp: 2, ready: false }
 ~ state.hp = 5
 ~ state.ready = true
 {state.hp}|{state.ready}
--> DONE

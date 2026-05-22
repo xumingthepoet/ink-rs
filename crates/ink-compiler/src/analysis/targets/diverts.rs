@@ -215,8 +215,6 @@ pub(super) fn static_divert_target_name(target: &DivertTarget) -> Option<&str> {
     match target {
         DivertTarget::Path(target) => Some(target),
         DivertTarget::QualifiedPath(target) => Some(target.as_str()),
-        DivertTarget::Dynamic(_) | DivertTarget::Done | DivertTarget::End | DivertTarget::Empty => {
-            None
-        }
+        DivertTarget::Dynamic(_) | DivertTarget::Empty => None,
     }
 }

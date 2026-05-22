@@ -3,7 +3,7 @@ use std::{cell::RefCell, rc::Rc};
 use crate::{
     callstack::CallStack,
     container::Container,
-    flow::Flow,
+    execution_state::ExecutionState,
     object::RTObject,
     pointer::{self, Pointer},
     push_pop::PushPopType,
@@ -14,11 +14,9 @@ use crate::{
 
 use rand::Rng;
 
-static DEFAULT_FLOW_NAME: &str = "DEFAULT_FLOW";
-
 mod errors;
 mod evaluation_stack;
-mod flow_state;
+mod execution;
 mod function_eval;
 mod output;
 mod output_mutation;
@@ -26,7 +24,7 @@ mod patch;
 mod save_json;
 
 pub(crate) struct StoryState {
-    pub current_flow: Flow,
+    pub current_execution: ExecutionState,
     pub did_safe_exit: bool,
     output_stream_text_dirty: bool,
     output_stream_tags_dirty: bool,
@@ -45,14 +43,14 @@ pub(crate) struct StoryState {
 
 impl StoryState {
     pub fn new(main_content_container: Rc<Container>) -> StoryState {
-        let current_flow = Flow::new(DEFAULT_FLOW_NAME, main_content_container.clone());
-        let callstack = current_flow.callstack.clone();
+        let current_execution = ExecutionState::new(main_content_container.clone());
+        let callstack = current_execution.callstack.clone();
 
         let mut rng = rand::rng();
         let story_seed = rng.random_range(0..100);
 
         let state = StoryState {
-            current_flow,
+            current_execution,
             did_safe_exit: false,
             output_stream_text_dirty: true,
             output_stream_tags_dirty: true,
@@ -75,7 +73,7 @@ impl StoryState {
     }
 
     pub fn get_callstack(&self) -> &Rc<RefCell<CallStack>> {
-        &self.current_flow.callstack
+        &self.current_execution.callstack
     }
 
     pub fn pop_callstack(&mut self, t: Option<PushPopType>) -> Result<(), StoryError> {
@@ -136,25 +134,6 @@ mod tests {
         }
     }
 
-    fn choice_save_with_original_thread(
-        original_thread_index: usize,
-        choice_threads: Option<serde_json::Value>,
-    ) -> serde_json::Value {
-        let mut save = simple_save_json();
-        save["currentChoices"] = json!([{
-            "text": "Choice",
-            "index": 0,
-            "originalChoicePath": "0",
-            "originalThreadIndex": original_thread_index,
-            "targetPath": "0",
-            "tags": []
-        }]);
-        if let Some(choice_threads) = choice_threads {
-            save["choiceThreads"] = choice_threads;
-        }
-        save
-    }
-
     #[test]
     fn rejects_non_current_save_state_version() {
         let mut story = Story::new(SIMPLE_STORY_JSON).expect("valid story");
@@ -184,38 +163,47 @@ mod tests {
             .load_state(&save.to_string())
             .expect_err("expected missing callstack error");
 
-        assert!(error.to_string().contains("loading callstack"));
+        assert!(error.to_string().contains("Missing callstack"));
     }
 
     #[test]
-    fn rejects_malformed_flow_save_json_without_panicking() {
+    fn rejects_removed_save_state_fields() {
+        for field in [
+            "currentChoices",
+            "generatedChoices",
+            "choiceThreads",
+            "flows",
+            "currentFlowName",
+            "evalStack",
+            "currentDivertTarget",
+            "visitCounts",
+            "turnIndices",
+            "turnIdx",
+        ] {
+            let mut save = simple_save_json();
+            save[field] = json!([]);
+
+            assert_save_load_bad_json(save, &format!("Save-state field '{field}' was removed"));
+        }
+    }
+
+    #[test]
+    fn rejects_malformed_execution_save_json_without_panicking() {
         let mut save = simple_save_json();
         save["callstack"] = json!([]);
-        assert_save_load_bad_json(save, "callstack must be an object");
+        assert_save_load_bad_json(save, "Invalid callstack object");
 
         let mut save = simple_save_json();
-        save["currentChoices"] = json!({});
-        assert_save_load_bad_json(save, "currentChoices must be an array");
+        save["callstack"] = json!({});
+        assert_save_load_bad_json(save, "continuation frames must be an array");
 
         let mut save = simple_save_json();
-        save["callstack"]["threads"] = json!({});
-        assert_save_load_bad_json(save, "callstack threads must be an array");
+        save["callstack"]["frames"] = json!([]);
+        assert_save_load_bad_json(save, "continuation frames must not be empty");
 
         let mut save = simple_save_json();
-        save["callstack"]["threadCounter"] = json!("bad");
-        assert_save_load_bad_json(save, "threadCounter must be an integer");
-
-        let save = choice_save_with_original_thread(9, Some(json!([])));
-        assert_save_load_bad_json(save, "choiceThreads must be an object");
-
-        let save = choice_save_with_original_thread(9, None);
-        assert_save_load_bad_json(save, "Missing choiceThreads entry for original thread 9");
-
-        let save = choice_save_with_original_thread(9, Some(json!({ "9": [] })));
-        assert_save_load_bad_json(save, "choiceThreads['9'] must be an object");
-
-        let save = choice_save_with_original_thread(9, Some(json!({ "9": { "callstack": [] } })));
-        assert_save_load_bad_json(save, "Invalid thread index");
+        save["callstack"]["frames"] = json!([[]]);
+        assert_save_load_bad_json(save, "continuation frames[0] must be an object");
     }
 
     #[test]
@@ -282,12 +270,15 @@ mod tests {
 
         assert_eq!(save["inkSaveVersion"], json!(2));
         assert!(save.get("callstack").is_some());
-        assert!(save.get("currentChoices").is_some());
+        assert!(save["callstack"].get("frames").is_some());
         assert!(save.get("variablesState").is_some());
         assert!(save.get("storySeed").is_some());
         assert!(save.get("previousRandom").is_some());
 
         for omitted_field in [
+            "currentChoices",
+            "generatedChoices",
+            "choiceThreads",
             "flows",
             "currentFlowName",
             "evalStack",

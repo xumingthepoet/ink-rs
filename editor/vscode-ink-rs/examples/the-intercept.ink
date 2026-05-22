@@ -1611,7 +1611,6 @@ VAR visited_yes: bool = false
 	And then I'm on the road. Walking, not running. Silent. Free.
 	//  End - Run Away
 	For the moment, at least.
-	-> END
 
 /*--------------------------------------------------------------------------------
 	Return to room after slipping out
@@ -1955,7 +1954,6 @@ Nothing, that is, except to act as if there is no game being played. I'll have a
 -  The Bombe needs to be set up once more and set running. 
 It's time I tackled a problem I can solve.
 //  End - Scot Free
--> END
 
 
 == go_to_where_component_is_hidden ==
@@ -2009,7 +2007,6 @@ It's time I tackled a problem I can solve.
  		~ visited_go_to_where_component_is_hidden_done = true
 	//   End - Caught in AM
 		He leads me across the yard. Back towards Hut 5 to be decoded, and taken to pieces, once again.
-		-> END
 
 
 /*---------------------------------------------------------------
@@ -2154,4 +2151,3 @@ It's time I tackled a problem I can solve.
 		He drags me up to my feet. 
 		"You think you have to re—invent everything."
 		With that, he hustles me out of the door and I can't help thinking that, with a little more strategy, I could still have won the day. But too late now, of course.
-		-> END

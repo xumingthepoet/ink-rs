@@ -1,5 +1,7 @@
 # Control Flow Cleanup And Minimal Save State
 
+Status: completed. Final validation passed `make gate`.
+
 ## Purpose
 
 This active plan removes the remaining source-language shadows of old ink
@@ -89,9 +91,19 @@ without corresponding code and documentation changes.
 Each implementation task must add or update focused tests for its behavior and
 then pass the focused command listed in the task. The task ledger records
 changed files, validation, review state, remaining risks, and optional
-checkpoint commits. `make gate` is required before the active plan is completed,
-and may be run earlier at milestone boundaries or whenever accumulated changes
-need wider coverage.
+checkpoint commits. The task ledger, not checkpoint history, is the durable
+progress record below the active goal.
+
+Checkpoint commits are optional development aids. The implementer may create
+them when accumulated local diff becomes too large, when a risky milestone needs
+a recovery point, or when local review is easier with a temporary commit. They
+are not required for every task. Before this active plan is pushed or considered
+landed, all commits belonging to it must be combined into one final active-plan
+commit unless the project owner explicitly asks for a different history shape.
+
+`make gate` is required before the active plan is completed, and may be run
+earlier at milestone boundaries or whenever accumulated changes need wider
+coverage.
 
 The final closeout must show that:
 

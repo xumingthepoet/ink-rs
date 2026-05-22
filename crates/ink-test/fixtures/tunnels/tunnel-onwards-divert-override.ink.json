@@ -1,1 +1,1 @@
-{"inkVersion":1,"root":[{"->":"game.main"},"done",{"game":[{"A":["^This is A","\n","ev",{"^->":"game.B"},"/ev","->->",null],"B":["^Now in B.","\n","end",null],"main":[{"->t->":"game.A"},"^We will never return to here!","\n","end",null]}]}]}
+{"inkVersion":1,"root":[{"->":"game.main"},"done",{"game":[{"A":["^This is A","\n","ev",{"^->":"game.B"},"/ev","->->","done",null],"B":["^Now in B.","\n","done",null],"main":[{"->t->":"game.A"},"^We will never return to here!","\n","done",null]}]}]}

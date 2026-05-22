@@ -62,7 +62,7 @@ pub(super) fn resolve_static_target_expected_arguments(
     let target_name = match target {
         DivertTarget::Path(target) => target.as_str(),
         DivertTarget::QualifiedPath(target) => target.as_str(),
-        DivertTarget::Dynamic(_) | DivertTarget::Done | DivertTarget::End | DivertTarget::Empty => {
+        DivertTarget::Dynamic(_) | DivertTarget::Empty => {
             return None;
         }
     };

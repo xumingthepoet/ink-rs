@@ -19,4 +19,3 @@ VAR dynamic_scores: Dict<string, int> = %{"sum": 1 + 1}
 == main ==
 ~ temp local_default: Dict<int, string>
 ~ temp local_literal: Dict<int, string> = %{2: "two"}
--> DONE

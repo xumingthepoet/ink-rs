@@ -6,4 +6,3 @@ VAR scores: Dict<string, int> = %{"ada": 1, "grace": 2}
 {key}:{value}
 ~ DICT_REMOVE(scores, "grace")
 }
--> END

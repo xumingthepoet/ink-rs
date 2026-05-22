@@ -7,4 +7,3 @@ Welcome to Duck Burg!
 *   Money bin -> bin
 
 = money_bin
--> END

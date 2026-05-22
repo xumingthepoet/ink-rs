@@ -1,14 +1,25 @@
 use serde_json::{json, Map};
 
-use crate::{flow::Flow, pointer, story::INK_VERSION_CURRENT, story_error::StoryError};
+use crate::{
+    execution_state::ExecutionState, pointer, story::INK_VERSION_CURRENT, story_error::StoryError,
+};
 
-use super::{StoryState, DEFAULT_FLOW_NAME};
+use super::StoryState;
 
 pub const INK_SAVE_STATE_VERSION: u32 = 2;
 
 impl StoryState {
     pub fn to_json(&self) -> Result<String, StoryError> {
         Ok(self.write_json()?.to_string())
+    }
+
+    pub fn to_choice_replay_json(&self) -> Result<String, StoryError> {
+        let mut value = self.write_json()?;
+        let obj = value
+            .as_object_mut()
+            .ok_or_else(|| StoryError::BadJson("Invalid save state object".to_owned()))?;
+        obj.insert("resumeMode".to_owned(), json!("choiceReplay"));
+        Ok(value.to_string())
     }
 
     pub fn load_json(&mut self, save_string: &str) -> Result<(), StoryError> {
@@ -23,25 +34,13 @@ impl StoryState {
 
         let mut obj: Map<String, serde_json::Value> = Map::new();
 
-        let flow = self.current_flow.write_json()?;
-        let flow = flow
-            .as_object()
-            .ok_or_else(|| StoryError::BadJson("Invalid flow save data".to_owned()))?;
         obj.insert(
             "callstack".to_owned(),
-            flow.get("callstack")
-                .ok_or_else(|| StoryError::BadJson("Missing callstack".to_owned()))?
-                .clone(),
+            self.current_execution
+                .callstack
+                .borrow()
+                .write_json_minimal()?,
         );
-        obj.insert(
-            "currentChoices".to_owned(),
-            flow.get("currentChoices")
-                .ok_or_else(|| StoryError::BadJson("Missing current choices".to_owned()))?
-                .clone(),
-        );
-        if let Some(choice_threads) = flow.get("choiceThreads") {
-            obj.insert("choiceThreads".to_owned(), choice_threads.clone());
-        }
         obj.insert(
             "variablesState".to_owned(),
             self.variables_state.write_json()?,
@@ -98,11 +97,19 @@ impl StoryState {
         let root_obj = j_object
             .as_object()
             .ok_or_else(|| StoryError::BadJson("Invalid save state object".to_string()))?;
-        let mut loaded_flow = Flow::from_json(
-            DEFAULT_FLOW_NAME,
-            self.main_content_container.clone(),
-            root_obj,
-        )?;
+        reject_removed_save_fields(root_obj)?;
+
+        let mut loaded_execution = ExecutionState::new(self.main_content_container.clone());
+        let callstack_obj = root_obj
+            .get("callstack")
+            .ok_or_else(|| StoryError::BadJson("Missing callstack".to_string()))?;
+        let callstack_obj = callstack_obj
+            .as_object()
+            .ok_or_else(|| StoryError::BadJson("Invalid callstack object".to_string()))?;
+        loaded_execution
+            .callstack
+            .borrow_mut()
+            .load_json_minimal(&self.main_content_container, callstack_obj)?;
 
         let variables_state_obj = root_obj
             .get("variablesState")
@@ -112,7 +119,7 @@ impl StoryState {
             .ok_or_else(|| StoryError::BadJson("Invalid variables state object".to_string()))?;
         let mut loaded_variables_state = self.variables_state.clone();
         loaded_variables_state.load_json(variables_state_obj)?;
-        loaded_variables_state.set_callstack(loaded_flow.callstack.clone());
+        loaded_variables_state.set_callstack(loaded_execution.callstack.clone());
 
         let story_seed = root_obj
             .get("storySeed")
@@ -136,9 +143,9 @@ impl StoryState {
                     .map_err(|_| StoryError::BadJson("Invalid previous random value".to_string()))
             })?;
 
-        loaded_flow.output_stream.clear();
+        loaded_execution.output_stream.clear();
 
-        self.current_flow = loaded_flow;
+        self.current_execution = loaded_execution;
         self.variables_state = loaded_variables_state;
         self.evaluation_stack.clear();
         self.diverted_pointer = pointer::NULL.clone();
@@ -148,4 +155,27 @@ impl StoryState {
 
         Ok(())
     }
+}
+
+fn reject_removed_save_fields(root_obj: &Map<String, serde_json::Value>) -> Result<(), StoryError> {
+    for field in [
+        "currentChoices",
+        "generatedChoices",
+        "choiceThreads",
+        "flows",
+        "currentFlowName",
+        "evalStack",
+        "currentDivertTarget",
+        "visitCounts",
+        "turnIndices",
+        "turnIdx",
+    ] {
+        if root_obj.contains_key(field) {
+            return Err(StoryError::BadJson(format!(
+                "Save-state field '{field}' was removed in inkSaveVersion {INK_SAVE_STATE_VERSION}; load expects minimal execution state."
+            )));
+        }
+    }
+
+    Ok(())
 }

@@ -10,4 +10,3 @@ VAR copied_party: Stats[] = party
 
 == main ==
 {default_stats}|{party}|{copied_stats}|{copied_party}
--> DONE

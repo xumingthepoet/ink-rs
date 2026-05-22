@@ -10,4 +10,3 @@ VAR quest_stage: int = 1
 - else:
     stage many
 }
--> END

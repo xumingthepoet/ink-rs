@@ -506,7 +506,7 @@ mod tests {
 == main ==
 Line.
 * Continue
-    -> END
+
 "#,
         ))
         .expect("app should start");
@@ -522,7 +522,7 @@ Line.
 
 == main ==
 * Continue
-    -> END
+
 
 === module ui_text ===
 

@@ -7,4 +7,3 @@
 == view_over_stadium ==
 probably several hundred thousands.
 “all mourning the death of mont blanc.”
--> END

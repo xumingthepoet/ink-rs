@@ -89,11 +89,17 @@ defined by this repository.
   outside an active plan, commit the successful, validated change by default.
   Stage only related files, preserve unrelated edits, and skip the commit if
   validation fails or the owner explicitly asks not to commit.
-- During an active plan, use the active plan task list as the durable progress
-  ledger. Let the implementer decide when optional checkpoint commits are useful
-  to avoid an oversized temporary diff or preserve a recovery point. Before the
-  active plan is pushed or considered landed, combine active-plan commits into
-  one final commit unless the owner asks for a different history shape.
+- During an active plan, do not treat individual task completion as a commit
+  boundary. Use the active plan task list as the durable progress ledger below
+  the active goal, and record changed files, validation, remaining risks, and
+  optional checkpoint commit hashes in the relevant task section.
+- During an active plan, the implementer may create checkpoint commits at their
+  own judgment to avoid an oversized temporary diff, preserve a recovery point,
+  or make local review safer. These checkpoint commits are development aids,
+  not the final history shape.
+- Before an active plan is pushed or considered landed, combine all commits
+  belonging to that active plan into one final active-plan commit unless the
+  owner explicitly asks for a different history shape.
 - Use `active plan` terminology consistently. Do not create or reference stale
   aliases for the active-plan directory or concept.
 - Store active implementation plans under `docs/active_plan/`. When a plan is

@@ -43,16 +43,16 @@ impl Story {
     /// structure.
     ///
     /// Usually you would reset the callstack beforehand, which means that
-    /// any tunnels, threads or functions you were in at the time of
+    /// any tunnels, continuations or functions you were in at the time of
     /// calling will be discarded. This is different from the
     /// behaviour of
     /// [`choose_choice_index`](Story::choose_choice_index), which
     /// will always keep the callstack, since the choices are known to come
-    /// from a correct state, and their source thread is known.
+    /// from a correct state, and their source continuation is known.
     ///
     /// You have the option of passing `false` to the `reset_callstack`
     /// parameter if you don't want this behaviour, leaving any active
-    /// threads, tunnels or function calls intact.
+    /// continuations, tunnels or function calls intact.
     ///
     /// Not reseting the call stack is potentially dangerous! If you're in
     /// the middle of a tunnel, it'll redirect only the inner-most

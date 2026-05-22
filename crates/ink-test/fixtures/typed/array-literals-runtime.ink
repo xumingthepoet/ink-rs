@@ -9,4 +9,3 @@ VAR party: Player[] = [%Player{ hp: 10, name: "Ada" }]
 
 == main ==
 {numbers}|{matrix}|{party}
--> DONE

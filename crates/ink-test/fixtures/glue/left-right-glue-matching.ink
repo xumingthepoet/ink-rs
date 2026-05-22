@@ -6,7 +6,6 @@ A line.
     Another line.
 }
 
--> END
 
 == function f() => bool ==
 {false:nothing}

@@ -7,4 +7,3 @@ VAR state: Stats = %Stats{ hp: 9, ready: true }
 
 == main ==
 {state.hp}|{state.ready}
--> DONE

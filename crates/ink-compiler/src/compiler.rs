@@ -336,7 +336,7 @@ mod tests {
     fn current_syntax_errors_block_compile() {
         let compiler = Compiler::default();
         let output = compiler.compile(SourceInput::new(
-            "=== module game ===\nVAR score = 1\n== main ==\n-> DONE",
+            "=== module game ===\nVAR score = 1\n== main ==\n",
         ));
         assert!(output.artifact.is_none());
         assert_eq!(output.diagnostics.len(), 1);
@@ -413,7 +413,7 @@ mod tests {
     fn list_declaration_is_unsupported_diagnostic_before_module_content_fallback() {
         let compiler = Compiler::default();
         let output = compiler.compile(SourceInput::named(
-            "=== module game ===\n  LIST colors = red, blue\n== main ==\n-> END",
+            "=== module game ===\n  LIST colors = red, blue\n== main ==\n",
             "main.ink",
         ));
 

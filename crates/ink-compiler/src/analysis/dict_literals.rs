@@ -223,10 +223,7 @@ impl<'a> DictLiteralChecker<'a> {
                     );
                 }
             }
-            DivertTarget::Dynamic(_)
-            | DivertTarget::Done
-            | DivertTarget::End
-            | DivertTarget::Empty => {}
+            DivertTarget::Dynamic(_) | DivertTarget::Empty => {}
         }
     }
 
@@ -854,10 +851,10 @@ mod tests {
              VAR empty: Dict<string, int> = %{}\n\
              VAR emptyBag: Bag = %Bag{ scores: %{} }\n\
              == main ==\n\
-             -> END\n\
+             \n\
              === module left implements IRoute ===\n\
              == target ==\n\
-             -> END",
+             ",
         );
 
         assert_eq!(super::super::run_analysis_passes(&story), []);
@@ -867,7 +864,7 @@ mod tests {
     fn reports_wrong_dict_literal_key_type() {
         let story = parse_story(
             "VAR scores: Dict<int, int> = %{\"ada\": 1}\n\
-             -> DONE",
+             ",
         );
 
         let diagnostics = dict_literal_diagnostics(&story);
@@ -883,7 +880,7 @@ mod tests {
     fn reports_wrong_dict_literal_value_type() {
         let story = parse_story(
             "VAR scores: Dict<string, int> = %{\"ada\": \"high\"}\n\
-             -> DONE",
+             ",
         );
 
         let diagnostics = dict_literal_diagnostics(&story);
@@ -901,7 +898,7 @@ mod tests {
             "=== module game ===\n\
              == main ==\n\
              ~ temp value: int = total(%{\"one\": \"bad\"})\n\
-             -> END\n\
+             \n\
              == function total(values: Dict<string, int>) => int ==\n\
              ~ return 0",
         );
@@ -921,7 +918,7 @@ mod tests {
     fn reports_wrong_nested_dict_literal_value_type() {
         let story = parse_story(
             "VAR table: Dict<string, Dict<int, string>> = %{\"row\": %{1: 7}}\n\
-             -> DONE",
+             ",
         );
 
         let diagnostics = dict_literal_diagnostics(&story);
@@ -937,7 +934,7 @@ mod tests {
     fn reports_duplicate_string_dict_literal_keys() {
         let story = parse_story(
             "VAR scores: Dict<string, int> = %{\"ada\": 10, \"ada\": 12}\n\
-             -> DONE",
+             ",
         );
 
         let diagnostics = dict_literal_diagnostics(&story);
@@ -953,7 +950,7 @@ mod tests {
     fn reports_duplicate_int_dict_literal_keys() {
         let story = parse_story(
             "VAR names: Dict<int, string> = %{1: \"one\", 1: \"uno\"}\n\
-             -> DONE",
+             ",
         );
 
         let diagnostics = dict_literal_diagnostics(&story);
@@ -969,7 +966,7 @@ mod tests {
     fn reports_duplicate_nested_dict_literal_keys_with_context() {
         let story = parse_story(
             "VAR table: Dict<string, Dict<int, string>> = %{\"row\": %{1: \"one\", 1: \"uno\"}}\n\
-             -> DONE",
+             ",
         );
 
         let diagnostics = dict_literal_diagnostics(&story);
@@ -985,7 +982,7 @@ mod tests {
     fn rejects_dict_literal_without_expected_type() {
         let story = parse_story(
             "~ %{\"ada\": 1}\n\
-             -> DONE",
+             ",
         );
 
         let diagnostics = dict_literal_diagnostics(&story);
@@ -1004,7 +1001,7 @@ mod tests {
              scores: Dict<string, int>\n\
              }\n\
              VAR bag: Bag = %Bag{ scores: %Bag{ wrong: 1 } }\n\
-             -> DONE",
+             ",
         );
 
         let diagnostics = dict_literal_diagnostics(&story);

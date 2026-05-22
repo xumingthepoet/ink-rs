@@ -1,7 +1,5 @@
 Story
   Weave(baseIndent=0)
-    Gather(name=null, depth=1)
-    Divert(target="-> DONE", empty=false, tunnel=false, thread=false)
   Module(name="game")
     Weave(baseIndent=0)
       VariableAssignment(name="knows", global=true, temp=false, type=bool)
@@ -39,4 +37,3 @@ Story
           VariableReference(str)
         Text(".")
         Text("\n")
-        Divert(target="-> END", empty=false, tunnel=false, thread=false)

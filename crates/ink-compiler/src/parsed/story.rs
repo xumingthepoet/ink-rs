@@ -1,4 +1,4 @@
-use super::{push_indent, Flow, InterfaceDeclaration, Module, Weave};
+use super::{Flow, InterfaceDeclaration, Module, Weave};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Story {
@@ -54,12 +54,6 @@ impl Story {
     pub fn to_parse_snapshot(&self) -> String {
         let mut out = String::from("Story");
         self.root_weave.write_parse_snapshot(&mut out, 2);
-        out.push('\n');
-        push_indent(&mut out, 4);
-        out.push_str("Gather(name=null, depth=1)");
-        out.push('\n');
-        push_indent(&mut out, 4);
-        out.push_str("Divert(target=\"-> DONE\", empty=false, tunnel=false, thread=false)");
         for flow in &self.flows {
             flow.write_parse_snapshot(&mut out, 2);
         }
@@ -111,7 +105,7 @@ mod tests {
 
         assert_eq!(
             story.to_parse_snapshot(),
-            "Story\n  Weave(baseIndent=0)\n    Gather(name=null, depth=1)\n    Divert(target=\"-> DONE\", empty=false, tunnel=false, thread=false)\n  Module(name=\"game\")\n    Import(from=\"items\", names=[\"sword\"])\n    Weave(baseIndent=0)\n      Text(\"Line.\")\n    Flow(level=Knot, name=\"main\", function=false)"
+            "Story\n  Weave(baseIndent=0)\n  Module(name=\"game\")\n    Import(from=\"items\", names=[\"sword\"])\n    Weave(baseIndent=0)\n      Text(\"Line.\")\n    Flow(level=Knot, name=\"main\", function=false)"
         );
     }
 
@@ -130,7 +124,7 @@ mod tests {
 
         assert_eq!(
             story.to_parse_snapshot(),
-            "Story\n  Weave(baseIndent=0)\n    Gather(name=null, depth=1)\n    Divert(target=\"-> DONE\", empty=false, tunnel=false, thread=false)\n  Interface(name=\"IItem\")"
+            "Story\n  Weave(baseIndent=0)\n  Interface(name=\"IItem\")"
         );
     }
 

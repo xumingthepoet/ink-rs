@@ -9,4 +9,3 @@ floor:{FLOOR(3.5)}
 ceiling:{CEILING(3.5)}
 int:{INT(3.5)}
 float:{FLOAT(true)}
--> END

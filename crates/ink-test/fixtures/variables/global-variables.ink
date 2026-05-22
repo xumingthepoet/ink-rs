@@ -5,4 +5,3 @@ VAR is_hazardous: bool = false
 
 == main ==
 The latest measurement is {value} {unit}.
--> END

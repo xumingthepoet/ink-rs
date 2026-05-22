@@ -1098,7 +1098,7 @@ mod tests {
         );
         assert_eq!(
             story.to_parse_snapshot(),
-            "Story\n  Weave(baseIndent=0)\n    StructDeclaration(name=\"Player\")\n      Field(name=\"hp\", type=int)\n      Field(name=\"name\", type=string)\n      Field(name=\"inventory\", type=Item[])\n    Gather(name=null, depth=1)\n    Divert(target=\"-> DONE\", empty=false, tunnel=false, thread=false)"
+            "Story\n  Weave(baseIndent=0)\n    StructDeclaration(name=\"Player\")\n      Field(name=\"hp\", type=int)\n      Field(name=\"name\", type=string)\n      Field(name=\"inventory\", type=Item[])"
         );
     }
 
@@ -1122,7 +1122,7 @@ mod tests {
         );
         assert_eq!(
             story.to_parse_snapshot(),
-            "Story\n  Weave(baseIndent=0)\n    EnumDeclaration(name=\"State\")\n      Member(name=\"Idle\")\n      Member(name=\"Busy\")\n      Member(name=\"Done\")\n    Gather(name=null, depth=1)\n    Divert(target=\"-> DONE\", empty=false, tunnel=false, thread=false)"
+            "Story\n  Weave(baseIndent=0)\n    EnumDeclaration(name=\"State\")\n      Member(name=\"Idle\")\n      Member(name=\"Busy\")\n      Member(name=\"Done\")"
         );
     }
 
@@ -1135,7 +1135,7 @@ mod tests {
              Busy\n\
              }\n\
              == main ==\n\
-             -> END",
+             Done.",
         ));
 
         assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
@@ -1186,7 +1186,7 @@ mod tests {
         assert_eq!(story.modules()[0].name_span().column, 12);
         assert_eq!(
             story.to_parse_snapshot(),
-            "Story\n  Weave(baseIndent=0)\n    Gather(name=null, depth=1)\n    Divert(target=\"-> DONE\", empty=false, tunnel=false, thread=false)\n  Module(name=\"game\")"
+            "Story\n  Weave(baseIndent=0)\n  Module(name=\"game\")"
         );
     }
 
@@ -1202,7 +1202,7 @@ mod tests {
         assert_eq!(story.interfaces()[0].name_span().column, 15);
         assert_eq!(
             story.to_parse_snapshot(),
-            "Story\n  Weave(baseIndent=0)\n    Gather(name=null, depth=1)\n    Divert(target=\"-> DONE\", empty=false, tunnel=false, thread=false)\n  Interface(name=\"IItem\")"
+            "Story\n  Weave(baseIndent=0)\n  Interface(name=\"IItem\")"
         );
     }
 
@@ -1236,7 +1236,7 @@ mod tests {
         );
         assert_eq!(
             story.to_parse_snapshot(),
-            "Story\n  Weave(baseIndent=0)\n    Gather(name=null, depth=1)\n    Divert(target=\"-> DONE\", empty=false, tunnel=false, thread=false)\n  Interface(name=\"IItem\")\n    InterfaceMember(kind=Knot, name=\"target\", typed=true)\n      Argument(name=\"amount\", type=int)\n    InterfaceMember(kind=Function, name=\"score\", typed=true, return=int)\n      Argument(name=\"amount\", type=int)\n  Module(name=\"game\")"
+            "Story\n  Weave(baseIndent=0)\n  Interface(name=\"IItem\")\n    InterfaceMember(kind=Knot, name=\"target\", typed=true)\n      Argument(name=\"amount\", type=int)\n    InterfaceMember(kind=Function, name=\"score\", typed=true, return=int)\n      Argument(name=\"amount\", type=int)\n  Module(name=\"game\")"
         );
     }
 
@@ -1252,7 +1252,7 @@ mod tests {
              # tag\n\
              * choice\n\
              - gather\n\
-             -> DONE\n\
+             -> target\n\
              = stitch\n\
              Text.\n\
              === module game ===",
@@ -1289,7 +1289,7 @@ mod tests {
         let output = parse(SourceInput::new(
             "=== module game ===\n\
              == main ==\n\
-             -> DONE\n\
+             Done.\n\
              === interface IItem ===\n\
              === module items ===",
         ));
@@ -1337,7 +1337,7 @@ mod tests {
         );
         assert_eq!(
             story.to_parse_snapshot(),
-            "Story\n  Weave(baseIndent=0)\n    Gather(name=null, depth=1)\n    Divert(target=\"-> DONE\", empty=false, tunnel=false, thread=false)\n  Interface(name=\"IItem\")\n  Module(name=\"left\", implements=[\"IItem\", \"IOther\"])"
+            "Story\n  Weave(baseIndent=0)\n  Interface(name=\"IItem\")\n  Module(name=\"left\", implements=[\"IItem\", \"IOther\"])"
         );
     }
 
@@ -1369,7 +1369,7 @@ mod tests {
         );
         assert_eq!(
             story.to_parse_snapshot(),
-            "Story\n  Weave(baseIndent=0)\n    Gather(name=null, depth=1)\n    Divert(target=\"-> DONE\", empty=false, tunnel=false, thread=false)\n  Module(name=\"game\")\n    Import(from=\"items\", module=true)\n    Import(from=\"routes\", names=[\"start\", \"heal\"])"
+            "Story\n  Weave(baseIndent=0)\n  Module(name=\"game\")\n    Import(from=\"items\", module=true)\n    Import(from=\"routes\", names=[\"start\", \"heal\"])"
         );
     }
 
@@ -1568,7 +1568,7 @@ mod tests {
              ~ return\n\
              == main ==\n\
              = intro\n\
-             -> END",
+             Done.",
         ));
 
         assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
@@ -1608,14 +1608,14 @@ mod tests {
             "=== module game ===\n\
              CONST START: int = 1\n\
              == main ==\n\
-             -> END",
+             Done.",
         ));
 
         assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
         let story = output.artifact.expect("story should parse");
         assert_eq!(
             story.to_parse_snapshot(),
-            "Story\n  Weave(baseIndent=0)\n    Gather(name=null, depth=1)\n    Divert(target=\"-> DONE\", empty=false, tunnel=false, thread=false)\n  Module(name=\"game\")\n    Weave(baseIndent=0)\n      ConstantDeclaration(name=\"START\", type=int)\n        Number(1)\n    Flow(level=Knot, name=\"main\", function=false)\n      Weave(baseIndent=0)\n        Divert(target=\"-> END\", empty=false, tunnel=false, thread=false)"
+            "Story\n  Weave(baseIndent=0)\n  Module(name=\"game\")\n    Weave(baseIndent=0)\n      ConstantDeclaration(name=\"START\", type=int)\n        Number(1)\n    Flow(level=Knot, name=\"main\", function=false)\n      Weave(baseIndent=0)\n        Text(\"Done.\")\n        Text(\"\\n\")"
         );
     }
 
@@ -1727,8 +1727,8 @@ mod tests {
     #[test]
     fn global_var_declarations_inside_flows_report_current_syntax_error() {
         let cases = [
-            "== knot ==\nVAR score: int = 0\n-> DONE",
-            "== knot ==\n= stitch\nVAR score: int = 0\n-> DONE",
+            "== knot ==\nVAR score: int = 0\nDone.",
+            "== knot ==\n= stitch\nVAR score: int = 0\nDone.",
             "== function setup() => void ==\nVAR score: int = 0",
         ];
 

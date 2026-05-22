@@ -4,7 +4,6 @@
 -> A ->
 We will never return to here!
 
--> END
 
 == A ==
 This is A
@@ -12,4 +11,3 @@ This is A
 
 == B ==
 Now in B.
--> END

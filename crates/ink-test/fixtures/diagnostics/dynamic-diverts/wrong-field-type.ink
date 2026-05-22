@@ -9,4 +9,3 @@ VAR player: Player = %Player{ hp: 10 }
 
 == player ==
 = hp
--> DONE

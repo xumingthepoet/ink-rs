@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use ink_story_json_format::{Container, Object as RuntimeObject};
+use ink_story_json_format::{Container, ControlCommand, Object as RuntimeObject};
 
 use crate::parsed::{ContentList, DictKeyType, Flow, Object, TypeName, Weave};
 
@@ -8,9 +8,7 @@ use super::context::{ChoicePathMode, LoweringContext};
 use super::expression::infer_lowered_expression_type;
 use super::indexes::LoweringIndexes;
 use super::path::LabelIndex;
-use super::weave::{
-    lower_choice_weave, lower_linear_weave_into_context, weave_has_choice, weave_has_weave_points,
-};
+use super::weave::{lower_choice_weave, lower_linear_weave_into_context, weave_has_weave_points};
 use super::{ends_with_flow_terminator, named_container};
 
 pub(super) fn lower_module_flow(
@@ -139,14 +137,6 @@ fn lower_flow_with_context(flow: &Flow, context: &FlowLoweringContext<'_, '_>) -
     }
 
     if !flow.child_flows().is_empty() {
-        if !weave_has_choice(flow.weave()) && !ends_with_flow_terminator(&content) {
-            let first_child_name = flow.child_flows()[0].name();
-            content.push(RuntimeObject::Divert {
-                target: format!(".^.{}", first_child_name),
-                variable: false,
-            });
-        }
-
         let child_stitch_names: Vec<String> = flow
             .child_flows()
             .iter()
@@ -167,6 +157,8 @@ fn lower_flow_with_context(flow: &Flow, context: &FlowLoweringContext<'_, '_>) -
             })
             .collect();
 
+        append_natural_end_if_needed(flow, &mut content);
+
         return Container {
             content,
             named_content: child_containers,
@@ -175,11 +167,19 @@ fn lower_flow_with_context(flow: &Flow, context: &FlowLoweringContext<'_, '_>) -
         };
     }
 
+    append_natural_end_if_needed(flow, &mut content);
+
     Container {
         content,
         named_content: Vec::new(),
         name: Some(flow.name().to_string()),
         flags: None,
+    }
+}
+
+fn append_natural_end_if_needed(flow: &Flow, content: &mut Vec<RuntimeObject>) {
+    if !flow.is_function() && !ends_with_flow_terminator(content) {
+        content.push(RuntimeObject::ControlCommand(ControlCommand::Done));
     }
 }
 

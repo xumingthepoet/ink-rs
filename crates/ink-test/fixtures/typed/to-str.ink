@@ -19,4 +19,3 @@ VAR scores: Dict<string, int> = %{"ada": 10}
 
 == main ==
 {to_str(score)}|{to_str(ratio)}|{to_str(ready)}|{to_str("ok")}|{to_str(State.Busy)}|{hp_label(player.hp)}|{to_str(values)}|{to_str(player)}|{to_str(scores)}
--> DONE

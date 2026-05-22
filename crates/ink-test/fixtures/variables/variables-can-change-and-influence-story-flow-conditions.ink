@@ -10,4 +10,3 @@ VAR is_hazardous: bool = false
 The latest measurement is {value} {unit}. {not is_hazardous: Not terrible, not great. | Oh no.}
 
 *   Redo measurement -> root
--> END

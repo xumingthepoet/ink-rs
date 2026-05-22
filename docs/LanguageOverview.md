@@ -29,7 +29,6 @@ Gold: {gold}
 Price: {shop::price}
 ~ shop::price += 2
 Updated price: {shop::price}
--> END
 
 === module shop ===
 VAR price: int = 3
@@ -65,7 +64,6 @@ Score: {current_score}
 === module left implements IRoute ===
 == target() ==
 Arrived.
--> END
 
 == function score(value: int) => int ==
 ~ return value + 1
@@ -126,9 +124,13 @@ VAR label: string = "HP " + to_str(hp)
 ## Flow And Logic
 
 Knot and stitch content can use text, choices, gathers, diverts, tunnels,
-threads, conditionals, expressions, glue, tags, and temp variables. `VAR`
-declarations are module-top-level globals; local calculation state uses typed
-`temp` declarations inside logic lines.
+conditionals, expressions, glue, tags, and temp variables. `VAR` declarations
+are module-top-level globals; local calculation state uses typed `temp`
+declarations inside logic lines.
+
+Non-function knots and stitches end naturally when execution reaches the end of
+their content. Use explicit diverts only when execution should continue
+somewhere else.
 
 Explicit `and` / `&&` and `or` / `||` short-circuit inside a single expression,
 so guard checks can protect later array or Dict reads. Choice conditions use a
@@ -143,7 +145,11 @@ choices and diverts stay outside `for` bodies.
 Array-backed choices use a dynamic choice prefix after the choice marker:
 `* [item in items] Text {item}` or
 `* [index, item in items] {enabled[index]}: {item}`. The generated options
-behave like ordinary choices and save/load with their captured choice state.
+behave like ordinary choices. Save/load stores the replay point before choice
+generation and regenerates the options after load, so choice generation must be
+replay-safe: no function calls, random calls, variable mutation, or other
+side-effectful logic in the dynamic iterable, choice condition, or displayed
+choice text.
 
 ```ink
 == main ==
@@ -151,7 +157,6 @@ behave like ordinary choices and save/load with their captured choice state.
 * Look around
   ~ visits += 1
   The room is quiet.
-  -> END
 ```
 
 ## Host Integration

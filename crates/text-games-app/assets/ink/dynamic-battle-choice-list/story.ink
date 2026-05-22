@@ -46,4 +46,3 @@ Focus: {focus}
 - else:
     {actor_name} uses {actions[action_index].name}.
 }
--> END

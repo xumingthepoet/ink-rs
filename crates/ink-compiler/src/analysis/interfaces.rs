@@ -800,7 +800,7 @@ mod tests {
              == function score(amount: int) => int ==\n\
              === module left implements IItem, IOther ===\n\
              == target(amount: int) ==\n\
-             -> END\n\
+             \n\
              == function score(amount: int) => int ==\n\
              ~ return amount",
         );
@@ -819,7 +819,7 @@ mod tests {
              == target(amount: int) ==\n\
              === module left implements IItem, IRoute ===\n\
              == target(amount: int) ==\n\
-             -> END",
+             ",
         );
 
         let diagnostics = implementation_diagnostics(&story);
@@ -892,7 +892,7 @@ mod tests {
              == function score(amount: int) => int ==\n\
              === module left implements IItem ===\n\
              == target(amount: string) ==\n\
-             -> END\n\
+             \n\
              == function score(amount: string) => string ==\n\
              ~ return amount",
         );

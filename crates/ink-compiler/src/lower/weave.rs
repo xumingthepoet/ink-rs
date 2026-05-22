@@ -8,8 +8,9 @@ use super::context::{ChoicePathMode, LoweringContext};
 use super::expression::lower_expression_into;
 use super::path::{child_path, LabelIndex};
 use super::{
-    done_container, ends_with_end_or_done, lower_object_into_with_context,
-    lower_object_into_with_context_count, named_container, named_content,
+    done_container, ends_with_end_or_done, ends_with_flow_terminator,
+    lower_object_into_with_context, lower_object_into_with_context_count, named_container,
+    named_content,
 };
 
 enum ChoiceOuter {
@@ -169,12 +170,14 @@ pub(super) fn lower_choice_weave_with_initial_content(
                 };
                 let gather_has_choice =
                     lower_weave_section(objects, &mut index, &mut gather_content, &mut section);
-                if !gather_has_choice && !ends_with_end_or_done(&gather_content) {
+                if !gather_has_choice && !ends_with_flow_terminator(&gather_content) {
                     if let Some(target) = gather_path_mode.fallback_gather_target() {
                         gather_content.push(RuntimeObject::Divert {
                             target,
                             variable: false,
                         });
+                    } else {
+                        gather_content.push(RuntimeObject::ControlCommand(ControlCommand::Done));
                     }
                 }
 
@@ -465,6 +468,8 @@ fn lower_choice_in_section(
             variable: false,
         });
         *section.needs_terminal_gather = true;
+    } else if !ends_with_flow_terminator(&choice_content) {
+        choice_content.push(RuntimeObject::ControlCommand(ControlCommand::Done));
     }
 
     section

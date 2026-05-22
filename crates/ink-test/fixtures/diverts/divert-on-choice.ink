@@ -10,4 +10,3 @@ You stand by the wall of Analand, sword in hand.
 
 == paragraph_2 ==
 You open the gate, and step out onto the path.
--> DONE

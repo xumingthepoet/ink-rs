@@ -504,9 +504,6 @@ fn rewrite_divert(divert: Divert, aliases: &[LoopAlias]) -> Divert {
     if divert.is_tunnel() {
         rewritten = rewritten.with_tunnel();
     }
-    if divert.is_thread() {
-        rewritten = rewritten.with_thread();
-    }
     rewritten
 }
 

@@ -14,4 +14,3 @@ VAR sheet: Sheet = %Sheet{ scores: %{"ada": 10} }
 ~ nested[1]["ada"] = 13
 ~ score_arrays[0]["ada"] = 14
 ~ sheet.scores["ada"] = 15
--> DONE

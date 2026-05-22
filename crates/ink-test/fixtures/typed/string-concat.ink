@@ -4,4 +4,3 @@ VAR name: string = "Ada"
 
 == main ==
 {greeting + ", " + name + "!"}
--> DONE

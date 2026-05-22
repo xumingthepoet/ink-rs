@@ -10,4 +10,3 @@ VAR party_copy: Player[] = party
 == main ==
 ~ party_copy[0].hp = 1
 {grid[0][1]}|{LEN(grid[1])}|{party[0].hp}|{party_copy[0].hp}|{party == party_copy}
--> DONE

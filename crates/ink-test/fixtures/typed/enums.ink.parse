@@ -1,7 +1,5 @@
 Story
   Weave(baseIndent=0)
-    Gather(name=null, depth=1)
-    Divert(target="-> DONE", empty=false, tunnel=false, thread=false)
   Module(name="data")
     Weave(baseIndent=0)
       EnumDeclaration(name="State")
@@ -77,4 +75,3 @@ Story
         ContentList
           Binary(!=, QualifiedReference(data::state), VariableReference(data::State.Busy))
         Text("\n")
-        Divert(target="-> DONE", empty=false, tunnel=false, thread=false)

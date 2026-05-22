@@ -29,7 +29,6 @@ Gold: {gold}
 Price: {shop::price}
 ~ shop::price += 2
 Updated price: {shop::price}
--> END
 
 === module shop ===
 VAR price: int = 3
@@ -49,7 +48,6 @@ Plain lines inside knots and stitches produce output text.
 == main ==
 Hello.
 World.
--> END
 ```
 
 Use comments for author-only text:
@@ -79,7 +77,6 @@ VAR hp: int = 20
 HP: {hp}
 ~ temp label: string = "HP " + to_str(hp)
 {label}
--> END
 ```
 
 ## Values And Types
@@ -215,9 +212,11 @@ Diverts move story execution.
 ```ink
 -> next
 -> module::target
--> END
--> DONE
 ```
+
+Non-function knots and stitches end naturally when execution reaches the end of
+their content. Use an explicit divert when execution should continue at another
+target.
 
 Dynamic divert targets use braces and evaluate an expression of type `->`.
 
@@ -234,7 +233,6 @@ Tunnels call flow and return with `->->`.
 == main ==
 -> visit_room ->
 Back in main.
--> END
 
 == visit_room ==
 Room text.
@@ -246,23 +244,6 @@ Tunnel return can target another destination:
 ```ink
 ->-> fallback
 ```
-
-Threads collect choices from another flow using `<-`.
-
-```ink
-== main ==
-<- side_choices
-Main choice area.
-* Continue
-    -> END
-
-== side_choices ==
-* Side option
-    -> side_done
-```
-
-Threads are advanced flow control. When using them for reusable choice sets,
-pass explicit return targets or end the branch clearly.
 
 ## Choices And Weave
 
@@ -279,7 +260,6 @@ You reach a door.
     -> done
 - done
 End.
--> END
 ```
 
 Choices are repeatable. Hide or show choices with explicit state and conditions.
@@ -310,7 +290,6 @@ Gathers use `-` to join weave branches. Named gathers can be divert targets.
 ```ink
 - regroup
 Back together.
--> END
 ```
 
 Choice labels are supported on static choices and gathers.
@@ -341,7 +320,6 @@ CONST options: Option[] = [
 * [option in options] {option.enabled}: {option.text}
     -> {option.target}
 * Wait
-    -> END
 ```
 
 Use one binding variable for the value, or two variables for `index, value`.
@@ -351,9 +329,16 @@ Use one binding variable for the value, or two variables for `index, value`.
     -> choose(i, option.target)
 ```
 
-The array expression is evaluated once before expansion. Each generated choice
-captures its own binding values in ordinary choice state, so save/load preserves
-pending generated choices without regenerating the list.
+The array expression is evaluated once before expansion. Save/load stores the
+stable replay point before choice generation and regenerates pending choices
+after load instead of serializing generated choices.
+
+Choice generation must be replay-safe. Dynamic iterable expressions, choice
+conditions, and displayed choice text cannot call story functions, external
+functions, dynamic interface functions, `RANDOM`, `SEED_RANDOM`, mutating
+collection builtins, or other statement-level side effects. Move side effects
+to ordinary story content before the choice pause or into the selected-choice
+body.
 
 Dynamic binding variables are visible in the choice condition, displayed choice
 text, selected-choice body, tags, and nested choices. Dynamic choices can mix
@@ -388,7 +373,8 @@ Switch blocks compare a selector against case expressions.
 ```
 
 Branches use `- condition:` and `- else:`. A switch with no exhaustive branch
-may still need an explicit divert or terminator after the block.
+may still need an explicit divert after the block when later execution should
+continue somewhere else.
 
 ## Loops
 
@@ -457,7 +443,6 @@ Score: {{route}::score(10)}
 === module left implements IRoute ===
 == target() ==
 Arrived.
--> END
 
 == function score(value: int) => int ==
 ~ return value + 1
@@ -501,11 +486,12 @@ INTERNAL summary() => string
 
 Language-level state that should survive save/load belongs in globals, arrays,
 Dicts, structs, or explicit host state. Runtime `save_state()` stores stable
-pause-point state: globals, callstack/threads/temps, generated choices,
-choice-thread snapshots when needed, and random state.
+pause-point state: globals, callstack/temps, random state, and enough resume
+mode information to continue from the saved point.
 
-Dynamic choices save as generated ordinary choices with captured binding state.
-The runtime does not need to regenerate pending dynamic choices after load.
+Saves do not serialize pending generated choices. When saved at a choice pause,
+the runtime restores the pre-choice replay point and regenerates static and
+dynamic choices after load.
 
 ## Identifiers
 

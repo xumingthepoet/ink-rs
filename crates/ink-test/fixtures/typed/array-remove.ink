@@ -22,4 +22,3 @@ before{ARRAY_REMOVE(items, 0)}after|{items[0]}|{LEN(items)}
 {nested[1][0]}|{LEN(nested[1])}
 ~ ARRAY_REMOVE(bag.items, 0)
 {bag.items[0]}|{LEN(bag.items)}
--> DONE

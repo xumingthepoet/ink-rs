@@ -327,7 +327,7 @@ mod tests {
              nested_lookup: Dict<int, Dict<string, Item>>\n\
              hp: int\n\
              }\n\
-             -> DONE",
+             ",
         );
 
         let index = build_struct_type_index(&story);
@@ -377,13 +377,13 @@ mod tests {
              hp: int\n\
              }\n\
              == main ==\n\
-             -> DONE\n\
+             \n\
              === module items ===\n\
              STRUCT Item {\n\
              label: string\n\
              }\n\
              == helper ==\n\
-             -> DONE",
+             ",
         );
 
         let index = build_struct_type_index(&story);
@@ -412,7 +412,7 @@ mod tests {
              STRUCT Player {\n\
              name: string\n\
              }\n\
-             -> DONE",
+             ",
         );
 
         let diagnostics = struct_type_diagnostics(&story);
@@ -435,13 +435,13 @@ mod tests {
              label: string\n\
              }\n\
              == main ==\n\
-             -> DONE\n\
+             \n\
              === module items ===\n\
              STRUCT Item {\n\
              label: string\n\
              }\n\
              == helper ==\n\
-             -> DONE",
+             ",
         );
 
         let diagnostics = struct_type_diagnostics(&story);
@@ -460,7 +460,7 @@ mod tests {
              hp: int\n\
              hp: string\n\
              }\n\
-             -> DONE",
+             ",
         );
 
         let diagnostics = struct_type_diagnostics(&story);
@@ -478,7 +478,7 @@ mod tests {
             "STRUCT Player {\n\
              inventory: Item[][]\n\
              }\n\
-             -> DONE",
+             ",
         );
 
         let diagnostics = struct_type_diagnostics(&story);
@@ -498,13 +498,13 @@ mod tests {
              item: Item\n\
              }\n\
              == main ==\n\
-             -> DONE\n\
+             \n\
              === module items ===\n\
              STRUCT Item {\n\
              label: string\n\
              }\n\
              == helper ==\n\
-             -> DONE",
+             ",
         );
 
         let diagnostics = struct_type_diagnostics(&story);
@@ -527,7 +527,7 @@ mod tests {
              item: Item\n\
              }\n\
              == main ==\n\
-             -> DONE",
+             ",
         );
 
         assert!(struct_type_diagnostics(&story).is_empty());
@@ -540,7 +540,7 @@ mod tests {
              STRUCT Actor {\n\
              state: State\n\
              }\n\
-             -> DONE",
+             ",
         );
 
         assert!(struct_type_diagnostics(&story).is_empty());
@@ -554,11 +554,11 @@ mod tests {
              state: items::State\n\
              }\n\
              == main ==\n\
-             -> END\n\
+             \n\
              === module items ===\n\
              ENUM State { Idle Busy }\n\
              == helper ==\n\
-             -> END",
+             ",
         );
 
         assert!(struct_type_diagnostics(&story).is_empty());
@@ -570,7 +570,7 @@ mod tests {
             "STRUCT Node {\n\
              next: Node\n\
              }\n\
-             -> DONE",
+             ",
         );
 
         let diagnostics = struct_type_diagnostics(&story);

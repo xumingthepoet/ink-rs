@@ -14,9 +14,7 @@ VAR alternates: interface<IItem>[] = [right]
 === module left implements IItem ===
 == target(amount: int) ==
 Left {amount}.
--> END
 
 === module right implements IItem ===
 == target(amount: int) ==
 Right {amount}.
--> END

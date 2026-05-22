@@ -137,8 +137,8 @@ impl Story {
 
             // Finished a section of content / reached a choice point?
             if !self.can_continue() {
-                if self.state.get_callstack().borrow().can_pop_thread() {
-                    self.add_error("Thread available to pop, threads should always be flat by the end of evaluation?", false);
+                if self.state.get_callstack().borrow().can_pop_continuation() {
+                    self.add_error("Continuation available to pop, continuations should always be flat by the end of evaluation?", false);
                 }
 
                 if self.state.get_generated_choices().is_empty()
@@ -164,7 +164,7 @@ impl Story {
                         );
                     } else if !self.get_state().get_callstack().borrow().can_pop() {
                         self.add_error(
-                            "ran out of content. Do you need a '-> DONE' or '-> END'?",
+                            "ran out of content before reaching a natural end, authored choice, or divert target.",
                             false,
                         );
                     } else {
@@ -255,8 +255,20 @@ impl Story {
     }
 
     pub(crate) fn continue_single_step(&mut self) -> Result<bool, StoryError> {
+        let had_choices_before_step = !self.get_state().get_generated_choices().is_empty();
+        if !had_choices_before_step && self.get_state().is_replay_save_candidate() {
+            self.choice_replay_candidate = Some(self.get_state().copy_for_replay_snapshot());
+        }
+
         // Run main step function (walks through content)
         self.step()?;
+
+        if !had_choices_before_step
+            && !self.get_state().get_generated_choices().is_empty()
+            && self.choice_replay_state.is_none()
+        {
+            self.choice_replay_state = self.choice_replay_candidate.take();
+        }
 
         // Run out of content and we have a default invisible choice that we can follow?
         if !self.can_continue()
@@ -449,22 +461,28 @@ impl Story {
         // Increment the content pointer, following diverts if necessary
         self.next_content()?;
 
-        // Starting a thread should be done after the increment to the content
-        // pointer,
-        // so that when returning from the thread, it returns to the content
-        // after this instruction.
         if let Some(current_content_obj) = current_content_obj.as_ref() {
             if let Some(control_cmd) = current_content_obj
                 .as_any()
                 .downcast_ref::<ControlCommand>()
             {
-                if control_cmd.command_type == CommandType::StartThread {
-                    self.get_state().get_callstack().borrow_mut().push_thread();
+                if control_cmd.command_type == CommandType::LegacyStartThread {
+                    self.handle_legacy_start_thread_command();
                 }
             }
         }
 
         Ok(())
+    }
+
+    fn handle_legacy_start_thread_command(&mut self) {
+        // Historical compiled-story JSON can still contain the "thread" token.
+        // Current ink-rs source cannot emit it; this compatibility path keeps
+        // it away from ordinary choice execution.
+        self.get_state()
+            .get_callstack()
+            .borrow_mut()
+            .push_continuation();
     }
 
     pub(crate) fn next_content(&mut self) -> Result<(), StoryError> {
@@ -499,7 +517,7 @@ impl Story {
         let successful_pointer_increment = self.increment_content_pointer();
 
         // Ran out of content? Try to auto-exit from a function,
-        // or finish evaluating the content of a thread
+        // or finish evaluating the content of a continuation
         if !successful_pointer_increment {
             let mut did_pop = false;
 
@@ -529,13 +547,13 @@ impl Story {
                 .get_callstack()
                 .as_ref()
                 .borrow()
-                .can_pop_thread()
+                .can_pop_continuation()
             {
                 self.get_state()
                     .get_callstack()
                     .as_ref()
                     .borrow_mut()
-                    .pop_thread()?;
+                    .pop_continuation()?;
 
                 did_pop = true;
             } else {

@@ -23,11 +23,11 @@ impl StoryState {
     }
 
     pub fn get_output_stream(&self) -> &Vec<Rc<dyn RTObject>> {
-        &self.current_flow.output_stream
+        &self.current_execution.output_stream
     }
 
     pub(super) fn get_output_stream_mut(&mut self) -> &mut Vec<Rc<dyn RTObject>> {
-        &mut self.current_flow.output_stream
+        &mut self.current_execution.output_stream
     }
 
     pub(super) fn output_stream_dirty(&mut self) {

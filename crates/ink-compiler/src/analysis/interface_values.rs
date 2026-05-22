@@ -602,10 +602,7 @@ impl ParsedVisitor for InterfaceModuleLiteralUseCollector<'_> {
                         context,
                     );
                 }
-                DivertTarget::Dynamic(_)
-                | DivertTarget::Done
-                | DivertTarget::End
-                | DivertTarget::Empty => {}
+                DivertTarget::Dynamic(_) | DivertTarget::Empty => {}
             },
             Object::TunnelOnwards(tunnel_onwards) => {
                 if let Some(target) = tunnel_onwards.override_target() {
@@ -636,10 +633,7 @@ impl ParsedVisitor for InterfaceModuleLiteralUseCollector<'_> {
                                 context,
                             );
                         }
-                        DivertTarget::Dynamic(_)
-                        | DivertTarget::Done
-                        | DivertTarget::End
-                        | DivertTarget::Empty => {}
+                        DivertTarget::Dynamic(_) | DivertTarget::Empty => {}
                     }
                 }
             }

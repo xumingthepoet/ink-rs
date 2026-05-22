@@ -9,4 +9,3 @@ How much do you give?
 
 == give(a, b, c) ==
 You give {a} or {b} dollars. {c}
--> DONE

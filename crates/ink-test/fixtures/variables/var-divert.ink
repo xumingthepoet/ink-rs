@@ -14,4 +14,3 @@ Give up now, or keep trying to save your Kingdom?
 
 == everybody_dies ==
 Everybody dies.
--> DONE

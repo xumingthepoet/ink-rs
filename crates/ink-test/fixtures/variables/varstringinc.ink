@@ -6,4 +6,3 @@ VAR v: string = "a"
     Changed.
     ~ v = v + "b"
     {v}.
-    -> DONE

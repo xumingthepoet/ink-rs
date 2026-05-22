@@ -124,7 +124,6 @@ Temporary state before slot load: gold {to_str(items::gold)}, party {party::part
     -> mine_after_save
 - else:
     No saved route to resume.
-    -> END
 }
 
 == village_after_save ==
@@ -226,4 +225,3 @@ Quest log: {quests::quest_log()}.
 Flags: {events::flag_summary()}.
 -> save::show_slots ->
 JRPG slice complete.
--> END

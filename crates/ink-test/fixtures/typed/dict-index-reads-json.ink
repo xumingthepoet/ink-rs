@@ -5,4 +5,3 @@ VAR nested: Dict<int, Dict<string, int>> = %{1: %{"ada": 10}}
 
 == main ==
 {scores["ada"]}|{names[1]}|{nested[1]["ada"]}
--> DONE

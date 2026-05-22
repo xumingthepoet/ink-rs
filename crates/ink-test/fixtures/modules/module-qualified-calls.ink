@@ -5,7 +5,6 @@ FROM audio IMPORT play
 == main ==
 {math::add(2, 3)}
 {audio::play("intro")}
--> END
 
 === module math ===
 == function add(left: int, right: int) => int ==
@@ -15,4 +14,3 @@ FROM audio IMPORT play
 EXTERNAL play(name: string) => int
 
 == helper ==
--> END

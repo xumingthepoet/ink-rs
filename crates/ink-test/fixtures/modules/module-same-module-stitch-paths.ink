@@ -10,4 +10,3 @@ Intro.
 == scene ==
 = open
 Open.
--> END

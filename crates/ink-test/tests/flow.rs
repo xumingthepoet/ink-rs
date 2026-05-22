@@ -5,6 +5,30 @@ fn story_is_ended(story: &Story) -> bool {
 }
 
 #[test]
+fn root_flow_ends_naturally() {
+    let mut story = compile_fixture_to_story_allowing_warnings("flow/natural-root-end.ink");
+
+    assert_eq!("Root line.\n", story.cont_maximally());
+    assert!(story_is_ended(&story));
+}
+
+#[test]
+fn knot_ends_naturally_after_divert() {
+    let mut story = compile_fixture_to_story_allowing_warnings("flow/natural-knot-end.ink");
+
+    assert_eq!("Knot line.\n", story.cont_maximally());
+    assert!(story_is_ended(&story));
+}
+
+#[test]
+fn stitch_ends_naturally_after_divert() {
+    let mut story = compile_fixture_to_story_allowing_warnings("flow/natural-stitch-end.ink");
+
+    assert_eq!("Stitch line.\n", story.cont_maximally());
+    assert!(story_is_ended(&story));
+}
+
+#[test]
 fn unordered_knot_divert_story_runs_to_end() {
     let mut story = compile_fixture_to_story_allowing_warnings(
         "flow/unordered-knot-divert-story-runs-to-end.ink",

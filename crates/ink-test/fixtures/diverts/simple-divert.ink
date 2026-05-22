@@ -6,4 +6,4 @@
 
 
         == hurry_home ==
-        We hurried home to Savile Row as fast as we could. -> END
+        We hurried home to Savile Row as fast as we could.

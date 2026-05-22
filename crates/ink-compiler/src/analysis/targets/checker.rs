@@ -247,10 +247,7 @@ impl ParsedVisitor for CallTargetChecker<'_> {
                     {
                         self.check_plain_divert_target(divert, context);
                     }
-                    DivertTarget::Path(_)
-                    | DivertTarget::QualifiedPath(_)
-                    | DivertTarget::Done
-                    | DivertTarget::End => {}
+                    DivertTarget::Path(_) | DivertTarget::QualifiedPath(_) => {}
                 }
                 if !arguments_checked_by_dynamic_interface_target {
                     for argument in divert.arguments() {
@@ -322,7 +319,7 @@ impl ParsedVisitor for CallTargetChecker<'_> {
                                 );
                             }
                         }
-                        DivertTarget::Done | DivertTarget::End | DivertTarget::Empty => {}
+                        DivertTarget::Empty => {}
                     }
                 }
                 if !arguments_checked_by_dynamic_interface_target {
@@ -366,7 +363,7 @@ mod tests {
 
     #[test]
     fn reports_non_function_call_targets() {
-        let story = parse_story("~ knot()\n== knot ==\n-> DONE");
+        let story = parse_story("~ knot()\n== knot ==\n");
         let diagnostics = call_target_diagnostics(&story);
 
         assert_single_diagnostic(
@@ -391,7 +388,7 @@ mod tests {
              VAR copied_scores: int[] = echo_scores(source_scores)\n\
              VAR copied_lookup: Dict<string, int> = echo_lookup(source_lookup)\n\
              VAR copied_lookup_list: Dict<string, int>[] = echo_lookup_list(source_lookup_list)\n\
-             -> DONE\n\
+             Done.\n\
              == function add(a: int, b: int) => int ==\n\
              ~ return a + b\n\
              == function echo_player(player: Player) => Player ==\n\
@@ -423,7 +420,7 @@ mod tests {
              VAR adjusted_score: int = external_score(score) + LEN(scores)\n\
              VAR description: string = describe(source_player, scores)\n\
              VAR copied_scores: Dict<string, int> = copy_scores(score_lookup)\n\
-             -> DONE",
+             Done.",
         );
 
         assert_eq!(super::super::super::run_analysis_passes(&story), []);
@@ -440,7 +437,7 @@ mod tests {
              VAR source_scores: Dict<string, int> = %{\"ada\": 10}\n\
              VAR copied_scores: Dict<string, int> = {route}::copy_scores(source_scores)\n\
              == main ==\n\
-             -> END\n\
+             \n\
              === module scorer implements IScorer ===\n\
              == function copy_scores(scores: Dict<string, int>) => Dict<string, int> ==\n\
              ~ return scores",
@@ -454,7 +451,7 @@ mod tests {
         let story = parse_story(
             "EXTERNAL external_score(value: int) => int\n\
              ~ external_score()\n\
-             -> DONE",
+             Done.",
         );
 
         let diagnostics = call_target_diagnostics(&story);
@@ -472,7 +469,7 @@ mod tests {
             "EXTERNAL external_score(value: int) => int\n\
              VAR label: string = \"x\"\n\
              ~ external_score(label)\n\
-             -> DONE",
+             ",
         );
 
         let diagnostics = call_target_diagnostics(&story);
@@ -489,7 +486,7 @@ mod tests {
         let story = parse_story(
             "EXTERNAL external_label() => string\n\
              VAR score: int = external_label()\n\
-             -> DONE",
+             Done.",
         );
 
         let diagnostics = super::super::super::run_analysis_passes(&story);
@@ -518,7 +515,7 @@ mod tests {
              VAR score_count: int = LEN(scores)\n\
              VAR player_count: int = LEN(players)\n\
              VAR row_count: int = LEN(nested_scores)\n\
-             -> DONE",
+             ",
         );
 
         assert_eq!(super::super::super::run_analysis_passes(&story), []);
@@ -530,13 +527,13 @@ mod tests {
             (
                 "VAR value: int = 1\n\
                  VAR count: int = LEN(value)\n\
-                 -> DONE",
+                 ",
                 "Argument for builtin 'LEN' has type int but expected array",
             ),
             (
                 "VAR label: string = \"text\"\n\
                  VAR count: int = LEN(label)\n\
-                 -> DONE",
+                 ",
                 "Argument for builtin 'LEN' has type string but expected array",
             ),
             (
@@ -545,7 +542,7 @@ mod tests {
                  }\n\
                  VAR player: Player = %Player{ hp: 10 }\n\
                  VAR count: int = LEN(player)\n\
-                 -> DONE",
+                 ",
                 "Argument for builtin 'LEN' has type Player but expected array",
             ),
         ];
@@ -564,13 +561,13 @@ mod tests {
             (
                 "VAR values: int[] = [1]\n\
                  VAR count: int = LEN()\n\
-                 -> DONE",
+                 ",
                 "Builtin 'LEN' expects 1 argument but got 0",
             ),
             (
                 "VAR values: int[] = [1]\n\
                  VAR count: int = LEN(values, values)\n\
-                 -> DONE",
+                 ",
                 "Builtin 'LEN' expects 1 argument but got 2",
             ),
         ];
@@ -597,7 +594,7 @@ mod tests {
              ~ ARRAY_REMOVE(scores, 0)\n\
              ~ ARRAY_REMOVE(players, 0)\n\
              ~ ARRAY_REMOVE(nested_scores, 0)\n\
-             -> DONE",
+             ",
         );
 
         assert_eq!(super::super::super::run_analysis_passes(&story), []);
@@ -631,10 +628,10 @@ mod tests {
              ~ ARRAY_PUSH(nested_scores, scores)\n\
              ~ ARRAY_INSERT(scores, 0, 0)\n\
              ~ ARRAY_INSERT(scores, LEN(scores), 3)\n\
-             -> DONE\n\
+             Done.\n\
              === module left implements IRoute ===\n\
              == go ==\n\
-             -> DONE",
+             ",
         );
 
         assert_eq!(super::super::super::run_analysis_passes(&story), []);
@@ -646,32 +643,32 @@ mod tests {
             (
                 "VAR value: int = 1\n\
                  ~ ARRAY_REMOVE(value, 0)\n\
-                 -> DONE",
+                 ",
                 "First argument for builtin 'ARRAY_REMOVE' has type int but expected array",
             ),
             (
                 "VAR values: int[] = [1]\n\
                  VAR index: string = \"0\"\n\
                  ~ ARRAY_REMOVE(values, index)\n\
-                 -> DONE",
+                 ",
                 "Second argument for builtin 'ARRAY_REMOVE' has type string but expected int",
             ),
             (
                 "VAR values: int[] = [1]\n\
                  ~ ARRAY_REMOVE(values)\n\
-                 -> DONE",
+                 ",
                 "Builtin 'ARRAY_REMOVE' expects 2 arguments but got 1",
             ),
             (
                 "VAR values: int[] = [1]\n\
                  ~ ARRAY_REMOVE(values, 0, 1)\n\
-                 -> DONE",
+                 ",
                 "Builtin 'ARRAY_REMOVE' expects 2 arguments but got 3",
             ),
             (
                 "VAR values: int[] = [1]\n\
                  ~ ARRAY_REMOVE(copy_values(), 0)\n\
-                 -> DONE\n\
+                 \n\
                  == function copy_values() => int[] ==\n\
                  ~ return values",
                 "First argument for builtin 'ARRAY_REMOVE' must be a mutable lvalue",
@@ -692,13 +689,13 @@ mod tests {
             (
                 "VAR value: int = 1\n\
                  ~ ARRAY_PUSH(value, 1)\n\
-                 -> DONE",
+                 ",
                 "First argument for builtin 'ARRAY_PUSH' has type int but expected array",
             ),
             (
                 "VAR values: int[] = [1]\n\
                  ~ ARRAY_PUSH(copy_values(), 1)\n\
-                 -> DONE\n\
+                 \n\
                  == function copy_values() => int[] ==\n\
                  ~ return values",
                 "First argument for builtin 'ARRAY_PUSH' must be a mutable lvalue",
@@ -706,38 +703,38 @@ mod tests {
             (
                 "VAR values: int[] = [1]\n\
                  ~ ARRAY_PUSH(values, \"two\")\n\
-                 -> DONE",
+                 ",
                 "Second argument for builtin 'ARRAY_PUSH' has type string but expected int",
             ),
             (
                 "VAR values: int[] = [1]\n\
                  ~ ARRAY_PUSH(values)\n\
-                 -> DONE",
+                 ",
                 "Builtin 'ARRAY_PUSH' expects 2 arguments but got 1",
             ),
             (
                 "VAR values: int[] = [1]\n\
                  VAR index: string = \"0\"\n\
                  ~ ARRAY_INSERT(values, index, 2)\n\
-                 -> DONE",
+                 ",
                 "Second argument for builtin 'ARRAY_INSERT' has type string but expected int",
             ),
             (
                 "VAR values: int[] = [1]\n\
                  ~ ARRAY_INSERT(values, 0, \"two\")\n\
-                 -> DONE",
+                 ",
                 "Third argument for builtin 'ARRAY_INSERT' has type string but expected int",
             ),
             (
                 "VAR values: int[] = [1]\n\
                  ~ ARRAY_INSERT(values, 0)\n\
-                 -> DONE",
+                 ",
                 "Builtin 'ARRAY_INSERT' expects 3 arguments but got 2",
             ),
             (
                 "VAR values: int[] = [1]\n\
                  ~ ARRAY_INSERT(copy_values(), 0, 1)\n\
-                 -> DONE\n\
+                 \n\
                  == function copy_values() => int[] ==\n\
                  ~ return values",
                 "First argument for builtin 'ARRAY_INSERT' must be a mutable lvalue",
@@ -766,7 +763,7 @@ mod tests {
              VAR name_keys: int[] = DICT_KEYS(names)\n\
              ~ DICT_REMOVE(players, \"ada\")\n\
              ~ DICT_REMOVE(names, 1)\n\
-             -> DONE",
+             ",
         );
 
         assert_eq!(super::super::super::run_analysis_passes(&story), []);
@@ -778,31 +775,31 @@ mod tests {
             (
                 "VAR value: int = 1\n\
                  VAR has_value: bool = DICT_HAS(value, \"ada\")\n\
-                 -> DONE",
+                 ",
                 "First argument for builtin 'DICT_HAS' has type int but expected Dict",
             ),
             (
                 "VAR scores: Dict<string, int> = %{\"ada\": 10}\n\
                  VAR has_value: bool = DICT_HAS(scores, 1)\n\
-                 -> DONE",
+                 ",
                 "Second argument for builtin 'DICT_HAS' has type int but expected string",
             ),
             (
                 "VAR value: int = 1\n\
                  VAR count: int = DICT_SIZE(value)\n\
-                 -> DONE",
+                 ",
                 "First argument for builtin 'DICT_SIZE' has type int but expected Dict",
             ),
             (
                 "VAR scores: Dict<string, int> = %{\"ada\": 10}\n\
                  ~ DICT_REMOVE(scores, 1)\n\
-                 -> DONE",
+                 ",
                 "Second argument for builtin 'DICT_REMOVE' has type int but expected string",
             ),
             (
                 "VAR scores: Dict<string, int> = %{\"ada\": 10}\n\
                  ~ DICT_REMOVE(copy_scores(), \"ada\")\n\
-                 -> DONE\n\
+                 \n\
                  == function copy_scores() => Dict<string, int> ==\n\
                  ~ return scores",
                 "First argument for builtin 'DICT_REMOVE' must be a mutable lvalue",
@@ -810,13 +807,13 @@ mod tests {
             (
                 "VAR value: int = 1\n\
                  VAR keys: int[] = DICT_KEYS(value)\n\
-                 -> DONE",
+                 ",
                 "First argument for builtin 'DICT_KEYS' has type int but expected Dict",
             ),
             (
                 "VAR scores: Dict<string, int> = %{\"ada\": 10}\n\
                  VAR keys: string[] = DICT_KEYS()\n\
-                 -> DONE",
+                 ",
                 "Builtin 'DICT_KEYS' expects 1 argument but got 0",
             ),
         ];
@@ -833,7 +830,7 @@ mod tests {
     fn reports_function_call_argument_count_mismatch() {
         let story = parse_story(
             "~ add(1)\n\
-             -> DONE\n\
+             \n\
              == function add(a: int, b: int) => int ==\n\
              ~ return a",
         );
@@ -851,7 +848,7 @@ mod tests {
     fn reports_function_call_argument_type_mismatch() {
         let story = parse_story(
             "~ add(1, \"two\")\n\
-             -> DONE\n\
+             \n\
              == function add(a: int, b: int) => int ==\n\
              ~ return a",
         );
@@ -873,7 +870,7 @@ mod tests {
              }\n\
              VAR scores: int[] = [1]\n\
              ~ use_player(scores)\n\
-             -> DONE\n\
+             \n\
              == function use_player(player: Player) => void ==\n\
              ~ return",
         );
@@ -891,7 +888,7 @@ mod tests {
     fn function_return_type_participates_in_expression_type_checks() {
         let story = parse_story(
             "VAR score: int = label()\n\
-             -> DONE\n\
+             Done.\n\
              == function label() => string ==\n\
              ~ return \"ok\"",
         );
@@ -914,7 +911,7 @@ mod tests {
             "=== module game ===\n\
              == main ==\n\
              ~ helper()\n\
-             -> DONE\n\
+             \n\
              === module items ===\n\
              == function helper() => void ==\n\
              ~ return",
@@ -935,7 +932,7 @@ mod tests {
             "=== module game ===\n\
              == main ==\n\
              ~ helper()\n\
-             -> DONE\n\
+             \n\
              == function helper() => void ==\n\
              ~ return\n\
              === module items ===\n\
@@ -953,7 +950,7 @@ mod tests {
              FROM math IMPORT add\n\
              == main ==\n\
              ~ temp total: int = math::add(1, 2)\n\
-             -> END\n\
+             \n\
              === module math ===\n\
              == function add(left: int, right: int) => int ==\n\
              ~ return left + right",
@@ -969,7 +966,7 @@ mod tests {
              FROM data IMPORT State, echo, DEFAULT_STATE\n\
              == main ==\n\
              ~ temp state: data::State = data::echo(data::DEFAULT_STATE)\n\
-             -> END\n\
+             \n\
              === module data ===\n\
              ENUM State { Idle Busy }\n\
              CONST DEFAULT_STATE: State = State.Idle\n\
@@ -987,7 +984,7 @@ mod tests {
              FROM math IMPORT add\n\
              == main ==\n\
              ~ temp total: int = math::add(1, \"two\")\n\
-             -> END\n\
+             \n\
              === module math ===\n\
              == function add(left: int, right: int) => int ==\n\
              ~ return left + right",
@@ -1009,11 +1006,11 @@ mod tests {
              FROM audio IMPORT play\n\
              == main ==\n\
              ~ temp code: int = audio::play(\"intro\")\n\
-             -> END\n\
+             \n\
              === module audio ===\n\
              EXTERNAL play(name: string) => int\n\
              == helper ==\n\
-             -> END",
+             ",
         );
 
         assert_eq!(call_target_diagnostics(&story), []);
@@ -1027,7 +1024,7 @@ mod tests {
              -> scene.intro\n\
              == scene ==\n\
              = intro\n\
-             -> END",
+             ",
         );
 
         assert_eq!(call_target_diagnostics(&story), []);
@@ -1040,7 +1037,7 @@ mod tests {
              == main ==\n\
              -> intro\n\
              = intro\n\
-             -> END",
+             ",
         );
 
         assert_eq!(call_target_diagnostics(&story), []);
@@ -1054,7 +1051,7 @@ mod tests {
              -> game::scene.intro\n\
              == scene ==\n\
              = intro\n\
-             -> END",
+             ",
         );
 
         assert_eq!(call_target_diagnostics(&story), []);
@@ -1070,7 +1067,7 @@ mod tests {
              === module items ===\n\
              == scene ==\n\
              = intro\n\
-             -> END",
+             ",
         );
 
         let diagnostics = call_target_diagnostics(&story);
@@ -1092,7 +1089,7 @@ mod tests {
              === module items ===\n\
              == scene ==\n\
              = intro\n\
-             -> END",
+             ",
         );
 
         assert_eq!(call_target_diagnostics(&story), []);
@@ -1110,7 +1107,7 @@ mod tests {
              === module items ===\n\
              == scene ==\n\
              = intro\n\
-             -> END",
+             ",
         );
 
         let diagnostics = call_target_diagnostics(&story);
@@ -1142,7 +1139,7 @@ mod tests {
              -> {{routes[0]}::target}(1)\n\
              === module left implements IItem ===\n\
              == target(amount: int) ==\n\
-             -> END",
+             ",
         );
 
         assert_eq!(call_target_diagnostics(&story), []);
@@ -1163,10 +1160,10 @@ mod tests {
              -> {{route}::target}(left)\n\
              === module router implements IRouter ===\n\
              == target(next: interface<IItem>) ==\n\
-             -> END\n\
+             \n\
              === module left implements IItem ===\n\
              == target ==\n\
-             -> END",
+             ",
         );
 
         assert_eq!(call_target_diagnostics(&story), []);
@@ -1182,10 +1179,10 @@ mod tests {
              == main ==\n\
              -> register(left)\n\
              == register(next: interface<IItem>) ==\n\
-             -> END\n\
+             \n\
              === module left implements IItem ===\n\
              == target ==\n\
-             -> END",
+             ",
         );
 
         assert_eq!(super::super::super::run_analysis_passes(&story), []);
@@ -1200,12 +1197,12 @@ mod tests {
              FROM left\n\
              == main ==\n\
              ~ temp route: interface<IItem> = select(left)\n\
-             -> END\n\
+             \n\
              == function select(next: interface<IItem>) => interface<IItem> ==\n\
              ~ return next\n\
              === module left implements IItem ===\n\
              == target ==\n\
-             -> END",
+             ",
         );
 
         assert_eq!(super::super::super::run_analysis_passes(&story), []);
@@ -1222,15 +1219,15 @@ mod tests {
              == main ==\n\
              -> registry::register(left)\n\
              ~ temp route: interface<IItem> = registry::select(left)\n\
-             -> END\n\
+             \n\
              === module registry ===\n\
              == register(next: interface<IItem>) ==\n\
-             -> END\n\
+             \n\
              == function select(next: interface<IItem>) => interface<IItem> ==\n\
              ~ return next\n\
              === module left implements IItem ===\n\
              == target ==\n\
-             -> END",
+             ",
         );
 
         assert_eq!(super::super::super::run_analysis_passes(&story), []);
@@ -1246,12 +1243,12 @@ mod tests {
              == main ==\n\
              ~ temp left: int = 1\n\
              ~ temp route: interface<IItem> = select(left)\n\
-             -> END\n\
+             \n\
              == function select(next: interface<IItem>) => interface<IItem> ==\n\
              ~ return next\n\
              === module left implements IItem ===\n\
              == target ==\n\
-             -> END",
+             ",
         );
 
         assert_single_diagnostic(
@@ -1269,12 +1266,12 @@ mod tests {
              === module game ===\n\
              == main ==\n\
              ~ temp route: interface<IItem> = select(left)\n\
-             -> END\n\
+             \n\
              == function select(next: interface<IItem>) => interface<IItem> ==\n\
              ~ return next\n\
              === module left implements IItem ===\n\
              == target ==\n\
-             -> END",
+             ",
         );
 
         assert_single_diagnostic(
@@ -1295,12 +1292,12 @@ mod tests {
              FROM left\n\
              == main ==\n\
              ~ temp route: interface<IItem> = select(left)\n\
-             -> END\n\
+             \n\
              == function select(next: interface<IItem>) => interface<IItem> ==\n\
              ~ return next\n\
              === module left implements IOther ===\n\
              == target ==\n\
-             -> END",
+             ",
         );
 
         assert_single_diagnostic(
@@ -1323,13 +1320,13 @@ mod tests {
              VAR route: interface<IScorer> = scorer\n\
              == main ==\n\
              ~ temp value: int = {route}::score(left, 3)\n\
-             -> END\n\
+             \n\
              === module scorer implements IScorer ===\n\
              == function score(item: interface<IItem>, amount: int) => int ==\n\
              ~ return amount\n\
              === module left implements IItem ===\n\
              == target ==\n\
-             -> END",
+             ",
         );
 
         assert_eq!(call_target_diagnostics(&story), []);
@@ -1371,10 +1368,10 @@ mod tests {
                  VAR label: string = \"x\"\n\
                  == main ==\n\
                  {logic}\n\
-                 -> END\n\
+                 \n\
                  === module left implements IItem ===\n\
                  == target(amount: int) ==\n\
-                 -> END\n\
+                 \n\
                  == function score(amount: int) => int ==\n\
                  ~ return amount",
             ));
@@ -1422,7 +1419,7 @@ mod tests {
                  {divert}\n\
                  === module left implements IItem ===\n\
                  == target(amount: int) ==\n\
-                 -> END\n\
+                 \n\
                  == function score() => int ==\n\
                  ~ return 1",
             ));
@@ -1438,7 +1435,7 @@ mod tests {
             "VAR next: -> = -> done\n\
              -> {next}\n\
              == done ==\n\
-             -> END",
+             ",
         );
 
         assert_eq!(call_target_diagnostics(&story), []);
@@ -1450,7 +1447,7 @@ mod tests {
             "VAR next: -> = -> done\n\
              -> {next}(missing())\n\
              == done ==\n\
-             -> END",
+             ",
         );
         let diagnostics = call_target_diagnostics(&story);
 

@@ -1,13 +1,13 @@
 use crate::{
-    choice::Choice, choice_point::ChoicePoint, object::Object, path::Path, story::Story,
-    story_error::StoryError, tag::Tag, value::Value, value_type::StringValue,
+    choice::Choice, choice_point::ChoicePoint, path::Path, story::Story, story_error::StoryError,
+    tag::Tag, value::Value, value_type::StringValue,
 };
 use std::rc::Rc;
 /// # Choices
 /// Methods to get and select choices.
 impl Story {
     /// Chooses the [`Choice`](crate::choice::Choice) from the
-    /// `currentChoices` list with the given index. Internally, this
+    /// current choice list with the given index. Internally, this
     /// sets the current content path to what the
     /// [`Choice`](crate::choice::Choice) points to, ready
     /// to continue story evaluation.
@@ -17,17 +17,19 @@ impl Story {
             return Err(StoryError::BadArgument("choice out of range".to_owned()));
         }
 
-        // Replace callstack with the one from the thread at the choosing point,
+        // Replace callstack with the one from the continuation at the choosing point,
         // so that we can jump into the right place in the flow.
-        // This is important in case the flow was forked by a new thread, which
+        // This is important in case the flow was forked by a new continuation, which
         // can create multiple leading edges for the story, each of
         // which has its own context.
         let choice_to_choose = choices.get(choice_index).unwrap();
         self.get_state()
             .get_callstack()
             .borrow_mut()
-            .set_current_thread(choice_to_choose.get_thread_at_generation().unwrap());
+            .set_current_continuation(choice_to_choose.get_continuation_at_generation().unwrap());
 
+        self.choice_replay_candidate = None;
+        self.choice_replay_state = None;
         self.choose_path(&choice_to_choose.target_path, true)?;
 
         Ok(())
@@ -85,10 +87,12 @@ impl Story {
 
         let choice = Rc::new(Choice::new(
             choice_point.get_path_on_choice(),
-            Object::get_path(choice_point.as_ref()).to_string(),
             choice_point.is_invisible_default(),
             tags,
-            self.get_state().get_callstack().borrow_mut().fork_thread(),
+            self.get_state()
+                .get_callstack()
+                .borrow_mut()
+                .fork_continuation(),
             start_text.trim().to_string(),
         ));
 
@@ -117,29 +121,29 @@ impl Story {
 
         let choice = &invisible_choices[0];
 
-        // Invisible choice may have been generated on a different thread,
+        // Invisible choice may have been generated on a different continuation,
         // in which case we need to restore it before we continue
         self.get_state()
             .get_callstack()
             .as_ref()
             .borrow_mut()
-            .set_current_thread(choice.get_thread_at_generation().unwrap().clone());
+            .set_current_continuation(choice.get_continuation_at_generation().unwrap().clone());
 
         // If there's a chance that this state will be rolled back to before
-        // the invisible choice then make sure that the choice thread is
+        // the invisible choice then make sure that the choice continuation is
         // left intact, and it isn't re-entered in an old state.
         if self.state_snapshot_at_last_new_line.is_some() {
-            let fork_thread = self
+            let fork_continuation = self
                 .get_state()
                 .get_callstack()
                 .as_ref()
                 .borrow_mut()
-                .fork_thread();
+                .fork_continuation();
             self.get_state()
                 .get_callstack()
                 .as_ref()
                 .borrow_mut()
-                .set_current_thread(fork_thread);
+                .set_current_continuation(fork_continuation);
         }
 
         self.choose_path(&choice.target_path, false)

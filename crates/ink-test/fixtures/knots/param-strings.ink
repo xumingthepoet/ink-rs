@@ -11,4 +11,3 @@ Who do you accuse?
 
 == accuse(who) ==
 "I accuse {who}!" Poirot declared.
--> DONE

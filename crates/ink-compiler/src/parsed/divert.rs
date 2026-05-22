@@ -8,7 +8,6 @@ pub struct Divert {
     arguments: Vec<Expression>,
     span: SourceSpan,
     is_tunnel: bool,
-    is_thread: bool,
     has_argument_list: bool,
 }
 
@@ -17,8 +16,6 @@ pub enum DivertTarget {
     Path(String),
     QualifiedPath(QualifiedName),
     Dynamic(Expression),
-    Done,
-    End,
     Empty,
 }
 
@@ -29,7 +26,6 @@ impl Divert {
             arguments: Vec::new(),
             span,
             is_tunnel: false,
-            is_thread: false,
             has_argument_list: false,
         }
     }
@@ -44,18 +40,12 @@ impl Divert {
             arguments,
             span,
             is_tunnel: false,
-            is_thread: false,
             has_argument_list: true,
         }
     }
 
     pub fn with_tunnel(mut self) -> Self {
         self.is_tunnel = true;
-        self
-    }
-
-    pub fn with_thread(mut self) -> Self {
-        self.is_thread = true;
         self
     }
 
@@ -79,10 +69,6 @@ impl Divert {
         self.is_tunnel
     }
 
-    pub fn is_thread(&self) -> bool {
-        self.is_thread
-    }
-
     pub(crate) fn write_parse_snapshot(&self, out: &mut String, indent: usize) {
         out.push('\n');
         push_indent(out, indent);
@@ -96,8 +82,6 @@ impl Divert {
         });
         out.push_str(", tunnel=");
         out.push_str(if self.is_tunnel { "true" } else { "false" });
-        out.push_str(", thread=");
-        out.push_str(if self.is_thread { "true" } else { "false" });
         out.push(')');
     }
 }
@@ -107,8 +91,6 @@ impl DivertTarget {
         let normalized = text.trim();
         match normalized {
             "" => Self::Empty,
-            "DONE" => Self::Done,
-            "END" => Self::End,
             other => Self::Path(other.to_string()),
         }
     }
@@ -121,7 +103,7 @@ impl DivertTarget {
         match self {
             Self::Path(target) => Some(target),
             Self::QualifiedPath(target) => Some(target.as_str()),
-            Self::Dynamic(_) | Self::Done | Self::End | Self::Empty => None,
+            Self::Dynamic(_) | Self::Empty => None,
         }
     }
 
@@ -130,8 +112,6 @@ impl DivertTarget {
             Self::Path(target) => target.clone(),
             Self::QualifiedPath(target) => target.as_str().to_string(),
             Self::Dynamic(expression) => format!("{{{}}}", expression.to_source_string()),
-            Self::Done => "DONE".to_string(),
-            Self::End => "END".to_string(),
             Self::Empty => String::new(),
         }
     }

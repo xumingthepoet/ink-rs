@@ -21,20 +21,16 @@ VAR routes: interface<IItem>[] = [left, right]
 
 === module left implements IItem ===
 == target(amount: int) ==
--> END
 
 == fallback ==
--> END
 
 == function score(amount: int) => int ==
 ~ return amount
 
 === module right implements IItem ===
 == target(amount: int) ==
--> END
 
 == fallback ==
--> END
 
 == function score(amount: int) => int ==
 ~ return amount + 1

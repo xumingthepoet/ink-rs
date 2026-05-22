@@ -41,4 +41,3 @@ CONST backups: Stats[] = [
 
 == main ==
 {party[0].name}|{party[1].stats.hp}|{fallback.ready}|{backups[1].hp}|{LEN(party)}
--> DONE

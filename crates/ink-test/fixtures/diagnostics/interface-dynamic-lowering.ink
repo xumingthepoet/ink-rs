@@ -9,4 +9,3 @@ VAR route: interface<IItem> = left
 
 === module left implements IItem ===
 == target ==
--> END

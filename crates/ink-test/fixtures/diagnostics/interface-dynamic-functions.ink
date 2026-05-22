@@ -12,10 +12,8 @@ VAR label: string = "x"
 ~ temp knotCall: int = {route}::target(1)
 ~ temp wrongCount: int = {route}::score()
 ~ temp wrongType: int = {route}::score("bad")
--> END
 
 === module left implements IItem ===
 == target(amount: int) ==
--> END
 == function score(amount: int) => int ==
 ~ return amount

@@ -8,4 +8,3 @@ VAR details: string[][] = [["E1", "E2"], ["W1"]]
         topic {topic}.
         *** [detail in details[i]] Detail {topic}-{detail}
             detail {topic}:{detail}.
-            -> DONE

@@ -7,7 +7,6 @@ use ink_story_json_format as format;
 use serde_json::{json, Map};
 
 use crate::{
-    choice::Choice,
     choice_point::ChoicePoint,
     container::Container,
     control_command::{CommandType, ControlCommand},
@@ -45,10 +44,6 @@ pub fn write_rtobject(o: Rc<dyn RTObject>) -> Result<serde_json::Value, StoryErr
         jobj.insert("#".to_owned(), json!(tag.get_text()));
 
         return Ok(serde_json::Value::Object(jobj));
-    }
-
-    if let Some(choice) = o.as_any().downcast_ref::<Choice>() {
-        return Ok(write_choice(choice));
     }
 
     if let Some(c) = o.as_any().downcast_ref::<Container>() {
@@ -300,35 +295,6 @@ fn runtime_container_to_format(
         name,
         flags,
     })
-}
-
-pub fn write_choice(choice: &Choice) -> serde_json::Value {
-    let mut jobj: Map<String, serde_json::Value> = Map::new();
-
-    jobj.insert("text".to_owned(), json!(choice.text));
-    jobj.insert("index".to_owned(), json!(*choice.index.borrow()));
-    jobj.insert("originalChoicePath".to_owned(), json!(choice.source_path));
-    jobj.insert(
-        "originalThreadIndex".to_owned(),
-        json!(choice.original_thread_index),
-    );
-    jobj.insert(
-        "targetPath".to_owned(),
-        json!(choice.target_path.to_string()),
-    );
-
-    jobj.insert("tags".to_owned(), write_choice_tags(choice));
-
-    serde_json::Value::Object(jobj)
-}
-
-fn write_choice_tags(choice: &Choice) -> serde_json::Value {
-    let mut tags: Vec<serde_json::Value> = Vec::new();
-    for t in &choice.tags {
-        tags.push(json!(t));
-    }
-
-    serde_json::Value::Array(tags)
 }
 
 #[cfg(test)]

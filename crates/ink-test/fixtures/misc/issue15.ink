@@ -15,12 +15,9 @@ SET_X:
   - else:
     -> x_is_set
 }
--> END
 
 = x_not_set
 X is not set!
--> END
 
 = x_is_set
 X is set
--> END

@@ -240,7 +240,7 @@ mod tests {
                  ~ temp label: string = key\n\
                  ~ temp score: int = value\n\
              }\n\
-             -> DONE",
+             ",
         );
 
         assert!(diagnostics.is_empty(), "{diagnostics:#?}");
@@ -255,7 +255,7 @@ mod tests {
              { for item in score:\n\
                  item\n\
              }\n\
-             -> DONE",
+             ",
         );
 
         assert_single_diagnostic(
@@ -278,7 +278,7 @@ mod tests {
              { for key in scores:\n\
                  value\n\
              }\n\
-             -> DONE",
+             ",
         );
 
         assert_eq!(diagnostics.len(), 2, "{diagnostics:#?}");
@@ -295,15 +295,15 @@ mod tests {
              VAR values: int[] = [1]\n\
              == main ==\n\
              { for value in values:\n\
-                 -> DONE\n\
+                 * Pick\n\
              }\n\
-             -> DONE",
+             ",
         );
 
         assert_single_diagnostic(
             &diagnostics,
             DiagnosticSeverity::Error,
-            "Diverts are not allowed inside for loops.",
+            "Choices are not allowed inside for loops.",
         );
     }
 
@@ -317,7 +317,7 @@ mod tests {
                  {value}\n\
              }\n\
              ~ temp after: int = value\n\
-             -> DONE",
+             ",
         );
         let diagnostics = run_analysis_passes(&story);
 

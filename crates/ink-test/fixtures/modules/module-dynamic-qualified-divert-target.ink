@@ -8,4 +8,3 @@ FROM routes IMPORT target
 === module routes ===
 == target ==
 Dynamic target.
--> END

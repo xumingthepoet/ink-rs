@@ -8,4 +8,3 @@ VAR players: Player[] = [%Player{ hp: 1 }, %Player{ hp: 2 }]
 
 == main ==
 {LEN(empty)}|{LEN(items)}|{LEN(players)}
--> DONE

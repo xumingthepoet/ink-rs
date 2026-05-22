@@ -39,7 +39,7 @@
 //! ```
 //!
 //! The `ink_runtime` library supports the maintained ink-rs runtime features,
-//! including threads, variable set/get from code, external
+//! including continuations, variable set/get from code, external
 //! functions, tags on choices, and v2 minimal save/load state. Multi-flow APIs
 //! and visit/turn-count state are not part of the current runtime API.
 
@@ -50,7 +50,7 @@ mod container;
 mod control_command;
 mod divert;
 mod dynamic_interface;
-mod flow;
+mod execution_state;
 mod glue;
 mod json;
 mod native_function_call;

@@ -9,7 +9,6 @@ The map is unfolded.
 == chapter ==
 = breakfast
 The kettle whistles.
--> END
 
 = wake
 The station clock rings.

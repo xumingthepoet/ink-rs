@@ -33,7 +33,6 @@ The purse is empty.
 - else: Night closes the shutters.
 }
 * {not shop::closed} Visit the market -> shop::market_day
--> END
 
 === module shop ===
 VAR price: int = 3

@@ -312,10 +312,10 @@ mod tests {
 Opening
 * Go left
     Left ending
-    -> END
+
 * Go right
     Right ending
-    -> END
+
 "#,
         );
 
@@ -361,7 +361,7 @@ First line.
 
 Second line.
 * Continue
-    -> END
+
 "#,
         );
 
@@ -381,9 +381,9 @@ VAR can_select: bool = false
 
 == main ==
 * Always available. # enabled:true
-    -> END
+
 * Visible locked choice. # enabled:{can_select}
-    -> END
+
 "#,
         );
 
@@ -406,7 +406,7 @@ VAR can_select: bool = false
 
 == main ==
 * Continue
-    -> END
+
 
 === module ui_text ===
 
@@ -433,7 +433,7 @@ CONST default_prompt_title_text: string = "Next choice"
 == main ==
 Blue line. # color:blue
 * Continue.
-    -> END
+
 "#,
         );
 

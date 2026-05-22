@@ -265,7 +265,7 @@ mod tests {
 
     #[test]
     fn indexes_root_and_module_enums() {
-        let root_story = parse_story("ENUM RootState { Idle Busy }\n-> DONE");
+        let root_story = parse_story("ENUM RootState { Idle Busy }\n");
         let root_index = build_enum_type_index(&root_story);
 
         assert_eq!(
@@ -280,7 +280,7 @@ mod tests {
              Done\n\
              }\n\
              == main ==\n\
-             -> END",
+             ",
         );
         let module_index = build_enum_type_index(&module_story);
 
@@ -334,7 +334,7 @@ mod tests {
             "=== module game ===\n\
              ENUM State { Ready }\n\
              == main ==\n\
-             -> END",
+             ",
         );
         let index = build_enum_type_index(&story);
 

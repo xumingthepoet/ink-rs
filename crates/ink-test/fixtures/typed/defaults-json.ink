@@ -13,4 +13,3 @@ VAR global_player: Player
 ~ temp temp_score: int
 ~ temp temp_values: int[]
 ~ temp temp_player: Player
--> DONE

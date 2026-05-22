@@ -7,7 +7,6 @@ VAR counter: int = 0
 
 == main ==
 Ready.
--> DONE
 
 == INTERNAL read_config() => string ==
 ~ counter = counter + 1

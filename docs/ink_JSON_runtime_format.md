@@ -163,6 +163,13 @@ Represented by `"void"`, this is used to place an object on the evaluation stack
 
 Control commands are special instructions to the text engine to perform various actions. They are all represented by a particular text string:
 
+This table is a compiled-story JSON compatibility reference, not a source
+syntax list. Current compiler output still uses evaluation, string, callstack,
+random, and tag commands needed by the maintained language. Historical commands
+remain documented here only because the runtime may decode older compiled JSON;
+their presence here does not mean current ink-rs source can emit the removed
+syntax that originally produced them.
+
 * `"ev"` - Begin logical evaluation mode. In evaluation mode, objects that are encountered are added to an evaluation stack, rather than simply echoed into the main text output stream. As they're pushed onto the stack, they may be processed by other commands, functions, etc.
 * `"/ev"` - End logical evaluation mode. Future objects will be appended to the output stream rather than to the evaluation stack.
 * `"out"` - The topmost object on the evaluation stack is popped and appended to the output stream (main story output).
@@ -177,9 +184,14 @@ Control commands are special instructions to the text engine to perform various 
 * `"turns"` - Historical compiled-story command. The current runtime keeps no turn index state and pushes `-1` for known divert targets.
 * `"visit"` - Historical compiled-story command. The current runtime keeps no visit-count state and pushes `-1` as a sequence index fallback. ink-rs source no longer emits source sequence JSON.
 * `"seq"` - Historical compiled-story command for shuffle sequence JSON. Pops an integer, expected to be the number of elements in a sequence that's being entered. In return, it pushes an integer with the next sequence shuffle index to the evaluation stack. This shuffle index is derived from the element count, the sequence path, and the story's random seed from when it was first begun.
-* `"thread"` - Clones/starts a new thread, as used by thread-style source branching. This essentially clones the entire callstack, branching it.
-* `"done"` - Tries to close/pop the active thread, otherwise marks the story flow safe to exit without a loose end warning.
-* `"end"` - Ends the story flow immediately, closes all active threads, unwinds the callstack, and removes any choices that were previously created.
+* `"thread"` - Historical compiled-story command for thread-style source branching. Current ink-rs source no longer emits it. Runtime compatibility maps it to an isolated legacy continuation split.
+* `"done"` - Historical compiled-story command that can close a legacy continuation split, otherwise marks the story flow safe to exit without a loose end warning.
+* `"end"` - Historical compiled-story command that ends the story flow immediately, unwinds the callstack, and removes any choices that were previously created.
+
+Current source no longer emits `"thread"` from `<-`, or `"done"`/`"end"` from
+magic `-> DONE` or `-> END` diverts. Natural story endings and ordinary authored
+diverts are represented by the lowered container structure and normal divert
+commands instead.
 
 ## Native functions
 
@@ -224,6 +236,18 @@ This document describes compiled story JSON. Runtime save-state JSON remains
 owned by the runtime layer; it serializes current runtime values, including
 interface values as strings, but does not duplicate the compiled story's
 `interfaces` metadata.
+
+The current runtime save-state format is `inkSaveVersion` 2. It stores the
+active continuation/callstack frames, global `variablesState`, deterministic
+random state (`storySeed` and `previousRandom`), `inkSaveVersion`, and
+`inkFormatVersion`. It does not serialize generated choices, choice
+continuation snapshots, multi-flow maps, visit counts, turn indices, current
+divert targets, or evaluation-stack internals. Saves at a choice pause restore
+the replay point before choice generation and regenerate pending choices after
+load. Version 1 saves and v2 saves containing removed fields such as
+`currentChoices`, `choiceThreads`, `flows`, `currentFlowName`, `evalStack`,
+`currentDivertTarget`, `visitCounts`, or `turnIndices` are rejected rather than
+migrated.
 
 ## Variable assignment
 

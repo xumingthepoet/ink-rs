@@ -5,4 +5,3 @@ VAR observed: int = 5
 {observed}
 * Next
     {observed}
-    -> DONE

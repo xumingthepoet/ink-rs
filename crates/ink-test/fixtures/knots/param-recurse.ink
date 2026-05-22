@@ -15,4 +15,3 @@
         == finished(total) ==
             "The result is {total}!" you announce.
             Gauss stares at you in horror.
-            -> END

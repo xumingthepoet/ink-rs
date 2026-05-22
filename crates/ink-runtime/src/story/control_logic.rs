@@ -213,7 +213,8 @@ impl Story {
                             )
                             .cloned();
                         if !self.get_state().get_callstack().borrow().can_pop() {
-                            expected = Some("end of flow (-> END or choice)".to_owned());
+                            expected =
+                                Some("natural end, authored choice, or divert target".to_owned());
                         }
 
                         return Err(StoryError::InvalidStoryState(format!(
@@ -431,23 +432,28 @@ impl Story {
                     let v = Rc::new(Value::new::<i32>(shuffle_index));
                     self.get_state_mut().push_evaluation_stack(v);
                 }
-                CommandType::StartThread => {
-                    // Handled in main step function
+                CommandType::LegacyStartThread => {
+                    // Historical compiled-story compatibility is handled after
+                    // the content pointer advances in the main step function.
                 }
                 CommandType::Done => {
-                    // We may exist in the context of the initial
-                    // act of creating the thread, or in the context of
-                    // evaluating the content.
-                    if self.get_state().get_callstack().borrow().can_pop_thread() {
+                    // Historical compiled-story JSON may use "done" to leave a
+                    // legacy continuation split, or to mark normal flow exit.
+                    if self
+                        .get_state()
+                        .get_callstack()
+                        .borrow()
+                        .can_pop_continuation()
+                    {
                         self.get_state()
                             .get_callstack()
                             .as_ref()
                             .borrow_mut()
-                            .pop_thread()?;
+                            .pop_continuation()?;
                     }
                     // In normal flow - allow safe exit without warning
                     else {
-                        self.get_state_mut().set_did_safe_exit(true); // Stop flow in current thread
+                        self.get_state_mut().set_did_safe_exit(true); // Stop flow in current continuation
                         self.get_state().set_current_pointer(pointer::NULL.clone());
                     }
                 }

@@ -54,6 +54,17 @@ fn unsupported_source_sequences_report_unsupported_syntax_diagnostic() {
 }
 
 #[test]
+fn removed_thread_syntax_reports_removed_syntax_diagnostic() {
+    let diagnostics = diagnostics_for_fixture("diagnostics/removed-thread-syntax.ink");
+
+    assert_diagnostic(
+        &diagnostics,
+        DiagnosticSeverity::Error,
+        "Thread syntax '<-' has been removed from ink-rs; use ordinary choices and diverts instead.",
+    );
+}
+
+#[test]
 fn enum_diagnostics_cover_invalid_declarations_and_values() {
     let cases = [
         (
@@ -192,6 +203,20 @@ fn dynamic_choice_diagnostics_require_array_iterables() {
         DiagnosticSeverity::Error,
         "Dynamic choice iterable has type int but expected array",
     );
+}
+
+#[test]
+fn choice_generation_diagnostics_reject_replay_unsafe_calls() {
+    let diagnostics = diagnostics_for_fixture("diagnostics/choice-generation-replay-safe.ink");
+
+    for message in [
+        "Choice condition must be replay-safe; function call 'mark' is not allowed during choice generation",
+        "Choice text must be replay-safe; builtin 'RANDOM' is not allowed during choice generation",
+        "Choice text must be replay-safe; function call 'unsafe_label' is not allowed during choice generation",
+        "Dynamic choice iterable must be replay-safe; function call 'unsafe_items' is not allowed during choice generation",
+    ] {
+        assert_diagnostic(&diagnostics, DiagnosticSeverity::Error, message);
+    }
 }
 
 #[test]

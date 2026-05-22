@@ -6,4 +6,3 @@
 -> bin
 
 == money_bin ==
--> END

@@ -1,7 +1,5 @@
 Story
   Weave(baseIndent=0)
-    Gather(name=null, depth=1)
-    Divert(target="-> DONE", empty=false, tunnel=false, thread=false)
   Module(name="game")
     Weave(baseIndent=0)
       VariableAssignment(name="x", global=true, temp=false, type=int)
@@ -21,6 +19,5 @@ Story
         Text("The value is ")
         ContentList
           VariableReference(y)
-        Text(". ")
-        Divert(target="-> END", empty=false, tunnel=false, thread=false)
+        Text(".")
         Text("\n")

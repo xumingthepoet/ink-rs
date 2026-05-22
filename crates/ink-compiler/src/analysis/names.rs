@@ -498,7 +498,7 @@ mod tests {
 
     #[test]
     fn reports_duplicate_flow_arguments() {
-        let story = parse_story("== knot(a, a) ==\n-> DONE");
+        let story = parse_story("== knot(a, a) ==\n");
         let diagnostics = naming_diagnostics(&story);
 
         assert_single_diagnostic(
@@ -514,7 +514,7 @@ mod tests {
             "=== module game ===\n\
              == main(arg: int) ==\n\
              ~ temp arg: int = 0\n\
-             -> DONE",
+             ",
         );
         let diagnostics = naming_diagnostics(&story);
 
@@ -531,7 +531,7 @@ mod tests {
             "=== module game ===\n\
              VAR score: int = 0\n\
              == main(score: int) ==\n\
-             -> DONE",
+             ",
         );
         let diagnostics = naming_diagnostics(&story);
 

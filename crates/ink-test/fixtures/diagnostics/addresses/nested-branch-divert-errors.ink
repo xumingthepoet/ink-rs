@@ -7,4 +7,3 @@
     We headed to the money bin. -> bin
 
 == money_bin ==
--> END

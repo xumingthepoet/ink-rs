@@ -18,7 +18,6 @@ VAR sheet: Sheet = %Sheet{ scores: %{"ada": 10} }
 ~ sheet.scores["ada"] = 13
 ~ temp copy: Dict<string, int> = scores
 {lookup(copy, "ada")}
--> DONE
 
 == function lookup(values: Dict<string, int>, key: string) => int ==
 ~ return values[key]

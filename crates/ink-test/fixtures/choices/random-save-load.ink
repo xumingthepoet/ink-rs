@@ -5,4 +5,3 @@
 {RANDOM(1, 100)}
 * Continue
     {RANDOM(1, 100)}
-    -> DONE

@@ -503,10 +503,10 @@ mod tests {
             "-> support::helper\n",
             "=== module support ===\n",
             "== helper ==\n",
-            "-> END\n",
+            "\n",
             "=== module unused ===\n",
             "== spare ==\n",
-            "-> END\n",
+            "\n",
         );
         let compiler = Compiler::default();
         let parsed = compiler
@@ -541,21 +541,41 @@ mod tests {
     }
 
     #[test]
+    fn current_source_lowering_does_not_emit_historical_thread_command() {
+        let source = concat!(
+            "=== module game ===\n",
+            "== main ==\n",
+            "* Choice\n",
+            "    -> done\n",
+            "== done ==\n",
+            "Done.\n",
+        );
+        let compiler = Compiler::default();
+        let compiled = compiler
+            .compile(SourceInput::new(source))
+            .artifact
+            .expect("compile should succeed");
+        let json = compiled.program.to_json_value();
+
+        assert!(!json_contains_value(&json, &json!("thread")), "{json:#}");
+    }
+
+    #[test]
     fn module_lowering_json_contains_root_entry_and_reachable_module_containers() {
         let source = concat!(
             "=== module game ===\n",
             "FROM support IMPORT helper\n",
             "== main ==\n",
             "Game.\n",
-            "-> END\n",
+            "\n",
             "=== module support ===\n",
             "== helper ==\n",
             "Support.\n",
-            "-> END\n",
+            "\n",
             "=== module unused ===\n",
             "== main_unused ==\n",
             "Unused.\n",
-            "-> END\n",
+            "\n",
         );
         let compiler = Compiler::default();
         let compiled = compiler.compile(SourceInput::new(source));
@@ -603,11 +623,11 @@ mod tests {
             "=== module support ===\n",
             "VAR shown: int = 1\n",
             "== helper ==\n",
-            "-> END\n",
+            "\n",
             "=== module unused ===\n",
             "VAR hidden: int = 2\n",
             "== spare ==\n",
-            "-> END\n",
+            "\n",
         );
         let compiled = Compiler::default().compile(SourceInput::new(source));
 
@@ -633,7 +653,7 @@ mod tests {
         let source = concat!(
             "=== module game ===\n",
             "== main ==\n",
-            "-> END\n",
+            "\n",
             "=== module host_api ===\n",
             "FROM config IMPORT value\n",
             "== INTERNAL read() => string ==\n",
@@ -643,7 +663,7 @@ mod tests {
             "~ return \"ok\"\n",
             "=== module unused ===\n",
             "== spare ==\n",
-            "-> END\n",
+            "\n",
         );
         let compiled = Compiler::default().compile(SourceInput::new(source));
 
@@ -695,11 +715,11 @@ mod tests {
             "=== module support ===\n",
             "VAR shown: int = 7\n",
             "== helper ==\n",
-            "-> END\n",
+            "\n",
             "=== module unused ===\n",
             "VAR hidden: int = 9\n",
             "== spare ==\n",
-            "-> END\n",
+            "\n",
         );
         let compiled = Compiler::default().compile(SourceInput::new(source));
 
@@ -742,11 +762,11 @@ mod tests {
         let source = concat!(
             "=== module game ===\n",
             "== main ==\n",
-            "-> END\n",
+            "\n",
             "=== module unused ===\n",
             "VAR broken: int = \"wrong\"\n",
             "== spare ==\n",
-            "-> END\n",
+            "\n",
         );
         let compiled = Compiler::default().compile(SourceInput::new(source));
 
@@ -776,7 +796,7 @@ mod tests {
             "VAR items: int[] = [5, 8]\n",
             "== main ==\n",
             "{math::add(LIMIT, state.hp)}|{items[1]}|{\"HP {state.hp}\"}\n",
-            "-> END\n",
+            "\n",
             "=== module math ===\n",
             "== function add(left: int, right: int) => int ==\n",
             "~ return left + right\n",
@@ -845,7 +865,7 @@ mod tests {
             "~ items[local - 5] += stats.hp\n",
             "~ ARRAY_REMOVE(items, 1)\n",
             "{local}|{score}|{stats.hp}|{LEN(items)}\n",
-            "-> END\n",
+            "\n",
         );
         let compiled = Compiler::default().compile(SourceInput::new(source));
 
@@ -934,7 +954,7 @@ mod tests {
             "{DICT_HAS(scores, \"ada\")}|{DICT_SIZE(scores)}|{DICT_KEYS(scores)[0]}\n",
             "~ DICT_REMOVE(scores, \"ada\")\n",
             "~ DICT_REMOVE(nested[\"row\"], 1)\n",
-            "-> END\n",
+            "\n",
         );
         let compiled = Compiler::default().compile(SourceInput::new(source));
 
@@ -1011,7 +1031,7 @@ mod tests {
             "~ ARRAY_INSERT(items, 1, 2)\n",
             "~ ARRAY_PUSH(bags[0].items, 4)\n",
             "~ ARRAY_INSERT(bags[0].items, LEN(bags[0].items), 5)\n",
-            "-> END\n",
+            "\n",
         );
         let compiled = Compiler::default().compile(SourceInput::new(source));
 
@@ -1077,12 +1097,12 @@ mod tests {
             "== dynamic_target ==\n",
             "-> tunnel ->\n",
             "Back.\n",
-            "-> END\n",
+            "\n",
             "== tunnel ==\n",
             "->-> tunnel_exit\n",
             "== tunnel_exit ==\n",
             "Tunnel exit.\n",
-            "-> END\n",
+            "\n",
             "== function count_down(n: int, acc: int) => int ==\n",
             "{ if n <= 0:\n",
             "    ~ return acc\n",
@@ -1173,7 +1193,7 @@ mod tests {
             "    }\n",
             "- (after)\n",
             "After.\n",
-            "-> END\n",
+            "\n",
         );
         let compiled = Compiler::default().compile(SourceInput::new(source));
 

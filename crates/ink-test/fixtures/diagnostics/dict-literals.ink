@@ -7,4 +7,3 @@ VAR mixedKeys: Dict<string, int> = %{"one": 1, 2: 2}
 
 == main ==
 ~ %{}
--> DONE

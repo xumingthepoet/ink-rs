@@ -246,7 +246,7 @@ mod tests {
              VAR label: string = \"start\"\n\
              == knot ==\n\
              ~ temp next: int = score + 1\n\
-             -> DONE",
+             ",
         );
 
         assert_eq!(variable_initializer_diagnostics(&story), []);
@@ -258,7 +258,7 @@ mod tests {
             "CONST default_scores: Dict<string, int> = %{\"ada\": 10}\n\
              VAR score_tables: Dict<string, int>[] = [default_scores]\n\
              VAR empty_by_id: Dict<int, string>\n\
-             -> DONE",
+             ",
         );
 
         assert_eq!(super::super::run_analysis_passes(&story), []);
@@ -271,11 +271,11 @@ mod tests {
              FROM items IMPORT MAX_SCORE\n\
              VAR score: int = items::MAX_SCORE\n\
              == main ==\n\
-             -> DONE\n\
+             \n\
              === module items ===\n\
              CONST MAX_SCORE: int = 10\n\
              == helper ==\n\
-             -> DONE",
+             ",
         );
 
         assert_eq!(super::super::run_analysis_passes(&story), []);
@@ -288,13 +288,13 @@ mod tests {
              FROM items IMPORT Item\n\
              VAR item: items::Item\n\
              == main ==\n\
-             -> DONE\n\
+             \n\
              === module items ===\n\
              STRUCT Item {\n\
              hp: int\n\
              }\n\
              == helper ==\n\
-             -> DONE",
+             ",
         );
 
         assert_eq!(variable_initializer_diagnostics(&story), []);
@@ -307,11 +307,11 @@ mod tests {
              FROM items IMPORT MAX_SCORE\n\
              VAR score: string = items::MAX_SCORE\n\
              == main ==\n\
-             -> DONE\n\
+             \n\
              === module items ===\n\
              CONST MAX_SCORE: int = 10\n\
              == helper ==\n\
-             -> DONE",
+             ",
         );
 
         let diagnostics = variable_initializer_diagnostics(&story);
@@ -325,7 +325,7 @@ mod tests {
 
     #[test]
     fn reports_invalid_constant_initializer_type() {
-        let story = parse_story("CONST score: int = \"high\"\n-> DONE");
+        let story = parse_story("CONST score: int = \"high\"\n");
 
         let diagnostics = variable_initializer_diagnostics(&story);
 
@@ -338,7 +338,7 @@ mod tests {
 
     #[test]
     fn reports_invalid_primitive_initializer_type() {
-        let story = parse_story("VAR score: int = \"high\"\n-> DONE");
+        let story = parse_story("VAR score: int = \"high\"\n");
 
         let diagnostics = variable_initializer_diagnostics(&story);
 
@@ -351,7 +351,7 @@ mod tests {
 
     #[test]
     fn rejects_implicit_numeric_conversion_in_initializers() {
-        let story = parse_story("VAR ratio: float = 1\n-> DONE");
+        let story = parse_story("VAR ratio: float = 1\n");
 
         let diagnostics = variable_initializer_diagnostics(&story);
 
@@ -364,7 +364,7 @@ mod tests {
 
     #[test]
     fn rejects_operator_errors_in_primitive_initializers() {
-        let story = parse_story("VAR valid: bool = 1 && true\n-> DONE");
+        let story = parse_story("VAR valid: bool = 1 && true\n");
 
         let diagnostics = variable_initializer_diagnostics(&story);
 
@@ -381,14 +381,14 @@ mod tests {
             "CONST fallback: -> = -> knot\n\
              VAR next: -> = fallback\n\
              VAR route: ->[] = [-> knot, next]\n\
-             -> DONE\n\
+             \n\
              == knot ==\n\
-             -> DONE",
+             ",
         );
 
         assert_eq!(super::super::run_analysis_passes(&story), []);
 
-        let missing = parse_story("VAR next: ->\n-> DONE");
+        let missing = parse_story("VAR next: ->\n");
         let diagnostics = variable_initializer_diagnostics(&missing);
 
         assert_single_diagnostic(
@@ -407,9 +407,9 @@ mod tests {
              CONST default_route: interface<IItem> = left\n\
              VAR route: interface<IItem> = left\n\
              == main ==\n\
-             -> END\n\
+             \n\
              == target ==\n\
-             -> END",
+             ",
         );
 
         assert_eq!(super::super::run_analysis_passes(&story), []);
@@ -426,7 +426,7 @@ mod tests {
              VAR global_score: int = {route}::score(1)\n\
              == main ==\n\
              ~ temp local_score: int = {route}::score(2)\n\
-             -> END\n\
+             \n\
              === module left implements IItem ===\n\
              == function score(amount: int) => int ==\n\
              ~ return amount",
@@ -445,7 +445,7 @@ mod tests {
              VAR route: interface<IItem> = left\n\
              VAR label: string = {route}::score(1)\n\
              == main ==\n\
-             -> END\n\
+             \n\
              === module left implements IItem ===\n\
              == function score(amount: int) => int ==\n\
              ~ return amount",
@@ -468,10 +468,10 @@ mod tests {
              === module game ===\n\
              VAR route: interface<IItem> = left\n\
              == main ==\n\
-             -> END\n\
+             \n\
              === module left implements IItem ===\n\
              == target ==\n\
-             -> END",
+             ",
         );
 
         let diagnostics = variable_initializer_diagnostics(&story);
@@ -491,7 +491,7 @@ mod tests {
              === module game ===\n\
              VAR route: interface<IItem>\n\
              == main ==\n\
-             -> END",
+             ",
         );
 
         let diagnostics = variable_initializer_diagnostics(&story);
@@ -511,7 +511,7 @@ mod tests {
              === module game ===\n\
              VAR routes: interface<IItem>[]\n\
              == main ==\n\
-             -> END",
+             ",
         );
 
         assert_eq!(variable_initializer_diagnostics(&story), []);
@@ -526,10 +526,10 @@ mod tests {
              FROM left\n\
              VAR route: interface<IItem> = left\n\
              == main ==\n\
-             -> END\n\
+             \n\
              === module left ===\n\
              == target ==\n\
-             -> END",
+             ",
         );
 
         let diagnostics = variable_initializer_diagnostics(&story);
@@ -549,7 +549,7 @@ mod tests {
              === module game ===\n\
              VAR route: interface<IItem> = \"left\"\n\
              == main ==\n\
-             -> END",
+             ",
         );
 
         let diagnostics = variable_initializer_diagnostics(&story);
@@ -568,7 +568,7 @@ mod tests {
              CONST DEFAULT_STATE: State = State.Busy\n\
              VAR state: State = State.Idle\n\
              VAR default_state: State\n\
-             -> DONE",
+             ",
         );
 
         assert_eq!(variable_initializer_diagnostics(&story), []);
@@ -579,7 +579,7 @@ mod tests {
         let story = parse_story(
             "ENUM State { Idle Busy }\n\
              VAR state: State = State.Missing\n\
-             -> DONE",
+             ",
         );
 
         let diagnostics = variable_initializer_diagnostics(&story);
@@ -596,7 +596,7 @@ mod tests {
         let story = parse_story(
             "ENUM State { Idle Busy }\n\
              VAR state: State = \"State.Idle\"\n\
-             -> DONE",
+             ",
         );
 
         let diagnostics = variable_initializer_diagnostics(&story);
@@ -610,7 +610,7 @@ mod tests {
 
     #[test]
     fn rejects_non_target_initializer_for_divert_target_type() {
-        let story = parse_story("VAR next: -> = 1\n-> DONE");
+        let story = parse_story("VAR next: -> = 1\n");
 
         let diagnostics = variable_initializer_diagnostics(&story);
 
@@ -626,7 +626,7 @@ mod tests {
         let story = parse_story(
             "== knot ==\n\
              ~ temp hp: int\n\
-             -> DONE",
+             ",
         );
         let assignment = story.flows()[0]
             .weave()

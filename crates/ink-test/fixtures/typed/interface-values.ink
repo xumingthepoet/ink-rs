@@ -26,12 +26,9 @@ VAR config: Config = %Config{ route: right, routes: [left] }
 ~ local_routes[1] = right
 ~ local_config.route = right
 {route}|{routes}|{config}|{default_route}|{local}|{local_routes}|{local_config}
--> DONE
 
 === module left implements IItem ===
 == target ==
--> END
 
 === module right implements IItem ===
 == target ==
--> END

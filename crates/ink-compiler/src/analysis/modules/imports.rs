@@ -558,7 +558,7 @@ fn collect_qualified_uses_in_divert_target(
         DivertTarget::Dynamic(expression) => {
             collect_qualified_uses_in_expression(current_module, expression, fallback_span, uses)
         }
-        DivertTarget::Done | DivertTarget::End | DivertTarget::Empty => {}
+        DivertTarget::Empty => {}
     }
 }
 

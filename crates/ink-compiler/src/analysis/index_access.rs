@@ -217,7 +217,7 @@ mod tests {
         let story = parse_story(
             "VAR items: int[] = [1]\n\
              VAR first: int = items[0]\n\
-             -> DONE",
+             ",
         );
 
         assert_eq!(super::super::run_analysis_passes(&story), []);
@@ -228,7 +228,7 @@ mod tests {
         let story = parse_story(
             "VAR matrix: int[][] = [[1]]\n\
              VAR first: int = matrix[0][0]\n\
-             -> DONE",
+             ",
         );
 
         assert_eq!(index_access_diagnostics(&story), []);
@@ -239,7 +239,7 @@ mod tests {
         let story = parse_story(
             "VAR scores: Dict<string, int> = %{\"ada\": 10}\n\
              VAR first: int = scores[\"ada\"]\n\
-             -> DONE",
+             ",
         );
 
         assert_eq!(super::super::run_analysis_passes(&story), []);
@@ -250,7 +250,7 @@ mod tests {
         let story = parse_story(
             "VAR table: Dict<int, Dict<string, int[]>> = %{1: %{\"scores\": [10]}}\n\
              VAR first: int = table[1][\"scores\"][0]\n\
-             -> DONE",
+             ",
         );
 
         assert_eq!(super::super::run_analysis_passes(&story), []);
@@ -266,7 +266,7 @@ mod tests {
              VAR route: interface<IItem> = left\n\
              VAR first: int = {route}::scores()[0]\n\
              == main ==\n\
-             -> END\n\
+             \n\
              === module left implements IItem ===\n\
              VAR source_scores: int[] = [10]\n\
              == function scores() => int[] ==\n\
@@ -281,7 +281,7 @@ mod tests {
         let story = parse_story(
             "VAR items: int[] = [1]\n\
              {items[true]}\n\
-             -> DONE",
+             ",
         );
 
         let diagnostics = index_access_diagnostics(&story);
@@ -298,7 +298,7 @@ mod tests {
         let story = parse_story(
             "VAR items: int[] = [1]\n\
              {items[\"0\"]}\n\
-             -> DONE",
+             ",
         );
 
         let diagnostics = index_access_diagnostics(&story);
@@ -315,7 +315,7 @@ mod tests {
         let story = parse_story(
             "VAR scores: Dict<string, int> = %{\"ada\": 10}\n\
              {scores[1]}\n\
-             -> DONE",
+             ",
         );
 
         let diagnostics = index_access_diagnostics(&story);
@@ -332,7 +332,7 @@ mod tests {
         let story = parse_story(
             "VAR scores: Dict<int, string> = %{1: \"ada\"}\n\
              VAR first: string = scores[1]\n\
-             -> DONE",
+             ",
         );
 
         assert_eq!(super::super::run_analysis_passes(&story), []);
@@ -343,7 +343,7 @@ mod tests {
         let story = parse_story(
             "VAR score: int = 1\n\
              {score[0]}\n\
-             -> DONE",
+             ",
         );
 
         let diagnostics = index_access_diagnostics(&story);
@@ -360,7 +360,7 @@ mod tests {
         let story = parse_story(
             "VAR label: string = \"abc\"\n\
              {label[0]}\n\
-             -> DONE",
+             ",
         );
 
         let diagnostics = index_access_diagnostics(&story);

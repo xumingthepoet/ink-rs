@@ -11,28 +11,23 @@ FROM video IMPORT play
 Ready.
 * Continue
   {left::level}|{right::level}
-  -> END
 
 === module left ===
 VAR level: int = 1
 
 == helper ==
--> END
 
 === module right ===
 VAR level: int = 2
 
 == helper ==
--> END
 
 === module audio ===
 EXTERNAL play(name: string) => int
 
 == helper ==
--> END
 
 === module video ===
 EXTERNAL play(name: string) => int
 
 == helper ==
--> END

@@ -2,7 +2,6 @@
 
 == main ==
 {count_down(1500, 0)}|{carry(3, 0)}|{fact(5)}
--> DONE
 
 == function count_down(n: int, acc: int) => int ==
 { if n <= 0:

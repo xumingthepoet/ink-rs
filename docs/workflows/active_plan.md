@@ -8,6 +8,11 @@ Active plans are goal-driven, not commit-driven. When a project goal is active,
 use that goal as the top-level marker for completing the active plan. Use the
 active plan task list as the durable progress ledger below the goal.
 
+The task list is the progress unit below commit granularity. Do not create
+commits merely because a task is complete. Create checkpoint commits only when
+they help manage implementation risk, local review, or recovery from a large
+temporary diff.
+
 ## Location
 
 - Store active implementation plans under `docs/active_plan/`.
@@ -81,6 +86,10 @@ Each task should record, inside that task section:
 - remaining risks or follow-up notes
 - optional checkpoint commit hashes, when checkpoint commits exist
 
+The ledger must be specific enough that another LLM can resume without relying
+on commit history. A checkpoint commit hash can support the ledger, but it must
+not replace the changed-files, validation, risk, and status fields.
+
 Do not append separate running commentary after the task list. Put durable
 execution state into the relevant task section or into the plan's explicit
 progress file.
@@ -114,9 +123,14 @@ Active plans do not require one commit per task.
   to avoid an oversized temporary diff, preserve a recovery point, or separate
   risky work for local review.
 - Checkpoint commits are development aids, not required task boundaries.
+- A checkpoint commit may include several completed tasks, part of a task, or a
+  milestone slice, as long as the task ledger accurately records what is
+  implemented and validated.
 - Before the active plan is pushed or considered landed, combine all commits
   belonging to the active plan into one final active-plan commit unless the
   project owner explicitly asks for a different history shape.
+- The final active-plan commit is the durable review unit. It should be created
+  only after final required validation passes.
 - The final commit should include the implementation, tests, documentation, task
   ledger, and the move from `docs/active_plan/` to `docs/finished_plans/` when
   the plan is complete.

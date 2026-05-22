@@ -213,10 +213,7 @@ impl<'a> StructLiteralChecker<'a> {
                     );
                 }
             }
-            DivertTarget::Dynamic(_)
-            | DivertTarget::Done
-            | DivertTarget::End
-            | DivertTarget::Empty => {}
+            DivertTarget::Dynamic(_) | DivertTarget::Empty => {}
         }
     }
 
@@ -622,7 +619,7 @@ mod tests {
              }\n\
              CONST default_player: Player = %Player{ hp: 5, name: \"Lin\" }\n\
              VAR player: Player = %Player{ hp: 10, name: \"Ada\" }\n\
-             -> DONE",
+             ",
         );
 
         assert_eq!(struct_literal_diagnostics(&story), []);
@@ -637,14 +634,14 @@ mod tests {
              }\n\
              VAR item: Item = %Item{ hp: 1 }\n\
              == main ==\n\
-             -> DONE\n\
+             \n\
              === module items ===\n\
              STRUCT Item {\n\
              label: string\n\
              }\n\
              VAR item: Item = %Item{ label: \"sword\" }\n\
              == helper ==\n\
-             -> DONE",
+             ",
         );
 
         assert_eq!(struct_literal_diagnostics(&story), []);
@@ -657,13 +654,13 @@ mod tests {
              FROM items IMPORT Item\n\
              VAR item: items::Item = %items::Item{ hp: 1 }\n\
              == main ==\n\
-             -> DONE\n\
+             \n\
              === module items ===\n\
              STRUCT Item {\n\
              hp: int\n\
              }\n\
              == helper ==\n\
-             -> DONE",
+             ",
         );
 
         assert_eq!(super::super::run_analysis_passes(&story), []);
@@ -681,10 +678,10 @@ mod tests {
              }\n\
              VAR route: Route = %Route{ next: left }\n\
              == main ==\n\
-             -> END\n\
+             \n\
              === module left implements IItem ===\n\
              == target ==\n\
-             -> END",
+             ",
         );
 
         assert_eq!(super::super::run_analysis_passes(&story), []);
@@ -703,7 +700,7 @@ mod tests {
              VAR route: interface<IItem> = left\n\
              VAR result: Result = %Result{ score: {route}::score(1) }\n\
              == main ==\n\
-             -> END\n\
+             \n\
              === module left implements IItem ===\n\
              == function score(amount: int) => int ==\n\
              ~ return amount",
@@ -721,7 +718,7 @@ mod tests {
              }\n\
              == main ==\n\
              ~ temp value: int = score(%Player{ hp: \"bad\" })\n\
-             -> END\n\
+             \n\
              == function score(player: Player) => int ==\n\
              ~ return player.hp",
         );
@@ -749,10 +746,10 @@ mod tests {
              }\n\
              VAR route: Route = %Route{ next: left }\n\
              == main ==\n\
-             -> END\n\
+             \n\
              === module left ===\n\
              == target ==\n\
-             -> END",
+             ",
         );
 
         let diagnostics = struct_literal_diagnostics(&story);
@@ -775,7 +772,7 @@ mod tests {
              }\n\
              VAR route: Route = %Route{}\n\
              == main ==\n\
-             -> END",
+             ",
         );
 
         let diagnostics = struct_literal_diagnostics(&story);
@@ -794,13 +791,13 @@ mod tests {
              FROM items IMPORT Item\n\
              VAR item: items::Item = %items::Item{ hp: \"full\" }\n\
              == main ==\n\
-             -> DONE\n\
+             \n\
              === module items ===\n\
              STRUCT Item {\n\
              hp: int\n\
              }\n\
              == helper ==\n\
-             -> DONE",
+             ",
         );
 
         let diagnostics = struct_literal_diagnostics(&story);
@@ -820,7 +817,7 @@ mod tests {
              inventory: int[]\n\
              }\n\
              VAR player: Player = %Player{ hp: 10 }\n\
-             -> DONE",
+             ",
         );
 
         assert_eq!(struct_literal_diagnostics(&story), []);
@@ -834,7 +831,7 @@ mod tests {
              visits: int\n\
              }\n\
              VAR route: Route = %Route{ visits: 1 }\n\
-             -> DONE",
+             ",
         );
 
         let diagnostics = struct_literal_diagnostics(&story);
@@ -853,7 +850,7 @@ mod tests {
              hp: int\n\
              }\n\
              VAR player: Player = %Player{ hp: 10, mp: 5 }\n\
-             -> DONE",
+             ",
         );
 
         let diagnostics = struct_literal_diagnostics(&story);
@@ -872,7 +869,7 @@ mod tests {
              hp: int\n\
              }\n\
              VAR player: Player = %Player{ hp: 10, hp: 11 }\n\
-             -> DONE",
+             ",
         );
 
         let diagnostics = struct_literal_diagnostics(&story);
@@ -891,7 +888,7 @@ mod tests {
              hp: int\n\
              }\n\
              VAR player: Player = %Player{ hp: \"full\" }\n\
-             -> DONE",
+             ",
         );
 
         let diagnostics = struct_literal_diagnostics(&story);
@@ -914,7 +911,7 @@ mod tests {
              name: string\n\
              }\n\
              VAR player: Player = %Player{ stats: %Stats{ hp: 10 }, name: \"Ada\" }\n\
-             -> DONE",
+             ",
         );
 
         assert_eq!(struct_literal_diagnostics(&story), []);
@@ -928,7 +925,7 @@ mod tests {
              }\n\
              VAR player: Player = %Player{}\n\
              ~ player = %Player{ hp: \"full\" }\n\
-             -> DONE",
+             ",
         );
 
         let diagnostics = struct_literal_diagnostics(&story);
@@ -947,7 +944,7 @@ mod tests {
              hp: int\n\
              }\n\
              { %Player{ hp: \"dynamic\" } }\n\
-             -> DONE",
+             ",
         );
 
         let diagnostics = struct_literal_diagnostics(&story);

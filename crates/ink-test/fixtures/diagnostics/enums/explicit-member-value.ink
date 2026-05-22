@@ -2,4 +2,3 @@
 ENUM State { Idle = "idle" }
 
 == main ==
--> DONE

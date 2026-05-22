@@ -533,7 +533,7 @@ mod tests {
              ~ score = score + 1\n\
              ~ ready = false\n\
              ~ label = \"b\"\n\
-             -> DONE",
+             ",
         );
 
         assert_eq!(variable_assignment_diagnostics(&story), []);
@@ -558,10 +558,10 @@ mod tests {
              ~ route = local\n\
              ~ routes[0] = left\n\
              ~ holder.next = left\n\
-             -> END\n\
+             \n\
              === module left implements IItem ===\n\
              == target ==\n\
-             -> END",
+             ",
         );
 
         assert_eq!(super::super::run_analysis_passes(&story), []);
@@ -578,7 +578,7 @@ mod tests {
              VAR score: int = 0\n\
              == main ==\n\
              ~ score = {route}::score(3)\n\
-             -> END\n\
+             \n\
              === module left implements IItem ===\n\
              == function score(amount: int) => int ==\n\
              ~ return amount",
@@ -598,13 +598,13 @@ mod tests {
              VAR route: interface<IItem> = good\n\
              == main ==\n\
              ~ route = left\n\
-             -> END\n\
+             \n\
              === module good implements IItem ===\n\
              == target ==\n\
-             -> END\n\
+             \n\
              === module left ===\n\
              == target ==\n\
-             -> END",
+             ",
         );
 
         let diagnostics = variable_assignment_diagnostics(&story);
@@ -621,7 +621,7 @@ mod tests {
         let story = parse_story(
             "VAR score: int = 0\n\
              ~ score = 1.5\n\
-             -> DONE",
+             ",
         );
 
         let diagnostics = variable_assignment_diagnostics(&story);
@@ -638,7 +638,7 @@ mod tests {
         let story = parse_story(
             "VAR ratio: float = 0.0\n\
              ~ ratio = 1\n\
-             -> DONE",
+             ",
         );
 
         let diagnostics = variable_assignment_diagnostics(&story);
@@ -657,7 +657,7 @@ mod tests {
              VAR state: State = State.Idle\n\
              == knot ==\n\
              ~ state = State.Busy\n\
-             -> DONE",
+             ",
         );
 
         assert_eq!(variable_assignment_diagnostics(&story), []);
@@ -670,7 +670,7 @@ mod tests {
              VAR state: State = State.Idle\n\
              == knot ==\n\
              ~ state = State.Missing\n\
-             -> DONE",
+             ",
         );
 
         let diagnostics = variable_assignment_diagnostics(&story);
@@ -684,7 +684,7 @@ mod tests {
 
     #[test]
     fn reports_assignment_to_undeclared_variable() {
-        let story = parse_story("~ missing = 1\n-> DONE");
+        let story = parse_story("~ missing = 1\n");
 
         let diagnostics = variable_assignment_diagnostics(&story);
 
@@ -705,7 +705,7 @@ mod tests {
              ~ score -= 1\n\
              ~ ratio += 1.0\n\
              ~ label += \"b\"\n\
-             -> DONE",
+             ",
         );
 
         assert_eq!(variable_assignment_diagnostics(&story), []);
@@ -716,7 +716,7 @@ mod tests {
         let story = parse_story(
             "VAR score: int = 0\n\
              ~ score += 1.0\n\
-             -> DONE",
+             ",
         );
 
         let diagnostics = variable_assignment_diagnostics(&story);
@@ -733,7 +733,7 @@ mod tests {
         let story = parse_story(
             "VAR label: string = \"a\"\n\
              ~ label -= \"b\"\n\
-             -> DONE",
+             ",
         );
 
         let diagnostics = variable_assignment_diagnostics(&story);
@@ -757,7 +757,7 @@ mod tests {
              ~ player.hp = 11\n\
              ~ player.name = \"Grace\"\n\
              ~ scores[0] = 2\n\
-             -> DONE",
+             ",
         );
 
         assert_eq!(variable_assignment_diagnostics(&story), []);
@@ -769,7 +769,7 @@ mod tests {
             "VAR scores: Dict<string, int> = %{\"ada\": 1}\n\
              ~ scores[\"ada\"] = 2\n\
              ~ scores[\"grace\"] = 3\n\
-             -> DONE",
+             ",
         );
 
         assert_eq!(variable_assignment_diagnostics(&story), []);
@@ -786,7 +786,7 @@ mod tests {
              ~ players[\"ada\"].hp = 11\n\
              ~ players[\"ada\"].hp += 1\n\
              ~ table[1][\"name\"] = \"Grace\"\n\
-             -> DONE",
+             ",
         );
 
         assert_eq!(variable_assignment_diagnostics(&story), []);
@@ -800,7 +800,7 @@ mod tests {
              }\n\
              VAR player: Player = %Player{ hp: 10 }\n\
              ~ player.hp = \"high\"\n\
-             -> DONE",
+             ",
         );
 
         let diagnostics = variable_assignment_diagnostics(&story);
@@ -817,7 +817,7 @@ mod tests {
         let story = parse_story(
             "VAR scores: int[] = [1]\n\
              ~ scores[0] = \"two\"\n\
-             -> DONE",
+             ",
         );
 
         let diagnostics = variable_assignment_diagnostics(&story);
@@ -834,7 +834,7 @@ mod tests {
         let story = parse_story(
             "VAR scores: Dict<string, int> = %{\"ada\": 1}\n\
              ~ scores[1] = 2\n\
-             -> DONE",
+             ",
         );
 
         let diagnostics = variable_assignment_diagnostics(&story);
@@ -851,7 +851,7 @@ mod tests {
         let story = parse_story(
             "VAR scores: Dict<string, int> = %{\"ada\": 1}\n\
              ~ scores[\"ada\"] = \"two\"\n\
-             -> DONE",
+             ",
         );
 
         let diagnostics = variable_assignment_diagnostics(&story);
@@ -872,7 +872,7 @@ mod tests {
              VAR party: Player[] = [%Player{ hp: 10 }]\n\
              ~ party[0].hp = 11\n\
              ~ party[0].hp += 1\n\
-             -> DONE",
+             ",
         );
 
         assert_eq!(variable_assignment_diagnostics(&story), []);
@@ -886,7 +886,7 @@ mod tests {
              }\n\
              VAR party: Player[] = [%Player{ hp: 10 }]\n\
              ~ party[0].hp = \"low\"\n\
-             -> DONE",
+             ",
         );
 
         let diagnostics = variable_assignment_diagnostics(&story);
@@ -906,7 +906,7 @@ mod tests {
              }\n\
              VAR player: Player = %Player{ hp: 10 }\n\
              ~ player.hp += 1.0\n\
-             -> DONE",
+             ",
         );
 
         let diagnostics = variable_assignment_diagnostics(&story);
@@ -924,11 +924,11 @@ mod tests {
             "=== module game ===\n\
              == main ==\n\
              ~ value = 1\n\
-             -> DONE\n\
+             \n\
              === module items ===\n\
              VAR value: int = 0\n\
              == helper ==\n\
-             -> DONE",
+             ",
         );
 
         let diagnostics = variable_assignment_diagnostics(&story);
@@ -947,11 +947,11 @@ mod tests {
              VAR value: int = 0\n\
              == main ==\n\
              ~ value = 1\n\
-             -> DONE\n\
+             \n\
              === module items ===\n\
              VAR value: string = \"item\"\n\
              == helper ==\n\
-             -> DONE",
+             ",
         );
 
         assert_eq!(variable_assignment_diagnostics(&story), []);
@@ -966,11 +966,11 @@ mod tests {
              ~ state::score = 1\n\
              ~ state::score += 2\n\
              ~ state::score -= 1\n\
-             -> END\n\
+             \n\
              === module state ===\n\
              VAR score: int = 0\n\
              == helper ==\n\
-             -> END",
+             ",
         );
 
         assert_eq!(variable_assignment_diagnostics(&story), []);
@@ -983,12 +983,12 @@ mod tests {
              FROM data IMPORT State, state\n\
              == main ==\n\
              ~ data::state = data::State.Busy\n\
-             -> END\n\
+             \n\
              === module data ===\n\
              ENUM State { Idle Busy }\n\
              VAR state: State = State.Idle\n\
              == helper ==\n\
-             -> END",
+             ",
         );
 
         assert_eq!(variable_assignment_diagnostics(&story), []);
@@ -1001,11 +1001,11 @@ mod tests {
              FROM state IMPORT LIMIT\n\
              == main ==\n\
              ~ state::LIMIT = 1\n\
-             -> END\n\
+             \n\
              === module state ===\n\
              CONST LIMIT: int = 0\n\
              == helper ==\n\
-             -> END",
+             ",
         );
 
         let diagnostics = variable_assignment_diagnostics(&story);
@@ -1024,11 +1024,11 @@ mod tests {
              FROM state IMPORT score\n\
              == main ==\n\
              ~ state::score = \"high\"\n\
-             -> END\n\
+             \n\
              === module state ===\n\
              VAR score: int = 0\n\
              == helper ==\n\
-             -> END",
+             ",
         );
 
         let diagnostics = variable_assignment_diagnostics(&story);
@@ -1047,11 +1047,11 @@ mod tests {
              FROM state IMPORT score\n\
              == main ==\n\
              ~ state::score += 1.5\n\
-             -> END\n\
+             \n\
              === module state ===\n\
              VAR score: int = 0\n\
              == helper ==\n\
-             -> END",
+             ",
         );
 
         let diagnostics = variable_assignment_diagnostics(&story);
@@ -1069,11 +1069,11 @@ mod tests {
             "=== module game ===\n\
              == main ==\n\
              ~ state::missing = 1\n\
-             -> END\n\
+             \n\
              === module state ===\n\
              VAR score: int = 0\n\
              == helper ==\n\
-             -> END",
+             ",
         );
 
         let diagnostics = variable_assignment_diagnostics(&story);

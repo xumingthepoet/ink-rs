@@ -4,4 +4,3 @@
 Some <>
 content <>
 with glue.
--> END

@@ -11,7 +11,6 @@ VAR alternates: interface<IItem>[] = [right]
 == main ==
 ~ temp score: int = {route}::score(3)
 Score {score}.
--> END
 
 === module left implements IItem ===
 == function score(amount: int) => int ==

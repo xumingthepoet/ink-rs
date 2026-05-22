@@ -7,4 +7,3 @@ VAR value: int = 5
 
 == target(x: int) ==
 Value {x}.
--> END

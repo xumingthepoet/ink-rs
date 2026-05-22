@@ -17,4 +17,3 @@ I settled my master.
 
 = in_third_class
 I put myself in third.
--> DONE

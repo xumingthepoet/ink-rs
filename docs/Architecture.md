@@ -128,10 +128,10 @@ work. It intentionally omits build output and historical plan internals.
 |   |       |-- story/
 |   |       |   Public `Story` behavior split by execution concern.
 |   |       |-- story_state.rs
-|   |       |   Current flow, callstack, output stream, globals, random state,
-|   |       |   errors, warnings, and save/load state.
+|   |       |   Current execution state, callstack, output stream, globals,
+|   |       |   random state, errors, warnings, and save/load state.
 |   |       |-- callstack.rs
-|   |       |-- flow.rs
+|   |       |-- execution_state.rs
 |   |       |-- variables_state.rs
 |   |       |-- state_patch.rs
 |   |       |   Runtime state machinery.
@@ -425,6 +425,11 @@ command, native function, object variant, container field, or version rule.
 Compiler lowering should produce these types directly. Runtime loading should
 parse JSON through these types before constructing runtime execution objects.
 
+The format crate may retain historical compiled-story tokens for runtime
+compatibility after the source syntax that used to emit them has been removed.
+Document those tokens as compatibility-only in `docs/ink_JSON_runtime_format.md`
+and keep current compiler lowering tests proving they are no longer emitted.
+
 Do not add duplicate compiled-story JSON schemas in compiler emit or runtime
 JSON read/write code. If compiler and runtime both need to understand a
 compiled-story JSON shape, it belongs here.
@@ -449,13 +454,14 @@ Key areas:
 - `story/progress.rs`: continue loop and output production.
 - `story/state.rs`: public accessors and state APIs.
 - `story/tags.rs`: current tags and choice tags.
-- `story/flow.rs`: flow-level runtime behavior.
+- `story/callstack.rs`: public callstack reset behavior.
 - `story/errors.rs`: runtime error handling.
 - `story/external_functions.rs`: host function binding and fallback behavior.
 - `story_state.rs`: callstack, output stream, generated choices, globals,
-  evaluation stack, random state, current errors/warnings, and v2 save/load.
-- `callstack.rs`, `flow.rs`, `variables_state.rs`, `state_patch.rs`: mutable
-  execution state machinery.
+  evaluation stack, random state, current errors/warnings, choice replay, and
+  v2 save/load.
+- `callstack.rs`, `execution_state.rs`, `variables_state.rs`,
+  `state_patch.rs`: mutable execution state machinery.
 - `container.rs`, `object.rs`, `path.rs`, `pointer.rs`, `search_result.rs`:
   object graph and addressing.
 - `json/json_read.rs`: compiled-story JSON load path through the format crate.
@@ -483,16 +489,20 @@ Runtime save JSON is not compiled-story JSON. Save/load is owned by
 The v2 save format stores only stable pause-point state:
 
 - callstack frames
-- current generated choices
-- choice thread snapshots when choices require them
 - global `variablesState`
 - deterministic random state (`storySeed`, `previousRandom`)
 - `inkSaveVersion` and compiled-story `inkFormatVersion`
 
-It does not store multi-flow maps, mid-expression internals, current divert
-target internals, visit counts, turn indices, or version 1 state. Saving should
-fail clearly at unstable runtime points rather than
-serializing incomplete execution internals.
+It does not store generated choices, choice continuation snapshots, multi-flow
+maps, mid-expression internals, current divert target internals, visit counts,
+turn indices, or version 1 state. A save taken at a choice pause records the
+stable replay point before choice generation; load restores that replay point
+and regenerates pending static and dynamic choices. Version 1 saves and v2
+saves that contain removed fields such as `currentChoices`, `choiceThreads`,
+`flows`, `currentFlowName`, `evalStack`, `currentDivertTarget`, `visitCounts`,
+or `turnIndices` are rejected rather than migrated. Saving should fail clearly
+at unstable runtime points rather than serializing incomplete execution
+internals.
 
 ## Tests And Fixtures
 
@@ -648,7 +658,7 @@ Use this table to decide where to start.
 | External function behavior | `story/external_functions.rs`, `divert.rs` | runtime API fixtures |
 | Native operation or typed runtime value wrong | `native_function_call/`, `value_type.rs`, `value.rs` | typed value tests |
 | Variable get/set wrong | `variables_state.rs`, `story/state.rs` | runtime API and variables tests |
-| Save/load bug | `story_state.rs`, `json/json_write.rs`, `flow.rs`, `callstack.rs` | choices/runtime save-load tests |
+| Save/load bug | `story_state.rs`, `json/json_write.rs`, `execution_state.rs`, `callstack.rs` | choices/runtime save-load tests |
 | Dioxus game UI, shared UI tags, embedded ink-rs source lists and catalogs | `crates/ink-dioxus/src/` | `cargo test -p ink-dioxus`, `cargo check -p ink-dioxus --features web` |
 | Playable text game hub or bundled game sources | `crates/text-games-app/` | `cargo check -p text-games-app` |
 | CLI compile behavior | `crates/ink-tools/src/main.rs` | compiler API tests |

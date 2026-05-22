@@ -8,4 +8,3 @@ VAR x: int = 10
     - else:
         KO
     }
-    -> DONE

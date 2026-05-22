@@ -2,4 +2,3 @@
 FROM items IMPORT sword
 
 == main ==
--> END

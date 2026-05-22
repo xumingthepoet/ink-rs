@@ -7,4 +7,3 @@ hp: int
 -> start(%Player{ hp: "bad" })
 
 == start(player: Player) ==
--> DONE

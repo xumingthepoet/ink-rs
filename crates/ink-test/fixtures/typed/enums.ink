@@ -33,4 +33,3 @@ FROM data IMPORT State, state, states, actor, DEFAULT_STATE, DEFAULT_TONE, echo,
 {data::state}|{data::state == data::State.Idle}|{data::states[1]}|{data::actor.state}|{data::actor.history[0]}|{data::echo(data::DEFAULT_STATE)}|{data::tone_name(data::DEFAULT_TONE)}|{data::actor.mood}
 ~ data::state = data::State.Done
 |{data::state != data::State.Busy}
--> DONE

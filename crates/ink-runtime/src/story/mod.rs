@@ -32,6 +32,8 @@ pub struct Story {
     prev_containers: Vec<Rc<Container>>,
     pub(crate) on_error: Option<Rc<RefCell<dyn ErrorHandler>>>,
     pub(crate) state_snapshot_at_last_new_line: Option<StoryState>,
+    pub(crate) choice_replay_candidate: Option<StoryState>,
+    pub(crate) choice_replay_state: Option<StoryState>,
     pub(crate) has_validated_externals: bool,
     pub(crate) allow_external_function_fallbacks: bool,
     pub(crate) saw_lookahead_unsafe_function_after_new_line: bool,
@@ -147,6 +149,8 @@ mod misc {
                 async_saving: false,
                 saw_lookahead_unsafe_function_after_new_line: false,
                 state_snapshot_at_last_new_line: None,
+                choice_replay_candidate: None,
+                choice_replay_state: None,
                 on_error: None,
                 prev_containers: Vec::new(),
                 has_validated_externals: false,
@@ -246,11 +250,11 @@ mod misc {
     }
 }
 
+mod callstack;
 mod choices;
 mod control_logic;
 pub mod errors;
 pub mod external_functions;
-mod flow;
 mod internal_functions;
 mod navigation;
 mod progress;

@@ -1,7 +1,5 @@
 Story
   Weave(baseIndent=0)
-    Gather(name=null, depth=1)
-    Divert(target="-> DONE", empty=false, tunnel=false, thread=false)
   Module(name="game")
     Weave(baseIndent=0)
       StructDeclaration(name="Stats")
@@ -28,4 +26,3 @@ Story
         ContentList
           VariableReference(nested)
         Text("\n")
-        Divert(target="-> DONE", empty=false, tunnel=false, thread=false)

@@ -11,4 +11,3 @@ VAR items: int[] = [1]
 ~ state.name += "!"
 ~ items[0] += 1
 {state.hp}|{state.name}|{items[0]}
--> DONE

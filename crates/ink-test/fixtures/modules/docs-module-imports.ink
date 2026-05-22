@@ -8,7 +8,6 @@ Gold: {gold}
 Price: {shop::price}
 ~ shop::price += 2
 Updated price: {shop::price}
--> END
 
 === module shop ===
 VAR price: int = 3

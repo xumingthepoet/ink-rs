@@ -13,4 +13,3 @@
          ~ str += "a"
 
             The values are {knows} and {x} and {y} and {str}.
-            -> END

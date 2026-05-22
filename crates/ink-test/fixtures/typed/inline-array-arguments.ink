@@ -8,7 +8,6 @@ First {enemy_ids[0]}.
 Count {LEN(enemy_ids)}.
 ~ temp copied: int[] = identity([7, 8])
 Copied {copied[1]}.
--> END
 
 == function identity(values: int[]) => int[] ==
 ~ return values

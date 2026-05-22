@@ -9,7 +9,6 @@ VAR wrong_keys_arg: string[] = DICT_KEYS(1)
 ~ ARRAY_REMOVE(scores, 0)
 ~ DICT_REMOVE(scores, 1)
 ~ DICT_REMOVE(copy_scores(), "ada")
--> DONE
 
 == function copy_scores() => Dict<string, int> ==
 ~ return scores

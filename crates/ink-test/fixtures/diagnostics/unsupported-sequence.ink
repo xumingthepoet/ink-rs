@@ -6,4 +6,3 @@ A {one|two} line.
 - two
 }
 * Say {~hello|hi}
--> END

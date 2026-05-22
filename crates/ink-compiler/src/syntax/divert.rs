@@ -1,33 +1,67 @@
 use crate::{
+    diagnostic::{Diagnostic, DiagnosticCode},
     parsed::{Divert, DivertTarget, Expression, Object, QualifiedName, TunnelOnwards},
     source::SourceSpan,
 };
 
 use super::{parse_initial_expression, rule::RuleParser, scan, split_top_level_args};
 
+pub(super) const REMOVED_THREAD_SYNTAX_MESSAGE: &str =
+    "Thread syntax '<-' has been removed from ink-rs; use ordinary choices and diverts instead.";
+
+pub(super) fn removed_terminal_divert_message(target: &str) -> String {
+    format!(
+        "`-> {target}` has been removed from ink-rs; let story content end naturally or divert to an ordinary knot or stitch."
+    )
+}
+
 pub(super) fn parse_divert_objects(parser: &mut RuleParser<'_>) -> Option<Vec<Object>> {
     parser.skip_horizontal_whitespace();
     let span = parser.current_span();
     let source = parser.line_remainder().to_string();
-    if let Some(after_thread_arrow) = source.trim().strip_prefix("<-") {
-        if after_thread_arrow.trim().is_empty() {
-            parser.error("Expected target for new thread");
-            parser.skip_to_end();
-            return Some(vec![Object::Divert(
-                Divert::new(DivertTarget::Empty, span).with_thread(),
-            )]);
-        }
+    if source.trim().starts_with("<-") {
+        parser.diagnostic(removed_thread_syntax_diagnostic(span));
+        parser.skip_to_end();
+        return Some(Vec::new());
+    }
+    if let Some(target) = removed_terminal_divert_target_in_source(&source) {
+        parser.diagnostic(removed_terminal_divert_diagnostic(span, target));
+        parser.skip_to_end();
+        return Some(Vec::new());
     }
     let objects = parse_divert_objects_source(&source, span)?;
     parser.skip_to_end();
     Some(objects)
 }
 
+pub(super) fn removed_thread_syntax_diagnostic(span: SourceSpan) -> Diagnostic {
+    Diagnostic::error(span, REMOVED_THREAD_SYNTAX_MESSAGE)
+        .with_code(DiagnosticCode::InvalidInlineSyntax)
+}
+
+pub(super) fn removed_terminal_divert_diagnostic(span: SourceSpan, target: &str) -> Diagnostic {
+    Diagnostic::error(span, removed_terminal_divert_message(target))
+        .with_code(DiagnosticCode::InvalidInlineSyntax)
+}
+
+pub(super) fn removed_terminal_divert_target_in_source(source: &str) -> Option<&'static str> {
+    let source = source.trim();
+    if !source.starts_with("->") || source.starts_with("->->") {
+        return None;
+    }
+
+    let after_arrow = source.strip_prefix("->")?.trim();
+    let (segments, _) = split_multidivert_segments(after_arrow);
+    segments.into_iter().find_map(removed_terminal_target)
+}
+
 pub(super) fn parse_divert_objects_source(source: &str, span: SourceSpan) -> Option<Vec<Object>> {
     let source = source.trim();
-    if let Some(after_thread_arrow) = source.strip_prefix("<-") {
-        let divert = parse_divert_source(after_thread_arrow, span)?.with_thread();
-        return Some(vec![Object::Divert(divert)]);
+    if source.starts_with("<-") {
+        return None;
+    }
+    if removed_terminal_divert_target_in_source(source).is_some() {
+        return None;
     }
 
     if !source.starts_with("->") {
@@ -180,6 +214,15 @@ fn parse_divert_target_and_arguments(source: &str) -> Option<(&str, Vec<Expressi
     };
 
     Some((target, arguments, true))
+}
+
+fn removed_terminal_target(source: &str) -> Option<&'static str> {
+    let (target, _, _) = parse_divert_target_and_arguments(source)?;
+    match target.trim() {
+        "DONE" => Some("DONE"),
+        "END" => Some("END"),
+        _ => None,
+    }
 }
 
 fn parse_divert_target(source: &str, span: &SourceSpan) -> Option<DivertTarget> {

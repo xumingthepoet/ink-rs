@@ -11,4 +11,3 @@ How much do you give?
 
 == give(amount) ==
 You give {amount} dollars.
--> DONE

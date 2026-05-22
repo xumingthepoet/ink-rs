@@ -6,4 +6,3 @@ VAR values: int[] = [1, 2, 3]
 {index}:{value}
 ~ ARRAY_REMOVE(values, 0)
 }
--> END

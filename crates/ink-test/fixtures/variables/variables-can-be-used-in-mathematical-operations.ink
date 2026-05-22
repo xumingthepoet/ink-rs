@@ -12,4 +12,3 @@ Integer calculation does each step as integers, which may not be what you want.
 
 Float calculation works better:
 ({f} - {cf}) / {f} + {bf} = {(f - cf) / f + bf}!
--> END

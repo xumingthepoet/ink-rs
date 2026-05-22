@@ -7,7 +7,6 @@ B
 A
 {string()}
 B
--> END
 
 == function string() => string ==
     ~ return "{3}"

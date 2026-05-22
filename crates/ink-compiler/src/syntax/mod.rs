@@ -228,12 +228,75 @@ mod tests {
 
     #[test]
     fn parses_inline_divert_in_text() {
-        let output = parse(SourceInput::new("A line. -> END"));
+        let output = parse(SourceInput::new("A line. -> target"));
         assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
         let story = output.artifact.unwrap();
 
         assert_eq!(story.root_weave().content().len(), 3);
         assert!(matches!(story.root_weave().content()[1], Object::Divert(_)));
+    }
+
+    #[test]
+    fn rejects_removed_thread_syntax() {
+        let output = parse(SourceInput::new("<- choices"));
+
+        assert_eq!(output.diagnostics.len(), 1, "{:#?}", output.diagnostics);
+        assert_eq!(
+            output.diagnostics[0].message,
+            divert::REMOVED_THREAD_SYNTAX_MESSAGE
+        );
+        assert!(output.artifact.unwrap().root_weave().content().is_empty());
+    }
+
+    #[test]
+    fn rejects_removed_inline_thread_syntax() {
+        let output = parse(SourceInput::new("A line. <- choices"));
+
+        assert_eq!(output.diagnostics.len(), 1, "{:#?}", output.diagnostics);
+        assert_eq!(
+            output.diagnostics[0].message,
+            divert::REMOVED_THREAD_SYNTAX_MESSAGE
+        );
+    }
+
+    #[test]
+    fn rejects_removed_terminal_diverts() {
+        for target in ["DONE", "END"] {
+            let source = format!("-> {target}");
+            let output = parse(SourceInput::new(source));
+
+            assert_eq!(output.diagnostics.len(), 1, "{:#?}", output.diagnostics);
+            assert_eq!(
+                output.diagnostics[0].message,
+                divert::removed_terminal_divert_message(target)
+            );
+            assert!(output.artifact.unwrap().root_weave().content().is_empty());
+        }
+    }
+
+    #[test]
+    fn rejects_removed_inline_terminal_diverts() {
+        let output = parse(SourceInput::new("A line. -> END"));
+
+        assert_eq!(output.diagnostics.len(), 1, "{:#?}", output.diagnostics);
+        assert_eq!(
+            output.diagnostics[0].message,
+            divert::removed_terminal_divert_message("END")
+        );
+    }
+
+    #[test]
+    fn terminal_words_inside_identifiers_remain_ordinary_divert_targets() {
+        for source in ["-> done_count", "-> ending", "-> ENDING"] {
+            let output = parse(SourceInput::new(source));
+            assert!(
+                output.diagnostics.is_empty(),
+                "{source}: {:#?}",
+                output.diagnostics
+            );
+            let story = output.artifact.unwrap();
+            assert!(matches!(story.root_weave().content()[0], Object::Divert(_)));
+        }
     }
 
     #[test]
@@ -326,7 +389,7 @@ mod tests {
 
     #[test]
     fn trims_extra_separator_whitespace_before_terminal_divert() {
-        let output = parse(SourceInput::new("<>as fast as we could.  -> END"));
+        let output = parse(SourceInput::new("<>as fast as we could.  -> knot"));
         assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
         let story = output.artifact.unwrap();
 
@@ -339,7 +402,7 @@ mod tests {
     #[test]
     fn parses_knot_definition() {
         let output = parse(SourceInput::new(
-            "Top line.\n-> knot_name\n\n== knot_name ===\nInside knot. -> END",
+            "Top line.\n-> knot_name\n\n== knot_name ===\nInside knot. -> next",
         ));
         assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
         let story = output.artifact.unwrap();
@@ -355,7 +418,7 @@ mod tests {
         assert!(is_identifier("512x2"));
         assert!(!is_identifier("512"));
 
-        let output = parse(SourceInput::new("== 2tests ==\n-> DONE"));
+        let output = parse(SourceInput::new("== 2tests ==\nLine."));
         assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
         let story = output.artifact.unwrap();
         assert_eq!(story.flows()[0].name(), "2tests");

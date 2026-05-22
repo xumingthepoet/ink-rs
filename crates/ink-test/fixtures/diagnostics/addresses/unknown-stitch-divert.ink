@@ -4,4 +4,3 @@
 
 == duckburg ==
 = money_bin
--> END

@@ -216,10 +216,7 @@ impl<'a> ArrayLiteralChecker<'a> {
                     );
                 }
             }
-            DivertTarget::Dynamic(_)
-            | DivertTarget::Done
-            | DivertTarget::End
-            | DivertTarget::Empty => {}
+            DivertTarget::Dynamic(_) | DivertTarget::Empty => {}
         }
     }
 
@@ -721,7 +718,7 @@ mod tests {
         let story = parse_story(
             "CONST default_scores: int[] = [1, 2, 3]\n\
              VAR scores: int[] = [1, 2, 3]\n\
-             -> DONE",
+             ",
         );
 
         assert_eq!(array_literal_diagnostics(&story), []);
@@ -731,7 +728,7 @@ mod tests {
     fn accepts_empty_array_literals_with_expected_type() {
         let story = parse_story(
             "VAR scores: int[] = []\n\
-             -> DONE",
+             ",
         );
 
         assert_eq!(array_literal_diagnostics(&story), []);
@@ -746,10 +743,10 @@ mod tests {
              FROM left\n\
              VAR routes: interface<IItem>[] = [left]\n\
              == main ==\n\
-             -> END\n\
+             \n\
              === module left implements IItem ===\n\
              == target ==\n\
-             -> END",
+             ",
         );
 
         assert_eq!(super::super::run_analysis_passes(&story), []);
@@ -765,7 +762,7 @@ mod tests {
              VAR route: interface<IItem> = left\n\
              VAR scores: int[] = [{route}::score(1), 2]\n\
              == main ==\n\
-             -> END\n\
+             \n\
              === module left implements IItem ===\n\
              == function score(amount: int) => int ==\n\
              ~ return amount",
@@ -783,10 +780,10 @@ mod tests {
              FROM left\n\
              VAR routes: interface<IItem>[] = [left]\n\
              == main ==\n\
-             -> END\n\
+             \n\
              === module left ===\n\
              == target ==\n\
-             -> END",
+             ",
         );
 
         let diagnostics = array_literal_diagnostics(&story);
@@ -802,7 +799,7 @@ mod tests {
     fn accepts_nested_array_literals() {
         let story = parse_story(
             "VAR matrix: int[][] = [[1, 2], []]\n\
-             -> DONE",
+             ",
         );
 
         assert_eq!(array_literal_diagnostics(&story), []);
@@ -815,7 +812,7 @@ mod tests {
              == main ==\n\
              -> start([1, 2, 3])\n\
              == start(ids: int[]) ==\n\
-             -> END",
+             ",
         );
 
         assert_eq!(super::super::run_analysis_passes(&story), []);
@@ -828,7 +825,7 @@ mod tests {
              == main ==\n\
              ~ temp values: int[] = identity([1, 2, 3])\n\
              {values[0]}\n\
-             -> END\n\
+             \n\
              == function identity(values: int[]) => int[] ==\n\
              ~ return values",
         );
@@ -846,7 +843,7 @@ mod tests {
              == main ==\n\
              -> start([%Player{ hp: 10 }])\n\
              == start(players: Player[]) ==\n\
-             -> END",
+             ",
         );
 
         assert_eq!(super::super::run_analysis_passes(&story), []);
@@ -866,7 +863,7 @@ mod tests {
              -> {{route}::target}([1, 2])\n\
              === module left implements IItem ===\n\
              == target(ids: int[]) ==\n\
-             -> END\n\
+             \n\
              == function score(ids: int[]) => int ==\n\
              ~ return ids[0]",
         );
@@ -881,7 +878,7 @@ mod tests {
              == main ==\n\
              -> start([1, \"two\"])\n\
              == start(ids: int[]) ==\n\
-             -> END",
+             ",
         );
 
         let diagnostics = array_literal_diagnostics(&story);
@@ -899,7 +896,7 @@ mod tests {
             "=== module game ===\n\
              == main ==\n\
              ~ temp value: int = collect([\"bad\"])\n\
-             -> END\n\
+             \n\
              == function collect(values: int[]) => int ==\n\
              ~ return values[0]",
         );
@@ -925,7 +922,7 @@ mod tests {
              VAR route: interface<IScore> = left\n\
              == main ==\n\
              ~ temp value: int = {route}::score([\"bad\"])\n\
-             -> END\n\
+             \n\
              === module left implements IScore ===\n\
              == function score(values: int[]) => int ==\n\
              ~ return values[0]",
@@ -949,7 +946,7 @@ mod tests {
              hp: int\n\
              }\n\
              VAR party: Player[] = [%Player{ hp: 10 }, %Player{}]\n\
-             -> DONE",
+             ",
         );
 
         assert_eq!(array_literal_diagnostics(&story), []);
@@ -962,7 +959,7 @@ mod tests {
              scores: int[]\n\
              }\n\
              VAR player: Player = %Player{ scores: [1, 2] }\n\
-             -> DONE",
+             ",
         );
 
         assert_eq!(array_literal_diagnostics(&story), []);
@@ -972,7 +969,7 @@ mod tests {
     fn reports_mixed_array_element_type() {
         let story = parse_story(
             "VAR scores: int[] = [1, \"two\"]\n\
-             -> DONE",
+             ",
         );
 
         let diagnostics = array_literal_diagnostics(&story);
@@ -988,7 +985,7 @@ mod tests {
     fn reports_array_literal_without_expected_type() {
         let story = parse_story(
             "{[]}\n\
-             -> DONE",
+             ",
         );
 
         let diagnostics = array_literal_diagnostics(&story);

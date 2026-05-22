@@ -23,4 +23,3 @@ CONST rooms: Dict<int, RoomDef> = %{
 - else:
     missing-nine
 }
--> END

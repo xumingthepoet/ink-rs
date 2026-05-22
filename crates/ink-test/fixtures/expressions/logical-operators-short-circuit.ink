@@ -21,4 +21,3 @@ VAR effects: int = 0
 {needed_and}
 {needed_or}
 Effects: {effects}
--> END

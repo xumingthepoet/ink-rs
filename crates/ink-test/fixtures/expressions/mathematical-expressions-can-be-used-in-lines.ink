@@ -11,4 +11,3 @@ Let's nest a bit: <>
 
 Strings can be added, too: <>
 {"str" + "ing"} is string!
--> END

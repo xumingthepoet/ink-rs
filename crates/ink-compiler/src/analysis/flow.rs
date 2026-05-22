@@ -534,11 +534,6 @@ fn check_flow(
                 flow.name()
             ),
         ));
-    } else if let Some(span) = loose_end_warning_span(flow.weave()) {
-        diagnostics.push(Diagnostic::warning(
-            span,
-            "Apparent loose end exists where the flow runs out. Do you need a '-> DONE' statement, choice or divert?",
-        ));
     }
 
     for child in flow.child_flows() {
@@ -859,11 +854,6 @@ fn find_return_in_object(object: &Object) -> Option<&Return> {
     }
 }
 
-fn loose_end_warning_span(weave: &Weave) -> Option<SourceSpan> {
-    let terminating = last_significant_object(weave.content())?;
-    (!object_terminates_flow(terminating)).then(|| object_span(terminating))
-}
-
 fn last_significant_object(objects: &[Object]) -> Option<&Object> {
     objects
         .iter()
@@ -953,15 +943,11 @@ mod tests {
     };
 
     #[test]
-    fn reports_loose_end_warnings_for_unterminated_knots() {
+    fn accepts_natural_end_for_unterminated_knots() {
         let story = parse_story("== knot ==\nLine.");
         let diagnostics = flow_diagnostics(&story);
 
-        assert_single_diagnostic(
-            &diagnostics,
-            DiagnosticSeverity::Warning,
-            "Apparent loose end exists where the flow runs out. Do you need a '-> DONE' statement, choice or divert?",
-        );
+        assert_eq!(diagnostics, []);
     }
 
     #[test]
@@ -972,7 +958,7 @@ mod tests {
                Conditional text.\n\
              }\n\
              * { ready }: Choice text\n\
-             -> DONE",
+             ",
         );
 
         assert_eq!(flow_diagnostics(&story), []);
@@ -983,7 +969,7 @@ mod tests {
         let cases = ["{ if true:\n\
                VAR score: int = 0\n\
              }\n\
-             -> DONE"];
+             "];
 
         for source in cases {
             let story = parse_story(source);
@@ -1062,7 +1048,7 @@ mod tests {
              - 0:\n\
                stage zero\n\
              }\n\
-             -> DONE",
+             ",
         );
 
         assert_eq!(flow_diagnostics(&story), []);
@@ -1076,7 +1062,7 @@ mod tests {
              - \"zero\":\n\
                stage zero\n\
              }\n\
-             -> DONE",
+             ",
         );
         let diagnostics = flow_diagnostics(&story);
 
@@ -1096,7 +1082,7 @@ mod tests {
              - 0:\n\
                stage zero\n\
              }\n\
-             -> DONE",
+             ",
         );
         let diagnostics = flow_diagnostics(&story);
 
@@ -1115,7 +1101,7 @@ mod tests {
              - quest_stage == 1:\n\
                stage one\n\
              }\n\
-             -> DONE",
+             ",
         );
         let diagnostics = flow_diagnostics(&story);
 
@@ -1134,7 +1120,7 @@ mod tests {
              - else:\n\
                else text\n\
              }\n\
-             -> DONE",
+             ",
         );
         let diagnostics = flow_diagnostics(&story);
 
@@ -1158,14 +1144,14 @@ mod tests {
                -> finish\n\
              }\n\
              == finish ==\n\
-             -> END",
+             ",
         );
 
         assert_eq!(flow_diagnostics(&story), []);
     }
 
     #[test]
-    fn non_exhaustive_int_switch_still_reports_loose_end() {
+    fn non_exhaustive_int_switch_ends_naturally() {
         let story = parse_story(
             "=== module game ===\n\
              VAR quest_stage: int = 0\n\
@@ -1177,15 +1163,11 @@ mod tests {
                -> finish\n\
              }\n\
              == finish ==\n\
-             -> END",
+             Finished.",
         );
         let diagnostics = flow_diagnostics(&story);
 
-        assert_single_diagnostic(
-            &diagnostics,
-            DiagnosticSeverity::Warning,
-            "Apparent loose end exists where the flow runs out. Do you need a '-> DONE' statement, choice or divert?",
-        );
+        assert_eq!(diagnostics, []);
     }
 
     #[test]
@@ -1201,7 +1183,7 @@ mod tests {
                -> finish\n\
              }\n\
              == finish ==\n\
-             -> END",
+             ",
         );
 
         assert_eq!(flow_diagnostics(&story), []);
@@ -1240,9 +1222,9 @@ mod tests {
              VAR route: interface<IScorer> = scorer\n\
              == main ==\n\
              { if {route}::ready():\n\
-               -> END\n\
+               Ready.\n\
              }\n\
-             -> END\n\
+             Done.\n\
              == function get_score() => int ==\n\
              ~ return {route}::score(1)\n\
              === module scorer implements IScorer ===\n\
@@ -1266,9 +1248,9 @@ mod tests {
             (
                 "== main ==\n\
                  { if {route}::score(1):\n\
-                   -> END\n\
+                   Ready.\n\
                  }\n\
-                 -> END",
+                 Done.",
                 "Conditional condition has type int but expected bool",
             ),
         ];
@@ -1297,21 +1279,21 @@ mod tests {
             "=== module game ===\n\
              == main ==\n\
              ~ helper()\n\
-             -> DONE\n\
+             Done.\n\
              == function helper() => void ==\n\
-             -> DONE",
+             -> target",
         );
         let diagnostics = flow_diagnostics(&story);
 
         assert_single_diagnostic(
             &diagnostics,
             DiagnosticSeverity::Error,
-            "Functions may not contain diverts, but saw '-> DONE'",
+            "Functions may not contain diverts, but saw '-> target'",
         );
     }
 
     #[test]
-    fn module_flows_report_loose_end_warnings() {
+    fn module_flows_end_naturally() {
         let story = parse_story(
             "=== module game ===\n\
              == main ==\n\
@@ -1319,11 +1301,7 @@ mod tests {
         );
         let diagnostics = flow_diagnostics(&story);
 
-        assert_single_diagnostic(
-            &diagnostics,
-            DiagnosticSeverity::Warning,
-            "Apparent loose end exists where the flow runs out. Do you need a '-> DONE' statement, choice or divert?",
-        );
+        assert_eq!(diagnostics, []);
     }
 
     #[test]
@@ -1332,7 +1310,7 @@ mod tests {
             "=== module game ===\n\
              VAR score: int = 1\n\
              == main ==\n\
-             -> DONE\n\
+             Done.\n\
              == function current_score() => int ==\n\
              ~ return score",
         );

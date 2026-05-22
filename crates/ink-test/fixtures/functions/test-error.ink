@@ -9,4 +9,3 @@ VAR roll: int = 0
  { if roll == 0:
     ~ roll = 1
  }
--> END

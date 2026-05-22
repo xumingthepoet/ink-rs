@@ -11,7 +11,6 @@ VAR host_scores: Dict<string, Dict<int, string>> = %{}
 {bumped}|{made["seed"]}|{made["next"]}
 * Read host variable
     {host_scores["ada"][1]}|{host_scores["ada"][2]}
-    -> DONE
 
 == INTERNAL identity_scores(input_scores: Dict<string, int>) => Dict<string, int> ==
 ~ return input_scores

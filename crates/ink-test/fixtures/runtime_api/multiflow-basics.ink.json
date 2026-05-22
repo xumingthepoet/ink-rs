@@ -1,1 +1,1 @@
-{"inkVersion":1,"root":[{"->":"game.main"},"done",{"game":[{"knot1":["^knot 1 line 1","\n","^knot 1 line 2","\n","end",null],"knot2":["^knot 2 line 1","\n","^knot 2 line 2","\n","end",null],"main":[{"->":"game.knot1"},null]}]}]}
+{"inkVersion":1,"root":[{"->":"game.main"},"done",{"game":[{"knot1":["^knot 1 line 1","\n","^knot 1 line 2","\n","done",null],"knot2":["^knot 2 line 1","\n","^knot 2 line 2","\n","done",null],"main":[{"->":"game.knot1"},null]}]}]}

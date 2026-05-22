@@ -221,7 +221,7 @@ mod tests {
              }\n\
              VAR player: Player = %Player{ hp: 10 }\n\
              VAR hp: int = player.hp\n\
-             -> DONE",
+             ",
         );
 
         assert_eq!(field_access_diagnostics(&story), []);
@@ -238,7 +238,7 @@ mod tests {
              }\n\
              VAR player: Player = %Player{ stats: %Stats{ hp: 10 } }\n\
              VAR hp: int = player.stats.hp\n\
-             -> DONE",
+             ",
         );
 
         assert_eq!(field_access_diagnostics(&story), []);
@@ -254,13 +254,13 @@ mod tests {
              VAR route: interface<IItem> = left\n\
              VAR hp: int = {route}::player().hp\n\
              == main ==\n\
-             -> END\n\
+             \n\
              === module types ===\n\
              STRUCT Player {\n\
              hp: int\n\
              }\n\
              == helper ==\n\
-             -> END\n\
+             \n\
              === module left implements IItem ===\n\
              FROM types IMPORT Player\n\
              VAR source_player: types::Player = %types::Player{ hp: 10 }\n\
@@ -279,7 +279,7 @@ mod tests {
              }\n\
              VAR player: Player = %Player{ hp: 10 }\n\
              {player.mp}\n\
-             -> DONE",
+             ",
         );
 
         let diagnostics = field_access_diagnostics(&story);
@@ -296,7 +296,7 @@ mod tests {
         let story = parse_story(
             "VAR score: int = 0\n\
              {score.hp}\n\
-             -> DONE",
+             ",
         );
 
         let diagnostics = field_access_diagnostics(&story);
@@ -314,7 +314,7 @@ mod tests {
             "-> knot.stitch\n\
              == knot ==\n\
              = stitch\n\
-             -> DONE",
+             ",
         );
 
         assert_eq!(field_access_diagnostics(&story), []);
@@ -330,7 +330,7 @@ mod tests {
              -> knot.stitch_two\n\
              = stitch_two\n\
              * {knot.stitch_one.gatherpoint}: Found gatherpoint\n\
-             -> DONE",
+             ",
         );
 
         assert_eq!(field_access_diagnostics(&story), []);

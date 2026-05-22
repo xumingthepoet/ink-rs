@@ -6,4 +6,3 @@ VAR b: int = 5
 Before: {a} + {b} = {a + b}.
 ~ a = 7
 After: {a} + {b} = {a + b}.
--> END

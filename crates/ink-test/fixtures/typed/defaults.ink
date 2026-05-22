@@ -17,4 +17,3 @@ VAR global_player: Player
 ~ temp temp_values: int[]
 ~ temp temp_player: Player
 {global_score}|{global_ready}|{global_label}|{global_ratio}|{global_values}|{global_player}|{temp_score}|{temp_values}|{temp_player}
--> DONE

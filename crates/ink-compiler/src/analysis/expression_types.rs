@@ -847,7 +847,7 @@ mod tests {
         let story = parse_story(
             "VAR score: int = 0\n\
              == knot(flag: bool) ==\n\
-             -> DONE",
+             ",
         );
         let scopes = build_variable_scope_index(&story);
 
@@ -885,12 +885,12 @@ mod tests {
         let story = parse_story(
             "=== module game ===\n\
              == main ==\n\
-             -> DONE\n\
+             \n\
              === module items ===\n\
              CONST MAX_SCORE: int = 3\n\
              VAR score: int = 0\n\
              == helper ==\n\
-             -> DONE",
+             ",
         );
         let scopes = build_variable_scope_index(&story);
 
@@ -920,7 +920,7 @@ mod tests {
             "=== module game ===\n\
              FROM data IMPORT actor, DEFAULT_STATE, State\n\
              == main ==\n\
-             -> DONE\n\
+             \n\
              === module data ===\n\
              ENUM State { Idle Busy }\n\
              STRUCT Actor {\n\
@@ -930,7 +930,7 @@ mod tests {
              VAR actor: Actor\n\
              CONST DEFAULT_STATE: State = State.Idle\n\
              == helper ==\n\
-             -> DONE",
+             ",
         );
         let scopes = build_variable_scope_index(&story);
         let structs = build_struct_type_index(&story);
@@ -1090,9 +1090,9 @@ mod tests {
     fn rejects_boolean_operators_for_divert_targets() {
         let story = parse_story(
             "VAR next: -> = -> knot\n\
-             -> DONE\n\
+             \n\
              == knot ==\n\
-             -> DONE",
+             ",
         );
         let scopes = build_variable_scope_index(&story);
         let structs = build_struct_type_index(&story);
@@ -1147,11 +1147,11 @@ mod tests {
              VAR other_scores: int[] = [other_score]\n\
              VAR nested_scores: int[][] = [scores]\n\
              VAR other_nested_scores: int[][] = [other_scores]\n\
-             -> DONE\n\
+             \n\
              == knot ==\n\
-             -> DONE\n\
+             \n\
              == other ==\n\
-             -> DONE",
+             ",
         );
         let scopes = build_variable_scope_index(&story);
         let structs = build_struct_type_index(&story);
@@ -1218,7 +1218,7 @@ mod tests {
         let story = parse_story(
             "ENUM State { Idle Busy }\n\
              VAR state: State = State.Idle\n\
-             -> DONE",
+             ",
         );
         let scopes = build_variable_scope_index(&story);
         let structs = build_struct_type_index(&story);
@@ -1264,7 +1264,7 @@ mod tests {
 
     #[test]
     fn rejects_unknown_enum_members() {
-        let story = parse_story("ENUM State { Idle Busy }\n-> DONE");
+        let story = parse_story("ENUM State { Idle Busy }\n");
         let scopes = build_variable_scope_index(&story);
         let structs = build_struct_type_index(&story);
         let enums = build_enum_type_index(&story);
@@ -1305,7 +1305,7 @@ mod tests {
              VAR state: RouteState\n\
              VAR routes: interface<IItem>[]\n\
              == main ==\n\
-             -> END",
+             Done.",
         );
         let scopes = build_variable_scope_index(&story);
         let structs = build_struct_type_index(&story);
@@ -1357,7 +1357,7 @@ mod tests {
              VAR route: interface<IItem>\n\
              VAR label: string = \"x\"\n\
              == main ==\n\
-             -> END",
+             ",
         );
         let scopes = build_variable_scope_index(&story);
         let structs = build_struct_type_index(&story);
@@ -1411,7 +1411,7 @@ mod tests {
              VAR state: RouteState\n\
              VAR routes: interface<IItem>[]\n\
              == main ==\n\
-             -> END",
+             Done.",
         );
         let scopes = build_variable_scope_index(&story);
         let structs = build_struct_type_index(&story);
@@ -1465,7 +1465,7 @@ mod tests {
              VAR route: interface<IItem>\n\
              VAR label: string = \"x\"\n\
              == main ==\n\
-             -> END",
+             ",
         );
         let scopes = build_variable_scope_index(&story);
         let structs = build_struct_type_index(&story);
@@ -1514,7 +1514,7 @@ mod tests {
              VAR ratio: float = 1.0\n\
              VAR source_player: Player = %Player{ hp: 10 }\n\
              VAR scores: int[] = [score]\n\
-             -> DONE",
+             ",
         );
         let scopes = build_variable_scope_index(&story);
         let structs = build_struct_type_index(&story);
@@ -1571,11 +1571,11 @@ mod tests {
              VAR second_target: -> = -> other\n\
              VAR scores: int[] = [score]\n\
              VAR other_scores: int[] = [score]\n\
-             -> DONE\n\
+             \n\
              == knot ==\n\
-             -> DONE\n\
+             \n\
              == other ==\n\
-             -> DONE",
+             ",
         );
         let scopes = build_variable_scope_index(&story);
         let structs = build_struct_type_index(&story);

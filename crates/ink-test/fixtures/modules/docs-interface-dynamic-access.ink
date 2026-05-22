@@ -24,7 +24,6 @@ VAR base: int = 3
 === module left implements IRoute ===
 == arrive(stops: int) ==
 Left route {stops}.
--> END
 
 == function fare(base: int) => int ==
 ~ return base + 1
@@ -32,7 +31,6 @@ Left route {stops}.
 === module right implements IRoute ===
 == arrive(stops: int) ==
 Right route {stops}.
--> END
 
 == function fare(base: int) => int ==
 ~ return base + 2

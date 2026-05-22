@@ -14,7 +14,6 @@ GESICHT'S BEDROOM, MORNING
 = breakfast
 Before he's had the time to eat breakfast a call about a murder comes in.
 As Helena probes him about leaving he suggests that they take a vacation.
--> END
 
 = wake
 Gesicht is lying in his bed, eyes wide open and staring at the ceiling.

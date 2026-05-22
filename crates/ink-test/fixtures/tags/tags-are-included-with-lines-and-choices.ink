@@ -7,4 +7,3 @@ An old castle heaves in front of you. # description
 == gates ==
 
 *   Enter it. # action
--> END

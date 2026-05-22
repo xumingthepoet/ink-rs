@@ -8,4 +8,3 @@ VAR variable: int = 0
 
 == knot ==
 Empty knot.
--> END

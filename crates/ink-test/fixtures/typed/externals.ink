@@ -12,4 +12,3 @@ EXTERNAL make_player() => Player
 ~ temp scores: int[] = make_scores()
 ~ temp player: Player = make_player()
 {score}|{scores[0]}|{scores[1]}|{player.hp}
--> DONE

@@ -9,4 +9,3 @@ VAR unsupportedIntDict: Dict<int, string> = {1: "one"}
 VAR unsupportedEmptyDict: Dict<string, int> = {}
 
 == main ==
--> DONE

@@ -23,6 +23,32 @@ Each entry should include:
 - author impact
 - tests
 
+## 2026-05-23: Source Threads And Terminal Diverts Removed
+
+- status: removed
+- background: earlier ink-rs builds inherited source-level thread syntax
+  (`<- target`) and magic terminal divert targets (`-> DONE`, `-> END`) from
+  Ink-style control flow.
+- ink-rs behavior: source `<-`, `-> DONE`, and `-> END` are no longer accepted
+  syntax. The compiler reports targeted removed-syntax diagnostics for those
+  forms. Non-function knots, stitches, choice branches, and gather branches end
+  naturally when execution reaches the end of their authored content. A child
+  stitch is entered only through an explicit divert.
+- documentation effect: `SyntaxReference.md` and `LanguageOverview.md` teach
+  natural endings and explicit diverts only. Historical mentions of the removed
+  forms stay in this changelog and diagnostics tests.
+- rationale: ink-rs is its own narrative-game DSL, not an Ink compatibility
+  layer. Removing source threads and magic terminal names simplifies authored
+  flow and keeps data-driven choices centered on the dynamic choice syntax.
+- author impact: delete `-> DONE` and `-> END` where they only ended a flow.
+  Replace source threads used to generate data-driven options with dynamic
+  choices. Replace any remaining cross-flow collection pattern with explicit
+  ordinary diverts or authored local choices.
+- tests: parser diagnostics reject the removed forms; current fixtures,
+  examples, parse snapshots, and compiled JSON snapshots no longer use source
+  thread or magic terminal syntax; integration tests cover natural endings for
+  root, knot, stitch, gather, and choice content.
+
 ## 2026-05-22: Explicit Choice Condition Boundaries
 
 - status: supported
@@ -75,9 +101,10 @@ Each entry should include:
 - ink-rs behavior: a choice marker may be followed by a dynamic binding prefix:
   `* [item in items] Text {item}` or
   `* [index, item in items] {condition}: {index}:{item}`. The iterable must be
-  an array expression. The array is evaluated and stored once before expansion;
-  each element then emits an ordinary runtime `ChoicePoint` with per-choice
-  thread state, so save/load preserves already generated dynamic choices.
+  an array expression. The array is evaluated before expansion; each element
+  emits an ordinary runtime `ChoicePoint`. Save/load records the stable replay
+  point before choice generation and regenerates choices after load, so choice
+  generation must remain replay-safe.
   Binding variables are visible in the choice condition, displayed choice text,
   selected-choice body, tags, and nested choices. Dynamic choices may use any
   choice depth marker such as `*`, `**`, or `***`, and may mix with authored
@@ -87,21 +114,47 @@ Each entry should include:
 - documentation effect: `SyntaxReference.md` documents dynamic array choices
   as the current data-driven choice syntax, keeps square brackets literal
   except for the exact dynamic-choice prefix position, and removes the old
-  thread workaround as the recommended approach. `LanguageOverview.md`
+  removed thread workaround. `LanguageOverview.md`
   mentions dynamic choices next to current flow syntax.
 - rationale: data-driven choice counts are a common host and game-state need.
   Lowering dynamic choices to an explicit runtime loop around ordinary
   `ChoicePoint`s keeps save-state behavior and fallthrough semantics aligned
   with existing choices while avoiding source-level `for` restrictions.
 - author impact: replace recursive thread helpers that only walk an array
-  to offer choices with a dynamic choice line. Keep threads or helper knots for
-  genuinely parallel flow, cross-location choice collection, or non-array
-  control flow.
+  to offer choices with a dynamic choice line. Source thread syntax has since
+  been removed; model cross-location or non-array choice generation with
+  explicit authored state and ordinary choices.
 - tests: choice integration fixtures cover mixed static/dynamic choices,
   conditional filtering, index/value bindings, nested dynamic choices that
   capture outer variables, empty arrays with fallback choices, and save/load of
   generated dynamic choices. Diagnostics fixtures reject dynamic labels and
   non-array iterables.
+
+## 2026-05-23: Choice Generation Is Replay-Safe
+
+- status: supported
+- background: save/load now restores a stable pre-choice replay point instead
+  of serializing pending generated choices. Loading a save made at a choice
+  pause regenerates static and dynamic choices.
+- ink-rs behavior: expressions that run while generating choices must be
+  replay-safe. Choice conditions, dynamic choice iterable expressions, and
+  displayed choice text reject story function calls, external function calls,
+  dynamic interface function calls, `RANDOM`, `SEED_RANDOM`, mutating
+  collection builtins, and statement-level side effects.
+- documentation effect: `SyntaxReference.md` documents replay-safe choice
+  generation and describes save/load as replaying pending choices rather than
+  storing generated choices.
+- rationale: regenerating choices after load must not duplicate host calls,
+  variable writes, random draws, output emission, or other observable
+  side effects from the first choice generation pass.
+- author impact: compute side-effectful values before the choice pause and
+  store them in variables, or run side effects in the selected-choice body.
+  Pure reads, literals, field/index access, and non-mutating builtins such as
+  `LEN`, `DICT_HAS`, `DICT_SIZE`, `DICT_KEYS`, `MIN`, `MAX`, numeric casts,
+  and `to_str` remain valid.
+- tests: diagnostics fixtures reject replay-unsafe calls in choice conditions,
+  displayed choice text, and dynamic choice iterables; save/load choice tests
+  verify choices are regenerated without serializing generated choice data.
 
 ## 2026-05-21: Array And Dict For Control Blocks
 
@@ -151,8 +204,10 @@ Each entry should include:
 - rationale: guard expressions such as `index < LEN(items) && items[index] == x`
   should not evaluate an unsafe read after the guard fails.
 - author impact: keep side effects that must always run in separate logic
-  lines or separate colon-terminated choice condition blocks. Put side effects
-  inside `&&` or `||` only when skipping them is intended.
+  lines. Choice generation contexts are replay-safe and no longer allow
+  side-effectful calls in separate colon-terminated choice condition blocks.
+  Put side effects inside `&&` or `||` only when skipping them is intended and
+  the expression is outside choice generation.
 - tests: expression and choice integration fixtures cover skipped out-of-bounds
   reads, word and symbol operators, RHS side effects when evaluation is still
   required, and eager evaluation between adjacent choice condition blocks.
@@ -455,7 +510,7 @@ Each entry should include:
   a bool switch covers both `true` and `false`.
 - documentation effect: `SyntaxReference.md` clarifies the difference
   between ordinary conditionals and switch conditionals, and documents when a
-  conditional block closes flow without an extra `-> DONE`.
+  conditional block closes control flow without extra unreachable content.
 - rationale: the parser and lowering already modeled switch conditionals, but
   analysis incorrectly rejected typed non-bool selectors and emitted loose-end
   warnings for exhaustive bool switch diverts.
@@ -477,7 +532,7 @@ Each entry should include:
   one reachable module defines `== main ==`; and source files are supplied
   explicitly instead of through `INCLUDE`.
 - documentation effect: `SyntaxReference.md` rewrites the basics,
-  diverts, functions, tunnels, threads, and advanced examples to use
+  diverts, functions, tunnels, and advanced examples to use
   module-first syntax or clearly act as fragments inside a module. It also
   removes stale sequence/shuffle tutorial examples from the maintained guide
   and clarifies that module names are unique per compilation rather than merged
@@ -568,27 +623,19 @@ Each entry should include:
 
 ## 2026-04-27: Data-Driven Choice Generation With Threads
 
-- status: supported
+- status: removed/superseded by dynamic choices
 - background: Ink uses authored choice points and threads to
   collect choices from multiple flows. It does not provide a general source
   loop that expands an arbitrary data collection into choice syntax.
-- ink-rs behavior: existing ink-rs arrays, structs, `LEN`, dynamic divert
-  target values, and thread forking can be composed to generate a runtime number
-  of choices from data. A recursive thread can walk an array and offer one
-  choice per enabled element. The selected branch can then use the element's
-  stored `->` target.
-- documentation effect: `SyntaxReference.md` now documents the recursive
-  thread pattern for dynamic data-driven choices, including why the recursion
-  starts from the last index, why each element should be copied to a local temp
-  before offering the choice, and why `<>` is needed when the displayed choice
-  text starts with a dynamic expression.
+- ink-rs behavior: this pattern is no longer supported source syntax. Use
+  dynamic choices such as `* [item in items] Text {item}` for array-backed
+  choice generation.
+- documentation effect: maintained syntax docs no longer recommend recursive
+  thread helpers.
 - rationale: this is a useful authoring pattern made possible by already
   supported language features. Documenting it avoids mistaking the lack of a
   source-level `for` loop for a hard limit on runtime choice counts.
-- author impact: replace fixed preallocated choice slots with a recursive
-  thread helper when the number of generated options should follow an array's
-  current length. Keep branch behavior in authored knots or stitches and store
-  their divert targets in the data.
+- author impact: replace recursive thread helpers with dynamic choices.
 - tests: documentation-only change; the example pattern was manually compiled
   and run with the existing local `ink_compile` and runtime artifacts, producing
   choices `A`, `B`, and `D` from a four-item array where `C` was disabled.
@@ -692,13 +739,19 @@ Each entry should include:
   choice-only square bracket syntax is removed. `READ_COUNT`, `TURNS`,
   `TURNS_SINCE`, `CHOICE_COUNT`, and `{knot}` read-count shorthand are removed;
   authors should model state explicitly with variables. Runtime multi-flow APIs
-  and multi-flow save state are removed; threads remain supported.
+  and multi-flow save state are removed; runtime-internal continuation
+  machinery is not source syntax.
 - ink-rs save behavior: save JSON is version 2 and stores only the active
-  callstack, generated choices, optional choice thread snapshots, global
-  variables, `storySeed`, `previousRandom`, `inkSaveVersion`, and
-  `inkFormatVersion`. It no longer stores `flows`, `currentFlowName`,
-  `evalStack`, `currentDivertTarget`, `visitCounts`, `turnIndices`, or
-  `turnIdx`. Version 1 saves are rejected rather than migrated.
+  continuation/callstack frames, global variables, `storySeed`,
+  `previousRandom`, `inkSaveVersion`, and `inkFormatVersion`. It no longer
+  stores generated choices, choice continuation snapshots, `flows`,
+  `currentFlowName`, `evalStack`, `currentDivertTarget`, `visitCounts`,
+  `turnIndices`, or `turnIdx`. Saves at a choice pause restore the stable
+  replay point before choice generation and regenerate pending choices after
+  load. Version 1 saves, and v2 saves containing removed fields such as
+  `currentChoices`, `choiceThreads`, `flows`, `currentFlowName`, `evalStack`,
+  `currentDivertTarget`, `visitCounts`, or `turnIndices`, are rejected rather
+  than migrated.
 - documentation effect: `SyntaxReference.md` describes explicit dynamic
   divert syntax, repeatable display-only choices, removed count/turn features,
   and minimal save-state semantics. Runtime and JSON format docs mark remaining

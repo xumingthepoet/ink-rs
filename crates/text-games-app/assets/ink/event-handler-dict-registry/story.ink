@@ -29,7 +29,6 @@ VAR one_shot: Dict<int, bool> = %{}
 -> register(10, blessing_event, false) ->
 -> print_registry ->
 -> trigger(10, 7, 4) ->
--> END
 
 == register(event_id: int, handler: interface<IEventHandler>, once: bool) ==
 ~ handlers[event_id] = handler

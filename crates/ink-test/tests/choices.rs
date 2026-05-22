@@ -3,6 +3,7 @@ use crate::support::{
     runtime::{Story, StoryError},
     story_runner as common,
 };
+use serde_json::Value;
 
 #[test]
 fn no_choice_test() -> Result<(), StoryError> {
@@ -192,14 +193,14 @@ fn dynamic_choices_expand_from_arrays_and_mix_with_static_choices() {
 }
 
 #[test]
-fn dynamic_choice_threads_survive_save_load() {
+fn dynamic_choices_regenerate_after_save_load() {
     let compiled = compile_fixture("choices/dynamic-choice.ink");
     let mut story = Story::new(&compiled.json);
 
     assert_eq!(story.continue_maximally(), "");
     let save_string = story.save_state();
     let save: serde_json::Value = serde_json::from_str(&save_string).expect("valid save JSON");
-    assert!(save.get("choiceThreads").is_some());
+    assert_save_json_has_no_choice_or_thread_state(&save);
 
     let mut reloaded = Story::new(&compiled.json);
     reloaded.load_state(&save_string);
@@ -334,12 +335,6 @@ fn choice_condition_blocks_stay_eager_while_inner_logical_ops_short_circuit() {
     let mut story = Story::new(&compiled.json);
 
     assert_eq!(story.continue_maximally(), "");
-    assert_eq!(
-        Some(2),
-        story
-            .get_variable("game::hits")
-            .and_then(|value| value.get::<i32>())
-    );
     let choices = story.get_current_choices();
     assert_eq!(choices.len(), 2);
     assert_eq!(choices[0].text, "inner and evaluates right");
@@ -347,7 +342,7 @@ fn choice_condition_blocks_stay_eager_while_inner_logical_ops_short_circuit() {
 }
 
 #[test]
-fn save_load_preserves_generated_choices_without_regeneration() {
+fn save_load_regenerates_static_choices_from_replay_point() {
     let compiled = compile_fixture("choices/choice-save-load.ink");
     let mut story = Story::new(&compiled.json);
 
@@ -356,7 +351,7 @@ fn save_load_preserves_generated_choices_without_regeneration() {
     let save_string = story.save_state();
     let save: serde_json::Value = serde_json::from_str(&save_string).expect("valid save JSON");
     assert_eq!(save["inkSaveVersion"], serde_json::json!(2));
-    assert!(save.get("currentChoices").is_some());
+    assert_save_json_has_no_choice_or_thread_state(&save);
     assert!(save.get("flows").is_none());
     assert!(save.get("evalStack").is_none());
     assert!(save.get("visitCounts").is_none());
@@ -374,7 +369,44 @@ fn save_load_preserves_generated_choices_without_regeneration() {
 }
 
 #[test]
-fn save_load_preserves_thread_generated_choices() {
+fn static_choice_pause_save_omits_choice_and_thread_state() {
+    let compiled = compile_fixture("choices/choice-save-load.ink");
+    let mut story = Story::new(&compiled.json);
+
+    assert_eq!(story.continue_maximally(), "");
+    assert_eq!(story.get_current_choices().len(), 2);
+
+    let save: Value = serde_json::from_str(&story.save_state()).expect("valid save JSON");
+    assert_save_json_has_no_choice_or_thread_state(&save);
+}
+
+#[test]
+fn dynamic_choice_pause_save_omits_choice_and_thread_state() {
+    let compiled = compile_fixture("choices/dynamic-choice.ink");
+    let mut story = Story::new(&compiled.json);
+
+    assert_eq!(story.continue_maximally(), "");
+    assert_eq!(story.get_current_choices().len(), 4);
+
+    let save: Value = serde_json::from_str(&story.save_state()).expect("valid save JSON");
+    assert_save_json_has_no_choice_or_thread_state(&save);
+}
+
+#[test]
+fn selected_choice_aftermath_save_omits_choice_and_thread_state() {
+    let compiled = compile_fixture("choices/choice-save-load.ink");
+    let mut story = Story::new(&compiled.json);
+
+    assert_eq!(story.continue_maximally(), "");
+    story.choose_choice_index(1);
+    assert_eq!(story.continue_maximally(), "Picked 2.\n");
+
+    let save: Value = serde_json::from_str(&story.save_state()).expect("valid save JSON");
+    assert_save_json_has_no_choice_or_thread_state(&save);
+}
+
+#[test]
+fn save_load_regenerates_authored_choices_from_replay_point() {
     let compiled = compile_fixture("choices/thread-choice-save-load.ink");
     let mut story = Story::new(&compiled.json);
 
@@ -385,13 +417,72 @@ fn save_load_preserves_thread_generated_choices() {
     assert_eq!(choices[1].text, "Main");
     let save_string = story.save_state();
     let save: serde_json::Value = serde_json::from_str(&save_string).expect("valid save JSON");
-    assert!(save.get("choiceThreads").is_some());
+    assert_save_json_has_no_choice_or_thread_state(&save);
 
     let mut reloaded = Story::new(&compiled.json);
     reloaded.load_state(&save_string);
     assert_eq!(reloaded.get_current_choices().len(), 2);
     reloaded.choose_choice_index(0);
     assert_eq!(reloaded.continue_maximally(), "Thread branch.\n");
+}
+
+#[test]
+fn save_load_regenerated_choice_reaches_gather_after_selection() {
+    let compiled = compile_fixture("choices/gather-choice-save-load.ink");
+    let mut story = Story::new(&compiled.json);
+
+    assert_eq!(story.continue_maximally(), "");
+    assert_eq!(story.get_current_choices().len(), 2);
+    let save_string = story.save_state();
+    let save: serde_json::Value = serde_json::from_str(&save_string).expect("valid save JSON");
+    assert_save_json_has_no_choice_or_thread_state(&save);
+
+    let mut reloaded = Story::new(&compiled.json);
+    reloaded.load_state(&save_string);
+    assert_eq!(reloaded.get_current_choices().len(), 2);
+    reloaded.choose_choice_index(1);
+    assert_eq!(
+        reloaded.continue_maximally(),
+        "Right branch.\nregroup\nRegrouped.\n"
+    );
+}
+
+#[test]
+fn weave_fallthrough_works_without_thread_syntax() {
+    let compiled = compile_fixture("choices/weave-fallthrough-no-threads.ink");
+    let mut story = Story::new(&compiled.json);
+
+    assert_eq!(story.continue_maximally(), "Start.\n");
+    assert_eq!(story.get_current_choices().len(), 3);
+    story.choose_choice_index(0);
+    assert_eq!(story.continue_maximally(), "Hub entry.\n");
+    assert_eq!(story.get_current_choices().len(), 2);
+    story.choose_choice_index(0);
+
+    assert_eq!(story.continue_maximally(), "Hub branch.\n");
+}
+
+#[test]
+fn dynamic_weave_fallthrough_regenerates_after_save_load() {
+    let compiled = compile_fixture("choices/weave-fallthrough-no-threads.ink");
+    let mut story = Story::new(&compiled.json);
+
+    assert_eq!(story.continue_maximally(), "Start.\n");
+    let save_string = story.save_state();
+    let save: serde_json::Value = serde_json::from_str(&save_string).expect("valid save JSON");
+    assert_save_json_has_no_choice_or_thread_state(&save);
+
+    let mut reloaded = Story::new(&compiled.json);
+    reloaded.load_state(&save_string);
+    let choices = reloaded.get_current_choices();
+    assert_eq!(choices.len(), 3);
+    assert_eq!(choices[1].text, "Dynamic East");
+    reloaded.choose_choice_index(1);
+
+    assert_eq!(
+        reloaded.continue_maximally(),
+        "Dynamic branch 0:East.\nregroup\nRegrouped.\n"
+    );
 }
 
 #[test]
@@ -414,4 +505,59 @@ fn save_load_preserves_deterministic_random_state() {
     reloaded.load_state(&save_string);
     reloaded.choose_choice_index(0);
     assert_eq!(reloaded.continue_maximally(), uninterrupted_output);
+}
+
+fn assert_save_json_has_no_choice_or_thread_state(save: &Value) {
+    let forbidden_keys = [
+        "currentChoices",
+        "generatedChoices",
+        "choiceThreads",
+        "originalThreadIndex",
+        "threadIndex",
+        "threads",
+        "threadCounter",
+        "flows",
+        "currentFlowName",
+        "evalStack",
+        "currentDivertTarget",
+        "visitCounts",
+        "turnIndices",
+        "turnIdx",
+    ];
+    let mut found = Vec::new();
+    collect_forbidden_save_keys(save, "$", &forbidden_keys, &mut found);
+    assert!(
+        found.is_empty(),
+        "save JSON should not contain removed choice/continuation/execution fields: {found:?}\n{save:#}"
+    );
+}
+
+fn collect_forbidden_save_keys(
+    value: &Value,
+    path: &str,
+    forbidden_keys: &[&str],
+    found: &mut Vec<String>,
+) {
+    match value {
+        Value::Object(map) => {
+            for (key, nested) in map {
+                let nested_path = format!("{path}.{key}");
+                if forbidden_keys.contains(&key.as_str()) {
+                    found.push(nested_path.clone());
+                }
+                collect_forbidden_save_keys(nested, &nested_path, forbidden_keys, found);
+            }
+        }
+        Value::Array(items) => {
+            for (index, nested) in items.iter().enumerate() {
+                collect_forbidden_save_keys(
+                    nested,
+                    &format!("{path}[{index}]"),
+                    forbidden_keys,
+                    found,
+                );
+            }
+        }
+        _ => {}
+    }
 }

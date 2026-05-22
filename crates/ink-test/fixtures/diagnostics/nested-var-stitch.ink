@@ -6,4 +6,3 @@
 == knot ==
 = stitch
 VAR score: int = 0
--> DONE

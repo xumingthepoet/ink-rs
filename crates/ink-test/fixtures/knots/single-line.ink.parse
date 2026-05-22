@@ -1,10 +1,7 @@
 Story
   Weave(baseIndent=0)
-    Gather(name=null, depth=1)
-    Divert(target="-> DONE", empty=false, tunnel=false, thread=false)
   Module(name="game")
     Flow(level=Knot, name="main", function=false)
       Weave(baseIndent=0)
         Text("Hello, world!")
         Text("\n")
-        Divert(target="-> END", empty=false, tunnel=false, thread=false)

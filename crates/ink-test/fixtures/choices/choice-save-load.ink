@@ -5,8 +5,6 @@ VAR picked: int = 0
 * First
     ~ picked = 1
     Picked {picked}.
-    -> DONE
 * Second
     ~ picked = 2
     Picked {picked}.
-    -> DONE

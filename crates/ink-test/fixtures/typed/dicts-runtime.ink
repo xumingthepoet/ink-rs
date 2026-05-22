@@ -40,7 +40,6 @@ VAR sheet: Sheet = %Sheet{ scores: %{"ada": 10} }
 {name_keys[0]}|{LEN(name_keys)}
 ~ DICT_REMOVE(nested["ada"], 1)
 {DICT_HAS(nested["ada"], 1)}|{DICT_SIZE(nested["ada"])}
--> DONE
 
 == function sum_scores(values: Dict<string, int>) => int ==
 ~ return values["ada"] + values["bea"]

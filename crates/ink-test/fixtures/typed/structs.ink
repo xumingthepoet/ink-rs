@@ -15,4 +15,3 @@ VAR copy: Player = original
 == main ==
 ~ copy.stats.hp = 3
 {original.stats.hp}|{copy.stats.hp}|{original == copy}|{original.name}
--> DONE

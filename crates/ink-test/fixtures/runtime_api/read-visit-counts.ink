@@ -13,7 +13,6 @@ VAR x: int = 0
 }
 
 == two ==
--> END
 
 = s2
 ~ x = x + 1

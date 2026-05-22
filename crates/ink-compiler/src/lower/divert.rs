@@ -93,13 +93,7 @@ pub(super) fn push_divert_with_context(
         content.push(RuntimeObject::ControlCommand(ControlCommand::EvalEnd));
     }
 
-    if divert.is_thread() {
-        content.push(RuntimeObject::ControlCommand(ControlCommand::StartThread));
-    }
-
     match divert.target() {
-        DivertTarget::Done => content.push(RuntimeObject::ControlCommand(ControlCommand::Done)),
-        DivertTarget::End => content.push(RuntimeObject::ControlCommand(ControlCommand::End)),
         DivertTarget::Dynamic(_) => {
             unreachable!("dynamic divert targets return before static lowering")
         }
@@ -180,9 +174,6 @@ fn push_dynamic_divert_with_context(
     ));
     content.push(RuntimeObject::ControlCommand(ControlCommand::EvalEnd));
 
-    if divert.is_thread() {
-        content.push(RuntimeObject::ControlCommand(ControlCommand::StartThread));
-    }
     content.push(runtime_divert(
         DYNAMIC_DIVERT_TARGET_TEMP.to_string(),
         true,
@@ -233,8 +224,6 @@ pub(super) fn lower_tunnel_onwards_into(
             DivertTarget::QualifiedPath(target) => {
                 lower_tunnel_onwards_path_target_into(content, target.as_str(), context);
             }
-            DivertTarget::Done => content.push(RuntimeObject::DivertTarget("DONE".to_string())),
-            DivertTarget::End => content.push(RuntimeObject::DivertTarget("END".to_string())),
             DivertTarget::Empty => content.push(RuntimeObject::Void),
         }
     } else {
@@ -316,9 +305,7 @@ fn static_divert_target_name(target: &DivertTarget) -> Option<&str> {
     match target {
         DivertTarget::Path(target) => Some(target),
         DivertTarget::QualifiedPath(target) => Some(target.as_str()),
-        DivertTarget::Dynamic(_) | DivertTarget::Done | DivertTarget::End | DivertTarget::Empty => {
-            None
-        }
+        DivertTarget::Dynamic(_) | DivertTarget::Empty => None,
     }
 }
 

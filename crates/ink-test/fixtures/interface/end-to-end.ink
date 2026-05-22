@@ -41,7 +41,6 @@ VAR value: int = 3
 === module left implements IItem ===
 == target(amount: int) ==
 Left target {amount}.
--> END
 
 == function score(amount: int) => int ==
 ~ return amount + 10
@@ -49,7 +48,6 @@ Left target {amount}.
 === module right implements IItem, ILabel ===
 == target(amount: int) ==
 Right target {amount}.
--> END
 
 == function score(amount: int) => int ==
 ~ return amount + 20

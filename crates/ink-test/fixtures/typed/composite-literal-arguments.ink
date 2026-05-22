@@ -42,14 +42,12 @@ Onward {scores["ada"] + player.hp}.
 -> {{route}::target}(%{"ada": 40}, %types::Player{ hp: 5 }, %{})
 
 == after_override ==
--> DONE
 
 === module impl implements IComposite ===
 FROM types IMPORT Player
 
 == target(scores: Dict<string, int>, player: types::Player, empty_scores: Dict<string, int>) ==
 Target {scores["ada"] + player.hp}.
--> END
 
 == function score(scores: Dict<string, int>, player: types::Player, empty_scores: Dict<string, int>) => int ==
 ~ return scores["ada"] + player.hp

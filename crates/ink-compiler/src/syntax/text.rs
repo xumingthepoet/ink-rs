@@ -52,6 +52,29 @@ pub(super) fn parse_text_line(parser: &mut RuleParser<'_>) -> Option<Vec<Object>
         return None;
     }
 
+    if let Some(char_offset) = find_removed_thread_syntax_char_offset(&text) {
+        parser.diagnostic(super::divert::removed_thread_syntax_diagnostic(
+            SourceSpan::new(
+                text_span.source_name.clone(),
+                text_span.line,
+                text_span.column + char_offset,
+            ),
+        ));
+        return None;
+    }
+
+    if let Some((char_offset, target)) = find_removed_terminal_divert(&text) {
+        parser.diagnostic(super::divert::removed_terminal_divert_diagnostic(
+            SourceSpan::new(
+                text_span.source_name.clone(),
+                text_span.line,
+                text_span.column + char_offset,
+            ),
+            target,
+        ));
+        return None;
+    }
+
     let is_tag_line = text.starts_with('#');
     let mut objects = parse_inline_content(&text, &span)?;
     if objects.first().is_some_and(
@@ -140,6 +163,25 @@ fn find_unsupported_inline_sequence_char_offset(text: &str) -> Option<usize> {
     }
 
     None
+}
+
+fn find_removed_thread_syntax_char_offset(text: &str) -> Option<usize> {
+    scan::find_top_level_token_with_options(text, &["<-"], scan::ScanOptions::inline_tokens())
+        .map(|(byte_index, _)| text[..byte_index].chars().count())
+}
+
+fn find_removed_terminal_divert(text: &str) -> Option<(usize, &'static str)> {
+    scan::top_level_token_matches_with_options(
+        text,
+        &["->->", "->"],
+        scan::ScanOptions::inline_tokens(),
+    )
+    .into_iter()
+    .filter(|(_, token)| *token == "->")
+    .find_map(|(byte_index, _)| {
+        super::divert::removed_terminal_divert_target_in_source(&text[byte_index..])
+            .map(|target| (text[..byte_index].chars().count(), target))
+    })
 }
 
 fn is_unsupported_inline_sequence(source: &str) -> bool {

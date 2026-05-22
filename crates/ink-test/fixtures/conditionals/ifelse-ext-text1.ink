@@ -4,4 +4,3 @@
 This is text 1.
 * Continue
     This is the end.
-    -> DONE

@@ -1,7 +1,5 @@
 Story
   Weave(baseIndent=0)
-    Gather(name=null, depth=1)
-    Divert(target="-> DONE", empty=false, tunnel=false, thread=false)
   Module(name="game")
     Weave(baseIndent=0)
       VariableAssignment(name="x", global=true, temp=false, type=int)
@@ -21,7 +19,6 @@ Story
           VariableReference(y)
         Text(".")
         Text("\n")
-        Divert(target="-> END", empty=false, tunnel=false, thread=false)
     Flow(level=Knot, name="derp", function=true)
       Weave(baseIndent=0)
         VariableAssignment(name="x", global=false, temp=false)

@@ -11,8 +11,6 @@ VAR done: bool = true
 
 == finish ==
 Finished.
--> END
 
 == fail ==
 Failed.
--> END

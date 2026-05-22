@@ -7,4 +7,3 @@ VAR value: int = 1
 {value[0]}
 ~ scores[1] = 5
 ~ value[0] = 2
--> DONE

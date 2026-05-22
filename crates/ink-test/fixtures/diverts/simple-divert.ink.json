@@ -1,1 +1,1 @@
-{"inkVersion":1,"root":[{"->":"game.main"},"done",{"game":[{"hurry_home":["^We hurried home to Savile Row as fast as we could. ","end","\n",null],"main":["^We arrived into London at 9.45pm exactly.","\n",{"->":"game.hurry_home"},null]}]}]}
+{"inkVersion":1,"root":[{"->":"game.main"},"done",{"game":[{"hurry_home":["^We hurried home to Savile Row as fast as we could.","\n","done",null],"main":["^We arrived into London at 9.45pm exactly.","\n",{"->":"game.hurry_home"},null]}]}]}

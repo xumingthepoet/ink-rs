@@ -14,4 +14,3 @@ VAR nested: Stats = %Stats{ hp: 3 }
 
 == main ==
 {full}|{partial}|{nested}
--> DONE

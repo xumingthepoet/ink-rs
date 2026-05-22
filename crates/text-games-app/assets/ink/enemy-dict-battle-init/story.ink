@@ -34,7 +34,6 @@ Battle begins with {LEN(enemy_ids)} enemies.
 
 == enemy_summary(enemy_ids: int[], index: int) ==
 { if index >= LEN(enemy_ids):
-    -> END
 - else:
     ~ temp enemy_id: int = enemy_ids[index]
     ~ temp def: EnemyStatic = enemy_defs[enemy_id]

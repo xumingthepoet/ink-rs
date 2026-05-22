@@ -15,7 +15,5 @@ at the door. It was open.
 I stood up and...
 * go left
     Left.
-    -> DONE
 * go right
     Right.
-    -> DONE

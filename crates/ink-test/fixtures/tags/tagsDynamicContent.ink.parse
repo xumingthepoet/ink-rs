@@ -1,7 +1,5 @@
 Story
   Weave(baseIndent=0)
-    Gather(name=null, depth=1)
-    Divert(target="-> DONE", empty=false, tunnel=false, thread=false)
   Module(name="game")
     Weave(baseIndent=0)
       VariableAssignment(name="colour", global=true, temp=false, type=string)
@@ -18,4 +16,3 @@ Story
         Text(".jpg")
         Tag(start=false, inChoice=false)
         Text("\n")
-        Divert(target="-> END", empty=false, tunnel=false, thread=false)

@@ -15,6 +15,5 @@ VAR label: string = "x"
 
 === module left implements IItem ===
 == target(amount: int) ==
--> END
 == function score() => int ==
 ~ return 1

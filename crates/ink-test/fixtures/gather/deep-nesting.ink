@@ -6,7 +6,6 @@ Tell us a tale, Captain!"
     -> tale_1
 * "No, it's past your bed-time."
     The crew groaned.
-    -> DONE
 
 == tale_1 ==
 Once there was a ship.
@@ -28,4 +27,3 @@ The island had a cave.
 * And?
     "...Tell us a tale Captain!"
     To a man, the crew began to yawn.
-    -> DONE
