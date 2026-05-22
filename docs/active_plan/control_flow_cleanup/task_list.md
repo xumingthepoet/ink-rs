@@ -6,18 +6,24 @@ Status key:
 
 - `[ ]` not started
 - `[~]` in progress
-- `[>]` implemented and committed, awaiting review
+- `[>]` implemented and validated, awaiting owner review
 - `[x]` reviewed and complete
 - `[!]` blocked
 
 Task rules:
 
 - Complete tasks in order unless the project owner explicitly reprioritizes.
-- Every implementation task needs focused tests, focused validation, and `make
-  gate` before it can be marked `[>]`.
-- Commit implementation code separately from task-list progress records.
-- A task becomes `[x]` only after review is complete and this task list is
-  updated in a separate completion commit.
+- Every implementation task needs focused tests and focused validation before it
+  can be marked `[>]` or `[x]`.
+- Record changed files, validation result, review state, remaining risk, and any
+  optional checkpoint commit inside the relevant task section.
+- The implementer may create checkpoint commits when the temporary diff becomes
+  too large or risky, but task completion does not require a commit.
+- Before this active plan is pushed or considered landed, combine all commits
+  belonging to this active plan into one final active-plan commit unless the
+  project owner asks for a different history shape.
+- `make gate` is required before final closeout. It may also be run earlier at
+  milestone boundaries or when focused validation is not enough.
 
 ## [ ] Task 01: Remove Source Thread Syntax From The Parser
 
@@ -39,10 +45,15 @@ generic parse failure with no removal message.
 Modification boundaries: parser, diagnostics, parser tests, and syntax update
 notes only.
 
-Validation: run focused parser/diagnostic tests for thread syntax, then `make
-gate`.
+Validation: run focused parser/diagnostic tests for thread syntax.
 
-Commit record: pending.
+Progress ledger:
+
+- Changed files: pending
+- Validation result: pending
+- Owner review: pending
+- Remaining risk: pending
+- Checkpoint commits: none
 
 ## [ ] Task 02: Remove Magic `DONE` And `END` Divert Targets
 
@@ -62,9 +73,15 @@ do not treat all uppercase names as magic.
 
 Modification boundaries: parser, semantic analysis, diagnostics, tests.
 
-Validation: run focused divert diagnostic tests, then `make gate`.
+Validation: run focused divert diagnostic tests.
 
-Commit record: pending.
+Progress ledger:
+
+- Changed files: pending
+- Validation result: pending
+- Owner review: pending
+- Remaining risk: pending
+- Checkpoint commits: none
 
 ## [ ] Task 03: Remove Parsed-Model Thread Flags
 
@@ -84,10 +101,15 @@ to preserve old names.
 Modification boundaries: compiler parsed model, semantic analysis, lowering
 inputs, tests.
 
-Validation: run compiler unit tests touching parsed model and lowering, then
-`make gate`.
+Validation: run compiler unit tests touching parsed model and lowering.
 
-Commit record: pending.
+Progress ledger:
+
+- Changed files: pending
+- Validation result: pending
+- Owner review: pending
+- Remaining risk: pending
+- Checkpoint commits: none
 
 ## [ ] Task 04: Define Natural End For Knots And Stitches
 
@@ -108,9 +130,15 @@ tests pass.
 Modification boundaries: semantic analysis, lowering, runtime execution for
 natural end, tests.
 
-Validation: run focused flow-ending tests, then `make gate`.
+Validation: run focused flow-ending tests.
 
-Commit record: pending.
+Progress ledger:
+
+- Changed files: pending
+- Validation result: pending
+- Owner review: pending
+- Remaining risk: pending
+- Checkpoint commits: none
 
 ## [ ] Task 05: Stop Emitting Removed Source Terminals
 
@@ -131,9 +159,15 @@ without a documented format decision.
 Modification boundaries: compiler lowering, format emission tests, format docs
 if behavior changes.
 
-Validation: run compiler snapshot tests and format tests, then `make gate`.
+Validation: run compiler snapshot tests and format tests.
 
-Commit record: pending.
+Progress ledger:
+
+- Changed files: pending
+- Validation result: pending
+- Owner review: pending
+- Remaining risk: pending
+- Checkpoint commits: none
 
 ## [ ] Task 06: Rewrite Source Fixtures And Examples
 
@@ -151,9 +185,15 @@ language behavior change in test names or surrounding docs.
 
 Modification boundaries: fixtures, expected snapshots, example stories.
 
-Validation: run conformance fixtures and compiler snapshots, then `make gate`.
+Validation: run conformance fixtures and compiler snapshots.
 
-Commit record: pending.
+Progress ledger:
+
+- Changed files: pending
+- Validation result: pending
+- Owner review: pending
+- Remaining risk: pending
+- Checkpoint commits: none
 
 ## [ ] Task 07: Update Current Syntax Documentation
 
@@ -173,9 +213,15 @@ diagnostics, and examples.
 
 Modification boundaries: maintained docs and diagnostics wording if needed.
 
-Validation: run doc text searches for removed syntax and `make gate`.
+Validation: run doc text searches for removed syntax.
 
-Commit record: pending.
+Progress ledger:
+
+- Changed files: pending
+- Validation result: pending
+- Owner review: pending
+- Remaining risk: pending
+- Checkpoint commits: none
 
 ## [ ] Task 08: Pin The Minimal Save-State Contract With Failing Tests
 
@@ -198,7 +244,13 @@ Modification boundaries: runtime tests and save-state test helpers.
 Validation: run the focused new save-state tests and record the expected
 failure before implementation continues.
 
-Commit record: pending.
+Progress ledger:
+
+- Changed files: pending
+- Validation result: pending
+- Owner review: pending
+- Remaining risk: pending
+- Checkpoint commits: none
 
 ## [ ] Task 09: Define The Choice Replay Save Point
 
@@ -218,9 +270,15 @@ Forbidden shortcuts: do not keep hidden serialized choices under renamed fields.
 Modification boundaries: runtime story state, save/load, choice generation
 tests.
 
-Validation: run focused save/load choice replay tests, then `make gate`.
+Validation: run focused save/load choice replay tests.
 
-Commit record: pending.
+Progress ledger:
+
+- Changed files: pending
+- Validation result: pending
+- Owner review: pending
+- Remaining risk: pending
+- Checkpoint commits: none
 
 ## [ ] Task 10: Enforce Deterministic Choice Generation
 
@@ -244,7 +302,13 @@ checked statically, tests.
 Validation: run focused side-effect and save/load replay tests, then `make
 gate`.
 
-Commit record: pending.
+Progress ledger:
+
+- Changed files: pending
+- Validation result: pending
+- Owner review: pending
+- Remaining risk: pending
+- Checkpoint commits: none
 
 ## [ ] Task 11: Preserve Dynamic Choice Bindings Across Replay
 
@@ -265,9 +329,15 @@ aftermath work.
 Modification boundaries: compiler dynamic choice lowering, runtime choice
 generation and selection, tests.
 
-Validation: run dynamic choice save/load tests, then `make gate`.
+Validation: run dynamic choice save/load tests.
 
-Commit record: pending.
+Progress ledger:
+
+- Changed files: pending
+- Validation result: pending
+- Owner review: pending
+- Remaining risk: pending
+- Checkpoint commits: none
 
 ## [ ] Task 12: Remove Choice Thread Snapshot Serialization
 
@@ -288,9 +358,15 @@ obvious field.
 Modification boundaries: runtime choice model, save-state writer/reader,
 runtime tests.
 
-Validation: run runtime choice and save/load suites, then `make gate`.
+Validation: run runtime choice and save/load suites.
 
-Commit record: pending.
+Progress ledger:
+
+- Changed files: pending
+- Validation result: pending
+- Owner review: pending
+- Remaining risk: pending
+- Checkpoint commits: none
 
 ## [ ] Task 13: Remove Generated Choice Serialization
 
@@ -309,9 +385,15 @@ version handling.
 
 Modification boundaries: runtime save-state schema, reader/writer, tests, docs.
 
-Validation: run save-state compatibility tests and `make gate`.
+Validation: run save-state compatibility tests.
 
-Commit record: pending.
+Progress ledger:
+
+- Changed files: pending
+- Validation result: pending
+- Owner review: pending
+- Remaining risk: pending
+- Checkpoint commits: none
 
 ## [ ] Task 14: Document And Version The Save-State Break
 
@@ -330,9 +412,15 @@ incompatible.
 Modification boundaries: runtime docs, save-state fixtures, version constants,
 tests.
 
-Validation: run save-state docs/schema tests and `make gate`.
+Validation: run save-state docs/schema tests.
 
-Commit record: pending.
+Progress ledger:
+
+- Changed files: pending
+- Validation result: pending
+- Owner review: pending
+- Remaining risk: pending
+- Checkpoint commits: none
 
 ## [ ] Task 15: Rename Runtime `Thread` To Continuation Concepts
 
@@ -350,9 +438,15 @@ focused tests.
 
 Modification boundaries: runtime internals, runtime docs, tests.
 
-Validation: run runtime unit tests and `make gate`.
+Validation: run runtime unit tests.
 
-Commit record: pending.
+Progress ledger:
+
+- Changed files: pending
+- Validation result: pending
+- Owner review: pending
+- Remaining risk: pending
+- Checkpoint commits: none
 
 ## [ ] Task 16: Flatten Runtime Callstack Shape
 
@@ -372,9 +466,15 @@ runtime state.
 
 Modification boundaries: runtime callstack, execution state, save/load, tests.
 
-Validation: run runtime execution and save/load tests, then `make gate`.
+Validation: run runtime execution and save/load tests.
 
-Commit record: pending.
+Progress ledger:
+
+- Changed files: pending
+- Validation result: pending
+- Owner review: pending
+- Remaining risk: pending
+- Checkpoint commits: none
 
 ## [ ] Task 17: Quarantine Historical Compiled `StartThread` Handling
 
@@ -397,7 +497,13 @@ format docs.
 Validation: run format compatibility and compiler emission tests, then `make
 gate`.
 
-Commit record: pending.
+Progress ledger:
+
+- Changed files: pending
+- Validation result: pending
+- Owner review: pending
+- Remaining risk: pending
+- Checkpoint commits: none
 
 ## [ ] Task 18: Rename Choice Continuation Fields
 
@@ -418,7 +524,13 @@ Modification boundaries: runtime choice model, tests, docs.
 Validation: run runtime choice tests, thread terminology searches, and `make
 gate`.
 
-Commit record: pending.
+Progress ledger:
+
+- Changed files: pending
+- Validation result: pending
+- Owner review: pending
+- Remaining risk: pending
+- Checkpoint commits: none
 
 ## [ ] Task 19: Rename Runtime `Flow` Terminology
 
@@ -436,9 +548,15 @@ accurately represent current source syntax without a reason.
 
 Modification boundaries: runtime internals, architecture docs, tests.
 
-Validation: run runtime tests and `make gate`.
+Validation: run runtime tests.
 
-Commit record: pending.
+Progress ledger:
+
+- Changed files: pending
+- Validation result: pending
+- Owner review: pending
+- Remaining risk: pending
+- Checkpoint commits: none
 
 ## [ ] Task 20: Remove Multi-Flow Save-State Shape
 
@@ -456,9 +574,15 @@ values.
 
 Modification boundaries: runtime save-state schema, tests, docs.
 
-Validation: run save-state tests and `make gate`.
+Validation: run save-state tests.
 
-Commit record: pending.
+Progress ledger:
+
+- Changed files: pending
+- Validation result: pending
+- Owner review: pending
+- Remaining risk: pending
+- Checkpoint commits: none
 
 ## [ ] Task 21: Update Public Runtime Errors And Docs
 
@@ -478,7 +602,13 @@ Modification boundaries: runtime docs, error strings, docs tests if present.
 Validation: run runtime tests, text searches for removed wording, and `make
 gate`.
 
-Commit record: pending.
+Progress ledger:
+
+- Changed files: pending
+- Validation result: pending
+- Owner review: pending
+- Remaining risk: pending
+- Checkpoint commits: none
 
 ## [ ] Task 22: Refresh Compiler Snapshots And Integration Fixtures
 
@@ -497,9 +627,15 @@ Forbidden shortcuts: do not bless unrelated snapshot churn.
 Modification boundaries: compiler snapshots, integration fixtures,
 conformance outputs.
 
-Validation: run compiler snapshot and conformance suites, then `make gate`.
+Validation: run compiler snapshot and conformance suites.
 
-Commit record: pending.
+Progress ledger:
+
+- Changed files: pending
+- Validation result: pending
+- Owner review: pending
+- Remaining risk: pending
+- Checkpoint commits: none
 
 ## [ ] Task 23: Update Compiled-Story Format Documentation
 
@@ -520,9 +656,15 @@ runtime behavior.
 Modification boundaries: format docs and related tests if docs mention schema
 versions.
 
-Validation: run doc searches and `make gate`.
+Validation: run doc searches.
 
-Commit record: pending.
+Progress ledger:
+
+- Changed files: pending
+- Validation result: pending
+- Owner review: pending
+- Remaining risk: pending
+- Checkpoint commits: none
 
 ## [ ] Task 24: Remove Thread Syntax From Diagnostics Fixtures
 
@@ -539,9 +681,15 @@ Forbidden shortcuts: do not leave ignored tests for thread syntax.
 
 Modification boundaries: diagnostics fixtures, snapshots, docs.
 
-Validation: run diagnostics tests and `make gate`.
+Validation: run diagnostics tests.
 
-Commit record: pending.
+Progress ledger:
+
+- Changed files: pending
+- Validation result: pending
+- Owner review: pending
+- Remaining risk: pending
+- Checkpoint commits: none
 
 ## [ ] Task 25: Verify Fallthrough And Weave Behavior Without Threads
 
@@ -562,7 +710,13 @@ fixes.
 Validation: run flow, weave, dynamic choice, and save/load tests, then `make
 gate`.
 
-Commit record: pending.
+Progress ledger:
+
+- Changed files: pending
+- Validation result: pending
+- Owner review: pending
+- Remaining risk: pending
+- Checkpoint commits: none
 
 ## [ ] Task 26: Audit Save JSON For Forbidden Fields
 
@@ -582,9 +736,15 @@ new object fields.
 
 Modification boundaries: runtime save-state test helpers and fixtures.
 
-Validation: run the save JSON audit tests and `make gate`.
+Validation: run the save JSON audit tests.
 
-Commit record: pending.
+Progress ledger:
+
+- Changed files: pending
+- Validation result: pending
+- Owner review: pending
+- Remaining risk: pending
+- Checkpoint commits: none
 
 ## [ ] Task 27: Full Documentation Consistency Pass
 
@@ -605,9 +765,15 @@ text search.
 Modification boundaries: docs, comments, diagnostics text, tests where wording
 is asserted.
 
-Validation: run text searches, docs-related tests if present, and `make gate`.
+Validation: run text searches and docs-related tests if present.
 
-Commit record: pending.
+Progress ledger:
+
+- Changed files: pending
+- Validation result: pending
+- Owner review: pending
+- Remaining risk: pending
+- Checkpoint commits: none
 
 ## [ ] Task 28: Final Gate And Plan Closeout
 
@@ -628,4 +794,10 @@ Modification boundaries: active/finished plan docs and final status notes.
 
 Validation: run `make gate`.
 
-Commit record: pending.
+Progress ledger:
+
+- Changed files: pending
+- Validation result: pending
+- Owner review: pending
+- Remaining risk: pending
+- Checkpoint commits: none

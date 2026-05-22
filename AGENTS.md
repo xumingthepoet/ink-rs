@@ -85,10 +85,15 @@ defined by this repository.
 - Avoid broad unrelated edits when working on compiler or language behavior.
 - Do not automatically create or switch branches. Stay on the current branch
   unless the project owner explicitly asks for a branch change.
-- When asked to implement an approved plan, active plan task, or issue fix,
-  commit the successful, validated change by default. Stage only related files,
-  preserve unrelated edits, and skip the commit if validation fails or the owner
-  explicitly asks not to commit.
+- When asked to implement an approved plan, active plan task, or issue fix
+  outside an active plan, commit the successful, validated change by default.
+  Stage only related files, preserve unrelated edits, and skip the commit if
+  validation fails or the owner explicitly asks not to commit.
+- During an active plan, use the active plan task list as the durable progress
+  ledger. Let the implementer decide when optional checkpoint commits are useful
+  to avoid an oversized temporary diff or preserve a recovery point. Before the
+  active plan is pushed or considered landed, combine active-plan commits into
+  one final commit unless the owner asks for a different history shape.
 - Use `active plan` terminology consistently. Do not create or reference stale
   aliases for the active-plan directory or concept.
 - Store active implementation plans under `docs/active_plan/`. When a plan is

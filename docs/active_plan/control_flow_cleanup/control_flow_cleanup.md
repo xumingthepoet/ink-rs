@@ -87,9 +87,11 @@ without corresponding code and documentation changes.
 ## Validation Strategy
 
 Each implementation task must add or update focused tests for its behavior and
-then pass the focused command listed in the task. A task may not be marked ready
-for review until `make gate` passes, unless the task record documents a concrete
-external blocker.
+then pass the focused command listed in the task. The task ledger records
+changed files, validation, review state, remaining risks, and optional
+checkpoint commits. `make gate` is required before the active plan is completed,
+and may be run earlier at milestone boundaries or whenever accumulated changes
+need wider coverage.
 
 The final closeout must show that:
 

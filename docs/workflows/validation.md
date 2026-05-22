@@ -49,8 +49,19 @@ unit-test markers.
 
 ## Required Coverage
 
+For ordinary changes and active-plan tasks, the minimum required validation
+before marking a task done is focused validation that covers the changed
+surface. For active plans, record the focused command and result in the active
+plan task ledger.
+
+`make gate` is required before an active plan is completed, before the final
+active-plan commit is landed, and whenever repository policy or the project
+owner explicitly asks for the full gate. It is recommended at active-plan
+milestone boundaries or when accumulated changes make focused validation
+insufficient.
+
 For the current compiled-story format refactor, the minimum required validation
-before marking a change done is:
+before the active plan is finished is:
 
 - focused tests that cover the changed format data, JSON serialization, JSON
   deserialization, compiler output, or runtime loading behavior

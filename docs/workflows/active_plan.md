@@ -4,6 +4,10 @@ Use an active plan when a change is large enough that implementation order,
 review checkpoints, and durable task state matter. Ordinary small changes can
 use normal implementation commits without creating an active plan.
 
+Active plans are goal-driven, not commit-driven. When a project goal is active,
+use that goal as the top-level marker for completing the active plan. Use the
+active plan task list as the durable progress ledger below the goal.
+
 ## Location
 
 - Store active implementation plans under `docs/active_plan/`.
@@ -21,6 +25,7 @@ continue the current project goal from repository state and durable notes.
 
 Active plan directories may include a progress file. Keep that progress file
 synchronized while development proceeds, following the plan's own convention.
+If no separate progress file exists, keep progress inside the task list itself.
 
 ## Task List Requirements
 
@@ -32,16 +37,18 @@ synchronized while development proceeds, following the plan's own convention.
 - Do not write task lists as one-line task tables. Each task must have its own
   section with enough detail for another implementer to execute it without
   guessing: goal, implementation method, acceptance criteria, forbidden
-  shortcuts, modification boundaries, validation commands, and commit record.
+  shortcuts, modification boundaries, validation commands, progress ledger
+  fields, and optional checkpoint commit notes.
 - The first non-blank line of every task list must be a progress indicator in
   `Progress: X/N` form.
 - Every task must be represented by a status marker in its task heading, such
   as `### [ ] Task 01: ...`. Do not rely only on table status columns.
 - Use these task heading markers: `[ ]` pending, `[~]` in progress, `[>]`
-  waiting review, `[x]` complete, and `[!]` blocked.
-- `[>]` means the implementation commit exists after focused validation and
-  `make gate`, and the next required work is reviewing that commit plus any
-  fixes.
+  implemented and validated but waiting owner review, `[x]` complete, and `[!]`
+  blocked.
+- `[>]` does not require a commit. It means the implementation is present in the
+  working tree or in optional checkpoint commits, focused validation has passed,
+  and the next required work is owner review plus any fixes.
 - Group related tasks under milestone sections so parser, analysis, lowering,
   runtime, fixture, and documentation work are easy to navigate.
 - Prefer task lists with more than 20-25 tasks and fewer than 100 tasks. Split
@@ -61,27 +68,57 @@ to review safely. Prefer a cohesive vertical slice that adds tests,
 implementation, diagnostics, docs, and migration updates together when those
 pieces are required for the behavior to be correct.
 
-## Validation And Commit Flow
+## Progress Ledger
+
+The task list is the progress tool below commit granularity. Keep it useful for
+LLM continuation after context loss.
+
+Each task should record, inside that task section:
+
+- changed files or directories
+- focused validation commands and results
+- owner review state when review is needed
+- remaining risks or follow-up notes
+- optional checkpoint commit hashes, when checkpoint commits exist
+
+Do not append separate running commentary after the task list. Put durable
+execution state into the relevant task section or into the plan's explicit
+progress file.
+
+## Validation And Completion Flow
 
 - Every active-plan task must pass focused validation relevant to the changed
-  surface and then `make gate` before its implementation commit can be treated
-  as waiting review.
+  surface before it can be marked `[>]` or `[x]`.
+- `make gate` is required before finishing the active plan. It may also be run
+  at milestone boundaries or whenever the implementer judges that accumulated
+  changes need wider coverage.
 - Do not add documentation-only or read-only exceptions to task completion,
   except for the final plan closeout task after implementation is already
   validated.
 - Keep the progress counter, status key, acceptance conditions, forbidden
-  shortcuts, and modification boundaries in the task list itself.
-- Update task status and progress only after validation has passed.
-- Record validation and commit metadata inside the relevant task section. Do
-  not append separate notes, logs, journals, or running commentary after the
-  task list.
-- Commit implementation code separately from task-list progress records.
-- After implementation validation passes, commit the code and move the task to
-  `[>]` waiting review.
-- The next task-list action after `[>]` is to review that implementation commit,
-  fix issues in follow-up code commits if needed, rerun focused validation and
-  `make gate`, then mark the task `[x]`, update `Progress: X/N`, and commit the
-  completion record separately.
-- Do not start the next implementation task until the prior task has passed
-  review, any fixes have been committed, and the task-list completion record
-  has been committed.
+  shortcuts, modification boundaries, and ledger fields in the task list itself.
+- Update task status and progress only after the required focused validation has
+  passed or the blocking condition is recorded.
+- A task can move from `[~]` directly to `[x]` when implementation, focused
+  validation, task-ledger updates, and any required owner review are complete.
+- A task can move to `[>]` when implementation and focused validation are done
+  but owner review is still needed.
+- Do not start the next implementation task until the prior task is `[x]`,
+  unless the task list explicitly records why limited overlap is safe.
+
+## Commit Flow
+
+Active plans do not require one commit per task.
+
+- Let the LLM or implementer decide when to create optional checkpoint commits
+  to avoid an oversized temporary diff, preserve a recovery point, or separate
+  risky work for local review.
+- Checkpoint commits are development aids, not required task boundaries.
+- Before the active plan is pushed or considered landed, combine all commits
+  belonging to the active plan into one final active-plan commit unless the
+  project owner explicitly asks for a different history shape.
+- The final commit should include the implementation, tests, documentation, task
+  ledger, and the move from `docs/active_plan/` to `docs/finished_plans/` when
+  the plan is complete.
+- If no checkpoint commits were created, create one final commit after the final
+  validation passes.
