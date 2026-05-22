@@ -6,7 +6,7 @@ FROM party IMPORT join_ren, leave_ren, rejoin_ren, party_summary, damage_actor, 
 FROM items IMPORT add_item, add_gold, inventory_summary, gold, ITEM_POTION, ITEM_ANTIDOTE, ITEM_MINE_CHARM
 FROM equipment IMPORT equip, equipment_summary, EQUIP_GUARD_BADGE
 FROM shop IMPORT show_village_shop, buy
-FROM save IMPORT write_checkpoint, load_checkpoint, show_checkpoint
+FROM save IMPORT enter_save_point, leave_save_point, write_slot, load_slot, show_slots, current_save_point_id, current_save_point_label, loaded_save_point_id, any_slot_written, slot_written, slot_label, slot_choice_text, SAVE_POINT_VILLAGE, SAVE_POINT_GATE, SAVE_POINT_MINE
 FROM world IMPORT travel_to, current_location_name, travel_summary, LOC_FOREST, LOC_GATE, LOC_MINE, LOC_VILLAGE
 FROM encounters IMPORT forest_encounter
 FROM puzzle IMPORT gate
@@ -60,17 +60,72 @@ Inventory: {items::inventory_summary()}.
 
 == save_scene ==
 ~ events::set_flag(events::FLAG_VILLAGE_SAVE_WRITTEN)
--> save::write_checkpoint ->
-Flags: {events::flag_summary()}.
-* Stress load checkpoint
-    -> load_test_scene
+~ save::enter_save_point(save::SAVE_POINT_VILLAGE)
+-> save_point_menu
 
-== load_test_scene ==
+== save_point_menu ==
+Save point menu: {save::current_save_point_label()}.
+-> save::show_slots ->
+* Save current state
+    -> save_choose_slot
+* {save::any_slot_written()}: Load a slot
+    -> save_load_slot
+* {save::any_slot_written() && save::current_save_point_id() == save::SAVE_POINT_VILLAGE}: Stress mutate state before loading
+    -> village_save_stress
+* Continue
+    -> save_continue
+
+== save_choose_slot ==
+Choose a slot to write.
+* [slot_id in save::slot_ids] {save::slot_label(slot_id)}
+    -> save_write_slot(slot_id)
+
+== save_write_slot(slot_id: int) ==
+-> save::write_slot(slot_id) ->
+-> save_point_menu
+
+== save_load_slot ==
+Choose a slot to load.
+* [slot_id in save::slot_ids] {save::slot_written(slot_id)}: {save::slot_choice_text(slot_id)}
+    -> save_load_selected_slot(slot_id)
+* Back
+    -> save_point_menu
+
+== save_load_selected_slot(slot_id: int) ==
+-> save::load_slot(slot_id) ->
+~ save::leave_save_point()
+-> resume_loaded_save
+
+== village_save_stress ==
 ~ items::add_gold(3)
 ~ party::damage_actor(party::ACTOR_HERO, 4)
-Temporary state before load: gold {to_str(items::gold)}, party {party::party_summary()}.
--> save::load_checkpoint ->
-State after load: gold {to_str(items::gold)}, party {party::party_summary()}.
+Temporary state before slot load: gold {to_str(items::gold)}, party {party::party_summary()}.
+-> save_point_menu
+
+== save_continue ==
+~ temp save_point_id: int = save::current_save_point_id()
+~ save::leave_save_point()
+{ switch save_point_id:
+- save::SAVE_POINT_VILLAGE:
+    -> village_after_save
+- save::SAVE_POINT_GATE:
+    -> gate_after_save
+- else:
+    -> mine_after_save
+}
+
+== resume_loaded_save ==
+{ switch save::loaded_save_point_id():
+- save::SAVE_POINT_VILLAGE:
+    -> village_after_save
+- save::SAVE_POINT_GATE:
+    -> gate_after_save
+- else:
+    -> mine_after_save
+}
+
+== village_after_save ==
+Flags: {events::flag_summary()}.
 * Recruit Ren
     -> recruit_scene
 
@@ -116,6 +171,14 @@ Party: {party::party_summary()}.
 ~ party::rejoin_ren()
 ~ events::set_flag(events::FLAG_REN_REJOINED)
 Party: {party::party_summary()}.
+* Use gate camp save point
+    -> gate_save_scene
+
+== gate_save_scene ==
+~ save::enter_save_point(save::SAVE_POINT_GATE)
+-> save_point_menu
+
+== gate_after_save ==
 -> puzzle::gate ->
 ~ quests::set_objective(quests::OBJ_MAIN_GATE, 1)
 ~ events::set_flag(events::FLAG_GATE_OPENED)
@@ -125,6 +188,14 @@ Party: {party::party_summary()}.
 == mine_scene ==
 ~ world::travel_to(world::LOC_MINE)
 Location: {world::current_location_name()}.
+* Use mine lift save point
+    -> mine_save_scene
+
+== mine_save_scene ==
+~ save::enter_save_point(save::SAVE_POINT_MINE)
+-> save_point_menu
+
+== mine_after_save ==
 -> battle::mine_battle ->
 ~ quests::set_objective(quests::OBJ_MAIN_BATTLE, 1)
 Inventory: {items::inventory_summary()}.
@@ -146,6 +217,6 @@ Inventory: {items::inventory_summary()}.
 ~ events::set_flag(events::FLAG_SIDE_COMPLETE)
 Quest log: {quests::quest_log()}.
 Flags: {events::flag_summary()}.
--> save::show_checkpoint ->
+-> save::show_slots ->
 JRPG slice complete.
 -> END

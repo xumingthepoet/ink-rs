@@ -44,6 +44,20 @@ Input: {sequence_label()}.
     ~ return text
 }
 
+== function input_snapshot() => int[] ==
+~ return input
+
+== function failed_attempt_count() => int ==
+~ return failed_attempts
+
+== function is_solved() => bool ==
+~ return solved
+
+== function restore_state(saved_input: int[], saved_failed_attempts: int, saved_solved: bool) => void ==
+~ input = saved_input
+~ failed_attempts = saved_failed_attempts
+~ solved = saved_solved
+
 == function rune_label(rune_id: int) => string ==
 { switch rune_id:
 - 1:

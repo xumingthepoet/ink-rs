@@ -4,8 +4,9 @@
 
 Build a multi-file JRPG experiment that exercises cross-system state in ink-rs:
 location changes, main and side quests, party join/leave, inventory, equipment,
-character growth, shop flow, a single save checkpoint, encounters, loot tables,
-battle, status effects, rewards, dialogue, event flags, and a gate puzzle.
+character growth, shop flow, a three-slot ink-level save system, encounters,
+loot tables, battle, status effects, rewards, dialogue, event flags, and a gate
+puzzle.
 
 This is a vertical slice, not a complete RPG. The finished experiment should
 play through one compact chapter from village setup to dungeon clear and return.
@@ -70,7 +71,8 @@ the full interaction.
 3. Talk to Apothecary Senn to start a side quest: gather moonleaf in the forest.
 4. Visit the village shop, buy one potion, fail one unaffordable purchase, and
    render shop stock after inventory changes.
-5. Use the shrine save point to write the single save snapshot.
+5. Use the shrine save point to write Slot 1, mutate state, then load Slot 1
+   back through the save-point menu.
 6. Recruit Guard Ren after accepting the main quest.
 7. Travel from village to forest.
 8. Trigger a deterministic forest encounter from an encounter table, win it, and
@@ -79,14 +81,16 @@ the full interaction.
 10. Trigger a short story scene where Ren leaves to scout the mine gate, proving
     temporary party removal before he rejoins.
 11. Travel to mine gate.
-12. Solve a three-rune gate puzzle. Puzzle success sets a world flag and opens
+12. Use the mine gate camp save point to write Slot 2.
+13. Solve a three-rune gate puzzle. Puzzle success sets a world flag and opens
     the mine.
-13. Enter the mine and fight a scripted battle against two enemies.
-14. Resolve battle rewards: EXP, gold, item drop, and one new skill if a level
+14. Enter the mine and use the lift camp save point to write Slot 3.
+15. Fight a scripted battle against two enemies.
+16. Resolve battle rewards: EXP, gold, item drop, and one new skill if a level
     threshold is reached.
-15. Trigger rescue dialogue and party banter.
-16. Return to village, complete the main quest and side quest, optionally show
-    the saved checkpoint summary, then end.
+17. Trigger rescue dialogue and party banter.
+18. Return to village, complete the main quest and side quest, render all three
+    save slots, then end.
 
 The playthrough should cover at least one incorrect puzzle input, one shop
 purchase, one failed shop purchase, one save action, one deterministic encounter,
@@ -223,28 +227,31 @@ workarounds in current ink.
 
 The playthrough only needs one equipment grant or display, not a full shop UI.
 
-### Save Checkpoint
+### Save Slots
 
-Use a single save slot owned by `save.ink`. This is an ink-level checkpoint, not
-runtime save-state JSON.
+Use three save slots owned by `save.ink`. This is an ink-level checkpoint system,
+not runtime save-state JSON. Loading is only exposed through save-point menus.
 
 Minimum saved fields:
 
-- location id
+- save point id and location id
 - gold
 - main quest state
 - side quest state
 - active party ids
+- actor HP, MP, EXP, level, and equipment ids
 - inventory counts for potion, antidote, moonleaf, and mine charm
+- puzzle input, failure count, and solved state
 - important flags such as gate opened and forest encounter cleared
 
-The playthrough should write the save once at the village shrine and later render
-a checkpoint summary. Loading the save is optional for v1; if implemented, it
-must restore the same data used by the active systems rather than a display-only
-copy.
+The playthrough writes Slot 1 at the village shrine, deliberately mutates gold
+and HP, then loads Slot 1 to prove restoration. It later writes Slot 2 at the
+mine gate camp and Slot 3 at the mine lift camp. Loading a slot restores the
+active system variables and then routes through a save-point id switch so the
+story re-enters the location represented by that snapshot.
 
-Represent the snapshot as a `SaveSlot` struct if nested struct assignment is
-readable. If that shape exposes an issue, stop and record it.
+Represent each snapshot as a `SaveSlot` struct stored in
+`Dict<int, SaveSlot>`. If that shape exposes an issue, stop and record it.
 
 ### Skills And Battle Effects
 
@@ -378,9 +385,12 @@ The current implementation goes beyond the first vertical slice in a few places:
   of hardcoding the battle roster.
 - `shop.ink` now honors `ShopStock.unlock_flag`. The playthrough covers both an
   unaffordable purchase and a locked stock attempt.
-- `save.ink` stores raw checkpoint state for location, inventory counts, party
-  stats, quest state, objective progress, and event flags, then restores that
-  state during the playthrough.
+- `save.ink` stores three raw snapshot slots for location, inventory counts,
+  party stats, equipment ids, quest state, objective progress, puzzle state, and
+  event flags, then restores Slot 1 during the playthrough.
+- Save-point flow is pure ink: save menus are dynamic choices over slot ids,
+  `save.ink` guards write/load behind an opened save point, and `story.ink`
+  dispatches after load using the saved save-point id.
 - Numeric ids are named at use sites with constants where current syntax allows
   it. Dict literal keys remain numeric because the current Dict literal grammar
   accepts literal string/int keys, while imported constants must be referenced
@@ -395,7 +405,7 @@ that verifies:
 - Ren joins the party
 - Ren leaves for scouting and rejoins
 - one village shop purchase and one failed purchase
-- one single-slot save write and checkpoint summary
+- three save slot writes, one slot load, and final all-slot summary
 - one deterministic encounter selected from a table
 - one loot table resolution
 - inventory gain and item use

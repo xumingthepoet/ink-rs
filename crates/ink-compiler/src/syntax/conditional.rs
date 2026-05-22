@@ -100,8 +100,7 @@ fn parse_branch_header(trimmed: &str) -> Option<ParsedConditionalBranchHeader<'_
         });
     }
 
-    let (condition_source, inline_content) =
-        scan::split_top_level_once_with_options(after_dash, ':', scan::ScanOptions::inline_text())?;
+    let (condition_source, inline_content) = split_branch_header_separator(after_dash)?;
     Some(ParsedConditionalBranchHeader {
         builder: ConditionalBranchBuilder {
             is_true_branch: false,
@@ -112,6 +111,20 @@ fn parse_branch_header(trimmed: &str) -> Option<ParsedConditionalBranchHeader<'_
         },
         inline_content: non_empty_trimmed(inline_content),
     })
+}
+
+fn split_branch_header_separator(source: &str) -> Option<(&str, &str)> {
+    for (index, _) in
+        scan::top_level_token_matches_with_options(source, &[":"], scan::ScanOptions::inline_text())
+    {
+        let next_index = index + ':'.len_utf8();
+        let previous_is_colon = source[..index].chars().next_back() == Some(':');
+        let next_is_colon = source[next_index..].starts_with(':');
+        if !previous_is_colon && !next_is_colon {
+            return Some((&source[..index], &source[next_index..]));
+        }
+    }
+    None
 }
 
 fn parse_default_branch_content(trimmed: &str) -> Option<&str> {
@@ -422,6 +435,37 @@ mod tests {
             )
         });
         assert!(has_switch);
+    }
+
+    #[test]
+    fn switch_case_header_keeps_qualified_constant_separator() {
+        let output = parse(SourceInput::new(
+            "=== module game ===\n\
+             VAR point: int = save::SAVE_POINT_VILLAGE\n\
+             == main ==\n\
+             { switch point:\n\
+             - save::SAVE_POINT_VILLAGE:\n\
+                 village\n\
+             - else:\n\
+                 other\n\
+             }",
+        ));
+
+        assert!(output.diagnostics.is_empty(), "{:#?}", output.diagnostics);
+        let story = output.artifact.expect("expected story");
+        let game = story.modules().first().expect("game module");
+        let main = game.flows().first().expect("main flow");
+        let Object::ContentList(content) = &main.weave().content()[0] else {
+            panic!("expected conditional content list");
+        };
+        let Some(Object::Conditional(conditional)) = content.objects().first() else {
+            panic!("expected switch");
+        };
+        let first_case = conditional.branches()[0]
+            .own_condition()
+            .expect("case condition");
+
+        assert_eq!(first_case.to_source_string(), "save::SAVE_POINT_VILLAGE");
     }
 
     #[test]

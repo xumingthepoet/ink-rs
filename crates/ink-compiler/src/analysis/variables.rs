@@ -39,10 +39,14 @@ pub(super) fn build_variable_scope_index_with_type_indexes(
         enum_types: &'a EnumTypeIndex,
         target_symbols: &'a TargetSymbolIndex,
         interface_members: &'a InterfaceMemberIndex,
+        index_iterations: bool,
     }
 
     impl ParsedVisitor for VariableScopeVisitor<'_> {
         fn visit_flow(&mut self, flow: &Flow, context: &VisitContext) {
+            if self.index_iterations {
+                return;
+            }
             let Some(flow_path) = &context.current_flow_path else {
                 return;
             };
@@ -57,6 +61,19 @@ pub(super) fn build_variable_scope_index_with_type_indexes(
         }
 
         fn visit_object(&mut self, object: &Object, context: &VisitContext) {
+            if self.index_iterations {
+                match object {
+                    Object::ForLoop(for_loop) => {
+                        self.index_loop_variables(for_loop, context);
+                    }
+                    Object::Choice(choice) => {
+                        self.index_dynamic_choice_variables(choice, context);
+                    }
+                    _ => {}
+                }
+                return;
+            }
+
             match object {
                 Object::ConstantDeclaration(declaration) => {
                     self.index.insert_global(
@@ -254,12 +271,23 @@ pub(super) fn build_variable_scope_index_with_type_indexes(
         }
     }
 
-    let mut visitor = VariableScopeVisitor {
+    let mut declaration_visitor = VariableScopeVisitor {
         index: VariableScopeIndex::default(),
         struct_types,
         enum_types,
         target_symbols,
         interface_members,
+        index_iterations: false,
+    };
+    walk_story(story, &mut declaration_visitor);
+
+    let mut visitor = VariableScopeVisitor {
+        index: declaration_visitor.index,
+        struct_types,
+        enum_types,
+        target_symbols,
+        interface_members,
+        index_iterations: true,
     };
     walk_story(story, &mut visitor);
     visitor.index
@@ -326,7 +354,7 @@ fn insert_dynamic_choice_variable(
 
 #[cfg(test)]
 mod tests {
-    use crate::parsed::TypeName;
+    use crate::parsed::{Object, TypeName};
 
     use super::{super::test_support::parse_story, *};
 
@@ -520,6 +548,44 @@ mod tests {
         assert_eq!(
             index.qualified_global_variable_declared_type("missing::score"),
             None
+        );
+    }
+
+    #[test]
+    fn indexes_dynamic_choice_binding_from_later_module_array_constant() {
+        let story = parse_story(
+            "=== module game ===\n\
+             FROM save IMPORT slot_ids\n\
+             == main ==\n\
+             * [slot_id in save::slot_ids] {slot_id}\n\
+                 -> choose(slot_id)\n\
+             == choose(slot_id: int) ==\n\
+             -> DONE\n\
+             === module save ===\n\
+             CONST slot_ids: int[] = [1, 2, 3]\n",
+        );
+
+        let game = story
+            .modules()
+            .iter()
+            .find(|module| module.name() == "game")
+            .expect("game module");
+        let choice = game.flows()[0]
+            .weave()
+            .content()
+            .iter()
+            .find_map(|object| match object {
+                Object::Choice(choice) => Some(choice),
+                _ => None,
+            })
+            .expect("dynamic choice");
+        let runtime_name = choice.dynamic_binding().expect("binding").variables()[0].runtime_name();
+
+        let index = build_variable_scope_index(&story);
+
+        assert_eq!(
+            index.visible_variable_declared_type(runtime_name, Some("game"), Some("main")),
+            Some(Some(&TypeName::int()))
         );
     }
 }

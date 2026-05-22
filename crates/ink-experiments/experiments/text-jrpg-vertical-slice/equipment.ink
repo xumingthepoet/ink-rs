@@ -31,6 +31,20 @@ VAR equipped: Dict<int, int> = %{1: EQUIP_WORN_SABER}
     ~ return "none"
 }
 
+== function equipped_id(actor_id: int) => int ==
+{ if DICT_HAS(equipped, actor_id):
+    ~ return equipped[actor_id]
+- else:
+    ~ return 0
+}
+
+== function set_equipped(actor_id: int, equipment_id: int) => void ==
+{ if equipment_id > 0:
+    ~ equipped[actor_id] = equipment_id
+- else:
+    ~ DICT_REMOVE(equipped, actor_id)
+}
+
 == function attack_bonus(actor_id: int) => int ==
 { if DICT_HAS(equipped, actor_id):
     ~ return equipment_defs[equipped[actor_id]].attack

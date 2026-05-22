@@ -35,12 +35,32 @@
     "choose": 0
   },
   {
-    "output": "Save written at Brindle Village.\nSaved party: Lio HP 20 MP 6.\nFlags: main accepted, side accepted, saved.\n",
-    "choices": ["Stress load checkpoint"],
+    "output": "Save point menu: Village shrine.\nSave point: Village shrine\nCurrent slot: Slot 1\nSlots:\nSlot 1: empty\nSlot 2: empty\nSlot 3: empty\n",
+    "choices": ["Save current state", "Continue"],
     "choose": 0
   },
   {
-    "output": "Temporary state before load: gold 7, party Lio HP 16/20 MP 6.\nCheckpoint loaded at Brindle Village.\nLoaded party: Lio HP 20/20 MP 6.\nState after load: gold 4, party Lio HP 20/20 MP 6.\n",
+    "output": "Choose a slot to write.\n",
+    "choices": ["Slot 1", "Slot 2", "Slot 3"],
+    "choose": 0
+  },
+  {
+    "output": "Slot 1 saved at Brindle Village.\nSaved party: Lio HP 20 MP 6.\nSaved flags: main accepted, side accepted, saved.\nSave point menu: Village shrine.\nSave point: Village shrine\nCurrent slot: Slot 1\nSlots:\nSlot 1: Brindle Village; Village shrine; gold 4; Lio HP 20 MP 6\nSlot 2: empty\nSlot 3: empty\n",
+    "choices": ["Save current state", "Load a slot", "Stress mutate state before loading", "Continue"],
+    "choose": 2
+  },
+  {
+    "output": "Temporary state before slot load: gold 7, party Lio HP 16/20 MP 6.\nSave point menu: Village shrine.\nSave point: Village shrine\nCurrent slot: Slot 1\nSlots:\nSlot 1: Brindle Village; Village shrine; gold 4; Lio HP 20 MP 6\nSlot 2: empty\nSlot 3: empty\n",
+    "choices": ["Save current state", "Load a slot", "Stress mutate state before loading", "Continue"],
+    "choose": 1
+  },
+  {
+    "output": "Choose a slot to load.\n",
+    "choices": ["Slot 1 - Brindle Village; Village shrine; gold 4; Lio HP 20 MP 6", "Back"],
+    "choose": 0
+  },
+  {
+    "output": "Slot 1 loaded from Brindle Village.\nLoaded party: Lio HP 20/20 MP 6.\nResume point: Village shrine.\nFlags: main accepted, side accepted, saved.\n",
     "choices": ["Recruit Ren"],
     "choose": 0
   },
@@ -65,7 +85,27 @@
     "choose": 0
   },
   {
-    "output": "Ren returns with chalk marks from the gate: sun, star, moon.\nParty: Lio HP 20/20 MP 6, Ren HP 24/24 MP 2.\nThe mine gate waits for three runes.\nInput: empty.\n",
+    "output": "Ren returns with chalk marks from the gate: sun, star, moon.\nParty: Lio HP 20/20 MP 6, Ren HP 24/24 MP 2.\n",
+    "choices": ["Use gate camp save point"],
+    "choose": 0
+  },
+  {
+    "output": "Save point menu: Mine gate camp.\nSave point: Mine gate camp\nCurrent slot: Slot 1\nSlots:\nSlot 1: Brindle Village; Village shrine; gold 4; Lio HP 20 MP 6\nSlot 2: empty\nSlot 3: empty\n",
+    "choices": ["Save current state", "Load a slot", "Continue"],
+    "choose": 0
+  },
+  {
+    "output": "Choose a slot to write.\n",
+    "choices": ["Slot 1", "Slot 2", "Slot 3"],
+    "choose": 1
+  },
+  {
+    "output": "Slot 2 saved at Old Mine Gate.\nSaved party: Lio HP 20 MP 6, Ren HP 24 MP 2.\nSaved flags: main accepted, side accepted, Ren joined, Ren scouting, Ren rejoined, moonleaf, saved, forest clear.\nSave point menu: Mine gate camp.\nSave point: Mine gate camp\nCurrent slot: Slot 2\nSlots:\nSlot 1: Brindle Village; Village shrine; gold 4; Lio HP 20 MP 6\nSlot 2: Old Mine Gate; Mine gate camp; gold 4; Lio HP 20 MP 6, Ren HP 24 MP 2\nSlot 3: empty\n",
+    "choices": ["Save current state", "Load a slot", "Continue"],
+    "choose": 2
+  },
+  {
+    "output": "The mine gate waits for three runes.\nInput: empty.\n",
     "choices": ["Sun", "Moon", "Star"],
     "choose": 1
   },
@@ -100,7 +140,27 @@
     "choose": 0
   },
   {
-    "output": "Location: Old Mine.\nMine battle begins: Mine Warden patrol.\nTurn 1\nParty: Lio HP 20/20 MP 6, Ren HP 24/24 MP 2\nEnemies: Cave Imp 6, Mine Warden 10\nPoison turns: 0\n",
+    "output": "Location: Old Mine.\n",
+    "choices": ["Use mine lift save point"],
+    "choose": 0
+  },
+  {
+    "output": "Save point menu: Mine lift camp.\nSave point: Mine lift camp\nCurrent slot: Slot 2\nSlots:\nSlot 1: Brindle Village; Village shrine; gold 4; Lio HP 20 MP 6\nSlot 2: Old Mine Gate; Mine gate camp; gold 4; Lio HP 20 MP 6, Ren HP 24 MP 2\nSlot 3: empty\n",
+    "choices": ["Save current state", "Load a slot", "Continue"],
+    "choose": 0
+  },
+  {
+    "output": "Choose a slot to write.\n",
+    "choices": ["Slot 1", "Slot 2", "Slot 3"],
+    "choose": 2
+  },
+  {
+    "output": "Slot 3 saved at Old Mine.\nSaved party: Lio HP 20 MP 6, Ren HP 24 MP 2.\nSaved flags: main accepted, side accepted, Ren joined, Ren scouting, Ren rejoined, moonleaf, saved, forest clear, gate open.\nSave point menu: Mine lift camp.\nSave point: Mine lift camp\nCurrent slot: Slot 3\nSlots:\nSlot 1: Brindle Village; Village shrine; gold 4; Lio HP 20 MP 6\nSlot 2: Old Mine Gate; Mine gate camp; gold 4; Lio HP 20 MP 6, Ren HP 24 MP 2\nSlot 3: Old Mine; Mine lift camp; gold 4; Lio HP 20 MP 6, Ren HP 24 MP 2\n",
+    "choices": ["Save current state", "Load a slot", "Continue"],
+    "choose": 2
+  },
+  {
+    "output": "Mine battle begins: Mine Warden patrol.\nTurn 1\nParty: Lio HP 20/20 MP 6, Ren HP 24/24 MP 2\nEnemies: Cave Imp 6, Mine Warden 10\nPoison turns: 0\n",
     "choices": ["Hero Spark", "Use Potion", "Ren Guard", "Hero Strike"],
     "choose": 0
   },
@@ -130,7 +190,7 @@
     "choose": 0
   },
   {
-    "output": "Elder Mara marks the caravan rescued and closes the village ledger.\nApothecary Senn trades the moonleaf for the promised cure.\nQuest log: Missing Caravan=complete, Moonleaf Remedy=complete.\nFlags: main accepted, side accepted, Ren joined, Ren scouting, Ren rejoined, moonleaf, saved, forest clear, gate open, mine won, mine loot, caravan, main complete, side complete.\nCheckpoint: Brindle Village; gold 4; potions 2; moonleaf 0.\nSaved party: Lio HP 20 MP 6.\nSaved quests: main active, side active.\nSaved flags: main accepted, side accepted, saved.\nJRPG slice complete.\n",
+    "output": "Elder Mara marks the caravan rescued and closes the village ledger.\nApothecary Senn trades the moonleaf for the promised cure.\nQuest log: Missing Caravan=complete, Moonleaf Remedy=complete.\nFlags: main accepted, side accepted, Ren joined, Ren scouting, Ren rejoined, moonleaf, saved, forest clear, gate open, mine won, mine loot, caravan, main complete, side complete.\nSave point: not at save point\nCurrent slot: Slot 3\nSlots:\nSlot 1: Brindle Village; Village shrine; gold 4; Lio HP 20 MP 6\nSlot 2: Old Mine Gate; Mine gate camp; gold 4; Lio HP 20 MP 6, Ren HP 24 MP 2\nSlot 3: Old Mine; Mine lift camp; gold 4; Lio HP 20 MP 6, Ren HP 24 MP 2\nJRPG slice complete.\n",
     "choices": []
   }
 ]
