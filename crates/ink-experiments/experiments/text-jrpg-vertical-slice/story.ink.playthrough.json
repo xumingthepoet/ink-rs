@@ -161,22 +161,27 @@
   },
   {
     "output": "Mine battle begins: Mine Warden patrol.\nTurn 1\nParty: Lio HP 20/20 MP 6, Ren HP 24/24 MP 2\nEnemies: Cave Imp 6, Mine Warden 10\nPoison turns: 0\n",
-    "choices": ["Hero Spark", "Use Potion", "Ren Guard", "Hero Strike"],
+    "choices": ["Hero Spark", "Use Potion", "Ren Guard", "Hero Strike", "Exposed Rush"],
+    "choose": 4
+  },
+  {
+    "output": "Lio breaks formation and charges the warden alone.\nLio falls. The current slot will be restored.\nDeath rollback: loading Slot 3.\nSlot 3 loaded from Old Mine.\nLoaded party: Lio HP 20/20 MP 6, Ren HP 24/24 MP 2.\nResume point: Mine lift camp.\nMine battle begins: Mine Warden patrol.\nTurn 1\nParty: Lio HP 20/20 MP 6, Ren HP 24/24 MP 2\nEnemies: Cave Imp 6, Mine Warden 10\nPoison turns: 0\n",
+    "choices": ["Hero Spark", "Use Potion", "Ren Guard", "Hero Strike", "Exposed Rush"],
     "choose": 0
   },
   {
     "output": "Skill Spark dispatches to spark effect.\nSpark hits enemy slot 2.\nLio spends 2 MP; the warden is poisoned.\nMine Warden strikes Lio for 3 damage.\nPoison ticks on the warden for 2.\nTurn 2\nParty: Lio HP 17/20 MP 4, Ren HP 24/24 MP 2\nEnemies: Cave Imp 6, Mine Warden 4\nPoison turns: 1\n",
-    "choices": ["Hero Spark", "Use Potion", "Ren Guard", "Hero Strike"],
+    "choices": ["Hero Spark", "Use Potion", "Ren Guard", "Hero Strike", "Exposed Rush"],
     "choose": 1
   },
   {
     "output": "Lio drinks a potion.\nMine Warden strikes Lio for 3 damage.\nPoison ticks on the warden for 2.\nTurn 3\nParty: Lio HP 17/20 MP 4, Ren HP 24/24 MP 2\nEnemies: Cave Imp 6, Mine Warden 2\nPoison turns: 0\n",
-    "choices": ["Hero Spark", "Use Potion", "Ren Guard", "Hero Strike"],
+    "choices": ["Hero Spark", "Use Potion", "Ren Guard", "Hero Strike", "Exposed Rush"],
     "choose": 2
   },
   {
     "output": "Skill Guard dispatches to guard effect.\nGuard raises actor 2's shield.\nRen guards the line.\nMine Warden attacks into Ren's guard for 1 damage.\nNo status tick.\nTurn 4\nParty: Lio HP 16/20 MP 4, Ren HP 24/24 MP 2\nEnemies: Cave Imp 6, Mine Warden 2\nPoison turns: 0\n",
-    "choices": ["Hero Spark", "Use Potion", "Ren Guard", "Hero Strike"],
+    "choices": ["Hero Spark", "Use Potion", "Ren Guard", "Hero Strike", "Exposed Rush"],
     "choose": 3
   },
   {

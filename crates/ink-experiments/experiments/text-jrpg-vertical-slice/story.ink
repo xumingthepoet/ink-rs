@@ -6,11 +6,11 @@ FROM party IMPORT join_ren, leave_ren, rejoin_ren, party_summary, damage_actor, 
 FROM items IMPORT add_item, add_gold, inventory_summary, gold, ITEM_POTION, ITEM_ANTIDOTE, ITEM_MINE_CHARM
 FROM equipment IMPORT equip, equipment_summary, EQUIP_GUARD_BADGE
 FROM shop IMPORT show_village_shop, buy
-FROM save IMPORT enter_save_point, leave_save_point, write_slot, load_slot, show_slots, current_save_point_id, current_save_point_label, loaded_save_point_id, any_slot_written, slot_written, slot_label, slot_choice_text, SAVE_POINT_VILLAGE, SAVE_POINT_GATE, SAVE_POINT_MINE
+FROM save IMPORT enter_save_point, leave_save_point, write_slot, load_slot, load_current_slot_after_death, show_slots, current_save_point_id, current_save_point_label, loaded_save_point_id, any_slot_written, slot_written, slot_label, slot_choice_text, SAVE_POINT_VILLAGE, SAVE_POINT_GATE, SAVE_POINT_MINE
 FROM world IMPORT travel_to, current_location_name, travel_summary, LOC_FOREST, LOC_GATE, LOC_MINE, LOC_VILLAGE
 FROM encounters IMPORT forest_encounter
 FROM puzzle IMPORT gate
-FROM battle IMPORT mine_battle
+FROM battle IMPORT mine_battle, was_defeated
 
 == main ==
 Text JRPG vertical slice.
@@ -120,8 +120,11 @@ Temporary state before slot load: gold {to_str(items::gold)}, party {party::part
     -> village_after_save
 - save::SAVE_POINT_GATE:
     -> gate_after_save
-- else:
+- save::SAVE_POINT_MINE:
     -> mine_after_save
+- else:
+    No saved route to resume.
+    -> END
 }
 
 == village_after_save ==
@@ -197,6 +200,10 @@ Location: {world::current_location_name()}.
 
 == mine_after_save ==
 -> battle::mine_battle ->
+{ if battle::was_defeated():
+    -> save::load_current_slot_after_death ->
+    -> resume_loaded_save
+}
 ~ quests::set_objective(quests::OBJ_MAIN_BATTLE, 1)
 Inventory: {items::inventory_summary()}.
 * Rescue the caravan

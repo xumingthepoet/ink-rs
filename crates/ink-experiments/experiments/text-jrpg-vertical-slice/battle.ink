@@ -1,7 +1,7 @@
 === module battle ===
 FROM encounters IMPORT encounter_name, encounter_enemy_ids, encounter_loot_table, ENCOUNTER_MINE
 FROM enemies IMPORT enemy_name, enemy_max_hp, enemy_action_text, enemy_damage
-FROM party IMPORT party_summary, damage_actor, heal_actor, spend_mp, add_exp, ACTOR_HERO, ACTOR_REN
+FROM party IMPORT party_summary, damage_actor, heal_actor, spend_mp, add_exp, actor_hp, ACTOR_HERO, ACTOR_REN
 FROM items IMPORT remove_item, ITEM_POTION
 FROM skills IMPORT use_skill, SKILL_SPARK, SKILL_GUARD, SKILL_STRIKE
 FROM loot IMPORT resolve
@@ -16,12 +16,14 @@ VAR enemy_hp: Dict<int, int> = %{}
 VAR poison_turns: int = 0
 VAR guarded: bool = false
 VAR turn: int = 1
+VAR defeated: bool = false
 
 == mine_battle ==
 -> start_encounter(encounters::ENCOUNTER_MINE) ->
 ~ poison_turns = 0
 ~ guarded = false
 ~ turn = 1
+~ defeated = false
 -> battle_prompt
 
 == start_encounter(encounter_id: int) ==
@@ -51,6 +53,8 @@ Poison turns: {to_str(poison_turns)}
     -> ren_guard
 * Hero Strike
     -> hero_strike
+* Exposed Rush
+    -> exposed_rush
 
 == hero_spark ==
 -> skills::use_skill(skills::SKILL_SPARK, party::ACTOR_HERO, ENEMY_WARDEN_SLOT) ->
@@ -62,6 +66,10 @@ Poison turns: {to_str(poison_turns)}
     Lio lacks MP.
 }
 -> enemy_turn ->
+-> check_defeat ->
+{ if defeated:
+    ->->
+}
 -> status_tick ->
 ~ turn += 1
 -> battle_prompt
@@ -74,6 +82,10 @@ Poison turns: {to_str(poison_turns)}
     No potion remains.
 }
 -> enemy_turn ->
+-> check_defeat ->
+{ if defeated:
+    ->->
+}
 -> status_tick ->
 ~ turn += 1
 -> battle_prompt
@@ -83,8 +95,21 @@ Poison turns: {to_str(poison_turns)}
 ~ guarded = true
 Ren guards the line.
 -> enemy_turn ->
+-> check_defeat ->
+{ if defeated:
+    ->->
+}
 -> status_tick ->
 ~ turn += 1
+-> battle_prompt
+
+== exposed_rush ==
+Lio breaks formation and charges the warden alone.
+~ party::damage_actor(party::ACTOR_HERO, 25)
+-> check_defeat ->
+{ if defeated:
+    ->->
+}
 -> battle_prompt
 
 == hero_strike ==
@@ -110,6 +135,13 @@ EXP result: {level_text}.
 }
 ->->
 
+== check_defeat ==
+{ if party::actor_hp(party::ACTOR_HERO) <= 0:
+    ~ defeated = true
+    Lio falls. The current slot will be restored.
+}
+->->
+
 == status_tick ==
 { if poison_turns > 0:
     ~ enemy_hp[ENEMY_WARDEN_SLOT] = enemy_hp[ENEMY_WARDEN_SLOT] - 2
@@ -132,3 +164,6 @@ EXP result: {level_text}.
     }
 }
 ~ return text
+
+== function was_defeated() => bool ==
+~ return defeated

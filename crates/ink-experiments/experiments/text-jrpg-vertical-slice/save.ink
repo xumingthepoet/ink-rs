@@ -277,35 +277,54 @@ VAR slots: Dict<int, SaveSlot> = %{
     Cannot load outside a save point.
 - else:
     { if slot_written(slot_id):
-        ~ current_slot_id = slot_id
-        ~ temp snapshot: SaveSlot = slots[slot_id]
-        ~ loaded_save_point = snapshot.save_point_id
-        ~ world::travel_to(snapshot.location_id)
-        ~ items::set_gold(snapshot.gold)
-        ~ items::set_item_count(items::ITEM_POTION, snapshot.potion_count)
-        ~ items::set_item_count(items::ITEM_ANTIDOTE, snapshot.antidote_count)
-        ~ items::set_item_count(items::ITEM_MOONLEAF, snapshot.moonleaf_count)
-        ~ items::set_item_count(items::ITEM_MINE_CHARM, snapshot.mine_charm_count)
-        ~ party::restore_roster(snapshot.ren_active)
-        ~ party::set_actor_state(party::ACTOR_HERO, snapshot.hero_hp, snapshot.hero_mp, snapshot.hero_exp, snapshot.hero_level)
-        ~ party::set_actor_state(party::ACTOR_REN, snapshot.ren_hp, snapshot.ren_mp, snapshot.ren_exp, snapshot.ren_level)
-        ~ equipment::set_equipped(party::ACTOR_HERO, snapshot.hero_equipment)
-        ~ equipment::set_equipped(party::ACTOR_REN, snapshot.ren_equipment)
-        ~ quests::restore_quest(quests::QUEST_MAIN, snapshot.main_state)
-        ~ quests::restore_quest(quests::QUEST_SIDE, snapshot.side_state)
-        ~ quests::set_objective(quests::OBJ_MAIN_REN, snapshot.obj_main_ren)
-        ~ quests::set_objective(quests::OBJ_MAIN_GATE, snapshot.obj_main_gate)
-        ~ quests::set_objective(quests::OBJ_MAIN_BATTLE, snapshot.obj_main_battle)
-        ~ quests::set_objective(quests::OBJ_SIDE_MOONLEAF, snapshot.obj_side_moonleaf)
-        ~ puzzle::restore_state(snapshot.puzzle_input, snapshot.puzzle_failed_attempts, snapshot.puzzle_solved)
-        ~ restore_flags(snapshot)
+        -> restore_slot(slot_id) ->
         {slot_label(slot_id)} loaded from {world::current_location_name()}.
         Loaded party: {party::party_summary()}.
-        Resume point: {save_point_label(snapshot.save_point_id)}.
+        Resume point: {save_point_label(loaded_save_point)}.
     - else:
         {slot_label(slot_id)} is empty.
     }
 }
+->->
+
+== load_current_slot_after_death ==
+{ if slot_written(current_slot_id):
+    Death rollback: loading {slot_label(current_slot_id)}.
+    -> restore_slot(current_slot_id) ->
+    {slot_label(current_slot_id)} loaded from {world::current_location_name()}.
+    Loaded party: {party::party_summary()}.
+    Resume point: {save_point_label(loaded_save_point)}.
+- else:
+    ~ loaded_save_point = SAVE_POINT_NONE
+    Death rollback failed: {slot_label(current_slot_id)} is empty.
+}
+->->
+
+== restore_slot(slot_id: int) ==
+~ current_slot_id = slot_id
+~ save_point_open = false
+~ current_save_point = SAVE_POINT_NONE
+~ temp snapshot: SaveSlot = slots[slot_id]
+~ loaded_save_point = snapshot.save_point_id
+~ world::travel_to(snapshot.location_id)
+~ items::set_gold(snapshot.gold)
+~ items::set_item_count(items::ITEM_POTION, snapshot.potion_count)
+~ items::set_item_count(items::ITEM_ANTIDOTE, snapshot.antidote_count)
+~ items::set_item_count(items::ITEM_MOONLEAF, snapshot.moonleaf_count)
+~ items::set_item_count(items::ITEM_MINE_CHARM, snapshot.mine_charm_count)
+~ party::restore_roster(snapshot.ren_active)
+~ party::set_actor_state(party::ACTOR_HERO, snapshot.hero_hp, snapshot.hero_mp, snapshot.hero_exp, snapshot.hero_level)
+~ party::set_actor_state(party::ACTOR_REN, snapshot.ren_hp, snapshot.ren_mp, snapshot.ren_exp, snapshot.ren_level)
+~ equipment::set_equipped(party::ACTOR_HERO, snapshot.hero_equipment)
+~ equipment::set_equipped(party::ACTOR_REN, snapshot.ren_equipment)
+~ quests::restore_quest(quests::QUEST_MAIN, snapshot.main_state)
+~ quests::restore_quest(quests::QUEST_SIDE, snapshot.side_state)
+~ quests::set_objective(quests::OBJ_MAIN_REN, snapshot.obj_main_ren)
+~ quests::set_objective(quests::OBJ_MAIN_GATE, snapshot.obj_main_gate)
+~ quests::set_objective(quests::OBJ_MAIN_BATTLE, snapshot.obj_main_battle)
+~ quests::set_objective(quests::OBJ_SIDE_MOONLEAF, snapshot.obj_side_moonleaf)
+~ puzzle::restore_state(snapshot.puzzle_input, snapshot.puzzle_failed_attempts, snapshot.puzzle_solved)
+~ restore_flags(snapshot)
 ->->
 
 == show_slots ==

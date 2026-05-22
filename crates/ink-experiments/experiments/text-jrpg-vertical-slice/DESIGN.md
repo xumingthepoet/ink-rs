@@ -85,7 +85,8 @@ the full interaction.
 13. Solve a three-rune gate puzzle. Puzzle success sets a world flag and opens
     the mine.
 14. Enter the mine and use the lift camp save point to write Slot 3.
-15. Fight a scripted battle against two enemies.
+15. Fight a scripted battle against two enemies. The first attempt deliberately
+    dies and automatically reloads the current slot, proving death rollback.
 16. Resolve battle rewards: EXP, gold, item drop, and one new skill if a level
     threshold is reached.
 17. Trigger rescue dialogue and party banter.
@@ -249,6 +250,10 @@ and HP, then loads Slot 1 to prove restoration. It later writes Slot 2 at the
 mine gate camp and Slot 3 at the mine lift camp. Loading a slot restores the
 active system variables and then routes through a save-point id switch so the
 story re-enters the location represented by that snapshot.
+
+Death rollback is a special load path: it does not expose the load menu and does
+not allow choosing another slot. It restores `current_slot_id`, equivalent to
+the player loading their latest selected slot after a party wipe.
 
 Represent each snapshot as a `SaveSlot` struct stored in
 `Dict<int, SaveSlot>`. If that shape exposes an issue, stop and record it.
