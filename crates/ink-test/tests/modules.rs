@@ -91,13 +91,19 @@ fn interface_dynamic_knot_targets_run() {
         story.get_current_errors()
     );
 
-    let mut saved = Story::new(&compiled.json);
+    let save_compiled = compile_fixture("modules/interface-dynamic-knot-targets-save.ink");
+    let mut saved = Story::new(&save_compiled.json);
     saved
         .set_variable("game::route", &ValueType::from("right"))
         .expect("route should accept another implementing module");
+    assert_eq!(saved.continue_maximally(), "");
+    assert_eq!(saved.get_current_choices().len(), 1);
     let save = saved.save_state();
-    let mut reloaded = Story::new(&compiled.json);
+    let mut reloaded = Story::new(&save_compiled.json);
     reloaded.load_state(&save);
+    assert_eq!(reloaded.continue_maximally(), "");
+    assert_eq!(reloaded.get_current_choices().len(), 1);
+    reloaded.choose_choice_index(0);
     assert_eq!(reloaded.continue_maximally(), "Right 3.\n");
     assert!(
         reloaded.get_current_errors().is_empty(),
@@ -116,16 +122,29 @@ fn interface_dynamic_knot_targets_run() {
         .to_string()
         .contains("Module missing does not implement dynamic interface IItem"));
 
-    let saved = RuntimeStory::new(&compiled.json)
-        .expect("story should load")
-        .save_state()
-        .expect("story should save");
+    let mut saved_story = RuntimeStory::new(&save_compiled.json).expect("story should load");
+    assert_eq!(
+        saved_story
+            .continue_maximally()
+            .expect("story should continue"),
+        ""
+    );
+    let saved = saved_story.save_state().expect("story should save");
     let mut saved: serde_json::Value = serde_json::from_str(&saved).expect("save should be JSON");
     saved["variablesState"]["game::route"] = serde_json::json!("^missing");
-    let mut invalid_saved = RuntimeStory::new(&compiled.json).expect("story should load");
+    let mut invalid_saved = RuntimeStory::new(&save_compiled.json).expect("story should load");
     invalid_saved
         .load_state(&saved.to_string())
         .expect("modified save should load");
+    assert_eq!(
+        invalid_saved
+            .continue_maximally()
+            .expect("story should continue to choice"),
+        ""
+    );
+    invalid_saved
+        .choose_choice_index(0)
+        .expect("choice should be valid");
     let error = invalid_saved
         .continue_maximally()
         .expect_err("invalid saved route should stop with a runtime error");
@@ -160,9 +179,9 @@ fn globals_and_externals_use_module_qualified_runtime_names() {
         story.bind_external_function(name, Rc::new(RefCell::new(ModuleExternal)), true);
     }
     let output = story.continue_maximally();
-    story.choose_choice_index(0);
 
     assert_eq!(output, "7|8\nReady.\n");
+    assert_eq!(story.get_current_choices().len(), 1);
     assert_eq!(
         story
             .get_variable("left::level")
@@ -188,12 +207,17 @@ fn globals_and_externals_use_module_qualified_runtime_names() {
         save["variablesState"].get("level").is_none(),
         "module globals should not save under unqualified names: {save:#}"
     );
+    story.choose_choice_index(0);
+    assert_eq!(story.continue_maximally(), "11|22\n");
 
     let mut reloaded = Story::new(&compiled.json);
     for name in ["audio::play", "video::play"] {
         reloaded.bind_external_function(name, Rc::new(RefCell::new(ModuleExternal)), true);
     }
     reloaded.load_state(&save_string);
+    assert_eq!(reloaded.continue_maximally(), "");
+    assert_eq!(reloaded.get_current_choices().len(), 1);
+    reloaded.choose_choice_index(0);
     assert_eq!(reloaded.continue_maximally(), "11|22\n");
 }
 

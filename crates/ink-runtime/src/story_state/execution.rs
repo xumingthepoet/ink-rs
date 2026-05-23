@@ -15,6 +15,13 @@ impl StoryState {
         !self.get_current_pointer().is_null() && !self.has_error()
     }
 
+    pub fn is_choice_save_snapshot_candidate(&self) -> bool {
+        self.evaluation_stack.is_empty()
+            && self.diverted_pointer.is_null()
+            && !self.in_string_evaluation()
+            && self.can_continue()
+    }
+
     /// String representation of the location where the story currently is.
     pub fn current_path_string(&self) -> Option<String> {
         let pointer = self.get_current_pointer();

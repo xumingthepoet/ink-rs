@@ -134,13 +134,6 @@ pub enum InkAppInteraction {
     Ended,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct InkAppSaveSnapshot {
-    pub story_state: String,
-    pub story_title: String,
-    pub prompt_title: Option<String>,
-}
-
 #[derive(Debug, Clone)]
 enum InkAppMode {
     Running,
@@ -225,35 +218,20 @@ impl InkApp {
     }
 
     pub fn submit_choice(&mut self, option_index: usize) -> Result<(), InkError> {
-        let _ = self.submit_choice_with_save_snapshot(option_index)?;
-        Ok(())
-    }
-
-    pub fn submit_choice_with_save_snapshot(
-        &mut self,
-        option_index: usize,
-    ) -> Result<Option<InkAppSaveSnapshot>, InkError> {
         if let InkAppMode::Choice { options, .. } = &self.mode {
             if options
                 .get(option_index)
                 .is_none_or(|option| !option.enabled)
             {
-                return Ok(None);
+                return Ok(());
             }
 
             self.mode = InkAppMode::Running;
             self.prompt_title = None;
             self.runtime.select_choice(option_index)?;
-            let save_snapshot = InkAppSaveSnapshot {
-                story_state: self.runtime.save_state()?,
-                story_title: self.story_title.clone(),
-                prompt_title: self.prompt_title.clone(),
-            };
             self.drive_story()?;
-            return Ok(Some(save_snapshot));
         }
-
-        Ok(None)
+        Ok(())
     }
 
     pub fn current_interaction(&self) -> InkAppInteraction {

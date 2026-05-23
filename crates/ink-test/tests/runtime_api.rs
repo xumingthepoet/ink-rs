@@ -314,10 +314,9 @@ fn load_save_test() -> Result<(), Box<dyn Error>> {
         "We arrived into London at 9.45pm exactly.",
         text.first().unwrap()
     );
+    assert_eq!(story.get_current_choices().len(), 2);
 
-    story.choose_choice_index(0);
-
-    // save the game state after the player has selected a choice
+    // Save while the story is waiting on the choice list.
     let save_string = story.save_state();
 
     println!("{}", save_string);
@@ -325,6 +324,10 @@ fn load_save_test() -> Result<(), Box<dyn Error>> {
     // recreate game and load state
     let mut story = common::story_from_fixture("runtime_api/load-save.ink");
     story.load_state(&save_string);
+
+    assert_eq!(story.continue_maximally(), "");
+    assert_eq!(story.get_current_choices().len(), 2);
+    story.choose_choice_index(0);
 
     common::next_all(&mut story, &mut text);
     assert_eq!(
@@ -480,9 +483,11 @@ fn internal_host_calls_return_values_and_keep_side_effects() {
 
 #[test]
 fn interface_values_save_as_existing_json_values_and_restore_defaults() {
-    let compiled = compile_fixture("typed/interface-values.ink");
+    let compiled = compile_fixture("typed/interface-values-save.ink");
 
-    let fresh = Story::new(&compiled.json);
+    let mut fresh = Story::new(&compiled.json);
+    assert_eq!(fresh.continue_maximally(), "");
+    assert_eq!(fresh.get_current_choices().len(), 1);
     let fresh_save = fresh.save_state();
     let fresh_save_json: serde_json::Value =
         serde_json::from_str(&fresh_save).expect("fresh save should be JSON");
@@ -507,6 +512,8 @@ fn interface_values_save_as_existing_json_values_and_restore_defaults() {
     story
         .set_variable("game::config", &ValueType::Object(config))
         .expect("struct with interface fields should be settable");
+    assert_eq!(story.continue_maximally(), "");
+    assert_eq!(story.get_current_choices().len(), 1);
 
     let save = story.save_state();
     let save_json: serde_json::Value = serde_json::from_str(&save).expect("save should be JSON");
@@ -698,11 +705,13 @@ fn internal_host_calls_validate_return_metadata_at_runtime() {
 
 #[test]
 fn internal_host_calls_survive_save_load() {
-    let compiled = compile_fixture("runtime_api/internal-functions.ink");
+    let compiled = compile_fixture("runtime_api/internal-functions-save.ink");
     let mut story = Story::new(&compiled.json);
     story
         .call_internal("game::read_config", None)
         .expect("internal call should succeed");
+    assert_eq!(story.continue_maximally(), "Ready.\n");
+    assert_eq!(story.get_current_choices().len(), 1);
     let save = story.save_state();
     let mut reloaded = Story::new(&compiled.json);
     reloaded.load_state(&save);

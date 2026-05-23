@@ -304,7 +304,7 @@ mod tests {
     }
 
     #[test]
-    fn story_state_rejects_choice_prompt_save_and_roundtrips_after_selection() {
+    fn story_state_roundtrips_from_choice_prompt() {
         let source = r#"=== module game ===
 
 == main ==
@@ -328,28 +328,35 @@ Opening
             RuntimePause::Ended => panic!("expected choices before ending"),
         }
 
-        let error = runtime
-            .save_state()
-            .expect_err("choice prompt should not be language-saveable");
-        assert!(error
-            .to_string()
-            .contains("Cannot save while choices are pending"));
-
-        runtime.select_choice(0).expect("left choice should select");
-        let saved = runtime
-            .save_state()
-            .expect("state should save after selection");
-        let left = plain_text(runtime.run_until_pause().expect("left branch"));
-        assert!(left.iter().any(|line| line == "Left ending"));
-
+        let saved = runtime.save_state().expect("choice prompt should save");
         let mut restored = compile_test_runtime(source);
         restored.load_state(&saved).expect("state should load");
-        let restored_left = plain_text(restored.run_until_pause().expect("restored branch"));
-        assert!(restored_left.iter().any(|line| line == "Left ending"));
+        let restored_pause = restored.run_until_pause().expect("restored pause");
+        match restored_pause.pause {
+            RuntimePause::Choice(choices) => {
+                assert_eq!(choices.len(), 2);
+                assert_eq!(choices[0].label, "Go left");
+                assert_eq!(choices[1].label, "Go right");
+            }
+            RuntimePause::Ended => panic!("expected restored choices before ending"),
+        }
+
+        restored
+            .select_choice(0)
+            .expect("left choice should select");
+        let left = plain_text(restored.run_until_pause().expect("left branch"));
+        assert!(left.iter().any(|line| line == "Left ending"));
+
+        let error = restored
+            .save_state()
+            .expect_err("selected aftermath should not be runtime-saveable");
+        assert!(error
+            .to_string()
+            .contains("Cannot save unless choices are pending"));
     }
 
     #[test]
-    fn story_state_after_selection_roundtrips_nested_choice_without_transition_text() {
+    fn story_state_roundtrips_nested_choice_without_transition_text() {
         let source = r#"=== module game ===
 
 == main ==
@@ -372,9 +379,6 @@ Opening
         }
 
         runtime.select_choice(0).expect("menu choice should select");
-        let saved = runtime
-            .save_state()
-            .expect("state should save after selecting parent choice");
         let nested_pause = runtime.run_until_pause().expect("nested pause");
         match nested_pause.pause {
             RuntimePause::Choice(choices) => {
@@ -385,6 +389,7 @@ Opening
             RuntimePause::Ended => panic!("expected nested choices before ending"),
         }
 
+        let saved = runtime.save_state().expect("nested choice should save");
         let mut restored = compile_test_runtime(source);
         restored.load_state(&saved).expect("state should load");
         let restored_pause = restored.run_until_pause().expect("restored nested pause");

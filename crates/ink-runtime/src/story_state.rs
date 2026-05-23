@@ -112,11 +112,23 @@ mod tests {
         value_type::{DictKey, DictKeyType, DictValue, ValueType},
     };
 
-    const SIMPLE_STORY_JSON: &str = r#"{"inkVersion":2,"root":["nop",null]}"#;
+    const SIMPLE_STORY_JSON: &str = r##"{"inkVersion":2,"root":[{"->":"game.main"},{"game":[{"main":[[["ev",{"^->":"game.main.0.0.$r1"},{"temp=":"$r"},"str",{"->":".^.s"},[{"#n":"$r1"}],"/str","/ev",{"*":".^.^.c-0","flg":2},{"s":["^Save point",{"->":"$r","var":true},null]}],{"c-0":["\n","^Done.","\n",null]}],null]}],"global decl":["ev",0,{"VAR=":"game::score"},"/ev",null]}]}"##;
+    const ARRAY_OBJECT_CHOICE_STORY_JSON: &str = r##"{"inkVersion":2,"root":[{"->":"game.main"},{"game":[{"main":[[["ev",{"^->":"game.main.0.0.$r1"},{"temp=":"$r"},"str",{"->":".^.s"},[{"#n":"$r1"}],"/str","/ev",{"*":".^.^.c-0","flg":2},{"s":["^Save point",{"->":"$r","var":true},null]}],{"c-0":["\n","^Done.","\n",null]}],null]}],"global decl":["ev",0,{"VAR=":"game::items"},0,{"VAR=":"game::player"},"/ev",null]}]}"##;
+    const DICT_CHOICE_STORY_JSON: &str = r##"{"inkVersion":2,"root":[{"->":"game.main"},{"game":[{"main":[[["ev",{"^->":"game.main.0.0.$r1"},{"temp=":"$r"},"str",{"->":".^.s"},[{"#n":"$r1"}],"/str","/ev",{"*":".^.^.c-0","flg":2},{"s":["^Save point",{"->":"$r","var":true},null]}],{"c-0":["\n","^Done.","\n",null]}],null]}],"global decl":["ev",["dict","string",[]],{"VAR=":"game::scores"},"/ev",null]}]}"##;
 
     fn simple_save_json() -> serde_json::Value {
-        let story = Story::new(SIMPLE_STORY_JSON).expect("valid story");
+        let story = story_at_choice(SIMPLE_STORY_JSON);
         serde_json::from_str(&story.save_state().expect("save state")).expect("valid save")
+    }
+
+    fn story_at_choice(json: &str) -> Story {
+        let mut story = Story::new(json).expect("valid story");
+        assert_eq!(story.continue_maximally().expect("continue to choice"), "");
+        assert!(
+            !story.get_current_choices().is_empty(),
+            "test story should stop at a saveable choice"
+        );
+        story
     }
 
     fn assert_save_load_bad_json(save: serde_json::Value, expected_message: &str) {
@@ -137,8 +149,7 @@ mod tests {
     #[test]
     fn rejects_non_current_save_state_version() {
         let mut story = Story::new(SIMPLE_STORY_JSON).expect("valid story");
-        let mut save: serde_json::Value =
-            serde_json::from_str(&story.save_state().expect("save state")).expect("valid save");
+        let mut save = simple_save_json();
         save["inkSaveVersion"] = json!(2);
 
         let error = story
@@ -153,8 +164,7 @@ mod tests {
     #[test]
     fn rejects_save_state_without_callstack() {
         let mut story = Story::new(SIMPLE_STORY_JSON).expect("valid story");
-        let mut save: serde_json::Value =
-            serde_json::from_str(&story.save_state().expect("save state")).expect("valid save");
+        let mut save = simple_save_json();
         save.as_object_mut()
             .expect("save object")
             .remove("callstack");
@@ -265,9 +275,7 @@ mod tests {
 
     #[test]
     fn save_state_uses_minimal_v3_shape() {
-        let story = Story::new(SIMPLE_STORY_JSON).expect("valid story");
-        let save: serde_json::Value =
-            serde_json::from_str(&story.save_state().expect("save state")).expect("valid save");
+        let save = simple_save_json();
 
         assert_eq!(save["inkSaveVersion"], json!(3));
         assert!(save.get("callstack").is_some());
@@ -299,8 +307,7 @@ mod tests {
     #[test]
     fn rejects_save_state_without_previous_random() {
         let mut story = Story::new(SIMPLE_STORY_JSON).expect("valid story");
-        let mut save: serde_json::Value =
-            serde_json::from_str(&story.save_state().expect("save state")).expect("valid save");
+        let mut save = simple_save_json();
         save.as_object_mut()
             .expect("save object")
             .remove("previousRandom");
@@ -314,28 +321,15 @@ mod tests {
 
     #[test]
     fn failed_load_state_keeps_existing_story_state() {
-        let json = r#"{
-            "inkVersion": 2,
-            "root": [
-                "nop",
-                {
-                    "global decl": [
-                        "ev", 0, {"VAR=": "score"}, "/ev",
-                        "nop",
-                        null
-                    ]
-                }
-            ]
-        }"#;
-        let mut story = Story::new(json).expect("valid story");
+        let mut story = story_at_choice(SIMPLE_STORY_JSON);
         assert!(matches!(
-            story.get_variable("score"),
+            story.get_variable("game::score"),
             Some(ValueType::Int(0))
         ));
 
         let mut save: serde_json::Value =
             serde_json::from_str(&story.save_state().expect("save state")).expect("valid save");
-        save["variablesState"]["score"] = json!(7);
+        save["variablesState"]["game::score"] = json!(7);
         save.as_object_mut()
             .expect("save object")
             .remove("previousRandom");
@@ -346,83 +340,57 @@ mod tests {
 
         assert!(error.to_string().contains("Missing previous random value"));
         assert!(matches!(
-            story.get_variable("score"),
+            story.get_variable("game::score"),
             Some(ValueType::Int(0))
         ));
     }
 
     #[test]
     fn save_state_roundtrips_array_and_object_variables() {
-        let json = r#"{
-            "inkVersion": 2,
-            "root": [
-                "nop",
-                {
-                    "global decl": [
-                        "ev", 0, {"VAR=": "items"}, "/ev",
-                        "ev", 0, {"VAR=": "player"}, "/ev",
-                        "nop",
-                        null
-                    ]
-                }
-            ]
-        }"#;
         let items = ValueType::Array(vec![ValueType::Int(1), ValueType::Bool(true)]);
         let mut player_fields = BTreeMap::new();
         player_fields.insert("items".to_string(), items.clone());
         player_fields.insert("name".to_string(), ValueType::new("Ada"));
         let player = ValueType::Object(player_fields);
 
-        let mut story = Story::new(json).expect("valid story");
+        let mut story = Story::new(ARRAY_OBJECT_CHOICE_STORY_JSON).expect("valid story");
         story
-            .set_variable("items", &items)
+            .set_variable("game::items", &items)
             .expect("array variable should be set");
         story
-            .set_variable("player", &player)
+            .set_variable("game::player", &player)
             .expect("object variable should be set");
+        assert_eq!(story.continue_maximally().expect("continue to choice"), "");
 
         let save_string = story.save_state().expect("save state");
         let save: serde_json::Value =
             serde_json::from_str(&save_string).expect("save should be JSON");
-        assert_eq!(save["variablesState"]["items"], json!([1, true]));
+        assert_eq!(save["variablesState"]["game::items"], json!([1, true]));
         assert_eq!(
-            save["variablesState"]["player"],
+            save["variablesState"]["game::player"],
             json!({
                 "items": [1, true],
                 "name": "^Ada"
             })
         );
 
-        let mut reloaded = Story::new(json).expect("valid story");
+        let mut reloaded = Story::new(ARRAY_OBJECT_CHOICE_STORY_JSON).expect("valid story");
         reloaded
             .load_state(&save_string)
             .expect("save state should reload");
 
         assert!(matches!(
-            reloaded.get_variable("items"),
+            reloaded.get_variable("game::items"),
             Some(restored) if restored == items
         ));
         assert!(matches!(
-            reloaded.get_variable("player"),
+            reloaded.get_variable("game::player"),
             Some(restored) if restored == player
         ));
     }
 
     #[test]
     fn save_state_roundtrips_dict_variables_and_omits_defaults() {
-        let json = r#"{
-            "inkVersion": 2,
-            "root": [
-                "nop",
-                {
-                    "global decl": [
-                        "ev", ["dict", "string", []], {"VAR=": "scores"}, "/ev",
-                        "nop",
-                        null
-                    ]
-                }
-            ]
-        }"#;
         let scores = ValueType::Dict(
             DictValue::new(
                 DictKeyType::String,
@@ -436,30 +404,32 @@ mod tests {
             .expect("valid dict"),
         );
 
-        let mut story = Story::new(json).expect("valid story");
+        let story = story_at_choice(DICT_CHOICE_STORY_JSON);
         let fresh_save: serde_json::Value =
             serde_json::from_str(&story.save_state().expect("save state")).expect("valid save");
         assert_eq!(fresh_save["variablesState"], json!({}));
 
+        let mut story = Story::new(DICT_CHOICE_STORY_JSON).expect("valid story");
         story
-            .set_variable("scores", &scores)
+            .set_variable("game::scores", &scores)
             .expect("dict variable should be set");
+        assert_eq!(story.continue_maximally().expect("continue to choice"), "");
 
         let save_string = story.save_state().expect("save state");
         let save: serde_json::Value =
             serde_json::from_str(&save_string).expect("save should be JSON");
         assert_eq!(
-            save["variablesState"]["scores"],
+            save["variablesState"]["game::scores"],
             json!(["dict", "string", [["ada", [10]]]])
         );
 
-        let mut reloaded = Story::new(json).expect("valid story");
+        let mut reloaded = Story::new(DICT_CHOICE_STORY_JSON).expect("valid story");
         reloaded
             .load_state(&save_string)
             .expect("save state should reload");
 
         assert!(matches!(
-            reloaded.get_variable("scores"),
+            reloaded.get_variable("game::scores"),
             Some(restored) if restored == scores
         ));
     }

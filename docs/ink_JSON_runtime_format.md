@@ -218,11 +218,14 @@ active continuation/callstack frames, global `variablesState`, deterministic
 random state (`storySeed` and `previousRandom`), `inkSaveVersion`, and
 `inkFormatVersion`. It does not serialize generated choices, choice
 continuation snapshots, multi-flow maps, visit counts, turn indices, current
-divert targets, or evaluation-stack internals. Calling `save_state()` while
-choices are pending returns an error. Earlier saves and v3 saves containing
-removed fields such as `currentChoices`, `choiceThreads`, `flows`,
-`currentFlowName`, `evalStack`, `currentDivertTarget`, `visitCounts`,
-`turnIndices`, or `resumeMode` are rejected rather than migrated.
+divert targets, or evaluation-stack internals. Calling `save_state()` is valid
+only while visible choices are pending; the JSON stores the stable execution
+snapshot from immediately before choice generation, and loading restores that
+pre-generation state. Hosts continue the story after load to regenerate the
+choice list. Earlier saves and v3 saves containing removed fields such as
+`currentChoices`, `choiceThreads`, `flows`, `currentFlowName`, `evalStack`,
+`currentDivertTarget`, `visitCounts`, `turnIndices`, or `resumeMode` are
+rejected rather than migrated.
 
 ## Variable assignment
 

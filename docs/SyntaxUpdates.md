@@ -23,9 +23,36 @@ Each entry should include:
 - author impact
 - tests
 
+## 2026-05-24: Choice-Pause Saves Use Pre-Choice Snapshots
+
+- status: supported
+- background: the 2026-05-23 save-state cleanup first removed serialized
+  choices and rejected saves at choice prompts. The intended author model is
+  now stricter and simpler: a visible choice prompt is the only language-level
+  save point, but the choices themselves remain derived UI.
+- ink-rs behavior: `save_state()` is valid only while visible choices are
+  pending. The save JSON stores the stable execution state from immediately
+  before choice generation, and does not store generated choices or
+  `resumeMode`. `load_state()` restores that pre-choice state and does not
+  auto-continue; hosts continue the story to regenerate the pending choice list.
+  Ordinary non-choice states are not save points.
+- documentation effect: `LanguageOverview.md`, `SyntaxReference.md`,
+  `Architecture.md`, `docs/ink_JSON_runtime_format.md`, and `ink-dioxus`
+  documentation describe pending-choice saves as pre-choice snapshots.
+- rationale: choice prompts are natural game save points, but serializing the
+  generated choices would reintroduce replay and continuation compatibility
+  state. Regeneration keeps save JSON minimal while supporting static, dynamic,
+  and nested choices.
+- author impact: choice generation must remain side-effect-free because it can
+  run again after load. Hosts should save at visible prompts and store their own
+  transcript/UI state separately when needed.
+- tests: runtime, `ink-test`, and `ink-dioxus` coverage verifies static,
+  dynamic, nested no-transition, loop, random-state, module, interface, and host
+  API saves at pending choice prompts. Non-choice saves are rejected.
+
 ## 2026-05-23: Choice-Pause Saves Rejected
 
-- status: removed
+- status: removed, superseded by the 2026-05-24 pre-choice snapshot rule
 - background: earlier same-day runtime behavior supported saving while choices
   were pending by writing a `resumeMode: "choiceReplay"` marker and replaying
   to the choice list after load.
@@ -193,7 +220,8 @@ Each entry should include:
   dynamic interface function calls, `RANDOM`, `SEED_RANDOM`, mutating
   collection builtins, and statement-level side effects.
 - documentation effect: `SyntaxReference.md` documents side-effect-free choice
-  generation and describes pending choices as transient, non-saveable UI state.
+  generation and describes pending choices as transient UI regenerated from
+  save-state snapshots.
 - rationale: choice generation should not perform host calls, variable writes,
   random draws, output emission, or other observable side effects before the
   player has selected an option.
@@ -204,8 +232,7 @@ Each entry should include:
   and `to_str` remain valid.
 - tests: diagnostics fixtures reject side-effectful calls in choice conditions,
   displayed choice text, and dynamic choice iterables; save/load choice tests
-  verify pending choices are rejected while selected-choice aftermath can still
-  be saved and loaded.
+  verify pending choices are regenerated from pre-choice save snapshots.
 
 ## 2026-05-21: Array And Dict For Control Blocks
 
@@ -797,8 +824,9 @@ Each entry should include:
   `previousRandom`, `inkSaveVersion`, and `inkFormatVersion`. It no longer
   stores generated choices, choice continuation snapshots, `flows`,
   `currentFlowName`, `evalStack`, `currentDivertTarget`, `visitCounts`,
-  `turnIndices`, or `turnIdx`. Saves while choices are pending are rejected.
-  Earlier saves, and v3 saves containing removed fields such as
+  `turnIndices`, or `turnIdx`. Saves are valid only while visible choices are
+  pending, and serialize the pre-choice execution snapshot rather than the
+  choice list. Earlier saves, and v3 saves containing removed fields such as
   `currentChoices`, `choiceThreads`, `flows`, `currentFlowName`, `evalStack`,
   `currentDivertTarget`, `visitCounts`, `turnIndices`, or `resumeMode`, are
   rejected rather than migrated.

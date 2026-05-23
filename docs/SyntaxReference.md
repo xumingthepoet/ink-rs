@@ -326,8 +326,10 @@ Use one binding variable for the value, or two variables for `index, value`.
 ```
 
 The array expression is evaluated once before expansion. Generated choices are
-transient and are not serialized. `save_state()` rejects saves while choices
-are pending; save before reaching the choice list or after choosing an option.
+transient and are not serialized. `save_state()` is allowed only while visible
+choices are pending; the save JSON stores the stable execution state from
+immediately before choice generation. After load, continue the story to
+regenerate the same pending choices before selecting one.
 
 Choice generation must be side-effect-free. Dynamic iterable expressions, choice
 conditions, and displayed choice text cannot call story functions, external

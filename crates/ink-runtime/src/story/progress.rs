@@ -243,6 +243,13 @@ impl Story {
     }
 
     pub(crate) fn continue_single_step(&mut self) -> Result<bool, StoryError> {
+        let had_visible_choices_before_step = self.has_generated_visible_choices();
+
+        if !had_visible_choices_before_step && self.get_state().is_choice_save_snapshot_candidate()
+        {
+            self.choice_save_snapshot = Some(self.get_state().copy_for_choice_save_snapshot());
+        }
+
         // Run main step function (walks through content)
         self.step()?;
 
@@ -625,6 +632,19 @@ impl Story {
         }
 
         choices
+    }
+
+    pub(crate) fn has_visible_pending_choices(&self) -> bool {
+        self.get_state()
+            .get_current_choices()
+            .is_some_and(|choices| choices.iter().any(|choice| !choice.is_invisible_default))
+    }
+
+    fn has_generated_visible_choices(&self) -> bool {
+        self.get_state()
+            .get_generated_choices()
+            .iter()
+            .any(|choice| !choice.is_invisible_default)
     }
 
     /// The string of output text available at the current point in

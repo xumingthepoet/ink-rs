@@ -107,17 +107,25 @@ impl Story {
 
     /// Exports the current state to JSON format, in order to save the game.
     pub fn save_state(&self) -> Result<String, StoryError> {
-        if !self.get_state().get_generated_choices().is_empty() {
+        if !self.has_visible_pending_choices() {
             return Err(StoryError::InvalidStoryState(
-                "Cannot save while choices are pending; choose an option before saving.".to_owned(),
+                "Cannot save unless choices are pending; continue to a choice before saving."
+                    .to_owned(),
             ));
         }
 
-        self.get_state().to_json()
+        let snapshot = self.choice_save_snapshot.as_ref().ok_or_else(|| {
+            StoryError::InvalidStoryState(
+                "Cannot save pending choices without a choice-generation snapshot.".to_owned(),
+            )
+        })?;
+
+        snapshot.to_json()
     }
 
     /// Loads a previously saved state in JSON format.
     pub fn load_state(&mut self, json_state: &str) -> Result<(), StoryError> {
+        self.choice_save_snapshot = None;
         self.get_state_mut().load_json(json_state)?;
 
         Ok(())
@@ -128,6 +136,7 @@ impl Story {
         self.if_async_we_cant("ResetState")?;
 
         self.state = StoryState::new(self.main_content_container.clone());
+        self.choice_save_snapshot = None;
 
         self.reset_globals()?;
 

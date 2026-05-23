@@ -145,12 +145,13 @@ choices and diverts stay outside `for` bodies.
 Array-backed choices use a dynamic choice prefix after the choice marker:
 `* [item in items] Text {item}` or
 `* [index, item in items] {enabled[index]}: {item}`. The generated options
-behave like ordinary choices. Pending choices are transient UI state:
-`save_state()` rejects saves while choices are waiting for selection. Save
-before reaching the choice list or after choosing an option. Choice generation
-must be side-effect-free: no function calls, random calls, variable mutation, or
-other side-effectful logic in the dynamic iterable, choice condition, or
-displayed choice text.
+behave like ordinary choices. Language-level saves are allowed only while
+visible choices are waiting for selection. The save JSON stores the stable
+execution state immediately before choice generation, not the generated choice
+list itself; after load, continue the story to regenerate the pending choices.
+Choice generation must be side-effect-free: no function calls, random calls,
+variable mutation, or other side-effectful logic in the dynamic iterable, choice
+condition, or displayed choice text.
 
 ```ink
 == main ==
