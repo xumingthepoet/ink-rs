@@ -1,5 +1,6 @@
 mod support;
 
+mod choice_loops;
 mod choices;
 mod compiler_api;
 mod compiler_snapshots;
@@ -19,7 +20,6 @@ mod runtime_api;
 mod stitches;
 mod tags;
 mod text;
-mod threads;
 mod tunnels;
 mod typed_values;
 mod variables;

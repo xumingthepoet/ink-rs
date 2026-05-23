@@ -92,8 +92,7 @@ impl Story {
     }
 
     pub(crate) fn discard_snapshot(&mut self) {
-        // Normally we want to integrate the patch
-        // into the main global/counts dictionaries.
+        // Normally we want to integrate the patch into the main runtime state.
         // However, if we're in the middle of async
         // saving, we simply stay in a "patching" state,
         // albeit with the newer cloned patch.

@@ -425,10 +425,9 @@ command, native function, object variant, container field, or version rule.
 Compiler lowering should produce these types directly. Runtime loading should
 parse JSON through these types before constructing runtime execution objects.
 
-The format crate may retain historical compiled-story tokens for runtime
-compatibility after the source syntax that used to emit them has been removed.
-Document those tokens as compatibility-only in `docs/ink_JSON_runtime_format.md`
-and keep current compiler lowering tests proving they are no longer emitted.
+The format crate is current-format only. When a compiled-story JSON break is
+approved, remove obsolete tokens from the format model and runtime execution
+instead of keeping compatibility decoders.
 
 Do not add duplicate compiled-story JSON schemas in compiler emit or runtime
 JSON read/write code. If compiler and runtime both need to understand a
@@ -476,8 +475,8 @@ Key areas:
   `push_pop.rs`, `tag.rs`, `glue.rs`, `variable_assigment.rs`,
   `variable_reference.rs`: runtime instruction and marker objects.
 
-Compiled-story JSON compatibility changes require coordinated updates in the
-format crate, compiler lowering/tests, runtime loading/tests, and
+Compiled-story JSON format changes require coordinated updates in the format
+crate, compiler lowering/tests, runtime loading/tests, and
 `docs/ink_JSON_runtime_format.md`.
 
 ### Runtime Save State
@@ -544,7 +543,7 @@ crates/ink-test/
 |   |-- stitches.rs
 |   |-- tags.rs
 |   |-- text.rs
-|   |-- threads.rs
+|   |-- choice_loops.rs
 |   |-- tunnels.rs
 |   |-- typed_values.rs
 |   |-- variables.rs
@@ -554,6 +553,7 @@ crates/ink-test/
 |       `-- story_runner.rs
 `-- fixtures/
     |-- choices/
+    |-- choice_loops/
     |-- compiler_api/
     |-- conditionals/
     |-- diagnostics/
@@ -570,7 +570,6 @@ crates/ink-test/
     |-- stitches/
     |-- tags/
     |-- text/
-    |-- threads/
     |-- tunnels/
     |-- typed/
     `-- variables/

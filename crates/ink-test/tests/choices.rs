@@ -200,7 +200,7 @@ fn dynamic_choices_regenerate_after_save_load() {
     assert_eq!(story.continue_maximally(), "");
     let save_string = story.save_state();
     let save: serde_json::Value = serde_json::from_str(&save_string).expect("valid save JSON");
-    assert_save_json_has_no_choice_or_thread_state(&save);
+    assert_save_json_has_no_choice_or_removed_execution_state(&save);
 
     let mut reloaded = Story::new(&compiled.json);
     reloaded.load_state(&save_string);
@@ -351,7 +351,7 @@ fn save_load_regenerates_static_choices_from_replay_point() {
     let save_string = story.save_state();
     let save: serde_json::Value = serde_json::from_str(&save_string).expect("valid save JSON");
     assert_eq!(save["inkSaveVersion"], serde_json::json!(2));
-    assert_save_json_has_no_choice_or_thread_state(&save);
+    assert_save_json_has_no_choice_or_removed_execution_state(&save);
     assert!(save.get("flows").is_none());
     assert!(save.get("evalStack").is_none());
     assert!(save.get("visitCounts").is_none());
@@ -369,7 +369,7 @@ fn save_load_regenerates_static_choices_from_replay_point() {
 }
 
 #[test]
-fn static_choice_pause_save_omits_choice_and_thread_state() {
+fn static_choice_pause_save_omits_choice_and_removed_execution_state() {
     let compiled = compile_fixture("choices/choice-save-load.ink");
     let mut story = Story::new(&compiled.json);
 
@@ -377,11 +377,11 @@ fn static_choice_pause_save_omits_choice_and_thread_state() {
     assert_eq!(story.get_current_choices().len(), 2);
 
     let save: Value = serde_json::from_str(&story.save_state()).expect("valid save JSON");
-    assert_save_json_has_no_choice_or_thread_state(&save);
+    assert_save_json_has_no_choice_or_removed_execution_state(&save);
 }
 
 #[test]
-fn dynamic_choice_pause_save_omits_choice_and_thread_state() {
+fn dynamic_choice_pause_save_omits_choice_and_removed_execution_state() {
     let compiled = compile_fixture("choices/dynamic-choice.ink");
     let mut story = Story::new(&compiled.json);
 
@@ -389,11 +389,11 @@ fn dynamic_choice_pause_save_omits_choice_and_thread_state() {
     assert_eq!(story.get_current_choices().len(), 4);
 
     let save: Value = serde_json::from_str(&story.save_state()).expect("valid save JSON");
-    assert_save_json_has_no_choice_or_thread_state(&save);
+    assert_save_json_has_no_choice_or_removed_execution_state(&save);
 }
 
 #[test]
-fn selected_choice_aftermath_save_omits_choice_and_thread_state() {
+fn selected_choice_aftermath_save_omits_choice_and_removed_execution_state() {
     let compiled = compile_fixture("choices/choice-save-load.ink");
     let mut story = Story::new(&compiled.json);
 
@@ -402,28 +402,28 @@ fn selected_choice_aftermath_save_omits_choice_and_thread_state() {
     assert_eq!(story.continue_maximally(), "Picked 2.\n");
 
     let save: Value = serde_json::from_str(&story.save_state()).expect("valid save JSON");
-    assert_save_json_has_no_choice_or_thread_state(&save);
+    assert_save_json_has_no_choice_or_removed_execution_state(&save);
 }
 
 #[test]
 fn save_load_regenerates_authored_choices_from_replay_point() {
-    let compiled = compile_fixture("choices/thread-choice-save-load.ink");
+    let compiled = compile_fixture("choices/authored-choice-save-load.ink");
     let mut story = Story::new(&compiled.json);
 
     assert_eq!(story.continue_maximally(), "");
     let choices = story.get_current_choices();
     assert_eq!(choices.len(), 2);
-    assert_eq!(choices[0].text, "Thread");
+    assert_eq!(choices[0].text, "Replay");
     assert_eq!(choices[1].text, "Main");
     let save_string = story.save_state();
     let save: serde_json::Value = serde_json::from_str(&save_string).expect("valid save JSON");
-    assert_save_json_has_no_choice_or_thread_state(&save);
+    assert_save_json_has_no_choice_or_removed_execution_state(&save);
 
     let mut reloaded = Story::new(&compiled.json);
     reloaded.load_state(&save_string);
     assert_eq!(reloaded.get_current_choices().len(), 2);
     reloaded.choose_choice_index(0);
-    assert_eq!(reloaded.continue_maximally(), "Thread branch.\n");
+    assert_eq!(reloaded.continue_maximally(), "Replay branch.\n");
 }
 
 #[test]
@@ -435,7 +435,7 @@ fn save_load_regenerated_choice_reaches_gather_after_selection() {
     assert_eq!(story.get_current_choices().len(), 2);
     let save_string = story.save_state();
     let save: serde_json::Value = serde_json::from_str(&save_string).expect("valid save JSON");
-    assert_save_json_has_no_choice_or_thread_state(&save);
+    assert_save_json_has_no_choice_or_removed_execution_state(&save);
 
     let mut reloaded = Story::new(&compiled.json);
     reloaded.load_state(&save_string);
@@ -448,8 +448,8 @@ fn save_load_regenerated_choice_reaches_gather_after_selection() {
 }
 
 #[test]
-fn weave_fallthrough_works_without_thread_syntax() {
-    let compiled = compile_fixture("choices/weave-fallthrough-no-threads.ink");
+fn weave_fallthrough_works_with_current_choice_structure() {
+    let compiled = compile_fixture("choices/weave-fallthrough-current.ink");
     let mut story = Story::new(&compiled.json);
 
     assert_eq!(story.continue_maximally(), "Start.\n");
@@ -464,13 +464,13 @@ fn weave_fallthrough_works_without_thread_syntax() {
 
 #[test]
 fn dynamic_weave_fallthrough_regenerates_after_save_load() {
-    let compiled = compile_fixture("choices/weave-fallthrough-no-threads.ink");
+    let compiled = compile_fixture("choices/weave-fallthrough-current.ink");
     let mut story = Story::new(&compiled.json);
 
     assert_eq!(story.continue_maximally(), "Start.\n");
     let save_string = story.save_state();
     let save: serde_json::Value = serde_json::from_str(&save_string).expect("valid save JSON");
-    assert_save_json_has_no_choice_or_thread_state(&save);
+    assert_save_json_has_no_choice_or_removed_execution_state(&save);
 
     let mut reloaded = Story::new(&compiled.json);
     reloaded.load_state(&save_string);
@@ -507,7 +507,7 @@ fn save_load_preserves_deterministic_random_state() {
     assert_eq!(reloaded.continue_maximally(), uninterrupted_output);
 }
 
-fn assert_save_json_has_no_choice_or_thread_state(save: &Value) {
+fn assert_save_json_has_no_choice_or_removed_execution_state(save: &Value) {
     let forbidden_keys = [
         "currentChoices",
         "generatedChoices",

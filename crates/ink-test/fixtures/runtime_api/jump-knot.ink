@@ -4,13 +4,13 @@
 -> one
 
 == one ==
-One -> end
+One -> finish
 
 == two ==
-Two -> end
+Two -> finish
 
 == three ==
-Three -> end
+Three -> finish
 
 
-== end ==
+== finish ==

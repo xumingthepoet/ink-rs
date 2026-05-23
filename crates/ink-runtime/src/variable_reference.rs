@@ -1,14 +1,10 @@
-use std::{fmt, rc::Rc};
+use std::fmt;
 
-use crate::{
-    object::{Object, RTObject},
-    path::Path,
-};
+use crate::object::{Object, RTObject};
 
 pub struct VariableReference {
     obj: Object,
     pub name: String,
-    pub path_for_count: Option<Path>,
 }
 
 impl VariableReference {
@@ -16,22 +12,7 @@ impl VariableReference {
         VariableReference {
             obj: Object::new(),
             name: name.to_string(),
-            path_for_count: None,
         }
-    }
-
-    pub fn from_path_for_count(path_for_count: &str) -> Self {
-        VariableReference {
-            obj: Object::new(),
-            name: String::new(),
-            path_for_count: Some(Path::new_with_components_string(Some(path_for_count))),
-        }
-    }
-
-    pub fn get_path_string_for_count(self: &Rc<Self>) -> Option<String> {
-        self.path_for_count
-            .as_ref()
-            .map(|path_for_count| Object::compact_path_string(self.clone(), path_for_count))
     }
 }
 
@@ -43,12 +24,6 @@ impl RTObject for VariableReference {
 
 impl fmt::Display for VariableReference {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self.name {
-            name if !name.is_empty() => write!(f, "var({})", name),
-            _ => match &self.path_for_count {
-                Some(path) => write!(f, "read_count({})", &path.to_string()), // TODO needs an RC path.compact_path_string(path)),
-                None => write!(f, "read_count(null)"),
-            },
-        }
+        write!(f, "var({})", self.name)
     }
 }

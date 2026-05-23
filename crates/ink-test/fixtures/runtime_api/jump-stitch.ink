@@ -5,20 +5,20 @@
 
 == one ==
 = sone
-One.1 -> end
+One.1 -> finish
 
 = stwo
-One.2 -> end
+One.2 -> finish
 
 == two ==
 
 = sone
-Two.1 -> end
+Two.1 -> finish
 
 = stwo
-Two.2 -> end
+Two.2 -> finish
 
 = sthree
-Two.3 -> end
+Two.3 -> finish
 
-== end ==
+== finish ==

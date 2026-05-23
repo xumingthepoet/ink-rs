@@ -138,7 +138,6 @@ fn write_elements_json(elements: &[Element]) -> Result<Vec<serde_json::Value>, S
 pub struct CallStack {
     start_of_root: Pointer,
     active_continuation: Continuation,
-    legacy_parent_continuation: Option<Continuation>,
 }
 
 impl CallStack {
@@ -146,7 +145,6 @@ impl CallStack {
         let mut cs = CallStack {
             start_of_root: Pointer::start_of(main_content_container),
             active_continuation: Continuation::new(),
-            legacy_parent_continuation: None,
         };
 
         cs.reset();
@@ -170,34 +168,11 @@ impl CallStack {
 
     pub fn reset(&mut self) {
         self.active_continuation = Continuation::new();
-        self.legacy_parent_continuation = None;
         self.active_continuation.callstack.push(Element::new(
             PushPopType::Tunnel,
             self.start_of_root.clone(),
             false,
         ));
-    }
-
-    pub fn can_pop_continuation(&self) -> bool {
-        self.legacy_parent_continuation.is_some() && !self.element_is_evaluate_from_game()
-    }
-
-    pub fn pop_continuation(&mut self) -> Result<(), StoryError> {
-        if self.can_pop_continuation() {
-            self.active_continuation = self
-                .legacy_parent_continuation
-                .take()
-                .expect("legacy parent continuation was checked");
-            Ok(())
-        } else {
-            Err(StoryError::InvalidStoryState(
-                "Can't pop continuation".to_owned(),
-            ))
-        }
-    }
-
-    pub fn push_continuation(&mut self) {
-        self.legacy_parent_continuation = Some(self.active_continuation.clone());
     }
 
     pub fn can_pop(&self) -> bool {
@@ -255,7 +230,6 @@ impl CallStack {
 
     pub fn set_current_continuation(&mut self, value: Continuation) {
         self.active_continuation = value;
-        self.legacy_parent_continuation = None;
     }
 
     pub fn fork_continuation(&mut self) -> Continuation {
@@ -429,7 +403,6 @@ impl CallStack {
         }
 
         self.active_continuation = continuation;
-        self.legacy_parent_continuation = None;
         self.start_of_root = Pointer::start_of(main_content_container.clone()).clone();
 
         Ok(())

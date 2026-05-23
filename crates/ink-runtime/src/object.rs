@@ -257,12 +257,11 @@ mod tests {
 
     #[test]
     fn get_path_test() {
-        let container1 = Container::new(None, 0, Vec::new(), HashMap::new());
-        let container21 = Container::new(None, 0, Vec::new(), HashMap::new());
-        let container2 = Container::new(None, 0, vec![container21.clone()], HashMap::new());
+        let container1 = Container::new(None, Vec::new(), HashMap::new());
+        let container21 = Container::new(None, Vec::new(), HashMap::new());
+        let container2 = Container::new(None, vec![container21.clone()], HashMap::new());
         let root = Container::new(
             None,
-            0,
             vec![container1.clone(), container2.clone()],
             HashMap::new(),
         );

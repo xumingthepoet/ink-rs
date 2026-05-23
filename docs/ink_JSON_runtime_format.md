@@ -1,4 +1,4 @@
-# ink's JSON runtime format
+# ink-rs JSON runtime format
 
 When ink is compiled to JSON, it is converted to a low level format for use by the runtime, and is made up of smaller, simpler building blocks. For an overview of the full pipeline, including a description of the runtime itself see the [Architecture documentation](Architecture.md).
 
@@ -32,7 +32,7 @@ metadata. `inkVersion` is an integer that denotes the format version, and
 }
 ```
 
-The current Rust format version is `1`. The runtime only loads compiled story
+The current Rust format version is `2`. The runtime only loads compiled story
 JSON whose `inkVersion` exactly matches the current format version; older
 compiled story JSON versions are not treated as compatible.
 
@@ -66,17 +66,7 @@ There is only one type of generalised collection, and this is the **Container** 
 
 The root of a story is a container, and as a story is evaluated, the engine steps through the sub-elements of containers.
 
-Although containers primarily behave like arrays, they also have additional attributes, including a way to reference named sub-elements that aren't included in the array itself. To support this behaviour, **the final element of the array is special**. The final element is either `null`, or it's an object (dictionary) that contains a combination of named sub-elements (for example, nested Containers), and optionally two other properties: `#f`, which is used to hold an integer of bit flags, and `#n`, which holds the name of the container itself, if that's not redundant due to being a named field of a parent container.
-
-Possible flags used by `#f`:
-
- * **0x1** - Visits: historical compiled-story metadata for visit counts.
- * **0x2** - Turns: historical compiled-story metadata for turn counts.
- * **0x4** - CountStartOnly: historical metadata for count-at-start behavior.
-
-ink-rs no longer exposes visit or turn counts in the source language or save
-state. These flags remain documented because the compiled-story JSON model can
-still represent them for historical compiled-story compatibility.
+Although containers primarily behave like arrays, they also have additional attributes, including a way to reference named sub-elements that aren't included in the array itself. To support this behaviour, **the final element of the array is special**. The final element is either `null`, or it's an object (dictionary) that contains named sub-elements, such as nested Containers, and optionally `#n`, which holds the name of the container itself when that name is not redundant due to being a named field of a parent container.
 
 Examples:
 
@@ -84,9 +74,9 @@ Examples:
 
 * `["^Hello world", {"#n": "hello"}]` - A Container named "hello" with the text object "Hello world".
 
-* `["^test", {"subContainer": [5, 6, null], "#f": 3}]`
+* `["^test", {"subContainer": [5, 6, null]}]`
 
-   A container with the text object "test", flags 1 and 2, and a nested container named "subContainer" that resembles the first example.
+   A container with the text object "test" and a nested container named "subContainer" that resembles the first example.
 
 ## Values
 
@@ -161,14 +151,7 @@ Represented by `"void"`, this is used to place an object on the evaluation stack
 
 ## Control commands
 
-Control commands are special instructions to the text engine to perform various actions. They are all represented by a particular text string:
-
-This table is a compiled-story JSON compatibility reference, not a source
-syntax list. Current compiler output still uses evaluation, string, callstack,
-random, and tag commands needed by the maintained language. Historical commands
-remain documented here only because the runtime may decode older compiled JSON;
-their presence here does not mean current ink-rs source can emit the removed
-syntax that originally produced them.
+Control commands are special instructions to the text engine to perform various actions. They are all represented by a particular text string. This is the current compiled-story JSON command set, not a source syntax list.
 
 * `"ev"` - Begin logical evaluation mode. In evaluation mode, objects that are encountered are added to an evaluation stack, rather than simply echoed into the main text output stream. As they're pushed onto the stack, they may be processed by other commands, functions, etc.
 * `"/ev"` - End logical evaluation mode. Future objects will be appended to the output stream rather than to the evaluation stack.
@@ -179,19 +162,12 @@ syntax that originally produced them.
 * `"str"` - Begin string evaluation mode. Adds a marker to the output stream, and goes into content mode (from evaluation mode). Must have already been in evaluation mode when this is encountered. See below for explanation.
 * `"/str"` - End string evaluation mode. All content after the previous Begin marker is concatenated together, removed from the output stream, and appended as a string value to the evaluation stack. Re-enters evaluation mode immediately afterwards.
 * `"nop"` - No-operation. Does nothing, but is useful as an addressable piece of content to divert to.
-* `"choiceCnt"` - Historical compiled-story command that pushes the current generated choice count. ink-rs source no longer emits `CHOICE_COUNT`.
-* `"turn"` - Historical compiled-story command. The current runtime keeps no turn counter and pushes `0`.
-* `"turns"` - Historical compiled-story command. The current runtime keeps no turn index state and pushes `-1` for known divert targets.
-* `"visit"` - Historical compiled-story command. The current runtime keeps no visit-count state and pushes `-1` as a sequence index fallback. ink-rs source no longer emits source sequence JSON.
-* `"seq"` - Historical compiled-story command for shuffle sequence JSON. Pops an integer, expected to be the number of elements in a sequence that's being entered. In return, it pushes an integer with the next sequence shuffle index to the evaluation stack. This shuffle index is derived from the element count, the sequence path, and the story's random seed from when it was first begun.
-* `"thread"` - Historical compiled-story command for thread-style source branching. Current ink-rs source no longer emits it. Runtime compatibility maps it to an isolated legacy continuation split.
-* `"done"` - Historical compiled-story command that can close a legacy continuation split, otherwise marks the story flow safe to exit without a loose end warning.
-* `"end"` - Historical compiled-story command that ends the story flow immediately, unwinds the callstack, and removes any choices that were previously created.
+* `"rnd"` - Pops maximum and minimum integer bounds from the evaluation stack, pushes a deterministic pseudo-random integer in that inclusive range, and advances the story random state.
+* `"srnd"` - Pops an integer seed, stores it as the story random seed, resets the previous random value, and pushes `void`.
 
-Current source no longer emits `"thread"` from `<-`, or `"done"`/`"end"` from
-magic `-> DONE` or `-> END` diverts. Natural story endings and ordinary authored
-diverts are represented by the lowered container structure and normal divert
-commands instead.
+Natural story endings are represented by reaching the end of the current
+container structure. Current compiled JSON has no terminal control command for
+story end.
 
 ## Native functions
 
@@ -271,18 +247,6 @@ Example:
 * `{"VAR?": "state::danger"}` - Get a module global by its source-qualified
   runtime variable name.
 
-## Historical Read Count
-
-Compiled-story JSON can still represent the historical read-count lookup shape. ink-rs
-source no longer emits this for `READ_COUNT` or `{knot}` shorthand, and runtime
-save JSON no longer stores visit counts. Runtime lookups therefore return the
-compatibility fallback count rather than maintained authored state.
-
-Example:
-
-* `{"CNT?": "the_hall.light_switch"}` - Historical compiled-story read-count lookup for the container at the given path.
-
-
 ## ChoicePoint
 
 Generates an instance of a `Choice`. Its exact behaviour depends on its flags. It doesn't contain any text itself, since choice text is generated at runtime and added to the evaluation stack. When a ChoicePoint is encountered, it pops content off the evaluation stack according to its flags, which indicate which texts are needed.
@@ -292,7 +256,7 @@ A ChoicePoint object's structure in JSON is:
 ```json
 {
     "*": "path.when.chosen",
-    "flg": 18
+    "flg": 2
 }
 ```
 
@@ -302,21 +266,20 @@ The `flg` field is a bitfield of flags:
 
  * **0x1 - Has condition?**: Set if the story should pop a value from the evaluation stack in order to determine whether a choice instance should be created at all.
  * **0x2 - Has start content?** - Choice display text should be popped from the evaluation stack.
- * **0x4 - Has choice-only content?** - Historical square-bracket choice text should be popped from the evaluation stack if present in compiled-story JSON. ink-rs source no longer accepts this syntax.
  * **0x8 - Is invisible default?** - When this is enabled, the choice isn't provided to the game (isn't presented to the player), and instead is automatically followed if there are no other choices generated.
- * **0x10 - Once only?** - Historical flag retained in the compiled-story shape. Current ink-rs source accepts only `*` choice markers, and the runtime ignores once-only flags when loading compiled stories.
 
-Example of the historical full JSON output, including the ChoicePoint object, when generating split choice text from `* Hello[.], world.`. Current ink-rs source does not accept choice square brackets, but the runtime data shape can still describe existing compiled content.
+Only these bits are valid in current compiled JSON. Other bits are rejected.
+
+Example of the full JSON output shape, including the ChoicePoint object, when
+generating display text and chosen content from a current `* Hello` choice:
 
 ```jsonc
 // Outer container
 [
 
   // Evaluate choice text.
-  // Starts by calling a "function" labelled
-  // 's', which is the start content for the choice.
-  // Historical compiled output used a small Container so that it could be
-  // re-used for visit-count behavior.
+  // Starts by calling a "function" labelled 's', which is the start
+  // content for the choice.
   "ev",
   "str",
   {
@@ -324,23 +287,15 @@ Example of the historical full JSON output, including the ChoicePoint object, wh
   },
   "/str",
 
-  // Evaluate historical content inside square brackets (simply '.')
-  "str",
-  "^.",
-  "/str",
-
   // Evaluation of choice text complete
   "/ev",
 
   // ChoicePoint object itself:
   //  - linked to own container named 'c'
-  //  - Flags 22 are:
-  //     * 0x2  - has start content
-  //     * 0x4  - has historical choice-only content
-  //     * 0x10 - historical once-only flag ignored by ink-rs runtime
+  //  - Flag 2 means it has start content
   {
     "*": ".^.c",
-    "flg": 22
+    "flg": 2
   },
 
   // Named content from outer container - 's' and 'c'
@@ -360,15 +315,7 @@ Example of the historical full JSON output, including the ChoicePoint object, wh
       },
       "^, world.",
       "\n",
-      "\n",
-
-      // Container has all three counting flags:
-      //  - Visits are counted
-      //  - Turns-since is counted
-      //  - Counted from start only
-      {
-        "#f": 7
-      }
+      null
     ]
   }
 ]

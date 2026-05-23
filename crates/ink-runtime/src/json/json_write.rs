@@ -108,11 +108,7 @@ fn runtime_object_to_format_object(object: Rc<dyn RTObject>) -> Result<format::O
     }
 
     if let Ok(var_ref) = object.clone().into_any().downcast::<VariableReference>() {
-        if let Some(read_count_path) = var_ref.get_path_string_for_count() {
-            return Ok(format::Object::ReadCount(read_count_path));
-        } else {
-            return Ok(format::Object::VariableReference(var_ref.name.clone()));
-        }
+        return Ok(format::Object::VariableReference(var_ref.name.clone()));
     }
 
     if let Some(var_ass) = object.as_any().downcast_ref::<VariableAssignment>() {
@@ -284,16 +280,10 @@ fn runtime_container_to_format(
                 .map(|container| format::NamedContainer::new(name.clone(), container))
         })
         .collect::<Result<Vec<_>, _>>()?;
-    let flags = match container.get_count_flags() {
-        0 => None,
-        flags => Some(flags),
-    };
-
     Ok(format::Container {
         content,
         named_content,
         name,
-        flags,
     })
 }
 
@@ -321,7 +311,6 @@ mod tests {
     fn converts_runtime_containers_to_format_objects_without_json_reparse() {
         let named_child = Container::new(
             Some("knot".to_string()),
-            0,
             vec![Rc::new(Value::new::<&str>("Nested")) as Rc<dyn RTObject>],
             HashMap::new(),
         );
@@ -329,11 +318,9 @@ mod tests {
         named_content.insert("knot".to_string(), named_child);
         let root = Container::new(
             Some("root".to_string()),
-            1,
             vec![
                 Rc::new(Value::new::<&str>("Line.")) as Rc<dyn RTObject>,
                 Rc::new(ControlCommand::new(CommandType::BeginTag)) as Rc<dyn RTObject>,
-                Rc::new(ControlCommand::new(CommandType::Done)) as Rc<dyn RTObject>,
             ],
             named_content,
         );
@@ -354,13 +341,11 @@ mod tests {
             panic!("expected format container object");
         };
         assert_eq!(format_container.name.as_deref(), Some("root"));
-        assert_eq!(format_container.flags, Some(1));
         assert_eq!(
             format_container.content,
             vec![
                 format::Object::String("Line.".to_string()),
                 format::Object::Tag { is_start: true },
-                format::Object::ControlCommand(format::ControlCommand::Done),
             ]
         );
         assert_eq!(format_container.named_content.len(), 1);

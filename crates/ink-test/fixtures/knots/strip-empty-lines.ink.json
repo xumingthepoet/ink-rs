@@ -1,1 +1,1 @@
-{"inkVersion":1,"root":[{"->":"game.main"},"done",{"game":[{"main":["^Hello, world!","\n","^Hello?","\n","^Hello, are you there?","\n","done",null]}]}]}
+{"inkVersion":2,"root":[{"->":"game.main"},{"game":[{"main":["^Hello, world!","\n","^Hello?","\n","^Hello, are you there?","\n",null]}]}]}

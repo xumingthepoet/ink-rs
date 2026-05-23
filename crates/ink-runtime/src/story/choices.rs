@@ -43,10 +43,6 @@ impl Story {
         self.get_state_mut()
             .set_chosen_path(p, incrementing_turn_index)?;
 
-        // Preserve the navigation hook. The current runtime no longer
-        // records visit or turn counts here.
-        self.visit_changed_containers_due_to_divert();
-
         Ok(())
     }
 
@@ -65,12 +61,7 @@ impl Story {
         }
 
         let mut start_text = String::new();
-        let mut choice_only_text = String::new();
         let mut tags: Vec<String> = Vec::with_capacity(0);
-
-        if choice_point.has_choice_only_content() {
-            choice_only_text = self.pop_choice_string_and_tags(&mut tags)?;
-        }
 
         if choice_point.has_start_content() {
             start_text = self.pop_choice_string_and_tags(&mut tags)?;
@@ -82,8 +73,6 @@ impl Story {
         if !show_choice {
             return Ok(None);
         }
-
-        start_text.push_str(&choice_only_text);
 
         let choice = Rc::new(Choice::new(
             choice_point.get_path_on_choice(),

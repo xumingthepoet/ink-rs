@@ -84,22 +84,18 @@ fn lower_module_story(
     }
 
     let root_content = if let Some(entry_point) = &story.entry_point {
-        vec![
-            RuntimeObject::Divert {
-                target: format!("{}.{}", entry_point.module, entry_point.knot),
-                variable: false,
-            },
-            RuntimeObject::ControlCommand(ControlCommand::Done),
-        ]
+        vec![RuntimeObject::Divert {
+            target: format!("{}.{}", entry_point.module, entry_point.knot),
+            variable: false,
+        }]
     } else {
-        vec![RuntimeObject::ControlCommand(ControlCommand::Done)]
+        Vec::new()
     };
 
     let mut root = Container {
         content: root_content,
         named_content: named_containers,
         name: None,
-        flags: None,
     };
     compact_path_strings_in_container(&mut root);
 
@@ -223,7 +219,6 @@ fn lower_module(module: &crate::parsed::Module, indexes: &LoweringIndexes<'_>) -
         content: Vec::new(),
         named_content,
         name: Some(module.name().to_string()),
-        flags: None,
     }
 }
 
@@ -246,7 +241,6 @@ pub(super) fn named_content(
             content,
             named_content: Vec::new(),
             name: Some(name),
-            flags: None,
         },
     )
 }
@@ -306,13 +300,11 @@ fn lower_global_declarations(
         }
     }
     content.push(RuntimeObject::ControlCommand(ControlCommand::EvalEnd));
-    content.push(RuntimeObject::ControlCommand(ControlCommand::End));
 
     Some(Container {
         content,
         named_content: Vec::new(),
         name: Some("global decl".to_string()),
-        flags: None,
     })
 }
 
@@ -458,12 +450,14 @@ fn ends_with_flow_terminator(content: &[RuntimeObject]) -> bool {
             matches!(
                 object,
                 RuntimeObject::Divert { .. }
-                    | RuntimeObject::ControlCommand(ControlCommand::End | ControlCommand::Done)
+                    | RuntimeObject::ControlCommand(
+                        ControlCommand::PopFunction | ControlCommand::PopTunnel
+                    )
             )
         })
 }
 
-fn ends_with_end_or_done(content: &[RuntimeObject]) -> bool {
+fn ends_with_explicit_flow_stop(content: &[RuntimeObject]) -> bool {
     content
         .iter()
         .rev()
@@ -471,17 +465,19 @@ fn ends_with_end_or_done(content: &[RuntimeObject]) -> bool {
         .is_some_and(|object| {
             matches!(
                 object,
-                RuntimeObject::ControlCommand(ControlCommand::End | ControlCommand::Done)
+                RuntimeObject::Divert { .. }
+                    | RuntimeObject::ControlCommand(
+                        ControlCommand::PopFunction | ControlCommand::PopTunnel
+                    )
             )
         })
 }
 
-fn done_container(name: &str) -> Container {
+fn terminal_container(name: &str) -> Container {
     Container {
-        content: vec![RuntimeObject::ControlCommand(ControlCommand::Done)],
+        content: vec![RuntimeObject::ControlCommand(ControlCommand::NoOp)],
         named_content: Vec::new(),
         name: Some(name.to_string()),
-        flags: None,
     }
 }
 

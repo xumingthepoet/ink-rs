@@ -8,9 +8,8 @@ use super::context::{ChoicePathMode, LoweringContext};
 use super::expression::lower_expression_into;
 use super::path::{child_path, LabelIndex};
 use super::{
-    done_container, ends_with_end_or_done, ends_with_flow_terminator,
-    lower_object_into_with_context, lower_object_into_with_context_count, named_container,
-    named_content,
+    ends_with_explicit_flow_stop, ends_with_flow_terminator, lower_object_into_with_context,
+    lower_object_into_with_context_count, named_container, named_content, terminal_container,
 };
 
 enum ChoiceOuter {
@@ -39,10 +38,6 @@ impl GatherLocation {
             }
         }
     }
-}
-
-fn named_container_flags(force_named_flag: bool) -> Option<i32> {
-    force_named_flag.then_some(4)
 }
 
 pub(super) fn weave_has_choice(weave: &Weave) -> bool {
@@ -176,8 +171,6 @@ pub(super) fn lower_choice_weave_with_initial_content(
                             target,
                             variable: false,
                         });
-                    } else {
-                        gather_content.push(RuntimeObject::ControlCommand(ControlCommand::Done));
                     }
                 }
 
@@ -185,7 +178,6 @@ pub(super) fn lower_choice_weave_with_initial_content(
                     content: gather_content,
                     named_content: gather_named_content,
                     name: Some(gather_name),
-                    flags: named_container_flags(gather.identifier().is_some()),
                 };
                 if auto_enter_gather {
                     if let Some(location) = last_gather_location.clone() {
@@ -239,7 +231,7 @@ pub(super) fn lower_choice_weave_with_initial_content(
             {
                 container
                     .content
-                    .push(RuntimeObject::Container(done_container(&format!(
+                    .push(RuntimeObject::Container(terminal_container(&format!(
                         "g-{gather_count}"
                     ))));
             }
@@ -249,7 +241,7 @@ pub(super) fn lower_choice_weave_with_initial_content(
         && needs_terminal_gather
         && path_mode.fallback_gather_target().is_none()
     {
-        named_content.push(named_container(done_container(&format!(
+        named_content.push(named_container(terminal_container(&format!(
             "g-{gather_count}"
         ))));
     }
@@ -258,7 +250,6 @@ pub(super) fn lower_choice_weave_with_initial_content(
         content: main_content,
         named_content,
         name: None,
-        flags: None,
     }
 }
 
@@ -459,7 +450,7 @@ fn lower_choice_in_section(
     if include_gather
         && !(section.has_explicit_gather
             && !has_following_gather
-            && ends_with_end_or_done(&choice_content))
+            && ends_with_explicit_flow_stop(&choice_content))
     {
         choice_content.push(RuntimeObject::Divert {
             target: section
@@ -468,17 +459,12 @@ fn lower_choice_in_section(
             variable: false,
         });
         *section.needs_terminal_gather = true;
-    } else if !ends_with_flow_terminator(&choice_content) {
-        choice_content.push(RuntimeObject::ControlCommand(ControlCommand::Done));
     }
 
-    section
-        .named_content
-        .push(named_container(Container::named_with_flags(
-            choice_container_name,
-            choice_content,
-            named_container_flags(false),
-        )));
+    section.named_content.push(named_container(Container::named(
+        choice_container_name,
+        choice_content,
+    )));
     if let Some(identifier) = choice.identifier() {
         section.choice_labels.insert(
             identifier.to_string(),

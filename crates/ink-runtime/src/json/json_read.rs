@@ -77,7 +77,6 @@ fn format_container_to_runtime(container: &format::Container) -> Result<Rc<Conta
 
     Ok(Container::new(
         container.name.clone(),
-        container.flags.unwrap_or(0),
         content,
         named_content,
     ))
@@ -164,9 +163,6 @@ fn format_object_to_runtime(object: &format::Object) -> Result<Rc<dyn RTObject>,
             Ok(Rc::new(VariableAssignment::new(name, false, true)))
         }
         format::Object::VariableReference(name) => Ok(Rc::new(VariableReference::new(name))),
-        format::Object::ReadCount(target) => {
-            Ok(Rc::new(VariableReference::from_path_for_count(target)))
-        }
         format::Object::Glue => Ok(Rc::new(Glue::new())),
         format::Object::Tag { is_start } => {
             let token = if *is_start {
@@ -396,14 +392,14 @@ mod tests {
 
     #[test]
     fn loads_current_story_json_version() {
-        let json = r#"{"inkVersion":1,"root":["done",null]}"#;
+        let json = r#"{"inkVersion":2,"root":["nop",null]}"#;
 
         assert!(load_from_string(json).is_ok());
     }
 
     #[test]
     fn rejects_non_current_story_json_version() {
-        let json = r#"{"inkVersion":21,"root":["done",null]}"#;
+        let json = r#"{"inkVersion":1,"root":["nop",null]}"#;
 
         let error = match load_from_string(json) {
             Ok(_) => panic!("expected version mismatch"),
@@ -417,7 +413,7 @@ mod tests {
 
     #[test]
     fn loads_native_function_tokens_as_runtime_calls() {
-        let json = r#"{"inkVersion":1,"root":["LEN","done",null]}"#;
+        let json = r#"{"inkVersion":2,"root":["LEN","nop",null]}"#;
 
         let root = load_from_string(json).expect("story JSON should load");
         let function = root.content[0]
@@ -431,12 +427,12 @@ mod tests {
     #[test]
     fn loads_dynamic_interface_objects_and_metadata() {
         let json = r#"{
-            "inkVersion": 1,
+            "inkVersion": 2,
             "root": [
                 "^left",
                 {"i->": "target", "interface": "IItem"},
                 {"i()": "score", "interface": "IItem", "args": 1},
-                "done",
+                "nop",
                 null
             ],
             "interfaces": {
@@ -484,7 +480,7 @@ mod tests {
 
     #[test]
     fn rejects_unknown_native_function_tokens_from_story_json() {
-        let json = r#"{"inkVersion":1,"root":["UNKNOWN_NATIVE",null]}"#;
+        let json = r#"{"inkVersion":2,"root":["UNKNOWN_NATIVE",null]}"#;
 
         let error = match load_from_string(json) {
             Ok(_) => panic!("expected unsupported native token"),
@@ -497,12 +493,66 @@ mod tests {
     }
 
     #[test]
+    fn rejects_removed_current_format_commands_from_story_json() {
+        for token in [
+            "done",
+            "end",
+            "thread",
+            "choiceCnt",
+            "turn",
+            "turns",
+            "readc",
+            "visit",
+            "seq",
+        ] {
+            let json = format!(r#"{{"inkVersion":2,"root":["{token}",null]}}"#);
+            let error = match load_from_string(&json) {
+                Ok(_) => panic!("removed token should be rejected"),
+                Err(error) => error,
+            };
+
+            assert!(
+                error
+                    .to_string()
+                    .contains(&format!("unsupported native function token: {token}")),
+                "unexpected error for {token}: {error}"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_removed_read_count_and_container_flags_from_story_json() {
+        let read_count = r#"{"inkVersion":2,"root":[{"CNT?":"knot"},null]}"#;
+        let error = match load_from_string(read_count) {
+            Ok(_) => panic!("CNT? should be rejected"),
+            Err(error) => error,
+        };
+        assert!(error.to_string().contains("read-count object 'CNT?'"));
+
+        let flags = r##"{"inkVersion":2,"root":["^Line.",{"#f":1}]}"##;
+        let error = match load_from_string(flags) {
+            Ok(_) => panic!("#f should be rejected"),
+            Err(error) => error,
+        };
+        assert!(error.to_string().contains("container count flags '#f'"));
+
+        let choice_only = r#"{"inkVersion":2,"root":[{"*":"target","flg":4},null]}"#;
+        let error = match load_from_string(choice_only) {
+            Ok(_) => panic!("choice-only flag should be rejected"),
+            Err(error) => error,
+        };
+        assert!(error
+            .to_string()
+            .contains("choice point flags contain unsupported current-format bits"));
+    }
+
+    #[test]
     fn loads_dynamic_array_values_from_story_json() {
         let json = r#"{
-            "inkVersion": 1,
+            "inkVersion": 2,
             "root": [
                 [1, true, {"hp": 10}, ["^nested"]],
-                "done",
+                "nop",
                 null
             ]
         }"#;
@@ -525,11 +575,11 @@ mod tests {
     #[test]
     fn loads_dynamic_dict_values_from_story_json() {
         let json = r#"{
-            "inkVersion": 1,
+            "inkVersion": 2,
             "root": [
                 ["dict", "string", [["ada", 10], ["items", [1, true]]]],
                 ["dict", "int", [[1, "^one"]]],
-                "done",
+                "nop",
                 null
             ]
         }"#;
@@ -627,7 +677,7 @@ mod tests {
     #[test]
     fn rejects_non_value_dictionary_save_state_entries() {
         let value = json!({
-            "bad": "done"
+            "bad": "nop"
         });
         let error = match jobject_to_hashmap_values(value.as_object().expect("object")) {
             Ok(_) => panic!("expected non-value dictionary entry to fail"),

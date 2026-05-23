@@ -3,7 +3,7 @@ use serde_json::{Map, Value as JsonValue};
 use crate::{Container, FormatError, NamedContainer};
 
 use super::object::{object_from_value, object_to_value};
-use super::scalar::{json_value_to_i32, json_value_to_string};
+use super::scalar::json_value_to_string;
 
 pub(crate) fn container_from_value(
     value: &JsonValue,
@@ -24,7 +24,6 @@ pub(crate) fn container_from_value(
     }
 
     let mut name = name_hint;
-    let mut flags = None;
     let mut named_content = Vec::new();
 
     match terminator {
@@ -37,7 +36,11 @@ pub(crate) fn container_from_value(
         JsonValue::Object(obj) => {
             for (key, value) in obj {
                 match key.as_str() {
-                    "#f" => flags = Some(json_value_to_i32(value, "#f")?),
+                    "#f" => {
+                        return Err(FormatError::new(
+                            "container count flags '#f' are not supported in current compiled JSON",
+                        ));
+                    }
                     "#n" => name = Some(json_value_to_string(value, "#n")?.to_string()),
                     name => {
                         let container = container_from_value(value, Some(name.to_string()))?;
@@ -57,7 +60,6 @@ pub(crate) fn container_from_value(
         content,
         named_content,
         name,
-        flags,
     })
 }
 
@@ -79,10 +81,6 @@ fn container_terminator_to_value(container: &Container, include_name: bool) -> J
             named.name.clone(),
             container_to_value(&named.container, false),
         );
-    }
-
-    if let Some(flags) = container.flags {
-        obj.insert("#f".to_string(), JsonValue::Number(flags.into()));
     }
 
     if include_name {

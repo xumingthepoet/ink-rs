@@ -4,6 +4,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use serde_json::Value;
+
 const ALLOWED_NON_MODULE_INK_FIXTURES: &[&str] = &[];
 
 const ALLOWED_SOURCE_CONSTRUCTION_TESTS: &[&str] = &[];
@@ -40,6 +42,20 @@ const SOURCE_CONSTRUCTION_PATTERNS: &[&str] = &[
     "SourceInput::new(\"",
     "SourceInput::named(\"",
 ];
+
+const REMOVED_COMPILED_JSON_STRING_TOKENS: &[&str] = &[
+    "done",
+    "end",
+    "thread",
+    "choiceCnt",
+    "turn",
+    "turns",
+    "readc",
+    "visit",
+    "seq",
+];
+
+const REMOVED_COMPILED_JSON_OBJECT_KEYS: &[&str] = &["CNT?", "#f"];
 
 #[test]
 fn module_fixture_policy_tracks_non_module_ink_files() {
@@ -135,6 +151,46 @@ fn compiled_json_fixtures_have_source_siblings() {
 }
 
 #[test]
+fn current_compiled_json_surfaces_reject_removed_legacy_format() {
+    let workspace_root = workspace_root();
+    let fixture_root = ink_test::fixture_root();
+
+    let mut offenders = Vec::new();
+    for path in files_under(&fixture_root, |path| {
+        path.file_name()
+            .is_some_and(|name| name.to_string_lossy().ends_with(".ink.json"))
+    }) {
+        let text = fs::read_to_string(&path)
+            .unwrap_or_else(|error| panic!("failed to read fixture {}: {error}", path.display()));
+        let json: Value = serde_json::from_str(&text)
+            .unwrap_or_else(|error| panic!("fixture {} is not JSON: {error}", path.display()));
+        collect_removed_compiled_json_residue(
+            &json,
+            &relative_path(&workspace_root, &path),
+            "$",
+            &mut offenders,
+        );
+    }
+
+    let format_doc = workspace_root.join("docs/ink_JSON_runtime_format.md");
+    let format_doc_text = fs::read_to_string(&format_doc)
+        .unwrap_or_else(|error| panic!("failed to read {}: {error}", format_doc.display()));
+    for pattern in removed_compiled_json_doc_patterns() {
+        if format_doc_text.contains(&pattern) {
+            offenders.push(format!(
+                "{} contains removed current-format token {pattern}",
+                relative_path(&workspace_root, &format_doc)
+            ));
+        }
+    }
+
+    assert!(
+        offenders.is_empty(),
+        "current compiled JSON fixtures and format docs must not contain removed legacy format residue: {offenders:#?}"
+    );
+}
+
+#[test]
 fn disabled_test_harness_targets_stay_test_free() {
     let workspace_root = workspace_root();
     let disabled_manifests = manifests_with_disabled_test_harnesses(&workspace_root)
@@ -172,6 +228,66 @@ fn disabled_test_harness_targets_stay_test_free() {
         offenders.is_empty(),
         "targets with test = false must not contain unit-test markers because Cargo would ignore them; remove test = false or move the tests: {offenders:#?}"
     );
+}
+
+fn collect_removed_compiled_json_residue(
+    value: &Value,
+    file: &str,
+    json_path: &str,
+    offenders: &mut Vec<String>,
+) {
+    match value {
+        Value::String(token) => {
+            if REMOVED_COMPILED_JSON_STRING_TOKENS.contains(&token.as_str()) {
+                offenders.push(format!(
+                    "{file}:{json_path} contains removed token {token:?}"
+                ));
+            }
+        }
+        Value::Array(items) => {
+            for (index, item) in items.iter().enumerate() {
+                collect_removed_compiled_json_residue(
+                    item,
+                    file,
+                    &format!("{json_path}[{index}]"),
+                    offenders,
+                );
+            }
+        }
+        Value::Object(fields) => {
+            if let Some(flags) = fields.get("flg").and_then(Value::as_i64) {
+                if flags & !0x0b != 0 {
+                    offenders.push(format!(
+                        "{file}:{json_path}.flg contains unsupported choice flag bits {flags}"
+                    ));
+                }
+            }
+            for (key, item) in fields {
+                if REMOVED_COMPILED_JSON_OBJECT_KEYS.contains(&key.as_str()) {
+                    offenders.push(format!("{file}:{json_path} contains removed key {key:?}"));
+                }
+                collect_removed_compiled_json_residue(
+                    item,
+                    file,
+                    &format!("{json_path}.{key}"),
+                    offenders,
+                );
+            }
+        }
+        Value::Null | Value::Bool(_) | Value::Number(_) => {}
+    }
+}
+
+fn removed_compiled_json_doc_patterns() -> Vec<String> {
+    REMOVED_COMPILED_JSON_STRING_TOKENS
+        .iter()
+        .map(|token| format!("`\"{token}\"`"))
+        .chain(
+            REMOVED_COMPILED_JSON_OBJECT_KEYS
+                .iter()
+                .map(|key| format!("`{key}`")),
+        )
+        .collect()
 }
 
 fn non_module_fixture_path(root: &Path, path: &Path) -> Option<String> {

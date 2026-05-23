@@ -213,7 +213,6 @@ pub struct Container {
     pub content: Vec<Object>,
     pub named_content: Vec<NamedContainer>,
     pub name: Option<String>,
-    pub flags: Option<i32>,
 }
 
 impl Container {
@@ -222,7 +221,6 @@ impl Container {
             content,
             named_content: Vec::new(),
             name: None,
-            flags: None,
         }
     }
 
@@ -231,20 +229,6 @@ impl Container {
             content,
             named_content: Vec::new(),
             name: Some(name.into()),
-            flags: None,
-        }
-    }
-
-    pub fn named_with_flags(
-        name: impl Into<String>,
-        content: Vec<Object>,
-        flags: Option<i32>,
-    ) -> Self {
-        Self {
-            content,
-            named_content: Vec::new(),
-            name: Some(name.into()),
-            flags,
         }
     }
 
@@ -312,7 +296,6 @@ pub enum Object {
         target: String,
     },
     DivertTarget(String),
-    ReadCount(String),
     VariableAssignment(String),
     GlobalVariableAssignment(String),
     TempVariableReassignment(String),
@@ -367,25 +350,16 @@ impl Object {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ControlCommand {
-    Done,
-    End,
     EvalStart,
     EvalOutput,
     EvalEnd,
     BeginString,
     EndString,
-    VisitIndex,
-    SequenceShuffleIndex,
     Duplicate,
     NoOp,
     Pop,
     PopFunction,
     PopTunnel,
-    StartThread,
-    ChoiceCount,
-    Turns,
-    TurnsSince,
-    ReadCount,
     Random,
     SeedRandom,
 }
@@ -393,25 +367,16 @@ pub enum ControlCommand {
 impl ControlCommand {
     pub fn from_token(token: &str) -> Option<Self> {
         match token {
-            "done" => Some(Self::Done),
-            "end" => Some(Self::End),
             "ev" => Some(Self::EvalStart),
             "out" => Some(Self::EvalOutput),
             "/ev" => Some(Self::EvalEnd),
             "str" => Some(Self::BeginString),
             "/str" => Some(Self::EndString),
-            "visit" => Some(Self::VisitIndex),
-            "seq" => Some(Self::SequenceShuffleIndex),
             "du" => Some(Self::Duplicate),
             "nop" => Some(Self::NoOp),
             "pop" => Some(Self::Pop),
             "~ret" => Some(Self::PopFunction),
             "->->" => Some(Self::PopTunnel),
-            "thread" => Some(Self::StartThread),
-            "choiceCnt" => Some(Self::ChoiceCount),
-            "turn" => Some(Self::Turns),
-            "turns" => Some(Self::TurnsSince),
-            "readc" => Some(Self::ReadCount),
             "rnd" => Some(Self::Random),
             "srnd" => Some(Self::SeedRandom),
             _ => None,
@@ -420,25 +385,16 @@ impl ControlCommand {
 
     pub fn token(self) -> &'static str {
         match self {
-            Self::Done => "done",
-            Self::End => "end",
             Self::EvalStart => "ev",
             Self::EvalOutput => "out",
             Self::EvalEnd => "/ev",
             Self::BeginString => "str",
             Self::EndString => "/str",
-            Self::VisitIndex => "visit",
-            Self::SequenceShuffleIndex => "seq",
             Self::Duplicate => "du",
             Self::NoOp => "nop",
             Self::Pop => "pop",
             Self::PopFunction => "~ret",
             Self::PopTunnel => "->->",
-            Self::StartThread => "thread",
-            Self::ChoiceCount => "choiceCnt",
-            Self::Turns => "turn",
-            Self::TurnsSince => "turns",
-            Self::ReadCount => "readc",
             Self::Random => "rnd",
             Self::SeedRandom => "srnd",
         }

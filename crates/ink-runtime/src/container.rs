@@ -10,24 +10,16 @@ use crate::{
     value_type::ValueType,
 };
 
-const COUNTFLAGS_VISITS: i32 = 1;
-const COUNTFLAGS_TURNS: i32 = 2;
-const COUNTFLAGS_COUNTSTARTONLY: i32 = 4;
-
 pub struct Container {
     obj: Object,
     pub name: Option<String>,
     pub content: Vec<Rc<dyn RTObject>>,
     pub named_content: HashMap<String, Rc<Container>>,
-    pub visits_should_be_counted: bool,
-    pub turn_index_should_be_counted: bool,
-    pub counting_at_start_only: bool,
 }
 
 impl Container {
     pub fn new(
         name: Option<String>,
-        count_flags: i32,
         content: Vec<Rc<dyn RTObject>>,
         named_content: HashMap<String, Rc<Container>>,
     ) -> Rc<Container> {
@@ -41,17 +33,11 @@ impl Container {
             }
         });
 
-        let (visits_should_be_counted, turn_index_should_be_counted, counting_at_start_only) =
-            Container::split_count_flags(count_flags);
-
         let c = Rc::new(Container {
             obj: Object::new(),
             content,
             named_content,
             name,
-            visits_should_be_counted,
-            turn_index_should_be_counted,
-            counting_at_start_only,
         });
 
         c.content.iter().for_each(|o| o.get_object().set_parent(&c));
@@ -223,47 +209,6 @@ impl Container {
         }
 
         SearchResult::new(current_obj, approximate)
-    }
-
-    pub fn get_count_flags(&self) -> i32 {
-        let mut flags: i32 = 0;
-
-        if self.visits_should_be_counted {
-            flags |= COUNTFLAGS_VISITS
-        }
-
-        if self.turn_index_should_be_counted {
-            flags |= COUNTFLAGS_TURNS;
-        }
-
-        if self.counting_at_start_only {
-            flags |= COUNTFLAGS_COUNTSTARTONLY;
-        }
-
-        // If we're only storing CountStartOnly, it serves no purpose,
-        // since it's dependent on the other two to be used at all.
-        // (e.g. for setting the fact that *if* a gather or choice's
-        // content is counted, then is should only be counter at the start)
-        // So this is just an optimisation for storage.
-        if flags == COUNTFLAGS_COUNTSTARTONLY {
-            flags = 0;
-        }
-
-        flags
-    }
-
-    fn split_count_flags(value: i32) -> (bool, bool, bool) {
-        let visits_should_be_counted = (value & COUNTFLAGS_VISITS) > 0;
-
-        let turn_index_should_be_counted = (value & COUNTFLAGS_TURNS) > 0;
-
-        let counting_at_start_only = (value & COUNTFLAGS_COUNTSTARTONLY) > 0;
-
-        (
-            visits_should_be_counted,
-            turn_index_should_be_counted,
-            counting_at_start_only,
-        )
     }
 
     fn content_with_path_component(&self, component: &Component) -> Option<Rc<dyn RTObject>> {

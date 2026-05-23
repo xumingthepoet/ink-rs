@@ -1,7 +1,7 @@
 === module game ===
 
 == main ==
-* Thread
-    Thread branch.
+* Replay
+    Replay branch.
 * Main
     Main branch.

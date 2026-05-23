@@ -2,7 +2,6 @@ use crate::{
     choice::Choice,
     choice_point::ChoicePoint,
     container::Container,
-    control_command::{CommandType, ControlCommand},
     object::RTObject,
     pointer::{self, Pointer},
     push_pop::PushPopType,
@@ -137,10 +136,6 @@ impl Story {
 
             // Finished a section of content / reached a choice point?
             if !self.can_continue() {
-                if self.state.get_callstack().borrow().can_pop_continuation() {
-                    self.add_error("Continuation available to pop, continuations should always be flat by the end of evaluation?", false);
-                }
-
                 if self.state.get_generated_choices().is_empty()
                     && !self.get_state().is_did_safe_exit()
                     && self.temporary_evaluation_container.is_none()
@@ -162,13 +157,6 @@ impl Story {
                             "unexpectedly reached end of content. Do you need a '~ return'?",
                             false,
                         );
-                    } else if !self.get_state().get_callstack().borrow().can_pop() {
-                        self.add_error(
-                            "ran out of content before reaching a natural end, authored choice, or divert target.",
-                            false,
-                        );
-                    } else {
-                        self.add_error("unexpectedly reached end of content for unknown reason. Please debug compiler!", false);
                     }
                 }
             }
@@ -382,9 +370,7 @@ impl Story {
         // Is the current content Object:
         // - Normal content
         // - Or a logic/flow statement - if so, do it
-        // Stop flow if we hit a stack pop when we're unable to pop (e.g.
-        // return/done statement in knot
-        // that was diverted to rather than called as a function)
+        // Stop flow if control logic moves the current pointer to null.
         let mut current_content_obj = pointer.resolve();
 
         let is_logic_or_flow_control = self.perform_logic_and_flow_control(&current_content_obj)?;
@@ -461,33 +447,10 @@ impl Story {
         // Increment the content pointer, following diverts if necessary
         self.next_content()?;
 
-        if let Some(current_content_obj) = current_content_obj.as_ref() {
-            if let Some(control_cmd) = current_content_obj
-                .as_any()
-                .downcast_ref::<ControlCommand>()
-            {
-                if control_cmd.command_type == CommandType::LegacyStartThread {
-                    self.handle_legacy_start_thread_command();
-                }
-            }
-        }
-
         Ok(())
     }
 
-    fn handle_legacy_start_thread_command(&mut self) {
-        // Historical compiled-story JSON can still contain the "thread" token.
-        // Current ink-rs source cannot emit it; this compatibility path keeps
-        // it away from ordinary choice execution.
-        self.get_state()
-            .get_callstack()
-            .borrow_mut()
-            .push_continuation();
-    }
-
     pub(crate) fn next_content(&mut self) -> Result<(), StoryError> {
-        // Setting previousContentObject is critical for
-        // VisitChangedContainersDueToDivert
         let cp = self.get_state().get_current_pointer();
         self.get_state_mut().set_previous_pointer(cp);
 
@@ -497,10 +460,6 @@ impl Story {
             self.get_state_mut().set_current_pointer(dp);
             self.get_state_mut()
                 .set_diverted_pointer(pointer::NULL.clone());
-
-            // Internally uses state.previousContentObject and
-            // state.currentContentObject
-            self.visit_changed_containers_due_to_divert();
 
             // Diverted location has valid content?
             if !self.get_state().get_current_pointer().is_null() {
@@ -516,8 +475,7 @@ impl Story {
 
         let successful_pointer_increment = self.increment_content_pointer();
 
-        // Ran out of content? Try to auto-exit from a function,
-        // or finish evaluating the content of a continuation
+        // Ran out of content? Try to auto-exit from a function.
         if !successful_pointer_increment {
             let mut did_pop = false;
 
@@ -540,20 +498,6 @@ impl Story {
                     self.get_state_mut()
                         .push_evaluation_stack(Rc::new(Void::new()));
                 }
-
-                did_pop = true;
-            } else if self
-                .get_state()
-                .get_callstack()
-                .as_ref()
-                .borrow()
-                .can_pop_continuation()
-            {
-                self.get_state()
-                    .get_callstack()
-                    .as_ref()
-                    .borrow_mut()
-                    .pop_continuation()?;
 
                 did_pop = true;
             } else {

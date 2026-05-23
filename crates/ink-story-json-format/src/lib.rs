@@ -18,4 +18,4 @@ pub use model::{
 };
 
 /// The current compiled story JSON format version.
-pub const INK_VERSION_CURRENT: i32 = 1;
+pub const INK_VERSION_CURRENT: i32 = 2;

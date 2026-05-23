@@ -99,7 +99,6 @@ pub(super) fn lower_conditional_into(
                     content: content_container,
                     named_content: content_named_content,
                     name: Some("b".to_string()),
-                    flags: None,
                 }));
             content.push(RuntimeObject::Container(branch_container));
             continue;

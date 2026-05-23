@@ -1,1 +1,1 @@
-{"inkVersion":1,"root":[{"->":"game.main"},"done",{"game":[{"as_fast_as_we_could":["^as fast as we could.","\n","done",null],"main":["^We hurried home to Savile Row ",{"->":"game.as_fast_as_we_could"},"\n",null]}]}]}
+{"inkVersion":2,"root":[{"->":"game.main"},{"game":[{"as_fast_as_we_could":["^as fast as we could.","\n",null],"main":["^We hurried home to Savile Row ",{"->":"game.as_fast_as_we_could"},"\n",null]}]}]}

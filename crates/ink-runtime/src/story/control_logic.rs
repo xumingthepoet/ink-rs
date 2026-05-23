@@ -8,7 +8,6 @@ use crate::{
     native_function_call::NativeFunctionCall,
     object::RTObject,
     path::Path,
-    pointer,
     push_pop::PushPopType,
     story::Story,
     story_error::StoryError,
@@ -295,64 +294,6 @@ impl Story {
                         .push_evaluation_stack(Rc::new(Value::new::<&str>(&sb)));
                 }
                 CommandType::NoOp => {}
-                CommandType::ChoiceCount => {
-                    let choice_count = self.get_state().get_generated_choices().len();
-                    self.get_state_mut()
-                        .push_evaluation_stack(Rc::new(Value::new::<i32>(choice_count as i32)));
-                }
-                CommandType::Turns => {
-                    self.get_state_mut()
-                        .push_evaluation_stack(Rc::new(Value::new::<i32>(0)));
-                }
-                CommandType::TurnsSince | CommandType::ReadCount => {
-                    let target = self.get_state_mut().pop_evaluation_stack()?;
-                    if Value::get_value::<&Path>(target.as_ref()).is_none() {
-                        let mut extra_note = "".to_owned();
-                        if Value::get_value::<i32>(target.as_ref()).is_some() {
-                            extra_note = format!(". Did you accidentally pass a read count ('knot_name') instead of a target {}",
-                                    "('-> knot_name')?").to_owned();
-                        }
-
-                        return Err(StoryError::InvalidStoryState(format!("TURNS_SINCE expected a divert target (knot, stitch, label name), but saw {} {}", target
-                                , extra_note)));
-                    }
-
-                    let target = Value::get_value::<&Path>(target.as_ref()).unwrap();
-                    let otmp = self.content_at_path(target).correct_obj();
-                    let container = match &otmp {
-                        Some(o) => o.clone().into_any().downcast::<Container>().ok(),
-                        None => None,
-                    };
-                    let either_count: i32;
-                    match container {
-                        Some(_) => {
-                            either_count = if eval_command.command_type == CommandType::TurnsSince {
-                                -1
-                            } else {
-                                0
-                            };
-                        }
-                        None => {
-                            if eval_command.command_type == CommandType::TurnsSince {
-                                either_count = -1; // turn count, default to
-                                                   // never/unknown
-                            } else {
-                                either_count = 0;
-                            } // visit count, assume 0 to default to allowing entry
-
-                            self.add_error(
-                                &format!(
-                                    "Failed to find container for {} lookup at {}",
-                                    eval_command, target
-                                ),
-                                true,
-                            );
-                        }
-                    }
-
-                    self.get_state_mut()
-                        .push_evaluation_stack(Rc::new(Value::new::<i32>(either_count)));
-                }
                 CommandType::Random => {
                     let mut max_int = None;
                     let o = self.get_state_mut().pop_evaluation_stack()?;
@@ -413,51 +354,12 @@ impl Story {
                         ));
                     }
 
-                    // Story seed affects both RANDOM and shuffle behaviour
+                    // Story seed affects RANDOM.
                     self.get_state_mut().story_seed = seed.unwrap();
                     self.get_state_mut().previous_random = 0; // SEED_RANDOM returns nothing.
                     self.get_state_mut()
                         .push_evaluation_stack(Rc::new(Void::new()));
                 }
-                CommandType::VisitIndex => {
-                    // Compatibility fallback for compiled-story sequence JSON.
-                    // Source sequences are not part of current ink-rs syntax,
-                    // and the runtime no longer tracks visits.
-                    let count = -1;
-                    self.get_state_mut()
-                        .push_evaluation_stack(Rc::new(Value::new::<i32>(count)));
-                }
-                CommandType::SequenceShuffleIndex => {
-                    let shuffle_index = self.next_sequence_shuffle_index()?;
-                    let v = Rc::new(Value::new::<i32>(shuffle_index));
-                    self.get_state_mut().push_evaluation_stack(v);
-                }
-                CommandType::LegacyStartThread => {
-                    // Historical compiled-story compatibility is handled after
-                    // the content pointer advances in the main step function.
-                }
-                CommandType::Done => {
-                    // Historical compiled-story JSON may use "done" to leave a
-                    // legacy continuation split, or to mark normal flow exit.
-                    if self
-                        .get_state()
-                        .get_callstack()
-                        .borrow()
-                        .can_pop_continuation()
-                    {
-                        self.get_state()
-                            .get_callstack()
-                            .as_ref()
-                            .borrow_mut()
-                            .pop_continuation()?;
-                    }
-                    // In normal flow - allow safe exit without warning
-                    else {
-                        self.get_state_mut().set_did_safe_exit(true); // Stop flow in current continuation
-                        self.get_state().set_current_pointer(pointer::NULL.clone());
-                    }
-                }
-                CommandType::End => self.get_state_mut().force_end(),
                 CommandType::BeginTag => self
                     .get_state_mut()
                     .push_to_output_stream(content_obj.clone()),
@@ -563,22 +465,16 @@ impl Story {
             .into_any()
             .downcast::<VariableReference>()
         {
-            let found_value: Rc<Value>; // Explicit read count value
-            if var_ref.path_for_count.is_some() {
-                found_value = Rc::new(Value::new::<i32>(0));
-            }
-            // Normal variable reference
-            else {
-                match self
-                    .get_state()
-                    .variables_state
-                    .get_variable_with_name(&var_ref.name, -1)
-                {
-                    Some(v) => found_value = v,
-                    None => {
-                        self.add_error(&format!("Variable not found: '{}'. Using default value of 0 (false). This can happen with temporary variables if the declaration hasn't yet been hit. Globals are always given a default value on load if a value doesn't exist in the save state.", var_ref.name), true);
-                        found_value = Rc::new(Value::new::<i32>(0));
-                    }
+            let found_value: Rc<Value>;
+            match self
+                .get_state()
+                .variables_state
+                .get_variable_with_name(&var_ref.name, -1)
+            {
+                Some(v) => found_value = v,
+                None => {
+                    self.add_error(&format!("Variable not found: '{}'. Using default value of 0 (false). This can happen with temporary variables if the declaration hasn't yet been hit. Globals are always given a default value on load if a value doesn't exist in the save state.", var_ref.name), true);
+                    found_value = Rc::new(Value::new::<i32>(0));
                 }
             }
 
@@ -784,10 +680,7 @@ mod dynamic_interface_tests {
             NamedContainer, Object as O, Program,
         };
 
-        let target = FContainer::named(
-            "target",
-            vec![O::String("Left.\n".to_string()), O::ControlCommand(C::Done)],
-        );
+        let target = FContainer::named("target", vec![O::String("Left.\n".to_string())]);
         let score = FContainer::named(
             "score",
             vec![
@@ -809,7 +702,6 @@ mod dynamic_interface_tests {
                 O::String("left".to_string()),
                 O::GlobalVariableAssignment("route".to_string()),
                 O::ControlCommand(C::EvalEnd),
-                O::ControlCommand(C::End),
             ],
         );
 
@@ -826,7 +718,6 @@ mod dynamic_interface_tests {
                 target: "$divertTarget".to_string(),
                 variable: true,
             },
-            O::ControlCommand(C::Done),
         ]);
         root.named_content.push(NamedContainer::new("left", left));
         root.named_content
@@ -890,7 +781,6 @@ mod dynamic_interface_tests {
             },
             O::ControlCommand(C::EvalOutput),
             O::ControlCommand(C::EvalEnd),
-            O::ControlCommand(C::Done),
         ];
         let json = program.to_json_string().expect("valid story JSON");
         let mut story = Story::new(&json).expect("story should load");

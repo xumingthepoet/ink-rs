@@ -254,12 +254,8 @@ Choices use `*`. Repeating `*` controls nesting depth.
 You reach a door.
 * Open it
     The door opens.
-    -> done
 * Leave
     You step away.
-    -> done
-- done
-End.
 ```
 
 Choices are repeatable. Hide or show choices with explicit state and conditions.

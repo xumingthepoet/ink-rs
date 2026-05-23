@@ -5,28 +5,27 @@ use serde_json::json;
 use super::{program_from_value, program_to_value};
 use crate::{
     Container, ControlCommand, DictKey, DictKeyType, DictValue, InterfaceDefinition,
-    InterfaceMemberKind, InternalFunction, NativeFunction, Object, Program,
+    InterfaceMemberKind, InternalFunction, NativeFunction, Object, Program, INK_VERSION_CURRENT,
 };
 
 #[test]
 fn writes_plain_text_story_json() {
-    let program = Program::new(Container::unnamed(vec![
-        Object::Container(Container::unnamed(vec![
+    let program = Program::new(Container::unnamed(vec![Object::Container(
+        Container::unnamed(vec![
             Object::String("Line.".to_string()),
             Object::String("\n".to_string()),
             Object::Container(Container::named(
                 "g-0",
-                vec![Object::ControlCommand(ControlCommand::Done)],
+                vec![Object::ControlCommand(ControlCommand::NoOp)],
             )),
-        ])),
-        Object::ControlCommand(ControlCommand::Done),
-    ]));
+        ]),
+    )]));
 
     assert_eq!(
         program.to_json_value(),
         json!({
-            "inkVersion": 1,
-            "root": [["^Line.", "\n", ["done", {"#n": "g-0"}], null], "done", null]
+            "inkVersion": INK_VERSION_CURRENT,
+            "root": [["^Line.", "\n", ["nop", {"#n": "g-0"}], null], null]
         })
     );
 }
@@ -34,13 +33,13 @@ fn writes_plain_text_story_json() {
 #[test]
 fn roundtrips_named_content_and_command_tokens() {
     let input = json!({
-        "inkVersion": 1,
+        "inkVersion": INK_VERSION_CURRENT,
         "root": [
             ["#", "^tag", "/#", {"->t->": "knot"}, {"#n": "g-0"}],
-            "done",
+            "nop",
             {
-                "knot": ["ev", "str", "^value", "/str", "/ev", "end", {"#f": 1}],
-                "global decl": ["ev", 2, {"VAR=": "x"}, "/ev", "end", null]
+                "knot": ["ev", "str", "^value", "/str", "/ev", null],
+                "global decl": ["ev", 2, {"VAR=": "x"}, "/ev", null]
             }
         ]
     });
@@ -53,10 +52,9 @@ fn roundtrips_named_content_and_command_tokens() {
 #[test]
 fn roundtrips_module_shaped_named_content_without_schema_changes() {
     let input = json!({
-        "inkVersion": 1,
+        "inkVersion": INK_VERSION_CURRENT,
         "root": [
             {"->": "game.main"},
-            "done",
             {
                 "game": [
                     {
@@ -65,7 +63,7 @@ fn roundtrips_module_shaped_named_content_without_schema_changes() {
                 ],
                 "support": [
                     {
-                        "helper": ["^Support", "\n", "end", null]
+                        "helper": ["^Support", "\n", null]
                     }
                 ],
                 "global decl": [
@@ -73,7 +71,6 @@ fn roundtrips_module_shaped_named_content_without_schema_changes() {
                     1,
                     {"VAR=": "support::shown"},
                     "/ev",
-                    "end",
                     null
                 ]
             }
@@ -88,8 +85,8 @@ fn roundtrips_module_shaped_named_content_without_schema_changes() {
 #[test]
 fn roundtrips_internal_function_metadata() {
     let input = json!({
-        "inkVersion": 1,
-        "root": ["done", null],
+        "inkVersion": INK_VERSION_CURRENT,
+        "root": ["nop", null],
         "internalFunctions": {
             "game::read_config": {
                 "path": "game.read_config",
@@ -112,8 +109,8 @@ fn roundtrips_internal_function_metadata() {
 #[test]
 fn roundtrips_interface_metadata() {
     let input = json!({
-        "inkVersion": 1,
-        "root": ["done", null],
+        "inkVersion": INK_VERSION_CURRENT,
+        "root": ["nop", null],
         "interfaces": {
             "IItem": {
                 "members": {
@@ -149,7 +146,7 @@ fn writes_interface_metadata_from_typed_model() {
     members.insert("score".to_string(), InterfaceMemberKind::Function);
 
     let mut program = Program::new(Container::unnamed(vec![Object::ControlCommand(
-        ControlCommand::Done,
+        ControlCommand::NoOp,
     )]));
     program.interfaces.insert(
         "IItem".to_string(),
@@ -159,8 +156,8 @@ fn writes_interface_metadata_from_typed_model() {
     assert_eq!(
         program.to_json_value(),
         json!({
-            "inkVersion": 1,
-            "root": ["done", null],
+            "inkVersion": INK_VERSION_CURRENT,
+            "root": ["nop", null],
             "interfaces": {
                 "IItem": {
                     "members": {
@@ -177,8 +174,8 @@ fn writes_interface_metadata_from_typed_model() {
 #[test]
 fn rejects_unknown_interface_member_kind() {
     let input = json!({
-        "inkVersion": 1,
-        "root": ["done", null],
+        "inkVersion": INK_VERSION_CURRENT,
+        "root": ["nop", null],
         "interfaces": {
             "IItem": {
                 "members": {
@@ -199,8 +196,8 @@ fn rejects_unknown_interface_member_kind() {
 #[test]
 fn rejects_internal_function_metadata_with_mismatched_arg_count() {
     let input = json!({
-        "inkVersion": 1,
-        "root": ["done", null],
+        "inkVersion": INK_VERSION_CURRENT,
+        "root": ["nop", null],
         "internalFunctions": {
             "game::bad": {
                 "path": "game.bad",
@@ -240,6 +237,62 @@ fn rejects_unknown_native_function_tokens() {
         error.message(),
         "unsupported native function token: UNKNOWN_NATIVE"
     );
+}
+
+#[test]
+fn rejects_removed_control_command_tokens() {
+    for token in [
+        "done",
+        "end",
+        "thread",
+        "choiceCnt",
+        "turn",
+        "turns",
+        "readc",
+        "visit",
+        "seq",
+    ] {
+        let error = Object::from_json_value(json!(token)).unwrap_err();
+
+        assert!(
+            error
+                .message()
+                .contains(&format!("unsupported native function token: {token}")),
+            "unexpected error for {token}: {}",
+            error.message()
+        );
+        assert!(
+            ControlCommand::from_token(token).is_none(),
+            "{token} should not be a current control command"
+        );
+    }
+}
+
+#[test]
+fn rejects_removed_read_count_object() {
+    let error = Object::from_json_value(json!({ "CNT?": "knot" })).unwrap_err();
+
+    assert!(error
+        .message()
+        .contains("read-count object 'CNT?' is not supported"));
+}
+
+#[test]
+fn rejects_removed_container_count_flags() {
+    let error = Container::from_json_value(json!(["^Line.", {"#f": 1}]), None).unwrap_err();
+
+    assert!(error
+        .message()
+        .contains("container count flags '#f' are not supported"));
+}
+
+#[test]
+fn rejects_removed_choice_only_flag() {
+    let error = Object::from_json_value(json!({ "*": "choice.target", "flg": 4 })).unwrap_err();
+
+    assert!(error
+        .message()
+        .contains("choice point flags contain unsupported current-format bits"));
 }
 
 #[test]
@@ -464,12 +517,12 @@ fn parses_json_arrays_without_container_terminators_as_values() {
 
 #[test]
 fn still_parses_json_arrays_with_container_terminators_as_containers() {
-    let parsed = Object::from_json_value(json!(["done", null])).unwrap();
+    let parsed = Object::from_json_value(json!(["nop", null])).unwrap();
 
     assert_eq!(
         parsed,
         Object::Container(Container::unnamed(vec![Object::ControlCommand(
-            ControlCommand::Done
+            ControlCommand::NoOp
         )]))
     );
 }

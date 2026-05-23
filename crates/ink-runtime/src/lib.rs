@@ -10,7 +10,7 @@
 //! ```
 //! # use ink_runtime::{story::Story, story_error::StoryError};
 //! # fn main() -> Result<(), StoryError> {
-//! # let json_string = r##"{"inkVersion":1, "root":["done",null]}"##;
+//! # let json_string = r##"{"inkVersion":2, "root":["nop",null]}"##;
 //! # let read_input = |_:&_| 0;
 //! // story is the entry point of the `ink_runtime` lib.
 //! // json_string is a string with all the contents of the .ink.json file.

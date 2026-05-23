@@ -1,8 +1,8 @@
 use crate::support::{runtime::StoryError, story_runner as common};
 
 #[test]
-fn thread_test() -> Result<(), StoryError> {
-    let mut story = common::story_from_fixture("threads/thread-bug.ink");
+fn choice_loop_retries_until_success() -> Result<(), StoryError> {
+    let mut story = common::story_from_fixture("choice_loops/choice-loop.ink");
     println!("{}", story.build_string_of_hierarchy());
 
     assert_eq!(
@@ -26,8 +26,8 @@ fn thread_test() -> Result<(), StoryError> {
 }
 
 #[test]
-fn thread_test_bug() -> Result<(), StoryError> {
-    let mut story = common::story_from_fixture("threads/thread-bug.ink");
+fn choice_loop_save_load_regenerates_choices() -> Result<(), StoryError> {
+    let mut story = common::story_from_fixture("choice_loops/choice-loop.ink");
     println!("{}", story.build_string_of_hierarchy());
 
     assert_eq!(
@@ -40,7 +40,7 @@ fn thread_test_bug() -> Result<(), StoryError> {
 
     let save_string = story.save_state();
     println!("{}", save_string);
-    let mut story = common::story_from_fixture("threads/thread-bug.ink");
+    let mut story = common::story_from_fixture("choice_loops/choice-loop.ink");
     story.load_state(&save_string);
 
     story.choose_choice_index(0);

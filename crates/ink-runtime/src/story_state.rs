@@ -112,7 +112,7 @@ mod tests {
         value_type::{DictKey, DictKeyType, DictValue, ValueType},
     };
 
-    const SIMPLE_STORY_JSON: &str = r#"{"inkVersion":1,"root":["done",null]}"#;
+    const SIMPLE_STORY_JSON: &str = r#"{"inkVersion":2,"root":["nop",null]}"#;
 
     fn simple_save_json() -> serde_json::Value {
         let story = Story::new(SIMPLE_STORY_JSON).expect("valid story");
@@ -209,8 +209,8 @@ mod tests {
     #[test]
     fn malformed_evaluation_stack_underflow_returns_error() {
         let json = r#"{
-            "inkVersion": 1,
-            "root": ["ev", {"temp=": "missing"}, "/ev", "done", null]
+            "inkVersion": 2,
+            "root": ["ev", {"temp=": "missing"}, "/ev", "nop", null]
         }"#;
         let mut story = Story::new(json).expect("malformed story still loads");
 
@@ -227,8 +227,8 @@ mod tests {
     #[test]
     fn malformed_native_call_underflow_returns_error() {
         let json = r#"{
-            "inkVersion": 1,
-            "root": ["ev", "+", "/ev", "done", null]
+            "inkVersion": 2,
+            "root": ["ev", "+", "/ev", "nop", null]
         }"#;
         let mut story = Story::new(json).expect("malformed story still loads");
 
@@ -246,8 +246,8 @@ mod tests {
     #[test]
     fn malformed_variable_assignment_non_value_returns_error() {
         let json = r#"{
-            "inkVersion": 1,
-            "root": ["ev", "void", {"temp=": "missing"}, "/ev", "done", null]
+            "inkVersion": 2,
+            "root": ["ev", "void", {"temp=": "missing"}, "/ev", "nop", null]
         }"#;
         let mut story = Story::new(json).expect("malformed story still loads");
 
@@ -313,13 +313,13 @@ mod tests {
     #[test]
     fn failed_load_state_keeps_existing_story_state() {
         let json = r#"{
-            "inkVersion": 1,
+            "inkVersion": 2,
             "root": [
-                "done",
+                "nop",
                 {
                     "global decl": [
                         "ev", 0, {"VAR=": "score"}, "/ev",
-                        "end",
+                        "nop",
                         null
                     ]
                 }
@@ -352,14 +352,14 @@ mod tests {
     #[test]
     fn save_state_roundtrips_array_and_object_variables() {
         let json = r#"{
-            "inkVersion": 1,
+            "inkVersion": 2,
             "root": [
-                "done",
+                "nop",
                 {
                     "global decl": [
                         "ev", 0, {"VAR=": "items"}, "/ev",
                         "ev", 0, {"VAR=": "player"}, "/ev",
-                        "end",
+                        "nop",
                         null
                     ]
                 }
@@ -409,13 +409,13 @@ mod tests {
     #[test]
     fn save_state_roundtrips_dict_variables_and_omits_defaults() {
         let json = r#"{
-            "inkVersion": 1,
+            "inkVersion": 2,
             "root": [
-                "done",
+                "nop",
                 {
                     "global decl": [
                         "ev", ["dict", "string", []], {"VAR=": "scores"}, "/ev",
-                        "end",
+                        "nop",
                         null
                     ]
                 }

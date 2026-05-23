@@ -263,9 +263,7 @@ fn compact_path_strings_in_object(
                 compact_target_path_string(target, object_path, semantic_paths);
             }
         }
-        RuntimeObject::ConditionalDivert { target }
-        | RuntimeObject::ReadCount(target)
-        | RuntimeObject::ChoicePoint { target, .. } => {
+        RuntimeObject::ConditionalDivert { target } | RuntimeObject::ChoicePoint { target, .. } => {
             compact_target_path_string(target, object_path, semantic_paths);
         }
         _ => {}
@@ -351,7 +349,6 @@ mod tests {
             content,
             named_content: Vec::new(),
             name: name.map(str::to_string),
-            flags: None,
         }
     }
 

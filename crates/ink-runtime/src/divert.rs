@@ -281,7 +281,7 @@ mod tests {
             None,
             Some("missing"),
         ));
-        let _root = Container::new(None, 0, vec![divert.clone()], HashMap::new());
+        let _root = Container::new(None, vec![divert.clone()], HashMap::new());
 
         match divert.try_get_target_pointer() {
             Err(StoryError::InvalidStoryState(message)) => assert_eq!(

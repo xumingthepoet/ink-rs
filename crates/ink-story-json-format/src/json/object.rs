@@ -75,7 +75,6 @@ pub(crate) fn object_to_value(object: &Object) -> JsonValue {
             obj.insert("^->".to_string(), JsonValue::String(target.clone()));
             JsonValue::Object(obj)
         }
-        Object::ReadCount(target) => single_property_object("CNT?", target),
         Object::VariableAssignment(name) => single_property_object("temp=", name),
         Object::GlobalVariableAssignment(name) => single_property_object("VAR=", name),
         Object::TempVariableReassignment(name) => variable_assignment_to_value("temp=", name),
@@ -193,6 +192,11 @@ fn object_from_map(obj: &Map<String, JsonValue>) -> Result<Object, FormatError> 
             Some(value) => json_value_to_i32(value, "flg")?,
             None => 0,
         };
+        if flags & !0x0b != 0 {
+            return Err(FormatError::new(format!(
+                "choice point flags contain unsupported current-format bits: {flags}"
+            )));
+        }
         return Ok(Object::ChoicePoint {
             target: json_value_to_string(target, "*")?.to_string(),
             flags,
@@ -206,9 +210,10 @@ fn object_from_map(obj: &Map<String, JsonValue>) -> Result<Object, FormatError> 
     }
 
     if let Some(name) = obj.get("CNT?") {
-        return Ok(Object::ReadCount(
-            json_value_to_string(name, "CNT?")?.to_string(),
-        ));
+        return Err(FormatError::new(format!(
+            "read-count object 'CNT?' is not supported in current compiled JSON: {}",
+            json_value_to_string(name, "CNT?")?
+        )));
     }
 
     if let Some(assignment) = variable_assignment_from_map(obj)? {

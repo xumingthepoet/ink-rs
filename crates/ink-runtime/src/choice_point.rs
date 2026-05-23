@@ -9,7 +9,6 @@ use crate::{
 
 pub struct ChoicePoint {
     obj: Object,
-    has_choice_only_content: bool,
     has_start_content: bool,
     is_invisible_default: bool,
     has_condition: bool,
@@ -20,7 +19,6 @@ impl ChoicePoint {
     pub fn new(flags: i32, path_string_on_choice: &str) -> Self {
         Self {
             obj: Object::new(),
-            has_choice_only_content: (flags & 4) > 0,
             has_start_content: (flags & 2) > 0,
             is_invisible_default: (flags & 8) > 0,
             has_condition: (flags & 1) > 0,
@@ -42,17 +40,10 @@ impl ChoicePoint {
         if self.has_start_content() {
             flags |= 2;
         }
-        if self.has_choice_only_content() {
-            flags |= 4;
-        }
         if self.is_invisible_default() {
             flags |= 8;
         }
         flags
-    }
-
-    pub fn has_choice_only_content(&self) -> bool {
-        self.has_choice_only_content
     }
 
     pub fn has_condition(&self) -> bool {

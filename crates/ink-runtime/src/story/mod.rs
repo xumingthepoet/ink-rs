@@ -29,7 +29,6 @@ pub struct Story {
     recursive_continue_count: usize,
     async_continue_active: bool,
     async_saving: bool,
-    prev_containers: Vec<Rc<Container>>,
     pub(crate) on_error: Option<Rc<RefCell<dyn ErrorHandler>>>,
     pub(crate) state_snapshot_at_last_new_line: Option<StoryState>,
     pub(crate) choice_replay_candidate: Option<StoryState>,
@@ -119,19 +118,13 @@ pub(crate) fn compiled_story_random_next(seed: i32) -> i32 {
 
 mod misc {
     use crate::{
-        json::json_read,
-        object::{Object, RTObject},
-        path::Path,
-        story::Story,
-        story_error::StoryError,
-        story_state::StoryState,
-        value::Value,
+        json::json_read, object::RTObject, path::Path, story::Story, story_error::StoryError,
+        story_state::StoryState, value::Value,
     };
     use std::{collections::HashMap, rc::Rc};
 
     impl Story {
-        /// Construct a `Story` out of a JSON string that was compiled with
-        /// `inklecate`.
+        /// Construct a `Story` from ink-rs compiled story JSON.
         pub fn new(json_string: &str) -> Result<Self, StoryError> {
             let loaded_program = json_read::load_program_from_string(json_string)?;
             let main_content_container = loaded_program.main_content_container;
@@ -152,7 +145,6 @@ mod misc {
                 choice_replay_candidate: None,
                 choice_replay_state: None,
                 on_error: None,
-                prev_containers: Vec::new(),
                 has_validated_externals: false,
                 allow_external_function_fallbacks: false,
                 externals: HashMap::with_capacity(0),
@@ -185,67 +177,13 @@ mod misc {
 
             if let Some(val) = obj.as_ref().as_any().downcast_ref::<Value>() {
                 if let Some(target_path) = Value::get_value::<&Path>(obj.as_ref()) {
-                    return Err(StoryError::InvalidStoryState(format!("Shouldn't use a divert target (to {}) as a conditional value. Did you intend a function call 'likeThis()' or a read count check 'likeThis'? (no arrows)", target_path)));
+                    return Err(StoryError::InvalidStoryState(format!("Shouldn't use a divert target (to {}) as a conditional value. Did you intend a function call 'likeThis()'?", target_path)));
                 }
 
                 return val.is_truthy();
             }
 
             Ok(truthy)
-        }
-
-        pub(crate) fn next_sequence_shuffle_index(&mut self) -> Result<i32, StoryError> {
-            let pop_evaluation_stack = self.get_state_mut().pop_evaluation_stack()?;
-            let num_elements =
-                if let Some(v) = Value::get_value::<i32>(pop_evaluation_stack.as_ref()) {
-                    v
-                } else {
-                    return Err(StoryError::InvalidStoryState(
-                        "Expected number of elements in sequence for shuffle index".to_owned(),
-                    ));
-                };
-
-            let seq_container = self.get_state().get_current_pointer().container.unwrap();
-
-            let seq_count = if let Some(v) =
-                Value::get_value::<i32>(self.get_state_mut().pop_evaluation_stack()?.as_ref())
-            {
-                v
-            } else {
-                return Err(StoryError::InvalidStoryState(
-                    "Expected sequence count value for shuffle index".to_owned(),
-                ));
-            };
-
-            let loop_index = seq_count / num_elements;
-            let iteration_index = seq_count % num_elements;
-
-            // Generate the same shuffle based on:
-            // - The hash of this container, to make sure it's consistent each time the
-            //   runtime returns to the sequence
-            // - How many times the runtime has looped around this full shuffle
-            let seq_path_str = Object::get_path(seq_container.as_ref()).to_string();
-            let sequence_hash: i32 = seq_path_str.chars().map(|c| c as i32).sum();
-            let random_seed = sequence_hash
-                .wrapping_add(loop_index)
-                .wrapping_add(self.get_state().story_seed);
-
-            let mut random = super::CompiledStoryRandom::new(random_seed);
-            let mut unpicked_indices: Vec<i32> = (0..num_elements).collect();
-
-            for i in 0..=iteration_index {
-                let next_random = random.next();
-                let chosen = next_random % unpicked_indices.len() as i32;
-                let chosen_index = unpicked_indices.remove(chosen as usize);
-
-                if i == iteration_index {
-                    return Ok(chosen_index);
-                }
-            }
-
-            Err(StoryError::InvalidStoryState(
-                "Should never reach here".to_owned(),
-            ))
         }
     }
 }
