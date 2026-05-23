@@ -37,7 +37,6 @@ mod tests {
         assert_eq!(
             value,
             json!({
-                "inkVersion": format::INK_VERSION_CURRENT,
                 "root": ["^Line.", null]
             })
         );

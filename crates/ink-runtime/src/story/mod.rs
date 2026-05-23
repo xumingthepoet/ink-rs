@@ -10,9 +10,6 @@ use crate::{
 };
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-/// The current version of the ink-rs compiled story file format.
-pub const INK_VERSION_CURRENT: i32 = ink_story_json_format::INK_VERSION_CURRENT;
-
 #[derive(PartialEq)]
 pub(crate) enum OutputStateChange {
     NoChange,

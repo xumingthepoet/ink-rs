@@ -112,9 +112,9 @@ mod tests {
         value_type::{DictKey, DictKeyType, DictValue, ValueType},
     };
 
-    const SIMPLE_STORY_JSON: &str = r##"{"inkVersion":2,"root":[{"->":"game.main"},{"game":[{"main":[[["ev",{"^->":"game.main.0.0.$r1"},{"temp=":"$r"},"str",{"->":".^.s"},[{"#n":"$r1"}],"/str","/ev",{"*":".^.^.c-0","flg":2},{"s":["^Save point",{"->":"$r","var":true},null]}],{"c-0":["\n","^Done.","\n",null]}],null]}],"global decl":["ev",0,{"VAR=":"game::score"},"/ev",null]}]}"##;
-    const ARRAY_OBJECT_CHOICE_STORY_JSON: &str = r##"{"inkVersion":2,"root":[{"->":"game.main"},{"game":[{"main":[[["ev",{"^->":"game.main.0.0.$r1"},{"temp=":"$r"},"str",{"->":".^.s"},[{"#n":"$r1"}],"/str","/ev",{"*":".^.^.c-0","flg":2},{"s":["^Save point",{"->":"$r","var":true},null]}],{"c-0":["\n","^Done.","\n",null]}],null]}],"global decl":["ev",0,{"VAR=":"game::items"},0,{"VAR=":"game::player"},"/ev",null]}]}"##;
-    const DICT_CHOICE_STORY_JSON: &str = r##"{"inkVersion":2,"root":[{"->":"game.main"},{"game":[{"main":[[["ev",{"^->":"game.main.0.0.$r1"},{"temp=":"$r"},"str",{"->":".^.s"},[{"#n":"$r1"}],"/str","/ev",{"*":".^.^.c-0","flg":2},{"s":["^Save point",{"->":"$r","var":true},null]}],{"c-0":["\n","^Done.","\n",null]}],null]}],"global decl":["ev",["dict","string",[]],{"VAR=":"game::scores"},"/ev",null]}]}"##;
+    const SIMPLE_STORY_JSON: &str = r##"{"root":[{"->":"game.main"},{"game":[{"main":[[["ev",{"^->":"game.main.0.0.$r1"},{"temp=":"$r"},"str",{"->":".^.s"},[{"#n":"$r1"}],"/str","/ev",{"*":".^.^.c-0","flg":2},{"s":["^Save point",{"->":"$r","var":true},null]}],{"c-0":["\n","^Done.","\n",null]}],null]}],"global decl":["ev",0,{"VAR=":"game::score"},"/ev",null]}]}"##;
+    const ARRAY_OBJECT_CHOICE_STORY_JSON: &str = r##"{"root":[{"->":"game.main"},{"game":[{"main":[[["ev",{"^->":"game.main.0.0.$r1"},{"temp=":"$r"},"str",{"->":".^.s"},[{"#n":"$r1"}],"/str","/ev",{"*":".^.^.c-0","flg":2},{"s":["^Save point",{"->":"$r","var":true},null]}],{"c-0":["\n","^Done.","\n",null]}],null]}],"global decl":["ev",0,{"VAR=":"game::items"},0,{"VAR=":"game::player"},"/ev",null]}]}"##;
+    const DICT_CHOICE_STORY_JSON: &str = r##"{"root":[{"->":"game.main"},{"game":[{"main":[[["ev",{"^->":"game.main.0.0.$r1"},{"temp=":"$r"},"str",{"->":".^.s"},[{"#n":"$r1"}],"/str","/ev",{"*":".^.^.c-0","flg":2},{"s":["^Save point",{"->":"$r","var":true},null]}],{"c-0":["\n","^Done.","\n",null]}],null]}],"global decl":["ev",["dict","string",[]],{"VAR=":"game::scores"},"/ev",null]}]}"##;
 
     fn simple_save_json() -> serde_json::Value {
         let story = story_at_choice(SIMPLE_STORY_JSON);
@@ -144,21 +144,6 @@ mod tests {
             ),
             other => panic!("expected BadJson, got {other:?}"),
         }
-    }
-
-    #[test]
-    fn rejects_non_current_save_state_version() {
-        let mut story = Story::new(SIMPLE_STORY_JSON).expect("valid story");
-        let mut save = simple_save_json();
-        save["inkSaveVersion"] = json!(2);
-
-        let error = story
-            .load_state(&save.to_string())
-            .expect_err("expected save version mismatch");
-
-        assert!(error
-            .to_string()
-            .contains("ink-rs save format version mismatch"));
     }
 
     #[test]
@@ -220,7 +205,6 @@ mod tests {
     #[test]
     fn malformed_evaluation_stack_underflow_returns_error() {
         let json = r#"{
-            "inkVersion": 2,
             "root": ["ev", {"temp=": "missing"}, "/ev", "nop", null]
         }"#;
         let mut story = Story::new(json).expect("malformed story still loads");
@@ -238,7 +222,6 @@ mod tests {
     #[test]
     fn malformed_native_call_underflow_returns_error() {
         let json = r#"{
-            "inkVersion": 2,
             "root": ["ev", "+", "/ev", "nop", null]
         }"#;
         let mut story = Story::new(json).expect("malformed story still loads");
@@ -257,7 +240,6 @@ mod tests {
     #[test]
     fn malformed_variable_assignment_non_value_returns_error() {
         let json = r#"{
-            "inkVersion": 2,
             "root": ["ev", "void", {"temp=": "missing"}, "/ev", "nop", null]
         }"#;
         let mut story = Story::new(json).expect("malformed story still loads");
@@ -274,10 +256,9 @@ mod tests {
     }
 
     #[test]
-    fn save_state_uses_minimal_v3_shape() {
+    fn save_state_uses_minimal_shape() {
         let save = simple_save_json();
 
-        assert_eq!(save["inkSaveVersion"], json!(3));
         assert!(save.get("callstack").is_some());
         assert!(save["callstack"].get("frames").is_some());
         assert!(save.get("variablesState").is_some());

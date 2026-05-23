@@ -1,1 +1,1 @@
-{"inkVersion":2,"root":[{"->":"game.main"},{"game":[{"main":["^tag ","#","^pic","ev",5,3,"+","out","/ev","ev",{"VAR?":"game::colour"},"out","/ev","^.jpg","/#","\n",null]}],"global decl":["ev","str","^red","/str",{"VAR=":"game::colour"},"/ev",null]}]}
+{"root":[{"->":"game.main"},{"game":[{"main":["^tag ","#","^pic","ev",5,3,"+","out","/ev","ev",{"VAR?":"game::colour"},"out","/ev","^.jpg","/#","\n",null]}],"global decl":["ev","str","^red","/str",{"VAR=":"game::colour"},"/ev",null]}]}

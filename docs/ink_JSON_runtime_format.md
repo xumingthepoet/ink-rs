@@ -4,13 +4,11 @@ When ink is compiled to JSON, it is converted to a low level format for use by t
 
 ## Top level
 
-At the top level of the JSON file are `inkVersion`, `root`, and optional
-metadata. `inkVersion` is an integer that denotes the format version, and
-`root` is the outer-most Container for the entire story.
+At the top level of the JSON file are `root` and optional metadata. `root` is
+the outer-most Container for the entire story.
 
 ```json
 {
-    "inkVersion": 1,
     "root": <root container>,
     "internalFunctions": {
         "config::read_config": {
@@ -31,10 +29,6 @@ metadata. `inkVersion` is an integer that denotes the format version, and
     }
 }
 ```
-
-The current Rust format version is `2`. The runtime only loads compiled story
-JSON whose `inkVersion` exactly matches the current format version; older
-compiled story JSON versions are not treated as compatible.
 
 Broadly speaking, the entire format is composed of Containers, and individual sub-elements of the Story, within those Containers.
 
@@ -213,19 +207,17 @@ owned by the runtime layer; it serializes current runtime values, including
 interface values as strings, but does not duplicate the compiled story's
 `interfaces` metadata.
 
-The current runtime save-state format is `inkSaveVersion` 3. It stores the
-active continuation/callstack frames, global `variablesState`, deterministic
-random state (`storySeed` and `previousRandom`), `inkSaveVersion`, and
-`inkFormatVersion`. It does not serialize generated choices, choice
-continuation snapshots, multi-flow maps, visit counts, turn indices, current
-divert targets, or evaluation-stack internals. Calling `save_state()` is valid
-only while visible choices are pending; the JSON stores the stable execution
-snapshot from immediately before choice generation, and loading restores that
-pre-generation state. Hosts continue the story after load to regenerate the
-choice list. Earlier saves and v3 saves containing removed fields such as
-`currentChoices`, `choiceThreads`, `flows`, `currentFlowName`, `evalStack`,
-`currentDivertTarget`, `visitCounts`, `turnIndices`, or `resumeMode` are
-rejected rather than migrated.
+Runtime save-state JSON stores active continuation/callstack frames, global
+`variablesState`, and deterministic random state (`storySeed` and
+`previousRandom`). It does not serialize generated choices, choice continuation
+snapshots, multi-flow maps, visit counts, turn indices, current divert targets,
+or evaluation-stack internals. Calling `save_state()` is valid only while
+visible choices are pending; the JSON stores the stable execution snapshot from
+immediately before choice generation, and loading restores that pre-generation
+state. Hosts continue the story after load to regenerate the choice list.
+Save-state JSON containing removed execution fields such as `currentChoices`,
+`choiceThreads`, `flows`, `currentFlowName`, `evalStack`, `currentDivertTarget`,
+`visitCounts`, `turnIndices`, or `resumeMode` is rejected rather than migrated.
 
 ## Variable assignment
 

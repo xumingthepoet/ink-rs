@@ -5,7 +5,7 @@ use serde_json::json;
 use super::{program_from_value, program_to_value};
 use crate::{
     Container, ControlCommand, DictKey, DictKeyType, DictValue, InterfaceDefinition,
-    InterfaceMemberKind, InternalFunction, NativeFunction, Object, Program, INK_VERSION_CURRENT,
+    InterfaceMemberKind, InternalFunction, NativeFunction, Object, Program,
 };
 
 #[test]
@@ -24,7 +24,6 @@ fn writes_plain_text_story_json() {
     assert_eq!(
         program.to_json_value(),
         json!({
-            "inkVersion": INK_VERSION_CURRENT,
             "root": [["^Line.", "\n", ["nop", {"#n": "g-0"}], null], null]
         })
     );
@@ -33,7 +32,6 @@ fn writes_plain_text_story_json() {
 #[test]
 fn roundtrips_named_content_and_command_tokens() {
     let input = json!({
-        "inkVersion": INK_VERSION_CURRENT,
         "root": [
             ["#", "^tag", "/#", {"->t->": "knot"}, {"#n": "g-0"}],
             "nop",
@@ -52,7 +50,6 @@ fn roundtrips_named_content_and_command_tokens() {
 #[test]
 fn roundtrips_module_shaped_named_content_without_schema_changes() {
     let input = json!({
-        "inkVersion": INK_VERSION_CURRENT,
         "root": [
             {"->": "game.main"},
             {
@@ -85,7 +82,6 @@ fn roundtrips_module_shaped_named_content_without_schema_changes() {
 #[test]
 fn roundtrips_internal_function_metadata() {
     let input = json!({
-        "inkVersion": INK_VERSION_CURRENT,
         "root": ["nop", null],
         "internalFunctions": {
             "game::read_config": {
@@ -109,7 +105,6 @@ fn roundtrips_internal_function_metadata() {
 #[test]
 fn roundtrips_interface_metadata() {
     let input = json!({
-        "inkVersion": INK_VERSION_CURRENT,
         "root": ["nop", null],
         "interfaces": {
             "IItem": {
@@ -156,7 +151,6 @@ fn writes_interface_metadata_from_typed_model() {
     assert_eq!(
         program.to_json_value(),
         json!({
-            "inkVersion": INK_VERSION_CURRENT,
             "root": ["nop", null],
             "interfaces": {
                 "IItem": {
@@ -174,7 +168,6 @@ fn writes_interface_metadata_from_typed_model() {
 #[test]
 fn rejects_unknown_interface_member_kind() {
     let input = json!({
-        "inkVersion": INK_VERSION_CURRENT,
         "root": ["nop", null],
         "interfaces": {
             "IItem": {
@@ -196,7 +189,6 @@ fn rejects_unknown_interface_member_kind() {
 #[test]
 fn rejects_internal_function_metadata_with_mismatched_arg_count() {
     let input = json!({
-        "inkVersion": INK_VERSION_CURRENT,
         "root": ["nop", null],
         "internalFunctions": {
             "game::bad": {

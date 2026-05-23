@@ -1,1 +1,1 @@
-{"inkVersion":2,"root":[{"->":"game.main"},{"game":[{"f":["ev",3.8,"/ev","~ret",null],"main":["ev",{"f()":"game.f"},"/ev",{"VAR=":"game::x","re":true},"\n","^The value of x is ","ev",{"VAR?":"game::x"},"out","/ev","^.","\n",null]}],"global decl":["ev",0.0,{"VAR=":"game::x"},"/ev",null]}]}
+{"root":[{"->":"game.main"},{"game":[{"f":["ev",3.8,"/ev","~ret",null],"main":["ev",{"f()":"game.f"},"/ev",{"VAR=":"game::x","re":true},"\n","^The value of x is ","ev",{"VAR?":"game::x"},"out","/ev","^.","\n",null]}],"global decl":["ev",0.0,{"VAR=":"game::x"},"/ev",null]}]}

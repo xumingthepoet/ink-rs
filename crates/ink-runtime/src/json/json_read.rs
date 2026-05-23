@@ -19,7 +19,6 @@ use crate::{
     object::RTObject,
     path::Path,
     push_pop::PushPopType,
-    story::INK_VERSION_CURRENT,
     story_error::StoryError,
     tag::Tag,
     value::Value,
@@ -43,14 +42,6 @@ pub fn load_from_string(s: &str) -> Result<Rc<Container>, StoryError> {
 pub(crate) fn load_program_from_string(s: &str) -> Result<LoadedProgram, StoryError> {
     let program = format::Program::from_json_str(s)
         .map_err(|error| StoryError::BadJson(error.to_string()))?;
-    let version = program.ink_version;
-
-    if version != INK_VERSION_CURRENT {
-        return Err(StoryError::BadJson(format!(
-            "Story JSON format version mismatch: expected {}, got {}.",
-            INK_VERSION_CURRENT, version
-        )));
-    }
 
     let main_content_container = format_container_to_runtime(&program.root)?;
 
@@ -391,29 +382,15 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn loads_current_story_json_version() {
-        let json = r#"{"inkVersion":2,"root":["nop",null]}"#;
+    fn loads_story_json_current_shape() {
+        let json = r#"{"root":["nop",null]}"#;
 
         assert!(load_from_string(json).is_ok());
     }
 
     #[test]
-    fn rejects_non_current_story_json_version() {
-        let json = r#"{"inkVersion":1,"root":["nop",null]}"#;
-
-        let error = match load_from_string(json) {
-            Ok(_) => panic!("expected version mismatch"),
-            Err(error) => error,
-        };
-
-        assert!(error
-            .to_string()
-            .contains("Story JSON format version mismatch"));
-    }
-
-    #[test]
     fn loads_native_function_tokens_as_runtime_calls() {
-        let json = r#"{"inkVersion":2,"root":["LEN","nop",null]}"#;
+        let json = r#"{"root":["LEN","nop",null]}"#;
 
         let root = load_from_string(json).expect("story JSON should load");
         let function = root.content[0]
@@ -427,7 +404,6 @@ mod tests {
     #[test]
     fn loads_dynamic_interface_objects_and_metadata() {
         let json = r#"{
-            "inkVersion": 2,
             "root": [
                 "^left",
                 {"i->": "target", "interface": "IItem"},
@@ -480,7 +456,7 @@ mod tests {
 
     #[test]
     fn rejects_unknown_native_function_tokens_from_story_json() {
-        let json = r#"{"inkVersion":2,"root":["UNKNOWN_NATIVE",null]}"#;
+        let json = r#"{"root":["UNKNOWN_NATIVE",null]}"#;
 
         let error = match load_from_string(json) {
             Ok(_) => panic!("expected unsupported native token"),
@@ -505,7 +481,7 @@ mod tests {
             "visit",
             "seq",
         ] {
-            let json = format!(r#"{{"inkVersion":2,"root":["{token}",null]}}"#);
+            let json = format!(r#"{{"root":["{token}",null]}}"#);
             let error = match load_from_string(&json) {
                 Ok(_) => panic!("removed token should be rejected"),
                 Err(error) => error,
@@ -522,21 +498,21 @@ mod tests {
 
     #[test]
     fn rejects_removed_read_count_and_container_flags_from_story_json() {
-        let read_count = r#"{"inkVersion":2,"root":[{"CNT?":"knot"},null]}"#;
+        let read_count = r#"{"root":[{"CNT?":"knot"},null]}"#;
         let error = match load_from_string(read_count) {
             Ok(_) => panic!("CNT? should be rejected"),
             Err(error) => error,
         };
         assert!(error.to_string().contains("read-count object 'CNT?'"));
 
-        let flags = r##"{"inkVersion":2,"root":["^Line.",{"#f":1}]}"##;
+        let flags = r##"{"root":["^Line.",{"#f":1}]}"##;
         let error = match load_from_string(flags) {
             Ok(_) => panic!("#f should be rejected"),
             Err(error) => error,
         };
         assert!(error.to_string().contains("container count flags '#f'"));
 
-        let choice_only = r#"{"inkVersion":2,"root":[{"*":"target","flg":4},null]}"#;
+        let choice_only = r#"{"root":[{"*":"target","flg":4},null]}"#;
         let error = match load_from_string(choice_only) {
             Ok(_) => panic!("choice-only flag should be rejected"),
             Err(error) => error,
@@ -549,7 +525,6 @@ mod tests {
     #[test]
     fn loads_dynamic_array_values_from_story_json() {
         let json = r#"{
-            "inkVersion": 2,
             "root": [
                 [1, true, {"hp": 10}, ["^nested"]],
                 "nop",
@@ -575,7 +550,6 @@ mod tests {
     #[test]
     fn loads_dynamic_dict_values_from_story_json() {
         let json = r#"{
-            "inkVersion": 2,
             "root": [
                 ["dict", "string", [["ada", 10], ["items", [1, true]]]],
                 ["dict", "int", [[1, "^one"]]],

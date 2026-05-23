@@ -27,8 +27,9 @@ defined by this repository.
 - Keep compiler lowering directly into format crate data, and keep runtime
   compiled-story loading going through the format crate before constructing the
   runtime execution graph.
-- Preserve compatibility with the existing compiled-story JSON format unless an
-  explicit, documented runtime-format change is required.
+- Treat compiled-story JSON and runtime save JSON as current-only internal
+  contracts. Do not add format compatibility shims or migration layers unless
+  the project owner explicitly asks for them.
 
 ## Current Architecture
 

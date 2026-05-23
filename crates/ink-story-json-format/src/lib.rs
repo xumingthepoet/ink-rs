@@ -16,6 +16,3 @@ pub use model::{
     INTERFACES_METADATA_KEY, INTERFACE_IMPLEMENTATIONS_KEY, INTERFACE_MEMBERS_KEY, TAG_END_TOKEN,
     TAG_START_TOKEN,
 };
-
-/// The current compiled story JSON format version.
-pub const INK_VERSION_CURRENT: i32 = 2;

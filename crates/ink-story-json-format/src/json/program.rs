@@ -9,7 +9,6 @@ use super::metadata::{
     interfaces_from_value, interfaces_to_value, internal_functions_from_value,
     internal_functions_to_value,
 };
-use super::scalar::required_i32;
 
 pub(crate) fn program_from_str(input: &str) -> Result<Program, FormatError> {
     let value = serde_json::from_str(input)
@@ -22,7 +21,6 @@ pub(crate) fn program_from_value(value: JsonValue) -> Result<Program, FormatErro
         .as_object()
         .ok_or_else(|| FormatError::new("compiled story JSON must be an object"))?;
 
-    let ink_version = required_i32(obj, "inkVersion")?;
     let root_value = obj
         .get("root")
         .ok_or_else(|| FormatError::new("compiled story JSON is missing root"))?;
@@ -37,7 +35,6 @@ pub(crate) fn program_from_value(value: JsonValue) -> Result<Program, FormatErro
     };
 
     Ok(Program {
-        ink_version,
         root,
         internal_functions,
         interfaces,
@@ -52,10 +49,6 @@ pub(crate) fn program_to_string(program: &Program) -> Result<String, FormatError
 
 pub(crate) fn program_to_value(program: &Program) -> JsonValue {
     let mut obj = Map::new();
-    obj.insert(
-        "inkVersion".to_string(),
-        JsonValue::Number(program.ink_version.into()),
-    );
     obj.insert("root".to_string(), container_to_value(&program.root, true));
     if !program.internal_functions.is_empty() {
         obj.insert(

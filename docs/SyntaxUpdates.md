@@ -23,6 +23,25 @@ Each entry should include:
 - author impact
 - tests
 
+## 2026-05-24: Language Format Identifiers Removed
+
+- status: removed
+- background: earlier compiled-story JSON and runtime save JSON carried
+  language-format identifiers to reject older data.
+- ink-rs behavior: compiled-story JSON and runtime save JSON no longer carry
+  language-level format identifiers. The repository defines one current
+  language and one current data shape. Loading validates the current structure
+  directly rather than routing through compatibility checks or migrations.
+- documentation effect: `docs/ink_JSON_runtime_format.md` and
+  `Architecture.md` describe the current JSON shapes without compatibility
+  metadata.
+- rationale: ink-rs is still moving quickly and is not committing to long-term
+  language or save compatibility during this phase.
+- author impact: recompile story source and regenerate save data when the
+  current language or runtime shape changes.
+- tests: compiler emission, format codec, runtime loader, save-state tests, and
+  JSON fixtures use the identifier-free current shape.
+
 ## 2026-05-24: Choice-Pause Saves Use Pre-Choice Snapshots
 
 - status: supported
@@ -33,9 +52,9 @@ Each entry should include:
 - ink-rs behavior: `save_state()` is valid only while visible choices are
   pending. The save JSON stores the stable execution state from immediately
   before choice generation, and does not store generated choices or
-  `resumeMode`. `load_state()` restores that pre-choice state and does not
-  auto-continue; hosts continue the story to regenerate the pending choice list.
-  Ordinary non-choice states are not save points.
+  replay-mode markers. `load_state()` restores that pre-choice state and does
+  not auto-continue; hosts continue the story to regenerate the pending choice
+  list. Ordinary non-choice states are not save points.
 - documentation effect: `LanguageOverview.md`, `SyntaxReference.md`,
   `Architecture.md`, `docs/ink_JSON_runtime_format.md`, and `ink-dioxus`
   documentation describe pending-choice saves as pre-choice snapshots.
@@ -54,8 +73,8 @@ Each entry should include:
 
 - status: removed, superseded by the 2026-05-24 pre-choice snapshot rule
 - background: earlier same-day runtime behavior supported saving while choices
-  were pending by writing a `resumeMode: "choiceReplay"` marker and replaying
-  to the choice list after load.
+  were pending by writing a replay marker and replaying to the choice list
+  after load.
 - ink-rs behavior: `save_state()` now rejects saves while generated choices are
   pending. Language-level saves snapshot executable runtime state only. Hosts
   should save before reaching a choice list or after `choose_choice_index()`;
@@ -65,9 +84,8 @@ Each entry should include:
   `Architecture.md`, and `docs/ink_JSON_runtime_format.md` describe choice
   lists as transient UI state, not serialized or replayed save state.
 - rationale: pending choices are derived UI output. Rejecting choice-pause
-  saves removes replay-mode state from the save format, bumps runtime saves to
-  `inkSaveVersion` 3, and keeps load from automatically advancing ordinary
-  saves.
+  saves removed replay-mode state from the save format and kept load from
+  automatically advancing ordinary saves.
 - author impact: UI save controls should be disabled while choices are visible,
   or should prompt the player to choose first. Save after selection if the
   selected aftermath is the intended resume point. Host shells such as
@@ -83,11 +101,11 @@ Each entry should include:
 - status: removed
 - background: earlier builds kept several removed Ink-style compiled JSON
   commands and count metadata as runtime compatibility residue.
-- ink-rs behavior: compiled story JSON is now a current ink-rs-only format at
-  `inkVersion` 2. The format no longer represents or loads removed command
-  tokens for terminal flow, source threads, implicit counts, visit indexes, or
-  sequence shuffle indexes. The `CNT?` read-count object, container count
-  metadata, and removed choice-only flag bit are rejected.
+- ink-rs behavior: compiled story JSON is now a current ink-rs-only format. The
+  format no longer represents or loads removed command tokens for terminal
+  flow, source threads, implicit counts, visit indexes, or sequence shuffle
+  indexes. The `CNT?` read-count object, container count metadata, and removed
+  choice-only flag bit are rejected.
 - documentation effect: `docs/ink_JSON_runtime_format.md` describes only the
   current compiled story JSON contract. Historical command descriptions stay in
   this changelog, finished plan notes, or rejection tests, not in current-format
@@ -95,12 +113,11 @@ Each entry should include:
 - rationale: ink-rs is not a compatibility layer for Ink compiled JSON. Keeping
   removed tokens in the runtime made the architecture look broader than the
   actual language and kept old control-flow concepts alive.
-- author impact: compiled JSON generated by older versions must be recompiled.
-  Runtime saves still use the current save-state format and are checked against
-  the current compiled story format version.
+- author impact: compiled JSON generated by older compiler builds must be
+  recompiled. Runtime saves use the current save-state shape directly.
 - tests: format and runtime loader tests reject old command tokens, `CNT?`,
-  count metadata, removed choice flag bits, and old `inkVersion` values;
-  compiler snapshots use version 2 and contain no removed terminal commands.
+  count metadata, and removed choice flag bits; compiler snapshots contain no
+  removed terminal commands.
 
 ## 2026-05-23: Source Threads And Terminal Diverts Removed
 
@@ -819,9 +836,8 @@ Each entry should include:
   authors should model state explicitly with variables. Runtime multi-flow APIs
   and multi-flow save state are removed; runtime-internal continuation
   machinery is not source syntax.
-- ink-rs save behavior: save JSON is version 3 and stores only the active
-  continuation/callstack frames, global variables, `storySeed`,
-  `previousRandom`, `inkSaveVersion`, and `inkFormatVersion`. It no longer
+- ink-rs save behavior: save JSON stores only the active continuation/callstack
+  frames, global variables, `storySeed`, and `previousRandom`. It no longer
   stores generated choices, choice continuation snapshots, `flows`,
   `currentFlowName`, `evalStack`, `currentDivertTarget`, `visitCounts`,
   `turnIndices`, or `turnIdx`. Saves are valid only while visible choices are

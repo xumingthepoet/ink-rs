@@ -1,1 +1,1 @@
-{"inkVersion":2,"root":[{"->":"game.main"},{"game":[{"as_fast_as_we_could":["<>","^ as fast as we could.","\n",null],"main":["^We hurried home ","<>","\n",{"->":"game.to_savile_row"},null],"to_savile_row":["^to Savile Row","\n",{"->":"game.as_fast_as_we_could"},null]}]}]}
+{"root":[{"->":"game.main"},{"game":[{"as_fast_as_we_could":["<>","^ as fast as we could.","\n",null],"main":["^We hurried home ","<>","\n",{"->":"game.to_savile_row"},null],"to_savile_row":["^to Savile Row","\n",{"->":"game.as_fast_as_we_could"},null]}]}]}

@@ -2,11 +2,10 @@ use std::collections::BTreeMap;
 
 use serde_json::Value as JsonValue;
 
-use crate::{json, FormatError, INK_VERSION_CURRENT};
+use crate::{json, FormatError};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Program {
-    pub ink_version: i32,
     pub root: Container,
     pub internal_functions: BTreeMap<String, InternalFunction>,
     pub interfaces: BTreeMap<String, InterfaceDefinition>,
@@ -15,7 +14,6 @@ pub struct Program {
 impl Program {
     pub fn new(root: Container) -> Self {
         Self {
-            ink_version: INK_VERSION_CURRENT,
             root,
             internal_functions: BTreeMap::new(),
             interfaces: BTreeMap::new(),

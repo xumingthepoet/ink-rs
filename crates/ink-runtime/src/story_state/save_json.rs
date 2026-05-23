@@ -1,12 +1,8 @@
 use serde_json::{json, Map};
 
-use crate::{
-    execution_state::ExecutionState, pointer, story::INK_VERSION_CURRENT, story_error::StoryError,
-};
+use crate::{execution_state::ExecutionState, pointer, story_error::StoryError};
 
 use super::StoryState;
-
-pub const INK_SAVE_STATE_VERSION: u32 = 3;
 
 impl StoryState {
     pub fn to_json(&self) -> Result<String, StoryError> {
@@ -40,11 +36,6 @@ impl StoryState {
         obj.insert("storySeed".to_owned(), json!(self.story_seed));
         obj.insert("previousRandom".to_owned(), json!(self.previous_random));
 
-        obj.insert("inkSaveVersion".to_owned(), json!(INK_SAVE_STATE_VERSION));
-
-        // Not using this right now, but could do in future.
-        obj.insert("inkFormatVersion".to_owned(), json!(INK_VERSION_CURRENT));
-
         Ok(serde_json::Value::Object(obj))
     }
 
@@ -71,20 +62,6 @@ impl StoryState {
     }
 
     fn load_json_obj(&mut self, j_object: serde_json::Value) -> Result<(), StoryError> {
-        let save_version = j_object
-            .get("inkSaveVersion")
-            .and_then(|version| version.as_u64())
-            .ok_or_else(|| {
-                StoryError::BadJson("ink save format incorrect, can't load.".to_owned())
-            })?;
-
-        if save_version != INK_SAVE_STATE_VERSION as u64 {
-            return Err(StoryError::BadJson(format!(
-                "ink-rs save format version mismatch: expected {}, got {}.",
-                INK_SAVE_STATE_VERSION, save_version
-            )));
-        }
-
         let root_obj = j_object
             .as_object()
             .ok_or_else(|| StoryError::BadJson("Invalid save state object".to_string()))?;
@@ -164,7 +141,7 @@ fn reject_removed_save_fields(root_obj: &Map<String, serde_json::Value>) -> Resu
     ] {
         if root_obj.contains_key(field) {
             return Err(StoryError::BadJson(format!(
-                "Save-state field '{field}' was removed in inkSaveVersion {INK_SAVE_STATE_VERSION}; load expects minimal execution state."
+                "Save-state field '{field}' was removed; load expects minimal execution state."
             )));
         }
     }

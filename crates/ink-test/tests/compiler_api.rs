@@ -26,7 +26,7 @@ fn public_compiler_api_exposes_pipeline_artifacts() {
     let emitted = compiler.emit_json(program);
     assert!(!emitted.has_errors(), "{:#?}", emitted.diagnostics);
     let json = emitted.artifact.expect("expected emitted JSON");
-    assert!(json.contains("\"inkVersion\""));
+    assert!(json.contains("\"root\""));
 }
 
 #[test]
