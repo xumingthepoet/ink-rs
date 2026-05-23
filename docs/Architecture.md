@@ -457,8 +457,8 @@ Key areas:
 - `story/errors.rs`: runtime error handling.
 - `story/external_functions.rs`: host function binding and fallback behavior.
 - `story_state.rs`: callstack, output stream, generated choices, globals,
-  evaluation stack, random state, current errors/warnings, choice replay, and
-  v2 save/load.
+  evaluation stack, random state, current errors/warnings, and current
+  save/load.
 - `callstack.rs`, `execution_state.rs`, `variables_state.rs`,
   `state_patch.rs`: mutable execution state machinery.
 - `container.rs`, `object.rs`, `path.rs`, `pointer.rs`, `search_result.rs`:
@@ -483,9 +483,9 @@ crate, compiler lowering/tests, runtime loading/tests, and
 
 Runtime save JSON is not compiled-story JSON. Save/load is owned by
 `story_state.rs` and runtime JSON helpers. The current save-state version is
-`INK_SAVE_STATE_VERSION = 2`.
+`INK_SAVE_STATE_VERSION = 3`.
 
-The v2 save format stores only stable pause-point state:
+The v3 save format stores only stable execution state:
 
 - callstack frames
 - global `variablesState`
@@ -494,14 +494,13 @@ The v2 save format stores only stable pause-point state:
 
 It does not store generated choices, choice continuation snapshots, multi-flow
 maps, mid-expression internals, current divert target internals, visit counts,
-turn indices, or version 1 state. A save taken at a choice pause records the
-stable replay point before choice generation; load restores that replay point
-and regenerates pending static and dynamic choices. Version 1 saves and v2
-saves that contain removed fields such as `currentChoices`, `choiceThreads`,
-`flows`, `currentFlowName`, `evalStack`, `currentDivertTarget`, `visitCounts`,
-or `turnIndices` are rejected rather than migrated. Saving should fail clearly
-at unstable runtime points rather than serializing incomplete execution
-internals.
+turn indices, or earlier save-state versions. Saving while choices are pending
+is rejected; hosts should save before reaching a choice list or after choosing
+an option. Earlier saves and v3 saves that contain removed fields such as
+`currentChoices`, `choiceThreads`, `flows`, `currentFlowName`, `evalStack`,
+`currentDivertTarget`, `visitCounts`, `turnIndices`, or `resumeMode` are
+rejected rather than migrated. Saving should fail clearly at unstable runtime
+points rather than serializing incomplete execution internals.
 
 ## Tests And Fixtures
 

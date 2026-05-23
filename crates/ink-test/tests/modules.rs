@@ -160,6 +160,7 @@ fn globals_and_externals_use_module_qualified_runtime_names() {
         story.bind_external_function(name, Rc::new(RefCell::new(ModuleExternal)), true);
     }
     let output = story.continue_maximally();
+    story.choose_choice_index(0);
 
     assert_eq!(output, "7|8\nReady.\n");
     assert_eq!(
@@ -193,7 +194,6 @@ fn globals_and_externals_use_module_qualified_runtime_names() {
         reloaded.bind_external_function(name, Rc::new(RefCell::new(ModuleExternal)), true);
     }
     reloaded.load_state(&save_string);
-    reloaded.choose_choice_index(0);
     assert_eq!(reloaded.continue_maximally(), "11|22\n");
 }
 

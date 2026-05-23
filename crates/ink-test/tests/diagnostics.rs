@@ -206,14 +206,14 @@ fn dynamic_choice_diagnostics_require_array_iterables() {
 }
 
 #[test]
-fn choice_generation_diagnostics_reject_replay_unsafe_calls() {
-    let diagnostics = diagnostics_for_fixture("diagnostics/choice-generation-replay-safe.ink");
+fn choice_generation_diagnostics_reject_side_effectful_calls() {
+    let diagnostics = diagnostics_for_fixture("diagnostics/choice-generation-side-effect-free.ink");
 
     for message in [
-        "Choice condition must be replay-safe; function call 'mark' is not allowed during choice generation",
-        "Choice text must be replay-safe; builtin 'RANDOM' is not allowed during choice generation",
-        "Choice text must be replay-safe; function call 'unsafe_label' is not allowed during choice generation",
-        "Dynamic choice iterable must be replay-safe; function call 'unsafe_items' is not allowed during choice generation",
+        "Choice condition must be side-effect-free; function call 'mark' is not allowed during choice generation",
+        "Choice text must be side-effect-free; builtin 'RANDOM' is not allowed during choice generation",
+        "Choice text must be side-effect-free; function call 'unsafe_label' is not allowed during choice generation",
+        "Dynamic choice iterable must be side-effect-free; function call 'unsafe_items' is not allowed during choice generation",
     ] {
         assert_diagnostic(&diagnostics, DiagnosticSeverity::Error, message);
     }

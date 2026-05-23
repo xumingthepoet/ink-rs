@@ -1,7 +1,7 @@
 mod argument_resolution;
 mod array_literals;
 mod assignments;
-mod choice_replay;
+mod choice_generation;
 mod constants;
 mod context;
 mod dict_literals;
@@ -34,7 +34,7 @@ use crate::{compiler::StageOutput, diagnostic::Diagnostic, parsed::Story};
 
 use array_literals::array_literal_diagnostics_with_indexes;
 use assignments::variable_assignment_diagnostics_with_indexes;
-use choice_replay::choice_replay_diagnostics;
+use choice_generation::choice_generation_diagnostics;
 use constants::constant_redefinition_diagnostics;
 use dict_literals::dict_literal_diagnostics_with_indexes;
 use dynamic_choices::dynamic_choice_diagnostics_with_indexes;
@@ -164,7 +164,7 @@ fn run_analysis_passes_with_modules(
         story,
         &analysis_indexes,
     ));
-    diagnostics.extend(choice_replay_diagnostics(story));
+    diagnostics.extend(choice_generation_diagnostics(story));
 
     // Target checks build symbol and variable-scope indexes.
     // Keep this after naming/flow diagnostics so resolution errors do not hide

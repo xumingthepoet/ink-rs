@@ -139,7 +139,7 @@ mod tests {
         let mut story = Story::new(SIMPLE_STORY_JSON).expect("valid story");
         let mut save: serde_json::Value =
             serde_json::from_str(&story.save_state().expect("save state")).expect("valid save");
-        save["inkSaveVersion"] = json!(1);
+        save["inkSaveVersion"] = json!(2);
 
         let error = story
             .load_state(&save.to_string())
@@ -179,6 +179,7 @@ mod tests {
             "visitCounts",
             "turnIndices",
             "turnIdx",
+            "resumeMode",
         ] {
             let mut save = simple_save_json();
             save[field] = json!([]);
@@ -263,12 +264,12 @@ mod tests {
     }
 
     #[test]
-    fn save_state_uses_minimal_v2_shape() {
+    fn save_state_uses_minimal_v3_shape() {
         let story = Story::new(SIMPLE_STORY_JSON).expect("valid story");
         let save: serde_json::Value =
             serde_json::from_str(&story.save_state().expect("save state")).expect("valid save");
 
-        assert_eq!(save["inkSaveVersion"], json!(2));
+        assert_eq!(save["inkSaveVersion"], json!(3));
         assert!(save.get("callstack").is_some());
         assert!(save["callstack"].get("frames").is_some());
         assert!(save.get("variablesState").is_some());
@@ -286,6 +287,7 @@ mod tests {
             "visitCounts",
             "turnIndices",
             "turnIdx",
+            "resumeMode",
         ] {
             assert!(
                 save.get(omitted_field).is_none(),

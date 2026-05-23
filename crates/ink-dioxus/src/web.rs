@@ -1,5 +1,7 @@
 use crate::{
-    app::{InkApp, InkAppInteraction, InkAppOptions, InkChoicePrompt, InkToast},
+    app::{
+        InkApp, InkAppInteraction, InkAppOptions, InkAppSaveSnapshot, InkChoicePrompt, InkToast,
+    },
     runtime::{InkGameSource, InkRuntime, InkSource},
     styled_text::{
         parse_style_markup, parse_style_markup_with_tags, style_from_tags, StyledSegment, TextStyle,
@@ -227,7 +229,6 @@ fn web_app() -> Element {
                 let mut game = game.write();
                 if game.can_advance_transcript_reveal() {
                     game.advance_transcript_reveal();
-                    game.maybe_auto_save();
                 }
                 game.advance_toast_tick();
             }
@@ -380,7 +381,6 @@ struct WebGameState {
     visible_transcript_chars: usize,
     visible_transcript_revision: u64,
     reveal_carry_units: u32,
-    last_saved_prompt_revision: u64,
     pressed_choice_index: Option<usize>,
     toast: Option<WebToastState>,
     toast_queue: VecDeque<WebToastState>,
@@ -484,7 +484,6 @@ impl WebGameState {
             visible_transcript_chars: 0,
             visible_transcript_revision: 0,
             reveal_carry_units: 0,
-            last_saved_prompt_revision: 0,
             pressed_choice_index: None,
             toast: None,
             toast_queue: VecDeque::new(),
@@ -550,7 +549,6 @@ impl WebGameState {
         }
 
         self.storage_ready = true;
-        self.maybe_auto_save();
     }
 
     fn restore_from_web_save(&mut self, saved_state: &str) -> Result<(), String> {
@@ -581,9 +579,9 @@ impl WebGameState {
         self.visible_transcript_chars = self.target_transcript_chars;
         self.visible_transcript_revision = self.visible_transcript_revision.wrapping_add(1);
         self.reveal_carry_units = 0;
-        self.last_saved_prompt_revision = 0;
         self.toast = None;
         self.toast_queue.clear();
+        self.consume_output();
         Ok(())
     }
 
@@ -744,10 +742,14 @@ impl WebGameState {
             return;
         };
 
-        match app.submit_choice(index) {
-            Ok(()) => {
+        let transcript_text_before_choice = self.target_transcript_text.clone();
+
+        match app.submit_choice_with_save_snapshot(index) {
+            Ok(save_snapshot) => {
+                if let Some(save_snapshot) = save_snapshot {
+                    self.write_choice_selection_save(save_snapshot, transcript_text_before_choice);
+                }
                 self.consume_output();
-                self.maybe_auto_save();
             }
             Err(error) => {
                 self.error = Some(error.to_string());
@@ -881,43 +883,25 @@ impl WebGameState {
             .min(self.target_transcript_chars);
         self.reveal_carry_units = 0;
         self.visible_transcript_revision = self.visible_transcript_revision.wrapping_add(1);
-        self.maybe_auto_save();
     }
 
-    fn maybe_auto_save(&mut self) {
-        if !self.storage_ready || self.error.is_some() || self.has_pending_transcript_reveal() {
+    fn write_choice_selection_save(&self, snapshot: InkAppSaveSnapshot, transcript_text: String) {
+        if !self.storage_ready || self.error.is_some() {
             return;
         }
-
-        let Some(prompt) = self.current_prompt() else {
-            return;
-        };
-
-        if self.last_saved_prompt_revision == prompt.revision {
-            return;
-        }
-
-        let Some(app) = &self.app else {
-            return;
-        };
-
-        let Ok(story_state) = app.save_state() else {
-            return;
-        };
 
         let save_state = WebSaveState {
             schema_version: config().save_schema_version,
             content_fingerprint: embedded_ink_fingerprint(self.active_sources()),
-            story_state,
-            transcript_text: self.target_transcript_text.clone(),
-            story_title: app.story_title().to_string(),
-            prompt_title: app.dynamic_prompt_title().map(str::to_string),
+            story_state: snapshot.story_state,
+            transcript_text,
+            story_title: snapshot.story_title,
+            prompt_title: snapshot.prompt_title,
         };
 
         if let Ok(serialized) = serde_json::to_string(&save_state) {
             let storage_key = self.active_storage_key();
             write_web_save(&storage_key, &serialized);
-            self.last_saved_prompt_revision = prompt.revision;
         }
     }
 

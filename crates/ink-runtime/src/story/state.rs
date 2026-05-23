@@ -86,7 +86,7 @@ impl Story {
 
     pub(crate) fn state_snapshot(&mut self) {
         // tmp_state contains the new state and current state is stored in snapshot
-        let mut tmp_state = self.state.copy_and_start_patching(false);
+        let mut tmp_state = self.state.copy_and_start_patching();
         std::mem::swap(&mut tmp_state, &mut self.state);
         self.state_snapshot_at_last_new_line = Some(tmp_state);
     }
@@ -108,12 +108,9 @@ impl Story {
     /// Exports the current state to JSON format, in order to save the game.
     pub fn save_state(&self) -> Result<String, StoryError> {
         if !self.get_state().get_generated_choices().is_empty() {
-            let replay_state = self.choice_replay_state.as_ref().ok_or_else(|| {
-                StoryError::InvalidStoryState(
-                    "Cannot save at a choice pause without a replay point.".to_owned(),
-                )
-            })?;
-            return replay_state.to_choice_replay_json();
+            return Err(StoryError::InvalidStoryState(
+                "Cannot save while choices are pending; choose an option before saving.".to_owned(),
+            ));
         }
 
         self.get_state().to_json()
@@ -121,23 +118,7 @@ impl Story {
 
     /// Loads a previously saved state in JSON format.
     pub fn load_state(&mut self, json_state: &str) -> Result<(), StoryError> {
-        let should_regenerate_choices = serde_json::from_str::<serde_json::Value>(json_state)
-            .ok()
-            .and_then(|value| {
-                value
-                    .get("resumeMode")
-                    .and_then(|mode| mode.as_str())
-                    .map(|mode| mode == "choiceReplay")
-            })
-            .unwrap_or(false);
-
-        self.choice_replay_candidate = None;
-        self.choice_replay_state = None;
         self.get_state_mut().load_json(json_state)?;
-
-        if should_regenerate_choices && self.can_continue() {
-            self.continue_internal(0.0)?;
-        }
 
         Ok(())
     }
@@ -147,8 +128,6 @@ impl Story {
         self.if_async_we_cant("ResetState")?;
 
         self.state = StoryState::new(self.main_content_container.clone());
-        self.choice_replay_candidate = None;
-        self.choice_replay_state = None;
 
         self.reset_globals()?;
 

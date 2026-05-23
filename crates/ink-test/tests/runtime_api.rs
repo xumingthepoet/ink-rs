@@ -315,7 +315,9 @@ fn load_save_test() -> Result<(), Box<dyn Error>> {
         text.first().unwrap()
     );
 
-    // save the game state
+    story.choose_choice_index(0);
+
+    // save the game state after the player has selected a choice
     let save_string = story.save_state();
 
     println!("{}", save_string);
@@ -323,8 +325,6 @@ fn load_save_test() -> Result<(), Box<dyn Error>> {
     // recreate game and load state
     let mut story = common::story_from_fixture("runtime_api/load-save.ink");
     story.load_state(&save_string);
-
-    story.choose_choice_index(0);
 
     common::next_all(&mut story, &mut text);
     assert_eq!(

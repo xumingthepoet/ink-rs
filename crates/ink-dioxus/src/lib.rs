@@ -15,7 +15,8 @@ pub mod transcript;
 pub mod web;
 
 pub use app::{
-    InkApp, InkAppInteraction, InkAppOptions, InkChoiceOption, InkChoicePrompt, InkToast,
+    InkApp, InkAppInteraction, InkAppOptions, InkAppSaveSnapshot, InkChoiceOption, InkChoicePrompt,
+    InkToast,
 };
 pub use runtime::{
     InkError, InkGameSource, InkRuntime, InkSource, RuntimeChoice, RuntimePause, RuntimeStep,

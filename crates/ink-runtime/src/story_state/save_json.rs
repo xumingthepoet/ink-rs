@@ -6,20 +6,11 @@ use crate::{
 
 use super::StoryState;
 
-pub const INK_SAVE_STATE_VERSION: u32 = 2;
+pub const INK_SAVE_STATE_VERSION: u32 = 3;
 
 impl StoryState {
     pub fn to_json(&self) -> Result<String, StoryError> {
         Ok(self.write_json()?.to_string())
-    }
-
-    pub fn to_choice_replay_json(&self) -> Result<String, StoryError> {
-        let mut value = self.write_json()?;
-        let obj = value
-            .as_object_mut()
-            .ok_or_else(|| StoryError::BadJson("Invalid save state object".to_owned()))?;
-        obj.insert("resumeMode".to_owned(), json!("choiceReplay"));
-        Ok(value.to_string())
     }
 
     pub fn load_json(&mut self, save_string: &str) -> Result<(), StoryError> {
@@ -169,6 +160,7 @@ fn reject_removed_save_fields(root_obj: &Map<String, serde_json::Value>) -> Resu
         "visitCounts",
         "turnIndices",
         "turnIdx",
+        "resumeMode",
     ] {
         if root_obj.contains_key(field) {
             return Err(StoryError::BadJson(format!(

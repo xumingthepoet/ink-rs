@@ -243,20 +243,8 @@ impl Story {
     }
 
     pub(crate) fn continue_single_step(&mut self) -> Result<bool, StoryError> {
-        let had_choices_before_step = !self.get_state().get_generated_choices().is_empty();
-        if !had_choices_before_step && self.get_state().is_replay_save_candidate() {
-            self.choice_replay_candidate = Some(self.get_state().copy_for_replay_snapshot());
-        }
-
         // Run main step function (walks through content)
         self.step()?;
-
-        if !had_choices_before_step
-            && !self.get_state().get_generated_choices().is_empty()
-            && self.choice_replay_state.is_none()
-        {
-            self.choice_replay_state = self.choice_replay_candidate.take();
-        }
 
         // Run out of content and we have a default invisible choice that we can follow?
         if !self.can_continue()

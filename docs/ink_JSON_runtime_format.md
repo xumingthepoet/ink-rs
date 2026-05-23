@@ -213,17 +213,16 @@ owned by the runtime layer; it serializes current runtime values, including
 interface values as strings, but does not duplicate the compiled story's
 `interfaces` metadata.
 
-The current runtime save-state format is `inkSaveVersion` 2. It stores the
+The current runtime save-state format is `inkSaveVersion` 3. It stores the
 active continuation/callstack frames, global `variablesState`, deterministic
 random state (`storySeed` and `previousRandom`), `inkSaveVersion`, and
 `inkFormatVersion`. It does not serialize generated choices, choice
 continuation snapshots, multi-flow maps, visit counts, turn indices, current
-divert targets, or evaluation-stack internals. Saves at a choice pause restore
-the replay point before choice generation and regenerate pending choices after
-load. Version 1 saves and v2 saves containing removed fields such as
-`currentChoices`, `choiceThreads`, `flows`, `currentFlowName`, `evalStack`,
-`currentDivertTarget`, `visitCounts`, or `turnIndices` are rejected rather than
-migrated.
+divert targets, or evaluation-stack internals. Calling `save_state()` while
+choices are pending returns an error. Earlier saves and v3 saves containing
+removed fields such as `currentChoices`, `choiceThreads`, `flows`,
+`currentFlowName`, `evalStack`, `currentDivertTarget`, `visitCounts`,
+`turnIndices`, or `resumeMode` are rejected rather than migrated.
 
 ## Variable assignment
 

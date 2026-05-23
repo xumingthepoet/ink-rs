@@ -16,6 +16,11 @@ The adapter understands these ink-rs tags:
 Inline `[style color=...]...[/style]` markup is also supported for text that
 needs styling inside a line or choice label.
 
+The web shell auto-saves after a player submits an enabled choice, before the
+selected aftermath is continued. It does not save while a choice prompt is
+waiting for input, because pending choices are UI state in ink-rs rather than
+language save-state data.
+
 ## Web Game Skeleton
 
 Add the adapter as both a normal dependency and a build dependency:

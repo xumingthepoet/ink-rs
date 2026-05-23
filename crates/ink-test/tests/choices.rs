@@ -193,21 +193,18 @@ fn dynamic_choices_expand_from_arrays_and_mix_with_static_choices() {
 }
 
 #[test]
-fn dynamic_choices_regenerate_after_save_load() {
+fn save_after_dynamic_choice_selection_preserves_binding_aftermath() {
     let compiled = compile_fixture("choices/dynamic-choice.ink");
     let mut story = Story::new(&compiled.json);
 
     assert_eq!(story.continue_maximally(), "");
+    story.choose_choice_index(2);
     let save_string = story.save_state();
     let save: serde_json::Value = serde_json::from_str(&save_string).expect("valid save JSON");
     assert_save_json_has_no_choice_or_removed_execution_state(&save);
 
     let mut reloaded = Story::new(&compiled.json);
     reloaded.load_state(&save_string);
-    let choices = reloaded.get_current_choices();
-    assert_eq!(choices.len(), 4);
-    assert_eq!(choices[2].text, "2:Beta");
-    reloaded.choose_choice_index(2);
     assert_eq!(reloaded.continue_maximally(), "picked 2:Beta.\n");
 }
 
@@ -342,54 +339,36 @@ fn choice_condition_blocks_stay_eager_while_inner_logical_ops_short_circuit() {
 }
 
 #[test]
-fn save_load_regenerates_static_choices_from_replay_point() {
-    let compiled = compile_fixture("choices/choice-save-load.ink");
-    let mut story = Story::new(&compiled.json);
-
-    assert_eq!(story.continue_maximally(), "");
-    assert_eq!(story.get_current_choices().len(), 2);
-    let save_string = story.save_state();
-    let save: serde_json::Value = serde_json::from_str(&save_string).expect("valid save JSON");
-    assert_eq!(save["inkSaveVersion"], serde_json::json!(2));
-    assert_save_json_has_no_choice_or_removed_execution_state(&save);
-    assert!(save.get("flows").is_none());
-    assert!(save.get("evalStack").is_none());
-    assert!(save.get("visitCounts").is_none());
-    assert!(save.get("turnIndices").is_none());
-    assert!(save.get("turnIdx").is_none());
-
-    let mut reloaded = Story::new(&compiled.json);
-    reloaded.load_state(&save_string);
-    let choices = reloaded.get_current_choices();
-    assert_eq!(choices.len(), 2);
-    assert_eq!(choices[0].text, "First");
-    assert_eq!(choices[1].text, "Second");
-    reloaded.choose_choice_index(1);
-    assert_eq!(reloaded.continue_maximally(), "Picked 2.\n");
-}
-
-#[test]
-fn static_choice_pause_save_omits_choice_and_removed_execution_state() {
+fn choice_pause_save_is_rejected() {
     let compiled = compile_fixture("choices/choice-save-load.ink");
     let mut story = Story::new(&compiled.json);
 
     assert_eq!(story.continue_maximally(), "");
     assert_eq!(story.get_current_choices().len(), 2);
 
-    let save: Value = serde_json::from_str(&story.save_state()).expect("valid save JSON");
-    assert_save_json_has_no_choice_or_removed_execution_state(&save);
+    assert_pending_choice_save_rejected(&story);
 }
 
 #[test]
-fn dynamic_choice_pause_save_omits_choice_and_removed_execution_state() {
+fn static_choice_pause_save_is_rejected() {
+    let compiled = compile_fixture("choices/choice-save-load.ink");
+    let mut story = Story::new(&compiled.json);
+
+    assert_eq!(story.continue_maximally(), "");
+    assert_eq!(story.get_current_choices().len(), 2);
+
+    assert_pending_choice_save_rejected(&story);
+}
+
+#[test]
+fn dynamic_choice_pause_save_is_rejected() {
     let compiled = compile_fixture("choices/dynamic-choice.ink");
     let mut story = Story::new(&compiled.json);
 
     assert_eq!(story.continue_maximally(), "");
     assert_eq!(story.get_current_choices().len(), 4);
 
-    let save: Value = serde_json::from_str(&story.save_state()).expect("valid save JSON");
-    assert_save_json_has_no_choice_or_removed_execution_state(&save);
+    assert_pending_choice_save_rejected(&story);
 }
 
 #[test]
@@ -406,41 +385,39 @@ fn selected_choice_aftermath_save_omits_choice_and_removed_execution_state() {
 }
 
 #[test]
-fn save_load_regenerates_authored_choices_from_replay_point() {
+fn save_after_selecting_authored_choice_continues_aftermath() {
     let compiled = compile_fixture("choices/authored-choice-save-load.ink");
     let mut story = Story::new(&compiled.json);
 
     assert_eq!(story.continue_maximally(), "");
     let choices = story.get_current_choices();
     assert_eq!(choices.len(), 2);
-    assert_eq!(choices[0].text, "Replay");
+    assert_eq!(choices[0].text, "Saved");
     assert_eq!(choices[1].text, "Main");
+    story.choose_choice_index(0);
     let save_string = story.save_state();
     let save: serde_json::Value = serde_json::from_str(&save_string).expect("valid save JSON");
     assert_save_json_has_no_choice_or_removed_execution_state(&save);
 
     let mut reloaded = Story::new(&compiled.json);
     reloaded.load_state(&save_string);
-    assert_eq!(reloaded.get_current_choices().len(), 2);
-    reloaded.choose_choice_index(0);
-    assert_eq!(reloaded.continue_maximally(), "Replay branch.\n");
+    assert_eq!(reloaded.continue_maximally(), "Saved branch.\n");
 }
 
 #[test]
-fn save_load_regenerated_choice_reaches_gather_after_selection() {
+fn save_after_selecting_choice_reaches_gather_after_load() {
     let compiled = compile_fixture("choices/gather-choice-save-load.ink");
     let mut story = Story::new(&compiled.json);
 
     assert_eq!(story.continue_maximally(), "");
     assert_eq!(story.get_current_choices().len(), 2);
+    story.choose_choice_index(1);
     let save_string = story.save_state();
     let save: serde_json::Value = serde_json::from_str(&save_string).expect("valid save JSON");
     assert_save_json_has_no_choice_or_removed_execution_state(&save);
 
     let mut reloaded = Story::new(&compiled.json);
     reloaded.load_state(&save_string);
-    assert_eq!(reloaded.get_current_choices().len(), 2);
-    reloaded.choose_choice_index(1);
     assert_eq!(
         reloaded.continue_maximally(),
         "Right branch.\nregroup\nRegrouped.\n"
@@ -463,21 +440,22 @@ fn weave_fallthrough_works_with_current_choice_structure() {
 }
 
 #[test]
-fn dynamic_weave_fallthrough_regenerates_after_save_load() {
+fn save_after_selecting_dynamic_weave_choice_preserves_aftermath() {
     let compiled = compile_fixture("choices/weave-fallthrough-current.ink");
     let mut story = Story::new(&compiled.json);
 
     assert_eq!(story.continue_maximally(), "Start.\n");
+    let choices = story.get_current_choices();
+    assert_eq!(choices.len(), 3);
+    assert_eq!(choices[1].text, "Dynamic East");
+    story.choose_choice_index(1);
+
     let save_string = story.save_state();
     let save: serde_json::Value = serde_json::from_str(&save_string).expect("valid save JSON");
     assert_save_json_has_no_choice_or_removed_execution_state(&save);
 
     let mut reloaded = Story::new(&compiled.json);
     reloaded.load_state(&save_string);
-    let choices = reloaded.get_current_choices();
-    assert_eq!(choices.len(), 3);
-    assert_eq!(choices[1].text, "Dynamic East");
-    reloaded.choose_choice_index(1);
 
     assert_eq!(
         reloaded.continue_maximally(),
@@ -495,6 +473,7 @@ fn save_load_preserves_deterministic_random_state() {
 
     let mut saved = Story::new(&compiled.json);
     assert_eq!(saved.continue_maximally(), uninterrupted_first_output);
+    saved.choose_choice_index(0);
     let save_string = saved.save_state();
     let save: serde_json::Value = serde_json::from_str(&save_string).expect("valid save JSON");
     assert!(save.get("storySeed").is_some());
@@ -503,8 +482,36 @@ fn save_load_preserves_deterministic_random_state() {
 
     let mut reloaded = Story::new(&compiled.json);
     reloaded.load_state(&save_string);
-    reloaded.choose_choice_index(0);
     assert_eq!(reloaded.continue_maximally(), uninterrupted_output);
+}
+
+#[test]
+fn nested_choice_pause_without_transition_text_rejects_save() {
+    let compiled = compile_fixture("choices/dynamic-choice-nested.ink");
+    let mut story = Story::new(&compiled.json);
+
+    assert_eq!(story.continue_maximally(), "");
+    assert_eq!(story.get_current_choices()[0].text, "Topic menu");
+    story.choose_choice_index(0);
+    assert_eq!(story.continue_maximally(), "");
+
+    let topic_choices = story.get_current_choices();
+    assert_eq!(topic_choices.len(), 2);
+    assert_eq!(topic_choices[0].text, "Topic 0:East");
+    assert_eq!(topic_choices[1].text, "Topic 1:West");
+    assert_pending_choice_save_rejected(&story);
+}
+
+fn assert_pending_choice_save_rejected(story: &Story) {
+    let error = story
+        .try_save_state()
+        .expect_err("pending choices should not be runtime-saveable");
+
+    assert!(matches!(
+        error,
+        StoryError::InvalidStoryState(message)
+            if message.contains("Cannot save while choices are pending")
+    ));
 }
 
 fn assert_save_json_has_no_choice_or_removed_execution_state(save: &Value) {
@@ -523,6 +530,7 @@ fn assert_save_json_has_no_choice_or_removed_execution_state(save: &Value) {
         "visitCounts",
         "turnIndices",
         "turnIdx",
+        "resumeMode",
     ];
     let mut found = Vec::new();
     collect_forbidden_save_keys(save, "$", &forbidden_keys, &mut found);

@@ -7,19 +7,19 @@ use crate::{
     source::SourceSpan,
 };
 
-pub(super) fn choice_replay_diagnostics(story: &Story) -> Vec<Diagnostic> {
-    let mut checker = ChoiceReplayChecker {
+pub(super) fn choice_generation_diagnostics(story: &Story) -> Vec<Diagnostic> {
+    let mut checker = ChoiceGenerationChecker {
         diagnostics: Vec::new(),
     };
     walk_story(story, &mut checker);
     checker.diagnostics
 }
 
-struct ChoiceReplayChecker {
+struct ChoiceGenerationChecker {
     diagnostics: Vec<Diagnostic>,
 }
 
-impl ParsedVisitor for ChoiceReplayChecker {
+impl ParsedVisitor for ChoiceGenerationChecker {
     fn visit_object(&mut self, object: &Object, _context: &VisitContext) {
         let Object::Choice(choice) = object else {
             return;
@@ -28,31 +28,31 @@ impl ParsedVisitor for ChoiceReplayChecker {
     }
 }
 
-impl ChoiceReplayChecker {
+impl ChoiceGenerationChecker {
     fn check_choice(&mut self, choice: &Choice) {
         let span = choice.span();
 
         if let Some(binding) = choice.dynamic_binding() {
             self.check_expression(
                 binding.iterable(),
-                ChoiceReplayContext::DynamicIterable,
+                ChoiceGenerationContext::DynamicIterable,
                 span,
             );
         }
 
         if let Some(condition) = choice.condition() {
-            self.check_expression(condition, ChoiceReplayContext::Condition, span);
+            self.check_expression(condition, ChoiceGenerationContext::Condition, span);
         }
 
         if let Some(content) = choice.start_content() {
-            self.check_content(content, ChoiceReplayContext::Text, span);
+            self.check_content(content, ChoiceGenerationContext::Text, span);
         }
     }
 
     fn check_content(
         &mut self,
         content: &ContentList,
-        context: ChoiceReplayContext,
+        context: ChoiceGenerationContext,
         choice_span: &SourceSpan,
     ) {
         for object in content.objects() {
@@ -63,7 +63,7 @@ impl ChoiceReplayChecker {
     fn check_object(
         &mut self,
         object: &Object,
-        context: ChoiceReplayContext,
+        context: ChoiceGenerationContext,
         choice_span: &SourceSpan,
     ) {
         match object {
@@ -120,12 +120,12 @@ impl ChoiceReplayChecker {
     fn check_expression(
         &mut self,
         expression: &Expression,
-        context: ChoiceReplayContext,
+        context: ChoiceGenerationContext,
         choice_span: &SourceSpan,
     ) {
         match expression {
             Expression::FunctionCall { name, args } => {
-                if is_replay_safe_builtin(name) {
+                if is_side_effect_free_builtin(name) {
                     for arg in args {
                         self.check_expression(arg, context, choice_span);
                     }
@@ -218,25 +218,29 @@ impl ChoiceReplayChecker {
 
     fn report(
         &mut self,
-        context: ChoiceReplayContext,
+        context: ChoiceGenerationContext,
         span: &SourceSpan,
         reason: impl Into<String>,
     ) {
         self.diagnostics.push(Diagnostic::error(
             span.clone(),
-            format!("{} must be replay-safe; {}", context.label(), reason.into()),
+            format!(
+                "{} must be side-effect-free; {}",
+                context.label(),
+                reason.into()
+            ),
         ));
     }
 }
 
 #[derive(Debug, Clone, Copy)]
-enum ChoiceReplayContext {
+enum ChoiceGenerationContext {
     Condition,
     DynamicIterable,
     Text,
 }
 
-impl ChoiceReplayContext {
+impl ChoiceGenerationContext {
     fn label(self) -> &'static str {
         match self {
             Self::Condition => "Choice condition",
@@ -246,7 +250,7 @@ impl ChoiceReplayContext {
     }
 }
 
-fn is_replay_safe_builtin(name: &str) -> bool {
+fn is_side_effect_free_builtin(name: &str) -> bool {
     matches!(
         name,
         "MIN"

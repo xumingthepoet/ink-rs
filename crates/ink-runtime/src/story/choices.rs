@@ -28,8 +28,6 @@ impl Story {
             .borrow_mut()
             .set_current_continuation(choice_to_choose.get_continuation_at_generation().unwrap());
 
-        self.choice_replay_candidate = None;
-        self.choice_replay_state = None;
         self.choose_path(&choice_to_choose.target_path, true)?;
 
         Ok(())

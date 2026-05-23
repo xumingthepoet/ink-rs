@@ -325,15 +325,15 @@ Use one binding variable for the value, or two variables for `index, value`.
     -> choose(i, option.target)
 ```
 
-The array expression is evaluated once before expansion. Save/load stores the
-stable replay point before choice generation and regenerates pending choices
-after load instead of serializing generated choices.
+The array expression is evaluated once before expansion. Generated choices are
+transient and are not serialized. `save_state()` rejects saves while choices
+are pending; save before reaching the choice list or after choosing an option.
 
-Choice generation must be replay-safe. Dynamic iterable expressions, choice
+Choice generation must be side-effect-free. Dynamic iterable expressions, choice
 conditions, and displayed choice text cannot call story functions, external
 functions, dynamic interface functions, `RANDOM`, `SEED_RANDOM`, mutating
 collection builtins, or other statement-level side effects. Move side effects
-to ordinary story content before the choice pause or into the selected-choice
+to ordinary story content before the choice list or into the selected-choice
 body.
 
 Dynamic binding variables are visible in the choice condition, displayed choice
@@ -482,12 +482,10 @@ INTERNAL summary() => string
 
 Language-level state that should survive save/load belongs in globals, arrays,
 Dicts, structs, or explicit host state. Runtime `save_state()` stores stable
-pause-point state: globals, callstack/temps, random state, and enough resume
-mode information to continue from the saved point.
+execution state: globals, callstack/temps, and random state.
 
-Saves do not serialize pending generated choices. When saved at a choice pause,
-the runtime restores the pre-choice replay point and regenerates static and
-dynamic choices after load.
+Saves do not serialize pending generated choices. Calling `save_state()` while
+choices are pending returns an error; choose an option before saving.
 
 ## Identifiers
 

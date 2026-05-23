@@ -23,6 +23,34 @@ Each entry should include:
 - author impact
 - tests
 
+## 2026-05-23: Choice-Pause Saves Rejected
+
+- status: removed
+- background: earlier same-day runtime behavior supported saving while choices
+  were pending by writing a `resumeMode: "choiceReplay"` marker and replaying
+  to the choice list after load.
+- ink-rs behavior: `save_state()` now rejects saves while generated choices are
+  pending. Language-level saves snapshot executable runtime state only. Hosts
+  should save before reaching a choice list or after `choose_choice_index()`;
+  if choosing immediately produces another nested choice list with no
+  intervening text, that new choice pause is also not saveable.
+- documentation effect: `LanguageOverview.md`, `SyntaxReference.md`,
+  `Architecture.md`, and `docs/ink_JSON_runtime_format.md` describe choice
+  lists as transient UI state, not serialized or replayed save state.
+- rationale: pending choices are derived UI output. Rejecting choice-pause
+  saves removes replay-mode state from the save format, bumps runtime saves to
+  `inkSaveVersion` 3, and keeps load from automatically advancing ordinary
+  saves.
+- author impact: UI save controls should be disabled while choices are visible,
+  or should prompt the player to choose first. Save after selection if the
+  selected aftermath is the intended resume point. Host shells such as
+  `ink-dioxus` should capture their own UI/transcript state around that
+  selected-choice save point rather than treating the visible prompt as a
+  language save point.
+- tests: integration choice tests reject static, dynamic, and nested
+  no-text-transition choice-pause saves, while save/load after choice selection
+  still preserves static, dynamic, gather, loop, and random-state behavior.
+
 ## 2026-05-23: Compiled Story JSON Current-Only Format
 
 - status: removed
@@ -126,9 +154,9 @@ Each entry should include:
   `* [item in items] Text {item}` or
   `* [index, item in items] {condition}: {index}:{item}`. The iterable must be
   an array expression. The array is evaluated before expansion; each element
-  emits an ordinary runtime `ChoicePoint`. Save/load records the stable replay
-  point before choice generation and regenerates choices after load, so choice
-  generation must remain replay-safe.
+  emits an ordinary runtime `ChoicePoint`. Pending choices are transient UI
+  state and are not language-saveable, so choice generation must remain
+  side-effect-free.
   Binding variables are visible in the choice condition, displayed choice text,
   selected-choice body, tags, and nested choices. Dynamic choices may use any
   choice depth marker such as `*`, `**`, or `***`, and may mix with authored
@@ -150,35 +178,34 @@ Each entry should include:
   explicit authored state and ordinary choices.
 - tests: choice integration fixtures cover mixed static/dynamic choices,
   conditional filtering, index/value bindings, nested dynamic choices that
-  capture outer variables, empty arrays with fallback choices, and save/load of
-  generated dynamic choices. Diagnostics fixtures reject dynamic labels and
-  non-array iterables.
+  capture outer variables, empty arrays with fallback choices, and save/load
+  after a generated dynamic choice is selected. Diagnostics fixtures reject
+  dynamic labels and non-array iterables.
 
-## 2026-05-23: Choice Generation Is Replay-Safe
+## 2026-05-23: Choice Generation Is Side-Effect-Free
 
 - status: supported
-- background: save/load now restores a stable pre-choice replay point instead
-  of serializing pending generated choices. Loading a save made at a choice
-  pause regenerates static and dynamic choices.
+- background: choice generation runs before player selection and produces
+  transient pending choices that are not serialized.
 - ink-rs behavior: expressions that run while generating choices must be
-  replay-safe. Choice conditions, dynamic choice iterable expressions, and
+  side-effect-free. Choice conditions, dynamic choice iterable expressions, and
   displayed choice text reject story function calls, external function calls,
   dynamic interface function calls, `RANDOM`, `SEED_RANDOM`, mutating
   collection builtins, and statement-level side effects.
-- documentation effect: `SyntaxReference.md` documents replay-safe choice
-  generation and describes save/load as replaying pending choices rather than
-  storing generated choices.
-- rationale: regenerating choices after load must not duplicate host calls,
-  variable writes, random draws, output emission, or other observable
-  side effects from the first choice generation pass.
+- documentation effect: `SyntaxReference.md` documents side-effect-free choice
+  generation and describes pending choices as transient, non-saveable UI state.
+- rationale: choice generation should not perform host calls, variable writes,
+  random draws, output emission, or other observable side effects before the
+  player has selected an option.
 - author impact: compute side-effectful values before the choice pause and
   store them in variables, or run side effects in the selected-choice body.
   Pure reads, literals, field/index access, and non-mutating builtins such as
   `LEN`, `DICT_HAS`, `DICT_SIZE`, `DICT_KEYS`, `MIN`, `MAX`, numeric casts,
   and `to_str` remain valid.
-- tests: diagnostics fixtures reject replay-unsafe calls in choice conditions,
+- tests: diagnostics fixtures reject side-effectful calls in choice conditions,
   displayed choice text, and dynamic choice iterables; save/load choice tests
-  verify choices are regenerated without serializing generated choice data.
+  verify pending choices are rejected while selected-choice aftermath can still
+  be saved and loaded.
 
 ## 2026-05-21: Array And Dict For Control Blocks
 
@@ -228,7 +255,7 @@ Each entry should include:
 - rationale: guard expressions such as `index < LEN(items) && items[index] == x`
   should not evaluate an unsafe read after the guard fails.
 - author impact: keep side effects that must always run in separate logic
-  lines. Choice generation contexts are replay-safe and no longer allow
+  lines. Choice generation contexts must be side-effect-free and no longer allow
   side-effectful calls in separate colon-terminated choice condition blocks.
   Put side effects inside `&&` or `||` only when skipping them is intended and
   the expression is outside choice generation.
@@ -765,17 +792,16 @@ Each entry should include:
   authors should model state explicitly with variables. Runtime multi-flow APIs
   and multi-flow save state are removed; runtime-internal continuation
   machinery is not source syntax.
-- ink-rs save behavior: save JSON is version 2 and stores only the active
+- ink-rs save behavior: save JSON is version 3 and stores only the active
   continuation/callstack frames, global variables, `storySeed`,
   `previousRandom`, `inkSaveVersion`, and `inkFormatVersion`. It no longer
   stores generated choices, choice continuation snapshots, `flows`,
   `currentFlowName`, `evalStack`, `currentDivertTarget`, `visitCounts`,
-  `turnIndices`, or `turnIdx`. Saves at a choice pause restore the stable
-  replay point before choice generation and regenerate pending choices after
-  load. Version 1 saves, and v2 saves containing removed fields such as
+  `turnIndices`, or `turnIdx`. Saves while choices are pending are rejected.
+  Earlier saves, and v3 saves containing removed fields such as
   `currentChoices`, `choiceThreads`, `flows`, `currentFlowName`, `evalStack`,
-  `currentDivertTarget`, `visitCounts`, or `turnIndices`, are rejected rather
-  than migrated.
+  `currentDivertTarget`, `visitCounts`, `turnIndices`, or `resumeMode`, are
+  rejected rather than migrated.
 - documentation effect: `SyntaxReference.md` describes explicit dynamic
   divert syntax, repeatable display-only choices, removed count/turn features,
   and minimal save-state semantics. Runtime and JSON format docs describe only

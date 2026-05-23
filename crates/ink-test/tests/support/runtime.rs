@@ -114,6 +114,10 @@ impl Story {
         self.inner.save_state().expect("expected state to save")
     }
 
+    pub fn try_save_state(&self) -> Result<String, StoryError> {
+        self.inner.save_state()
+    }
+
     pub fn load_state(&mut self, json: &str) {
         self.inner.load_state(json).expect("expected state to load")
     }

@@ -5,40 +5,7 @@ use crate::state_patch::StatePatch;
 use super::StoryState;
 
 impl StoryState {
-    pub fn copy_for_replay_snapshot(&self) -> StoryState {
-        let mut copy = StoryState::new(self.main_content_container.clone());
-
-        copy.current_execution.callstack = Rc::new(RefCell::new(
-            self.current_execution.callstack.as_ref().borrow().clone(),
-        ));
-        copy.current_execution.output_stream = self.current_execution.output_stream.clone();
-        copy.current_execution.current_choices.clear();
-        copy.output_stream_dirty();
-
-        if self.has_error() {
-            copy.current_errors = self.current_errors.clone();
-        }
-
-        if self.has_warning() {
-            copy.current_warnings = self.current_warnings.clone();
-        }
-
-        copy.variables_state = self.variables_state.clone();
-        copy.variables_state
-            .set_callstack(copy.get_callstack().clone());
-        copy.variables_state.patch = None;
-
-        copy.evaluation_stack = self.evaluation_stack.clone();
-        copy.diverted_pointer = self.diverted_pointer.clone();
-        copy.set_previous_pointer(self.get_previous_pointer().clone());
-        copy.story_seed = self.story_seed;
-        copy.previous_random = self.previous_random;
-        copy.set_did_safe_exit(self.did_safe_exit);
-
-        copy
-    }
-
-    pub fn copy_and_start_patching(&self, for_background_save: bool) -> StoryState {
+    pub fn copy_and_start_patching(&self) -> StoryState {
         let mut copy = StoryState::new(self.main_content_container.clone());
 
         copy.patch = Some(self.patch.clone().unwrap_or_else(StatePatch::new));
@@ -50,20 +17,7 @@ impl StoryState {
         ));
         copy.current_execution.output_stream = self.current_execution.output_stream.clone();
         copy.output_stream_dirty();
-
-        // Background saves need choice copies because each choice snapshots the
-        // continuation at generation time, while internal snapshots can ref-copy.
-        if for_background_save {
-            copy.current_execution.current_choices =
-                Vec::with_capacity(self.current_execution.current_choices.len());
-
-            for choice in self.current_execution.current_choices.iter() {
-                let c = choice.as_ref().clone();
-                copy.current_execution.current_choices.push(Rc::new(c));
-            }
-        } else {
-            copy.current_execution.current_choices = self.current_execution.current_choices.clone();
-        }
+        copy.current_execution.current_choices = self.current_execution.current_choices.clone();
 
         if self.has_error() {
             copy.current_errors = self.current_errors.clone();
