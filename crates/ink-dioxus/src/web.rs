@@ -15,8 +15,7 @@ const DEFAULT_WEB_CSS: &str = include_str!("web.css");
 const DEFAULT_TEXT_REVEAL_CHARS_PER_SECOND: u32 = 48;
 const DEFAULT_TEXT_REVEAL_TICK_MS: u32 = 50;
 const DEFAULT_TOAST_DURATION_TICKS: u32 = 40;
-const DEFAULT_WEB_SAVE_STORAGE_KEY: &str = "ink_dioxus.web_save.v1";
-const DEFAULT_WEB_SAVE_SCHEMA_VERSION: u32 = 1;
+const DEFAULT_WEB_SAVE_STORAGE_KEY: &str = "ink_dioxus.web_save";
 
 static WEB_CONFIG: OnceLock<WebLaunchConfig> = OnceLock::new();
 
@@ -27,7 +26,6 @@ pub struct WebLaunchConfig {
     pub catalog_mode: bool,
     pub app_label: &'static str,
     pub storage_key: &'static str,
-    pub save_schema_version: u32,
     pub default_story_title: &'static str,
     pub default_prompt_title: &'static str,
     pub default_prompt_title_function: Option<&'static str>,
@@ -46,7 +44,6 @@ impl WebLaunchConfig {
             catalog_mode: false,
             app_label: "ink-rs",
             storage_key: DEFAULT_WEB_SAVE_STORAGE_KEY,
-            save_schema_version: DEFAULT_WEB_SAVE_SCHEMA_VERSION,
             default_story_title: "ink-rs Story",
             default_prompt_title: "Choices",
             default_prompt_title_function: None,
@@ -65,7 +62,6 @@ impl WebLaunchConfig {
             catalog_mode: true,
             app_label: "ink-rs",
             storage_key: DEFAULT_WEB_SAVE_STORAGE_KEY,
-            save_schema_version: DEFAULT_WEB_SAVE_SCHEMA_VERSION,
             default_story_title: "ink-rs Story",
             default_prompt_title: "Choices",
             default_prompt_title_function: None,
@@ -84,11 +80,6 @@ impl WebLaunchConfig {
 
     pub fn with_storage_key(mut self, value: &'static str) -> Self {
         self.storage_key = value;
-        self
-    }
-
-    pub fn with_save_schema_version(mut self, value: u32) -> Self {
-        self.save_schema_version = value;
         self
     }
 
@@ -390,7 +381,6 @@ struct WebGameState {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct WebSaveState {
-    schema_version: u32,
     content_fingerprint: String,
     story_state: String,
     transcript_text: String,
@@ -557,12 +547,8 @@ impl WebGameState {
         let save: WebSaveState = serde_json::from_str(saved_state)
             .map_err(|error| format!("save parse failed: {error}"))?;
 
-        if save.schema_version != config().save_schema_version {
-            return Err("save version is stale".to_string());
-        }
-
         if save.content_fingerprint != embedded_ink_fingerprint(self.active_sources()) {
-            return Err("save content version does not match current story".to_string());
+            return Err("save content does not match current story".to_string());
         }
 
         let runtime = InkRuntime::load_from_ink_sources(self.active_sources())
@@ -907,7 +893,6 @@ impl WebGameState {
         };
 
         let save_state = WebSaveState {
-            schema_version: config().save_schema_version,
             content_fingerprint: embedded_ink_fingerprint(self.active_sources()),
             story_state,
             transcript_text: self.target_transcript_text.clone(),

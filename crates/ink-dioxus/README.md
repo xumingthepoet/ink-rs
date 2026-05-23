@@ -54,7 +54,7 @@ fn main() {
     ink_dioxus::web::launch(
         ink_dioxus::web::WebLaunchConfig::new(INK_SOURCES)
             .with_app_label("TEXT RPG")
-            .with_storage_key("text_rpg.web_save.v1")
+            .with_storage_key("text_rpg.web_save")
             .with_default_story_title("ink-rs Story")
             .with_default_prompt_title("Choices"),
     );
@@ -85,7 +85,7 @@ fn main() {
     ink_dioxus::web::launch(
         ink_dioxus::web::WebLaunchConfig::new_catalog(INK_GAMES)
             .with_app_label("TEXT GAMES")
-            .with_storage_key("text_games.web_save.v1"),
+            .with_storage_key("text_games.web_save"),
     );
 }
 ```
